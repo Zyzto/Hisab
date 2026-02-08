@@ -13,7 +13,7 @@ dependencies:
 
   # State management (match mizaniyah)
   flutter_riverpod: ^3.0.1
-  riverpod_annotation: ^3.0.0
+  riverpod_annotation: ^4.0.0
 
   # Navigation
   go_router: ^17.0.0
@@ -43,6 +43,14 @@ dependencies:
   # Date & currency
   intl: ^0.20.2
 
+  # Receipt: camera + OCR
+  image_picker: ^1.0.7
+  google_mlkit_text_recognition: ^0.15.1
+
+  # Receipt AI (LangChain.dart – Gemini + OpenAI vision)
+  langchain_google: ^0.7.1
+  langchain_openai: ^0.8.1+1
+
   # Logging (match mizaniyah)
   easy_logger: ^0.0.2
   flutter_logging_service:
@@ -60,7 +68,7 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   drift_dev: ^2.18.0
   build_runner: ^2.4.9
-  riverpod_generator: ^3.0.0
+  riverpod_generator: ^4.0.0+1
   flutter_launcher_icons: ^0.14.4
 
 flutter:

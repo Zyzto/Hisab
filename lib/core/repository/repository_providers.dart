@@ -4,6 +4,7 @@ import '../../features/settings/providers/settings_framework_providers.dart';
 import 'group_repository.dart';
 import 'participant_repository.dart';
 import 'expense_repository.dart';
+import 'tag_repository.dart';
 import 'local_repository.dart';
 import 'convex_repository.dart';
 
@@ -34,4 +35,13 @@ IExpenseRepository expenseRepository(Ref ref) {
     return LocalExpenseRepository(ref.watch(expenseDaoProvider));
   }
   return ConvexExpenseRepository();
+}
+
+@riverpod
+ITagRepository tagRepository(Ref ref) {
+  final useLocal = ref.watch(localOnlyProvider);
+  if (useLocal) {
+    return LocalTagRepository(ref.watch(expenseTagDaoProvider));
+  }
+  return ConvexTagRepository();
 }

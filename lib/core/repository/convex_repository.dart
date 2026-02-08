@@ -7,6 +7,7 @@ import '../../domain/domain.dart';
 import 'group_repository.dart';
 import 'participant_repository.dart';
 import 'expense_repository.dart';
+import 'tag_repository.dart';
 
 /// Convex implementation. Uses ConvexClient.instance (must be initialized when Local Only is off).
 /// Convex ids are strings; no mapping needed.
@@ -215,12 +216,29 @@ class ConvexExpenseRepository implements IExpenseRepository {
     if (expense.toParticipantId != null) {
       args['toParticipantId'] = expense.toParticipantId;
     }
+    if (expense.tag != null) {
+      args['tag'] = expense.tag;
+    }
+    if (expense.description != null && expense.description!.isNotEmpty) {
+      args['description'] = expense.description;
+    }
+    if (expense.lineItems != null && expense.lineItems!.isNotEmpty) {
+      args['lineItemsJson'] = jsonEncode(
+        expense.lineItems!.map((e) => e.toJson()).toList(),
+      );
+    }
+    if (expense.receiptImagePath != null &&
+        expense.receiptImagePath!.isNotEmpty) {
+      args['receiptImagePath'] = expense.receiptImagePath;
+    }
     final raw = await ConvexClient.instance.mutation(
       name: 'expenses:create',
       args: args,
     );
     final id = raw as String? ?? '';
-    Log.info('Expense created: id=$id groupId=${expense.groupId} title="${expense.title}" amountCents=${expense.amountCents} currencyCode=${expense.currencyCode}');
+    Log.info(
+      'Expense created: id=$id groupId=${expense.groupId} title="${expense.title}" amountCents=${expense.amountCents} currencyCode=${expense.currencyCode}',
+    );
     return id;
   }
 
@@ -235,9 +253,17 @@ class ConvexExpenseRepository implements IExpenseRepository {
         'date': expense.date.millisecondsSinceEpoch,
         'splitSharesJson': jsonEncode(expense.splitShares),
         'updatedAt': expense.updatedAt.millisecondsSinceEpoch,
+        'tag': expense.tag,
+        'description': expense.description ?? '',
+        'lineItemsJson': expense.lineItems == null || expense.lineItems!.isEmpty
+            ? '[]'
+            : jsonEncode(expense.lineItems!.map((e) => e.toJson()).toList()),
+        'receiptImagePath': expense.receiptImagePath ?? '',
       },
     );
-    Log.info('Expense updated: id=${expense.id} title="${expense.title}" amountCents=${expense.amountCents}');
+    Log.info(
+      'Expense updated: id=${expense.id} title="${expense.title}" amountCents=${expense.amountCents}',
+    );
   }
 
   @override
@@ -266,6 +292,20 @@ class ConvexExpenseRepository implements IExpenseRepository {
     final toId = j['toParticipantId'] as String?;
     final splitTypeStr = j['splitType'] as String?;
     final splitType = _parseSplitType(splitTypeStr);
+    List<ReceiptLineItem>? lineItems;
+    try {
+      final lineJson = j['lineItemsJson'] as String?;
+      if (lineJson != null && lineJson.isNotEmpty) {
+        final list = jsonDecode(lineJson) as List<dynamic>?;
+        if (list != null && list.isNotEmpty) {
+          lineItems = list
+              .map((e) => ReceiptLineItem.fromJson(e as Map<String, dynamic>))
+              .toList();
+        }
+      }
+    } catch (e) {
+      Log.debug('Convex expense lineItems parse failed: $e');
+    }
     return Expense(
       id: j['_id'] as String? ?? '',
       groupId: j['groupId'] as String? ?? '',
@@ -273,6 +313,9 @@ class ConvexExpenseRepository implements IExpenseRepository {
       amountCents: (j['amountCents'] as num?)?.toInt() ?? 0,
       currencyCode: j['currencyCode'] as String? ?? 'USD',
       title: j['title'] as String? ?? '',
+      description: (j['description'] as String?)?.isEmpty ?? true
+          ? null
+          : j['description'] as String?,
       date: DateTime.fromMillisecondsSinceEpoch(
         (j['date'] as num?)?.toInt() ?? 0,
       ),
@@ -289,6 +332,85 @@ class ConvexExpenseRepository implements IExpenseRepository {
         orElse: () => TransactionType.expense,
       ),
       toParticipantId: toId,
+      tag: j['tag'] as String?,
+      lineItems: lineItems,
+      receiptImagePath: (j['receiptImagePath'] as String?)?.isEmpty ?? true
+          ? null
+          : j['receiptImagePath'] as String?,
+    );
+  }
+}
+
+class ConvexTagRepository implements ITagRepository {
+  @override
+  Future<List<ExpenseTag>> getByGroupId(String groupId) async {
+    final raw = await ConvexClient.instance.query('expense_tags:listByGroup', {
+      'groupId': groupId,
+    });
+    final list =
+        jsonDecode(raw.isNotEmpty ? raw : '[]') as List<dynamic>? ?? [];
+    return list.map((e) => _tagFromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  @override
+  Stream<List<ExpenseTag>> watchByGroupId(String groupId) {
+    return _subscribeList('expense_tags:listByGroup', {
+      'groupId': groupId,
+    }, _tagFromJson);
+  }
+
+  @override
+  Future<ExpenseTag?> getById(String id) async {
+    final raw = await ConvexClient.instance.query('expense_tags:get', {
+      'id': id,
+    });
+    if (raw.isEmpty) return null;
+    final map = jsonDecode(raw) as Map<String, dynamic>?;
+    return map != null ? _tagFromJson(map) : null;
+  }
+
+  @override
+  Future<String> create(String groupId, String label, String iconName) async {
+    final raw = await ConvexClient.instance.mutation(
+      name: 'expense_tags:create',
+      args: {'groupId': groupId, 'label': label, 'iconName': iconName},
+    );
+    return raw as String? ?? '';
+  }
+
+  @override
+  Future<void> update(ExpenseTag tag) async {
+    await ConvexClient.instance.mutation(
+      name: 'expense_tags:update',
+      args: {
+        'id': tag.id,
+        'label': tag.label,
+        'iconName': tag.iconName,
+        'updatedAt': tag.updatedAt.millisecondsSinceEpoch,
+      },
+    );
+  }
+
+  @override
+  Future<void> delete(String id) async {
+    await ConvexClient.instance.mutation(
+      name: 'expense_tags:remove',
+      args: {'id': id},
+    );
+  }
+
+  ExpenseTag _tagFromJson(Map<String, dynamic> j) {
+    return ExpenseTag(
+      id: j['_id'] as String? ?? '',
+      groupId: j['groupId'] as String? ?? '',
+      label: j['label'] as String? ?? '',
+      iconName: j['iconName'] as String? ?? 'label',
+      createdAt: DateTime.fromMillisecondsSinceEpoch(
+        (j['createdAt'] as num?)?.toInt() ?? 0,
+      ),
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(
+        (j['updatedAt'] as num?)?.toInt() ?? 0,
+      ),
     );
   }
 }
@@ -312,7 +434,11 @@ Stream<List<T>> _subscribeList<T>(
               list.map((e) => fromJson(e as Map<String, dynamic>)).toList(),
             );
           } catch (e, stackTrace) {
-            Log.error('Convex subscribe onUpdate parse failed', error: e, stackTrace: stackTrace);
+            Log.error(
+              'Convex subscribe onUpdate parse failed',
+              error: e,
+              stackTrace: stackTrace,
+            );
           }
         },
         onError: (error, stackTrace) {

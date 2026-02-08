@@ -18,7 +18,11 @@ Future<SettingsProviders?> initializeHisabSettings() async {
     final storage = SharedPreferencesStorage();
     return await initializeSettings(registry: registry, storage: storage);
   } catch (e, stackTrace) {
-    Log.warning('Settings init failed, using defaults', error: e, stackTrace: stackTrace);
+    Log.warning(
+      'Settings init failed, using defaults',
+      error: e,
+      stackTrace: stackTrace,
+    );
     return null;
   }
 }
@@ -30,7 +34,91 @@ bool localOnly(Ref ref) {
     if (settings == null) return true;
     return ref.watch(settings.provider(localOnlySettingDef));
   } catch (e, stackTrace) {
-    Log.warning('localOnly read failed, defaulting to true', error: e, stackTrace: stackTrace);
+    Log.warning(
+      'localOnly read failed, defaulting to true',
+      error: e,
+      stackTrace: stackTrace,
+    );
     return true;
+  }
+}
+
+@riverpod
+bool receiptOcrEnabled(Ref ref) {
+  try {
+    final settings = ref.watch(hisabSettingsProvidersProvider);
+    if (settings == null) return true;
+    return ref.watch(settings.provider(receiptOcrEnabledSettingDef));
+  } catch (e, stackTrace) {
+    Log.warning(
+      'receiptOcrEnabled read failed, defaulting to true',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return true;
+  }
+}
+
+@riverpod
+bool receiptAiEnabled(Ref ref) {
+  try {
+    final settings = ref.watch(hisabSettingsProvidersProvider);
+    if (settings == null) return false;
+    return ref.watch(settings.provider(receiptAiEnabledSettingDef));
+  } catch (e, stackTrace) {
+    Log.warning(
+      'receiptAiEnabled read failed, defaulting to false',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return false;
+  }
+}
+
+@riverpod
+String receiptAiProvider(Ref ref) {
+  try {
+    final settings = ref.watch(hisabSettingsProvidersProvider);
+    if (settings == null) return 'none';
+    return ref.watch(settings.provider(receiptAiProviderSettingDef));
+  } catch (e, stackTrace) {
+    Log.warning(
+      'receiptAiProvider read failed, defaulting to none',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return 'none';
+  }
+}
+
+@riverpod
+String geminiApiKey(Ref ref) {
+  try {
+    final settings = ref.watch(hisabSettingsProvidersProvider);
+    if (settings == null) return '';
+    return ref.watch(settings.provider(geminiApiKeySettingDef));
+  } catch (e, stackTrace) {
+    Log.warning(
+      'geminiApiKey read failed, defaulting to empty',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return '';
+  }
+}
+
+@riverpod
+String openaiApiKey(Ref ref) {
+  try {
+    final settings = ref.watch(hisabSettingsProvidersProvider);
+    if (settings == null) return '';
+    return ref.watch(settings.provider(openaiApiKeySettingDef));
+  } catch (e, stackTrace) {
+    Log.warning(
+      'openaiApiKey read failed, defaulting to empty',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return '';
   }
 }

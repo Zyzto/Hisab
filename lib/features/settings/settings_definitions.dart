@@ -23,6 +23,13 @@ final dataSection = const SettingSection(
   order: 2,
 );
 
+final receiptAiSection = const SettingSection(
+  key: 'receipt_ai',
+  titleKey: 'receipt_ai_section',
+  icon: Icons.receipt_long,
+  order: 3,
+);
+
 final themeModeSettingDef = const EnumSetting(
   'theme_mode',
   defaultValue: 'system',
@@ -85,7 +92,63 @@ final localOnlySettingDef = const BoolSetting(
   order: 0,
 );
 
-final allSections = [generalSection, appearanceSection, dataSection];
+/// When true, run OCR on receipt images (and optionally AI). When false, only attach the picture.
+final receiptOcrEnabledSettingDef = const BoolSetting(
+  'receipt_ocr_enabled',
+  defaultValue: true,
+  titleKey: 'receipt_ocr_enabled',
+  icon: Icons.document_scanner,
+  section: 'receipt_ai',
+  order: 0,
+);
+
+/// When true, use AI (Gemini/OpenAI) to extract receipt details from scanned image.
+final receiptAiEnabledSettingDef = const BoolSetting(
+  'receipt_ai_enabled',
+  defaultValue: false,
+  titleKey: 'receipt_ai_enabled',
+  icon: Icons.auto_awesome,
+  section: 'receipt_ai',
+  order: 1,
+);
+
+/// Which LLM provider to use for receipt extraction.
+final receiptAiProviderSettingDef = const EnumSetting(
+  'receipt_ai_provider',
+  defaultValue: 'none',
+  titleKey: 'receipt_ai_provider',
+  options: ['none', 'gemini', 'openai'],
+  optionLabels: {
+    'none': 'receipt_ai_provider_none',
+    'gemini': 'receipt_ai_provider_gemini',
+    'openai': 'receipt_ai_provider_openai',
+  },
+  icon: Icons.cloud,
+  section: 'receipt_ai',
+  order: 2,
+);
+
+/// Gemini API key (Google AI for Developers). Used when provider is gemini.
+final geminiApiKeySettingDef = const StringSetting(
+  'gemini_api_key',
+  defaultValue: '',
+  titleKey: 'gemini_api_key',
+  icon: Icons.key,
+  section: 'receipt_ai',
+  order: 3,
+);
+
+/// OpenAI API key. Used when provider is openai.
+final openaiApiKeySettingDef = const StringSetting(
+  'openai_api_key',
+  defaultValue: '',
+  titleKey: 'openai_api_key',
+  icon: Icons.key,
+  section: 'receipt_ai',
+  order: 4,
+);
+
+final allSections = [generalSection, appearanceSection, dataSection, receiptAiSection];
 
 final allSettings = <SettingDefinition>[
   themeModeSettingDef,
@@ -93,6 +156,11 @@ final allSettings = <SettingDefinition>[
   languageSettingDef,
   fontSizeScaleSettingDef,
   localOnlySettingDef,
+  receiptOcrEnabledSettingDef,
+  receiptAiEnabledSettingDef,
+  receiptAiProviderSettingDef,
+  geminiApiKeySettingDef,
+  openaiApiKeySettingDef,
 ];
 
 SettingsRegistry createHisabSettingsRegistry() {

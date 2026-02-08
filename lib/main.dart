@@ -62,7 +62,11 @@ void main() async {
       );
       Log.debug('Convex client initialized');
     } catch (e, stackTrace) {
-      Log.error('Convex client initialization failed', error: e, stackTrace: stackTrace);
+      Log.error(
+        'Convex client initialization failed',
+        error: e,
+        stackTrace: stackTrace,
+      );
     }
   }
 

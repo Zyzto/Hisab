@@ -23,6 +23,7 @@ export default defineSchema({
     amountCents: v.number(),
     currencyCode: v.string(),
     title: v.string(),
+    description: v.optional(v.string()),
     date: v.number(),
     splitType: v.string(),
     splitSharesJson: v.string(),
@@ -30,5 +31,15 @@ export default defineSchema({
     updatedAt: v.number(),
     type: v.optional(v.string()),
     toParticipantId: v.optional(v.id('participants')),
+    tag: v.optional(v.string()),
+    lineItemsJson: v.optional(v.string()),
+    receiptImagePath: v.optional(v.string()),
+  }).index('by_group', ['groupId']),
+  expense_tags: defineTable({
+    groupId: v.id('groups'),
+    label: v.string(),
+    iconName: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
   }).index('by_group', ['groupId']),
 });

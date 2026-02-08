@@ -6,10 +6,12 @@ import '../database/app_database.dart' as db;
 import '../database/daos/group_dao.dart';
 import '../database/daos/participant_dao.dart';
 import '../database/daos/expense_dao.dart';
+import '../database/daos/expense_tag_dao.dart';
 import '../../domain/domain.dart';
 import 'group_repository.dart';
 import 'participant_repository.dart';
 import 'expense_repository.dart';
+import 'tag_repository.dart';
 
 /// Prefix for local (Drift) ids when exposed as domain String ids.
 const String localIdPrefix = 'local_';
@@ -200,6 +202,25 @@ class LocalExpenseRepository implements IExpenseRepository {
     return jsonEncode(map);
   }
 
+  static String? _encodeLineItems(List<ReceiptLineItem>? list) {
+    if (list == null || list.isEmpty) return null;
+    return jsonEncode(list.map((e) => e.toJson()).toList());
+  }
+
+  static List<ReceiptLineItem> _parseLineItems(String? json) {
+    if (json == null || json.isEmpty) return const [];
+    try {
+      final list = jsonDecode(json) as List<dynamic>?;
+      if (list == null) return const [];
+      return list
+          .map((e) => ReceiptLineItem.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      Log.warning('Local repository: lineItems parse failed', error: e);
+      return const [];
+    }
+  }
+
   @override
   Future<List<Expense>> getByGroupId(String groupId) async {
     final intId = localIdToInt(groupId);
@@ -235,21 +256,35 @@ class LocalExpenseRepository implements IExpenseRepository {
     final toIntId = expense.toParticipantId != null
         ? localIdToInt(expense.toParticipantId!)
         : null;
+    final lineItemsEnc = _encodeLineItems(expense.lineItems);
     final companion = db.ExpensesCompanion.insert(
       groupId: groupIntId,
       payerParticipantId: payerIntId,
       amountCents: expense.amountCents,
       currencyCode: expense.currencyCode,
       title: expense.title,
+      description: expense.description != null && expense.description!.isNotEmpty
+          ? Value(expense.description!)
+          : const Value.absent(),
       date: expense.date,
       splitType: expense.splitType.name,
       splitSharesJson: Value(_encodeSplitShares(expense.splitShares)),
       type: Value(expense.transactionType.name),
       toParticipantId: toIntId != null ? Value(toIntId) : const Value.absent(),
+      tag: expense.tag != null ? Value(expense.tag!) : const Value.absent(),
+      lineItemsJson: lineItemsEnc != null
+          ? Value(lineItemsEnc)
+          : const Value.absent(),
+      receiptImagePath: expense.receiptImagePath != null &&
+              expense.receiptImagePath!.isNotEmpty
+          ? Value(expense.receiptImagePath!)
+          : const Value.absent(),
     );
     final id = await _expenseDao.insertExpense(companion);
     final domainId = intToLocalId(id);
-    Log.info('Expense created: id=$domainId groupId=${expense.groupId} title="${expense.title}" amountCents=${expense.amountCents} currencyCode=${expense.currencyCode}');
+    Log.info(
+      'Expense created: id=$domainId groupId=${expense.groupId} title="${expense.title}" amountCents=${expense.amountCents} currencyCode=${expense.currencyCode}',
+    );
     return domainId;
   }
 
@@ -267,16 +302,22 @@ class LocalExpenseRepository implements IExpenseRepository {
       amountCents: expense.amountCents,
       currencyCode: expense.currencyCode,
       title: expense.title,
+      description: expense.description,
       date: expense.date,
       splitType: expense.splitType.name,
       splitSharesJson: _encodeSplitShares(expense.splitShares),
       type: expense.transactionType.name,
       toParticipantId: toIntId,
+      tag: expense.tag,
+      lineItemsJson: _encodeLineItems(expense.lineItems),
+      receiptImagePath: expense.receiptImagePath,
       createdAt: expense.createdAt,
       updatedAt: expense.updatedAt,
     );
     await _expenseDao.updateExpense(row);
-    Log.info('Expense updated: id=${expense.id} title="${expense.title}" amountCents=${expense.amountCents}');
+    Log.info(
+      'Expense updated: id=${expense.id} title="${expense.title}" amountCents=${expense.amountCents}',
+    );
   }
 
   @override
@@ -289,6 +330,7 @@ class LocalExpenseRepository implements IExpenseRepository {
   }
 
   Expense _toDomain(db.Expense row) {
+    final lineItems = _parseLineItems(row.lineItemsJson);
     return Expense(
       id: intToLocalId(row.id),
       groupId: intToLocalId(row.groupId),
@@ -296,6 +338,7 @@ class LocalExpenseRepository implements IExpenseRepository {
       amountCents: row.amountCents,
       currencyCode: row.currencyCode,
       title: row.title,
+      description: row.description,
       date: row.date,
       splitType: _parseSplitType(row.splitType),
       splitShares: _parseSplitShares(row.splitSharesJson),
@@ -308,6 +351,87 @@ class LocalExpenseRepository implements IExpenseRepository {
       toParticipantId: row.toParticipantId != null
           ? intToLocalId(row.toParticipantId!)
           : null,
+      tag: row.tag,
+      lineItems: lineItems.isEmpty ? null : lineItems,
+      receiptImagePath: row.receiptImagePath,
+    );
+  }
+}
+
+class LocalTagRepository implements ITagRepository {
+  LocalTagRepository(this._dao);
+
+  final ExpenseTagDao _dao;
+
+  @override
+  Future<List<ExpenseTag>> getByGroupId(String groupId) async {
+    final intId = localIdToInt(groupId);
+    if (intId == null) return [];
+    final rows = await _dao.getByGroupId(intId);
+    return rows.map(_toDomain).toList();
+  }
+
+  @override
+  Stream<List<ExpenseTag>> watchByGroupId(String groupId) {
+    final intId = localIdToInt(groupId);
+    if (intId == null) return Stream.value([]);
+    return _dao
+        .watchByGroupId(intId)
+        .map((rows) => rows.map(_toDomain).toList());
+  }
+
+  @override
+  Future<ExpenseTag?> getById(String id) async {
+    final intId = localIdToInt(id);
+    if (intId == null) return null;
+    final row = await _dao.getById(intId);
+    return row != null ? _toDomain(row) : null;
+  }
+
+  @override
+  Future<String> create(String groupId, String label, String iconName) async {
+    final groupIntId = localIdToInt(groupId);
+    if (groupIntId == null) throw ArgumentError('Invalid groupId');
+    final companion = db.ExpenseTagsCompanion.insert(
+      groupId: groupIntId,
+      label: label,
+      iconName: iconName,
+    );
+    final id = await _dao.insertTag(companion);
+    return intToLocalId(id);
+  }
+
+  @override
+  Future<void> update(ExpenseTag tag) async {
+    final intId = localIdToInt(tag.id);
+    if (intId == null) return;
+    final groupIntId = localIdToInt(tag.groupId);
+    if (groupIntId == null) return;
+    final row = db.ExpenseTagRow(
+      id: intId,
+      groupId: groupIntId,
+      label: tag.label,
+      iconName: tag.iconName,
+      createdAt: tag.createdAt,
+      updatedAt: tag.updatedAt,
+    );
+    await _dao.updateTag(row);
+  }
+
+  @override
+  Future<void> delete(String id) async {
+    final intId = localIdToInt(id);
+    if (intId != null) await _dao.deleteTag(intId);
+  }
+
+  ExpenseTag _toDomain(db.ExpenseTagRow row) {
+    return ExpenseTag(
+      id: intToLocalId(row.id),
+      groupId: intToLocalId(row.groupId),
+      label: row.label,
+      iconName: row.iconName,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
     );
   }
 }

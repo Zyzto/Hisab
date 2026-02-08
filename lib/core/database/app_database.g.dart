@@ -842,6 +842,17 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _descriptionMeta = const VerificationMeta(
+    'description',
+  );
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+    'description',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _dateMeta = const VerificationMeta('date');
   @override
   late final GeneratedColumn<DateTime> date = GeneratedColumn<DateTime>(
@@ -897,6 +908,37 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
       'REFERENCES participants (id) ON DELETE SET NULL',
     ),
   );
+  static const VerificationMeta _tagMeta = const VerificationMeta('tag');
+  @override
+  late final GeneratedColumn<String> tag = GeneratedColumn<String>(
+    'tag',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lineItemsJsonMeta = const VerificationMeta(
+    'lineItemsJson',
+  );
+  @override
+  late final GeneratedColumn<String> lineItemsJson = GeneratedColumn<String>(
+    'line_items_json',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _receiptImagePathMeta = const VerificationMeta(
+    'receiptImagePath',
+  );
+  @override
+  late final GeneratedColumn<String> receiptImagePath = GeneratedColumn<String>(
+    'receipt_image_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -929,11 +971,15 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
     amountCents,
     currencyCode,
     title,
+    description,
     date,
     splitType,
     splitSharesJson,
     type,
     toParticipantId,
+    tag,
+    lineItemsJson,
+    receiptImagePath,
     createdAt,
     updatedAt,
   ];
@@ -1001,6 +1047,15 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
     } else if (isInserting) {
       context.missing(_titleMeta);
     }
+    if (data.containsKey('description')) {
+      context.handle(
+        _descriptionMeta,
+        description.isAcceptableOrUnknown(
+          data['description']!,
+          _descriptionMeta,
+        ),
+      );
+    }
     if (data.containsKey('date')) {
       context.handle(
         _dateMeta,
@@ -1038,6 +1093,30 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
         toParticipantId.isAcceptableOrUnknown(
           data['to_participant_id']!,
           _toParticipantIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('tag')) {
+      context.handle(
+        _tagMeta,
+        tag.isAcceptableOrUnknown(data['tag']!, _tagMeta),
+      );
+    }
+    if (data.containsKey('line_items_json')) {
+      context.handle(
+        _lineItemsJsonMeta,
+        lineItemsJson.isAcceptableOrUnknown(
+          data['line_items_json']!,
+          _lineItemsJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('receipt_image_path')) {
+      context.handle(
+        _receiptImagePathMeta,
+        receiptImagePath.isAcceptableOrUnknown(
+          data['receipt_image_path']!,
+          _receiptImagePathMeta,
         ),
       );
     }
@@ -1086,6 +1165,10 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
         DriftSqlType.string,
         data['${effectivePrefix}title'],
       )!,
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      ),
       date: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}date'],
@@ -1105,6 +1188,18 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
       toParticipantId: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}to_participant_id'],
+      ),
+      tag: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tag'],
+      ),
+      lineItemsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}line_items_json'],
+      ),
+      receiptImagePath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}receipt_image_path'],
       ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
@@ -1130,11 +1225,15 @@ class Expense extends DataClass implements Insertable<Expense> {
   final int amountCents;
   final String currencyCode;
   final String title;
+  final String? description;
   final DateTime date;
   final String splitType;
   final String? splitSharesJson;
   final String type;
   final int? toParticipantId;
+  final String? tag;
+  final String? lineItemsJson;
+  final String? receiptImagePath;
   final DateTime createdAt;
   final DateTime updatedAt;
   const Expense({
@@ -1144,11 +1243,15 @@ class Expense extends DataClass implements Insertable<Expense> {
     required this.amountCents,
     required this.currencyCode,
     required this.title,
+    this.description,
     required this.date,
     required this.splitType,
     this.splitSharesJson,
     required this.type,
     this.toParticipantId,
+    this.tag,
+    this.lineItemsJson,
+    this.receiptImagePath,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -1161,6 +1264,9 @@ class Expense extends DataClass implements Insertable<Expense> {
     map['amount_cents'] = Variable<int>(amountCents);
     map['currency_code'] = Variable<String>(currencyCode);
     map['title'] = Variable<String>(title);
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
     map['date'] = Variable<DateTime>(date);
     map['split_type'] = Variable<String>(splitType);
     if (!nullToAbsent || splitSharesJson != null) {
@@ -1169,6 +1275,15 @@ class Expense extends DataClass implements Insertable<Expense> {
     map['type'] = Variable<String>(type);
     if (!nullToAbsent || toParticipantId != null) {
       map['to_participant_id'] = Variable<int>(toParticipantId);
+    }
+    if (!nullToAbsent || tag != null) {
+      map['tag'] = Variable<String>(tag);
+    }
+    if (!nullToAbsent || lineItemsJson != null) {
+      map['line_items_json'] = Variable<String>(lineItemsJson);
+    }
+    if (!nullToAbsent || receiptImagePath != null) {
+      map['receipt_image_path'] = Variable<String>(receiptImagePath);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -1183,6 +1298,9 @@ class Expense extends DataClass implements Insertable<Expense> {
       amountCents: Value(amountCents),
       currencyCode: Value(currencyCode),
       title: Value(title),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
       date: Value(date),
       splitType: Value(splitType),
       splitSharesJson: splitSharesJson == null && nullToAbsent
@@ -1192,6 +1310,13 @@ class Expense extends DataClass implements Insertable<Expense> {
       toParticipantId: toParticipantId == null && nullToAbsent
           ? const Value.absent()
           : Value(toParticipantId),
+      tag: tag == null && nullToAbsent ? const Value.absent() : Value(tag),
+      lineItemsJson: lineItemsJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lineItemsJson),
+      receiptImagePath: receiptImagePath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(receiptImagePath),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -1209,11 +1334,15 @@ class Expense extends DataClass implements Insertable<Expense> {
       amountCents: serializer.fromJson<int>(json['amountCents']),
       currencyCode: serializer.fromJson<String>(json['currencyCode']),
       title: serializer.fromJson<String>(json['title']),
+      description: serializer.fromJson<String?>(json['description']),
       date: serializer.fromJson<DateTime>(json['date']),
       splitType: serializer.fromJson<String>(json['splitType']),
       splitSharesJson: serializer.fromJson<String?>(json['splitSharesJson']),
       type: serializer.fromJson<String>(json['type']),
       toParticipantId: serializer.fromJson<int?>(json['toParticipantId']),
+      tag: serializer.fromJson<String?>(json['tag']),
+      lineItemsJson: serializer.fromJson<String?>(json['lineItemsJson']),
+      receiptImagePath: serializer.fromJson<String?>(json['receiptImagePath']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -1228,11 +1357,15 @@ class Expense extends DataClass implements Insertable<Expense> {
       'amountCents': serializer.toJson<int>(amountCents),
       'currencyCode': serializer.toJson<String>(currencyCode),
       'title': serializer.toJson<String>(title),
+      'description': serializer.toJson<String?>(description),
       'date': serializer.toJson<DateTime>(date),
       'splitType': serializer.toJson<String>(splitType),
       'splitSharesJson': serializer.toJson<String?>(splitSharesJson),
       'type': serializer.toJson<String>(type),
       'toParticipantId': serializer.toJson<int?>(toParticipantId),
+      'tag': serializer.toJson<String?>(tag),
+      'lineItemsJson': serializer.toJson<String?>(lineItemsJson),
+      'receiptImagePath': serializer.toJson<String?>(receiptImagePath),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -1245,11 +1378,15 @@ class Expense extends DataClass implements Insertable<Expense> {
     int? amountCents,
     String? currencyCode,
     String? title,
+    Value<String?> description = const Value.absent(),
     DateTime? date,
     String? splitType,
     Value<String?> splitSharesJson = const Value.absent(),
     String? type,
     Value<int?> toParticipantId = const Value.absent(),
+    Value<String?> tag = const Value.absent(),
+    Value<String?> lineItemsJson = const Value.absent(),
+    Value<String?> receiptImagePath = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => Expense(
@@ -1259,6 +1396,7 @@ class Expense extends DataClass implements Insertable<Expense> {
     amountCents: amountCents ?? this.amountCents,
     currencyCode: currencyCode ?? this.currencyCode,
     title: title ?? this.title,
+    description: description.present ? description.value : this.description,
     date: date ?? this.date,
     splitType: splitType ?? this.splitType,
     splitSharesJson: splitSharesJson.present
@@ -1268,6 +1406,13 @@ class Expense extends DataClass implements Insertable<Expense> {
     toParticipantId: toParticipantId.present
         ? toParticipantId.value
         : this.toParticipantId,
+    tag: tag.present ? tag.value : this.tag,
+    lineItemsJson: lineItemsJson.present
+        ? lineItemsJson.value
+        : this.lineItemsJson,
+    receiptImagePath: receiptImagePath.present
+        ? receiptImagePath.value
+        : this.receiptImagePath,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -1285,6 +1430,9 @@ class Expense extends DataClass implements Insertable<Expense> {
           ? data.currencyCode.value
           : this.currencyCode,
       title: data.title.present ? data.title.value : this.title,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
       date: data.date.present ? data.date.value : this.date,
       splitType: data.splitType.present ? data.splitType.value : this.splitType,
       splitSharesJson: data.splitSharesJson.present
@@ -1294,6 +1442,13 @@ class Expense extends DataClass implements Insertable<Expense> {
       toParticipantId: data.toParticipantId.present
           ? data.toParticipantId.value
           : this.toParticipantId,
+      tag: data.tag.present ? data.tag.value : this.tag,
+      lineItemsJson: data.lineItemsJson.present
+          ? data.lineItemsJson.value
+          : this.lineItemsJson,
+      receiptImagePath: data.receiptImagePath.present
+          ? data.receiptImagePath.value
+          : this.receiptImagePath,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -1308,11 +1463,15 @@ class Expense extends DataClass implements Insertable<Expense> {
           ..write('amountCents: $amountCents, ')
           ..write('currencyCode: $currencyCode, ')
           ..write('title: $title, ')
+          ..write('description: $description, ')
           ..write('date: $date, ')
           ..write('splitType: $splitType, ')
           ..write('splitSharesJson: $splitSharesJson, ')
           ..write('type: $type, ')
           ..write('toParticipantId: $toParticipantId, ')
+          ..write('tag: $tag, ')
+          ..write('lineItemsJson: $lineItemsJson, ')
+          ..write('receiptImagePath: $receiptImagePath, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -1327,11 +1486,15 @@ class Expense extends DataClass implements Insertable<Expense> {
     amountCents,
     currencyCode,
     title,
+    description,
     date,
     splitType,
     splitSharesJson,
     type,
     toParticipantId,
+    tag,
+    lineItemsJson,
+    receiptImagePath,
     createdAt,
     updatedAt,
   );
@@ -1345,11 +1508,15 @@ class Expense extends DataClass implements Insertable<Expense> {
           other.amountCents == this.amountCents &&
           other.currencyCode == this.currencyCode &&
           other.title == this.title &&
+          other.description == this.description &&
           other.date == this.date &&
           other.splitType == this.splitType &&
           other.splitSharesJson == this.splitSharesJson &&
           other.type == this.type &&
           other.toParticipantId == this.toParticipantId &&
+          other.tag == this.tag &&
+          other.lineItemsJson == this.lineItemsJson &&
+          other.receiptImagePath == this.receiptImagePath &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -1361,11 +1528,15 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
   final Value<int> amountCents;
   final Value<String> currencyCode;
   final Value<String> title;
+  final Value<String?> description;
   final Value<DateTime> date;
   final Value<String> splitType;
   final Value<String?> splitSharesJson;
   final Value<String> type;
   final Value<int?> toParticipantId;
+  final Value<String?> tag;
+  final Value<String?> lineItemsJson;
+  final Value<String?> receiptImagePath;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   const ExpensesCompanion({
@@ -1375,11 +1546,15 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     this.amountCents = const Value.absent(),
     this.currencyCode = const Value.absent(),
     this.title = const Value.absent(),
+    this.description = const Value.absent(),
     this.date = const Value.absent(),
     this.splitType = const Value.absent(),
     this.splitSharesJson = const Value.absent(),
     this.type = const Value.absent(),
     this.toParticipantId = const Value.absent(),
+    this.tag = const Value.absent(),
+    this.lineItemsJson = const Value.absent(),
+    this.receiptImagePath = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   });
@@ -1390,11 +1565,15 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     required int amountCents,
     required String currencyCode,
     required String title,
+    this.description = const Value.absent(),
     required DateTime date,
     required String splitType,
     this.splitSharesJson = const Value.absent(),
     this.type = const Value.absent(),
     this.toParticipantId = const Value.absent(),
+    this.tag = const Value.absent(),
+    this.lineItemsJson = const Value.absent(),
+    this.receiptImagePath = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   }) : groupId = Value(groupId),
@@ -1411,11 +1590,15 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     Expression<int>? amountCents,
     Expression<String>? currencyCode,
     Expression<String>? title,
+    Expression<String>? description,
     Expression<DateTime>? date,
     Expression<String>? splitType,
     Expression<String>? splitSharesJson,
     Expression<String>? type,
     Expression<int>? toParticipantId,
+    Expression<String>? tag,
+    Expression<String>? lineItemsJson,
+    Expression<String>? receiptImagePath,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
   }) {
@@ -1427,11 +1610,15 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
       if (amountCents != null) 'amount_cents': amountCents,
       if (currencyCode != null) 'currency_code': currencyCode,
       if (title != null) 'title': title,
+      if (description != null) 'description': description,
       if (date != null) 'date': date,
       if (splitType != null) 'split_type': splitType,
       if (splitSharesJson != null) 'split_shares_json': splitSharesJson,
       if (type != null) 'type': type,
       if (toParticipantId != null) 'to_participant_id': toParticipantId,
+      if (tag != null) 'tag': tag,
+      if (lineItemsJson != null) 'line_items_json': lineItemsJson,
+      if (receiptImagePath != null) 'receipt_image_path': receiptImagePath,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
     });
@@ -1444,11 +1631,15 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     Value<int>? amountCents,
     Value<String>? currencyCode,
     Value<String>? title,
+    Value<String?>? description,
     Value<DateTime>? date,
     Value<String>? splitType,
     Value<String?>? splitSharesJson,
     Value<String>? type,
     Value<int?>? toParticipantId,
+    Value<String?>? tag,
+    Value<String?>? lineItemsJson,
+    Value<String?>? receiptImagePath,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
   }) {
@@ -1459,11 +1650,15 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
       amountCents: amountCents ?? this.amountCents,
       currencyCode: currencyCode ?? this.currencyCode,
       title: title ?? this.title,
+      description: description ?? this.description,
       date: date ?? this.date,
       splitType: splitType ?? this.splitType,
       splitSharesJson: splitSharesJson ?? this.splitSharesJson,
       type: type ?? this.type,
       toParticipantId: toParticipantId ?? this.toParticipantId,
+      tag: tag ?? this.tag,
+      lineItemsJson: lineItemsJson ?? this.lineItemsJson,
+      receiptImagePath: receiptImagePath ?? this.receiptImagePath,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -1490,6 +1685,9 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     if (title.present) {
       map['title'] = Variable<String>(title.value);
     }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
     if (date.present) {
       map['date'] = Variable<DateTime>(date.value);
     }
@@ -1504,6 +1702,15 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     }
     if (toParticipantId.present) {
       map['to_participant_id'] = Variable<int>(toParticipantId.value);
+    }
+    if (tag.present) {
+      map['tag'] = Variable<String>(tag.value);
+    }
+    if (lineItemsJson.present) {
+      map['line_items_json'] = Variable<String>(lineItemsJson.value);
+    }
+    if (receiptImagePath.present) {
+      map['receipt_image_path'] = Variable<String>(receiptImagePath.value);
     }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
@@ -1523,11 +1730,420 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
           ..write('amountCents: $amountCents, ')
           ..write('currencyCode: $currencyCode, ')
           ..write('title: $title, ')
+          ..write('description: $description, ')
           ..write('date: $date, ')
           ..write('splitType: $splitType, ')
           ..write('splitSharesJson: $splitSharesJson, ')
           ..write('type: $type, ')
           ..write('toParticipantId: $toParticipantId, ')
+          ..write('tag: $tag, ')
+          ..write('lineItemsJson: $lineItemsJson, ')
+          ..write('receiptImagePath: $receiptImagePath, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ExpenseTagsTable extends ExpenseTags
+    with TableInfo<$ExpenseTagsTable, ExpenseTagRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ExpenseTagsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _groupIdMeta = const VerificationMeta(
+    'groupId',
+  );
+  @override
+  late final GeneratedColumn<int> groupId = GeneratedColumn<int>(
+    'group_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES "groups" (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _labelMeta = const VerificationMeta('label');
+  @override
+  late final GeneratedColumn<String> label = GeneratedColumn<String>(
+    'label',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 100,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _iconNameMeta = const VerificationMeta(
+    'iconName',
+  );
+  @override
+  late final GeneratedColumn<String> iconName = GeneratedColumn<String>(
+    'icon_name',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 80,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    groupId,
+    label,
+    iconName,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'expense_tags';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ExpenseTagRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('group_id')) {
+      context.handle(
+        _groupIdMeta,
+        groupId.isAcceptableOrUnknown(data['group_id']!, _groupIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_groupIdMeta);
+    }
+    if (data.containsKey('label')) {
+      context.handle(
+        _labelMeta,
+        label.isAcceptableOrUnknown(data['label']!, _labelMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_labelMeta);
+    }
+    if (data.containsKey('icon_name')) {
+      context.handle(
+        _iconNameMeta,
+        iconName.isAcceptableOrUnknown(data['icon_name']!, _iconNameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_iconNameMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ExpenseTagRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ExpenseTagRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      groupId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}group_id'],
+      )!,
+      label: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}label'],
+      )!,
+      iconName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}icon_name'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $ExpenseTagsTable createAlias(String alias) {
+    return $ExpenseTagsTable(attachedDatabase, alias);
+  }
+}
+
+class ExpenseTagRow extends DataClass implements Insertable<ExpenseTagRow> {
+  final int id;
+  final int groupId;
+  final String label;
+  final String iconName;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const ExpenseTagRow({
+    required this.id,
+    required this.groupId,
+    required this.label,
+    required this.iconName,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['group_id'] = Variable<int>(groupId);
+    map['label'] = Variable<String>(label);
+    map['icon_name'] = Variable<String>(iconName);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  ExpenseTagsCompanion toCompanion(bool nullToAbsent) {
+    return ExpenseTagsCompanion(
+      id: Value(id),
+      groupId: Value(groupId),
+      label: Value(label),
+      iconName: Value(iconName),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory ExpenseTagRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ExpenseTagRow(
+      id: serializer.fromJson<int>(json['id']),
+      groupId: serializer.fromJson<int>(json['groupId']),
+      label: serializer.fromJson<String>(json['label']),
+      iconName: serializer.fromJson<String>(json['iconName']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'groupId': serializer.toJson<int>(groupId),
+      'label': serializer.toJson<String>(label),
+      'iconName': serializer.toJson<String>(iconName),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  ExpenseTagRow copyWith({
+    int? id,
+    int? groupId,
+    String? label,
+    String? iconName,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => ExpenseTagRow(
+    id: id ?? this.id,
+    groupId: groupId ?? this.groupId,
+    label: label ?? this.label,
+    iconName: iconName ?? this.iconName,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  ExpenseTagRow copyWithCompanion(ExpenseTagsCompanion data) {
+    return ExpenseTagRow(
+      id: data.id.present ? data.id.value : this.id,
+      groupId: data.groupId.present ? data.groupId.value : this.groupId,
+      label: data.label.present ? data.label.value : this.label,
+      iconName: data.iconName.present ? data.iconName.value : this.iconName,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ExpenseTagRow(')
+          ..write('id: $id, ')
+          ..write('groupId: $groupId, ')
+          ..write('label: $label, ')
+          ..write('iconName: $iconName, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, groupId, label, iconName, createdAt, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ExpenseTagRow &&
+          other.id == this.id &&
+          other.groupId == this.groupId &&
+          other.label == this.label &&
+          other.iconName == this.iconName &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class ExpenseTagsCompanion extends UpdateCompanion<ExpenseTagRow> {
+  final Value<int> id;
+  final Value<int> groupId;
+  final Value<String> label;
+  final Value<String> iconName;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  const ExpenseTagsCompanion({
+    this.id = const Value.absent(),
+    this.groupId = const Value.absent(),
+    this.label = const Value.absent(),
+    this.iconName = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+  });
+  ExpenseTagsCompanion.insert({
+    this.id = const Value.absent(),
+    required int groupId,
+    required String label,
+    required String iconName,
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+  }) : groupId = Value(groupId),
+       label = Value(label),
+       iconName = Value(iconName);
+  static Insertable<ExpenseTagRow> custom({
+    Expression<int>? id,
+    Expression<int>? groupId,
+    Expression<String>? label,
+    Expression<String>? iconName,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (groupId != null) 'group_id': groupId,
+      if (label != null) 'label': label,
+      if (iconName != null) 'icon_name': iconName,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+    });
+  }
+
+  ExpenseTagsCompanion copyWith({
+    Value<int>? id,
+    Value<int>? groupId,
+    Value<String>? label,
+    Value<String>? iconName,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+  }) {
+    return ExpenseTagsCompanion(
+      id: id ?? this.id,
+      groupId: groupId ?? this.groupId,
+      label: label ?? this.label,
+      iconName: iconName ?? this.iconName,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (groupId.present) {
+      map['group_id'] = Variable<int>(groupId.value);
+    }
+    if (label.present) {
+      map['label'] = Variable<String>(label.value);
+    }
+    if (iconName.present) {
+      map['icon_name'] = Variable<String>(iconName.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ExpenseTagsCompanion(')
+          ..write('id: $id, ')
+          ..write('groupId: $groupId, ')
+          ..write('label: $label, ')
+          ..write('iconName: $iconName, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -1541,6 +2157,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $GroupsTable groups = $GroupsTable(this);
   late final $ParticipantsTable participants = $ParticipantsTable(this);
   late final $ExpensesTable expenses = $ExpensesTable(this);
+  late final $ExpenseTagsTable expenseTags = $ExpenseTagsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1549,6 +2166,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     groups,
     participants,
     expenses,
+    expenseTags,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -1579,6 +2197,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('expenses', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'groups',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('expense_tags', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -1636,6 +2261,24 @@ final class $$GroupsTableReferences
     ).filter((f) => f.groupId.id.sqlEquals($_itemColumn<int>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_expensesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$ExpenseTagsTable, List<ExpenseTagRow>>
+  _expenseTagsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.expenseTags,
+    aliasName: $_aliasNameGenerator(db.groups.id, db.expenseTags.groupId),
+  );
+
+  $$ExpenseTagsTableProcessedTableManager get expenseTagsRefs {
+    final manager = $$ExpenseTagsTableTableManager(
+      $_db,
+      $_db.expenseTags,
+    ).filter((f) => f.groupId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_expenseTagsRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -1717,6 +2360,31 @@ class $$GroupsTableFilterComposer
           }) => $$ExpensesTableFilterComposer(
             $db: $db,
             $table: $db.expenses,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> expenseTagsRefs(
+    Expression<bool> Function($$ExpenseTagsTableFilterComposer f) f,
+  ) {
+    final $$ExpenseTagsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.expenseTags,
+      getReferencedColumn: (t) => t.groupId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ExpenseTagsTableFilterComposer(
+            $db: $db,
+            $table: $db.expenseTags,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -1837,6 +2505,31 @@ class $$GroupsTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> expenseTagsRefs<T extends Object>(
+    Expression<T> Function($$ExpenseTagsTableAnnotationComposer a) f,
+  ) {
+    final $$ExpenseTagsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.expenseTags,
+      getReferencedColumn: (t) => t.groupId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ExpenseTagsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.expenseTags,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$GroupsTableTableManager
@@ -1852,7 +2545,11 @@ class $$GroupsTableTableManager
           $$GroupsTableUpdateCompanionBuilder,
           (Group, $$GroupsTableReferences),
           Group,
-          PrefetchHooks Function({bool participantsRefs, bool expensesRefs})
+          PrefetchHooks Function({
+            bool participantsRefs,
+            bool expensesRefs,
+            bool expenseTagsRefs,
+          })
         > {
   $$GroupsTableTableManager(_$AppDatabase db, $GroupsTable table)
     : super(
@@ -1900,12 +2597,17 @@ class $$GroupsTableTableManager
               )
               .toList(),
           prefetchHooksCallback:
-              ({participantsRefs = false, expensesRefs = false}) {
+              ({
+                participantsRefs = false,
+                expensesRefs = false,
+                expenseTagsRefs = false,
+              }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (participantsRefs) db.participants,
                     if (expensesRefs) db.expenses,
+                    if (expenseTagsRefs) db.expenseTags,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -1948,6 +2650,27 @@ class $$GroupsTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (expenseTagsRefs)
+                        await $_getPrefetchedData<
+                          Group,
+                          $GroupsTable,
+                          ExpenseTagRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$GroupsTableReferences
+                              ._expenseTagsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$GroupsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).expenseTagsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.groupId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -1968,7 +2691,11 @@ typedef $$GroupsTableProcessedTableManager =
       $$GroupsTableUpdateCompanionBuilder,
       (Group, $$GroupsTableReferences),
       Group,
-      PrefetchHooks Function({bool participantsRefs, bool expensesRefs})
+      PrefetchHooks Function({
+        bool participantsRefs,
+        bool expensesRefs,
+        bool expenseTagsRefs,
+      })
     >;
 typedef $$ParticipantsTableCreateCompanionBuilder =
     ParticipantsCompanion Function({
@@ -2309,11 +3036,15 @@ typedef $$ExpensesTableCreateCompanionBuilder =
       required int amountCents,
       required String currencyCode,
       required String title,
+      Value<String?> description,
       required DateTime date,
       required String splitType,
       Value<String?> splitSharesJson,
       Value<String> type,
       Value<int?> toParticipantId,
+      Value<String?> tag,
+      Value<String?> lineItemsJson,
+      Value<String?> receiptImagePath,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
     });
@@ -2325,11 +3056,15 @@ typedef $$ExpensesTableUpdateCompanionBuilder =
       Value<int> amountCents,
       Value<String> currencyCode,
       Value<String> title,
+      Value<String?> description,
       Value<DateTime> date,
       Value<String> splitType,
       Value<String?> splitSharesJson,
       Value<String> type,
       Value<int?> toParticipantId,
+      Value<String?> tag,
+      Value<String?> lineItemsJson,
+      Value<String?> receiptImagePath,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
     });
@@ -2427,6 +3162,11 @@ class $$ExpensesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<DateTime> get date => $composableBuilder(
     column: $table.date,
     builder: (column) => ColumnFilters(column),
@@ -2444,6 +3184,21 @@ class $$ExpensesTableFilterComposer
 
   ColumnFilters<String> get type => $composableBuilder(
     column: $table.type,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get tag => $composableBuilder(
+    column: $table.tag,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lineItemsJson => $composableBuilder(
+    column: $table.lineItemsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get receiptImagePath => $composableBuilder(
+    column: $table.receiptImagePath,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2556,6 +3311,11 @@ class $$ExpensesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get date => $composableBuilder(
     column: $table.date,
     builder: (column) => ColumnOrderings(column),
@@ -2573,6 +3333,21 @@ class $$ExpensesTableOrderingComposer
 
   ColumnOrderings<String> get type => $composableBuilder(
     column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get tag => $composableBuilder(
+    column: $table.tag,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lineItemsJson => $composableBuilder(
+    column: $table.lineItemsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get receiptImagePath => $composableBuilder(
+    column: $table.receiptImagePath,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -2681,6 +3456,11 @@ class $$ExpensesTableAnnotationComposer
   GeneratedColumn<String> get title =>
       $composableBuilder(column: $table.title, builder: (column) => column);
 
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get date =>
       $composableBuilder(column: $table.date, builder: (column) => column);
 
@@ -2694,6 +3474,19 @@ class $$ExpensesTableAnnotationComposer
 
   GeneratedColumn<String> get type =>
       $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<String> get tag =>
+      $composableBuilder(column: $table.tag, builder: (column) => column);
+
+  GeneratedColumn<String> get lineItemsJson => $composableBuilder(
+    column: $table.lineItemsJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get receiptImagePath => $composableBuilder(
+    column: $table.receiptImagePath,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -2809,11 +3602,15 @@ class $$ExpensesTableTableManager
                 Value<int> amountCents = const Value.absent(),
                 Value<String> currencyCode = const Value.absent(),
                 Value<String> title = const Value.absent(),
+                Value<String?> description = const Value.absent(),
                 Value<DateTime> date = const Value.absent(),
                 Value<String> splitType = const Value.absent(),
                 Value<String?> splitSharesJson = const Value.absent(),
                 Value<String> type = const Value.absent(),
                 Value<int?> toParticipantId = const Value.absent(),
+                Value<String?> tag = const Value.absent(),
+                Value<String?> lineItemsJson = const Value.absent(),
+                Value<String?> receiptImagePath = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => ExpensesCompanion(
@@ -2823,11 +3620,15 @@ class $$ExpensesTableTableManager
                 amountCents: amountCents,
                 currencyCode: currencyCode,
                 title: title,
+                description: description,
                 date: date,
                 splitType: splitType,
                 splitSharesJson: splitSharesJson,
                 type: type,
                 toParticipantId: toParticipantId,
+                tag: tag,
+                lineItemsJson: lineItemsJson,
+                receiptImagePath: receiptImagePath,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),
@@ -2839,11 +3640,15 @@ class $$ExpensesTableTableManager
                 required int amountCents,
                 required String currencyCode,
                 required String title,
+                Value<String?> description = const Value.absent(),
                 required DateTime date,
                 required String splitType,
                 Value<String?> splitSharesJson = const Value.absent(),
                 Value<String> type = const Value.absent(),
                 Value<int?> toParticipantId = const Value.absent(),
+                Value<String?> tag = const Value.absent(),
+                Value<String?> lineItemsJson = const Value.absent(),
+                Value<String?> receiptImagePath = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
               }) => ExpensesCompanion.insert(
@@ -2853,11 +3658,15 @@ class $$ExpensesTableTableManager
                 amountCents: amountCents,
                 currencyCode: currencyCode,
                 title: title,
+                description: description,
                 date: date,
                 splitType: splitType,
                 splitSharesJson: splitSharesJson,
                 type: type,
                 toParticipantId: toParticipantId,
+                tag: tag,
+                lineItemsJson: lineItemsJson,
+                receiptImagePath: receiptImagePath,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
               ),
@@ -2963,6 +3772,337 @@ typedef $$ExpensesTableProcessedTableManager =
         bool toParticipantId,
       })
     >;
+typedef $$ExpenseTagsTableCreateCompanionBuilder =
+    ExpenseTagsCompanion Function({
+      Value<int> id,
+      required int groupId,
+      required String label,
+      required String iconName,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+    });
+typedef $$ExpenseTagsTableUpdateCompanionBuilder =
+    ExpenseTagsCompanion Function({
+      Value<int> id,
+      Value<int> groupId,
+      Value<String> label,
+      Value<String> iconName,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+    });
+
+final class $$ExpenseTagsTableReferences
+    extends BaseReferences<_$AppDatabase, $ExpenseTagsTable, ExpenseTagRow> {
+  $$ExpenseTagsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $GroupsTable _groupIdTable(_$AppDatabase db) => db.groups.createAlias(
+    $_aliasNameGenerator(db.expenseTags.groupId, db.groups.id),
+  );
+
+  $$GroupsTableProcessedTableManager get groupId {
+    final $_column = $_itemColumn<int>('group_id')!;
+
+    final manager = $$GroupsTableTableManager(
+      $_db,
+      $_db.groups,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_groupIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$ExpenseTagsTableFilterComposer
+    extends Composer<_$AppDatabase, $ExpenseTagsTable> {
+  $$ExpenseTagsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get iconName => $composableBuilder(
+    column: $table.iconName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$GroupsTableFilterComposer get groupId {
+    final $$GroupsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.groupId,
+      referencedTable: $db.groups,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$GroupsTableFilterComposer(
+            $db: $db,
+            $table: $db.groups,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ExpenseTagsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ExpenseTagsTable> {
+  $$ExpenseTagsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get iconName => $composableBuilder(
+    column: $table.iconName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$GroupsTableOrderingComposer get groupId {
+    final $$GroupsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.groupId,
+      referencedTable: $db.groups,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$GroupsTableOrderingComposer(
+            $db: $db,
+            $table: $db.groups,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ExpenseTagsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ExpenseTagsTable> {
+  $$ExpenseTagsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get label =>
+      $composableBuilder(column: $table.label, builder: (column) => column);
+
+  GeneratedColumn<String> get iconName =>
+      $composableBuilder(column: $table.iconName, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$GroupsTableAnnotationComposer get groupId {
+    final $$GroupsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.groupId,
+      referencedTable: $db.groups,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$GroupsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.groups,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ExpenseTagsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ExpenseTagsTable,
+          ExpenseTagRow,
+          $$ExpenseTagsTableFilterComposer,
+          $$ExpenseTagsTableOrderingComposer,
+          $$ExpenseTagsTableAnnotationComposer,
+          $$ExpenseTagsTableCreateCompanionBuilder,
+          $$ExpenseTagsTableUpdateCompanionBuilder,
+          (ExpenseTagRow, $$ExpenseTagsTableReferences),
+          ExpenseTagRow,
+          PrefetchHooks Function({bool groupId})
+        > {
+  $$ExpenseTagsTableTableManager(_$AppDatabase db, $ExpenseTagsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ExpenseTagsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ExpenseTagsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ExpenseTagsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> groupId = const Value.absent(),
+                Value<String> label = const Value.absent(),
+                Value<String> iconName = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+              }) => ExpenseTagsCompanion(
+                id: id,
+                groupId: groupId,
+                label: label,
+                iconName: iconName,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int groupId,
+                required String label,
+                required String iconName,
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+              }) => ExpenseTagsCompanion.insert(
+                id: id,
+                groupId: groupId,
+                label: label,
+                iconName: iconName,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$ExpenseTagsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({groupId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (groupId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.groupId,
+                                referencedTable: $$ExpenseTagsTableReferences
+                                    ._groupIdTable(db),
+                                referencedColumn: $$ExpenseTagsTableReferences
+                                    ._groupIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$ExpenseTagsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ExpenseTagsTable,
+      ExpenseTagRow,
+      $$ExpenseTagsTableFilterComposer,
+      $$ExpenseTagsTableOrderingComposer,
+      $$ExpenseTagsTableAnnotationComposer,
+      $$ExpenseTagsTableCreateCompanionBuilder,
+      $$ExpenseTagsTableUpdateCompanionBuilder,
+      (ExpenseTagRow, $$ExpenseTagsTableReferences),
+      ExpenseTagRow,
+      PrefetchHooks Function({bool groupId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -2973,4 +4113,6 @@ class $AppDatabaseManager {
       $$ParticipantsTableTableManager(_db, _db.participants);
   $$ExpensesTableTableManager get expenses =>
       $$ExpensesTableTableManager(_db, _db.expenses);
+  $$ExpenseTagsTableTableManager get expenseTags =>
+      $$ExpenseTagsTableTableManager(_db, _db.expenseTags);
 }

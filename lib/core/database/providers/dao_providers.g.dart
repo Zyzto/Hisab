@@ -10,12 +10,12 @@ part of 'dao_providers.dart';
 // ignore_for_file: type=lint, type=warning
 
 @ProviderFor(groupDao)
-const groupDaoProvider = GroupDaoProvider._();
+final groupDaoProvider = GroupDaoProvider._();
 
 final class GroupDaoProvider
     extends $FunctionalProvider<GroupDao, GroupDao, GroupDao>
     with $Provider<GroupDao> {
-  const GroupDaoProvider._()
+  GroupDaoProvider._()
     : super(
         from: null,
         argument: null,
@@ -51,12 +51,12 @@ final class GroupDaoProvider
 String _$groupDaoHash() => r'619163864aea3c776eaac282383f5cc9c7599b89';
 
 @ProviderFor(participantDao)
-const participantDaoProvider = ParticipantDaoProvider._();
+final participantDaoProvider = ParticipantDaoProvider._();
 
 final class ParticipantDaoProvider
     extends $FunctionalProvider<ParticipantDao, ParticipantDao, ParticipantDao>
     with $Provider<ParticipantDao> {
-  const ParticipantDaoProvider._()
+  ParticipantDaoProvider._()
     : super(
         from: null,
         argument: null,
@@ -92,12 +92,12 @@ final class ParticipantDaoProvider
 String _$participantDaoHash() => r'1b4fd4cf8c40ec6e75db4f5bf6c77ad910c3a4b3';
 
 @ProviderFor(expenseDao)
-const expenseDaoProvider = ExpenseDaoProvider._();
+final expenseDaoProvider = ExpenseDaoProvider._();
 
 final class ExpenseDaoProvider
     extends $FunctionalProvider<ExpenseDao, ExpenseDao, ExpenseDao>
     with $Provider<ExpenseDao> {
-  const ExpenseDaoProvider._()
+  ExpenseDaoProvider._()
     : super(
         from: null,
         argument: null,
@@ -131,3 +131,44 @@ final class ExpenseDaoProvider
 }
 
 String _$expenseDaoHash() => r'cb5ed281fb22cfd9d3d90f8b3d3c7116b7b6eb30';
+
+@ProviderFor(expenseTagDao)
+final expenseTagDaoProvider = ExpenseTagDaoProvider._();
+
+final class ExpenseTagDaoProvider
+    extends $FunctionalProvider<ExpenseTagDao, ExpenseTagDao, ExpenseTagDao>
+    with $Provider<ExpenseTagDao> {
+  ExpenseTagDaoProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'expenseTagDaoProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$expenseTagDaoHash();
+
+  @$internal
+  @override
+  $ProviderElement<ExpenseTagDao> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  ExpenseTagDao create(Ref ref) {
+    return expenseTagDao(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ExpenseTagDao value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ExpenseTagDao>(value),
+    );
+  }
+}
+
+String _$expenseTagDaoHash() => r'f25223361a580acf00ab04d4d65143eda53f1d0f';

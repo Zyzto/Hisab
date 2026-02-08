@@ -161,8 +161,9 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
                           color: selected
                               ? theme.colorScheme.primary
                               : theme.colorScheme.onSurfaceVariant,
-                          fontWeight:
-                              selected ? FontWeight.w600 : FontWeight.w500,
+                          fontWeight: selected
+                              ? FontWeight.w600
+                              : FontWeight.w500,
                         ),
                       ),
                     ),
@@ -196,11 +197,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
               child: const SizedBox(
                 width: 56,
                 height: 56,
-                child: Icon(
-                  Icons.add,
-                  color: Colors.white,
-                  size: 28,
-                ),
+                child: Icon(Icons.add, color: Colors.white, size: 28),
               ),
             ),
           ),
@@ -215,8 +212,9 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
       );
     }
     if (index == 2) {
-      final participantsAsync =
-          ref.watch(participantsByGroupProvider(widget.group.id));
+      final participantsAsync = ref.watch(
+        participantsByGroupProvider(widget.group.id),
+      );
       final participantCount = participantsAsync.value?.length ?? 0;
       return Column(
         mainAxisSize: MainAxisSize.min,
@@ -238,11 +236,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
               child: const SizedBox(
                 width: 56,
                 height: 56,
-                child: Icon(
-                  Icons.person_add,
-                  color: Colors.white,
-                  size: 28,
-                ),
+                child: Icon(Icons.person_add, color: Colors.white, size: 28),
               ),
             ),
           ),
@@ -276,10 +270,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
         ),
         title: _buildAppBarTitle(context),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _onRefresh,
-          ),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _onRefresh),
         ],
       ),
       body: Column(
@@ -308,8 +299,7 @@ class _ExpensesTab extends ConsumerWidget {
 
   const _ExpensesTab({required this.groupId, required this.group});
 
-  static DateTime _dateOnly(DateTime d) =>
-      DateTime(d.year, d.month, d.day);
+  static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -319,8 +309,9 @@ class _ExpensesTab extends ConsumerWidget {
     return participantsAsync.when(
       data: (participants) {
         final nameOf = {for (final p in participants) p.id: p.name};
-        final firstParticipantId =
-            participants.isNotEmpty ? participants.first.id : null;
+        final firstParticipantId = participants.isNotEmpty
+            ? participants.first.id
+            : null;
 
         return expensesAsync.when(
           data: (expenses) {
@@ -340,7 +331,8 @@ class _ExpensesTab extends ConsumerWidget {
               final key = _dateOnly(e.date);
               byDate.putIfAbsent(key, () => []).add(e);
             }
-            final dateKeys = byDate.keys.toList()..sort((a, b) => b.compareTo(a));
+            final dateKeys = byDate.keys.toList()
+              ..sort((a, b) => b.compareTo(a));
 
             int myExpensesCents = 0;
             int totalCents = 0;
@@ -360,7 +352,10 @@ class _ExpensesTab extends ConsumerWidget {
               padding: const EdgeInsets.only(bottom: 24),
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   child: Row(
                     children: [
                       Expanded(
@@ -438,7 +433,8 @@ class _ExpensesTab extends ConsumerWidget {
                         ),
                         child: ExpenseListTile(
                           expense: expense,
-                          payerName: nameOf[expense.payerParticipantId] ??
+                          payerName:
+                              nameOf[expense.payerParticipantId] ??
                               expense.payerParticipantId,
                         ),
                       ),
@@ -448,9 +444,7 @@ class _ExpensesTab extends ConsumerWidget {
               ],
             );
           },
-          loading: () => const Center(
-            child: CircularProgressIndicator(),
-          ),
+          loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, st) => Center(
             child: Text(
               e.toString(),

@@ -11,13 +11,20 @@ class Expenses extends Table {
   IntColumn get amountCents => integer()();
   TextColumn get currencyCode => text().withLength(min: 3, max: 3)();
   TextColumn get title => text().withLength(min: 1, max: 500)();
+  TextColumn get description => text().nullable()();
   DateTimeColumn get date => dateTime()();
   TextColumn get splitType => text()(); // 'equal' | 'parts' | 'amounts'
   TextColumn get splitSharesJson =>
       text().nullable()(); // JSON map participantId -> cents or percentage
   TextColumn get type => text().withDefault(const Constant('expense'))();
-  IntColumn get toParticipantId =>
-      integer().nullable().references(Participants, #id, onDelete: KeyAction.setNull)();
+  IntColumn get toParticipantId => integer().nullable().references(
+    Participants,
+    #id,
+    onDelete: KeyAction.setNull,
+  )();
+  TextColumn get tag => text().nullable()();
+  TextColumn get lineItemsJson => text().nullable()();
+  TextColumn get receiptImagePath => text().nullable()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 }

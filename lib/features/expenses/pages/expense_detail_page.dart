@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/receipt/receipt_image_view.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../domain/domain.dart';
@@ -55,86 +56,137 @@ class ExpenseDetailPage extends ConsumerWidget {
                       IconButton(
                         icon: const Icon(Icons.chevron_left),
                         onPressed: hasPrev && prevId != null
-                            ? () => context.go(RoutePaths.groupExpenseDetail(groupId, prevId))
+                            ? () => context.go(
+                                RoutePaths.groupExpenseDetail(groupId, prevId),
+                              )
                             : null,
                       ),
                       IconButton(
                         icon: const Icon(Icons.chevron_right),
                         onPressed: hasNext && nextId != null
-                            ? () => context.go(RoutePaths.groupExpenseDetail(groupId, nextId))
+                            ? () => context.go(
+                                RoutePaths.groupExpenseDetail(groupId, nextId),
+                              )
                             : null,
                       ),
-                  PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert),
-                    onSelected: (value) async {
-                      if (value == 'edit') {
-                        await context.push(RoutePaths.groupExpenseEdit(groupId, expenseId));
-                        if (context.mounted) {
-                          // Defer invalidation to next frame to avoid scheduling on a disposing view (Flutter Web)
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                      PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert),
+                        onSelected: (value) async {
+                          if (value == 'edit') {
+                            await context.push(
+                              RoutePaths.groupExpenseEdit(groupId, expenseId),
+                            );
                             if (context.mounted) {
-                              ref.invalidate(futureExpenseProvider(expenseId));
-                              ref.invalidate(expensesByGroupProvider(groupId));
+                              // Defer invalidation to next frame to avoid scheduling on a disposing view (Flutter Web)
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                if (context.mounted) {
+                                  ref.invalidate(
+                                    futureExpenseProvider(expenseId),
+                                  );
+                                  ref.invalidate(
+                                    expensesByGroupProvider(groupId),
+                                  );
+                                }
+                              });
                             }
-                          });
-                        }
-                      } else if (value == 'delete') {
-                        _confirmDelete(context, ref, expense);
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                      PopupMenuItem(
-                        value: 'delete',
-                        child: Text('Delete', style: TextStyle(color: theme.colorScheme.error)),
+                          } else if (value == 'delete') {
+                            _confirmDelete(context, ref, expense);
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(
+                            value: 'edit',
+                            child: Text('Edit'),
+                          ),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Text(
+                              'Delete',
+                              style: TextStyle(color: theme.colorScheme.error),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
                     ],
                   ),
                   body: ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
                     children: [
                       _ExpenseHeader(expense: expense),
+                      if (expense.receiptImagePath != null &&
+                          expense.receiptImagePath!.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(
+                            'receipt'.tr(),
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                        buildReceiptImageView(
+                          expense.receiptImagePath,
+                          maxHeight: 280,
+                        ),
+                      ],
                       const SizedBox(height: 28),
                       _SectionLabel(label: _payerSectionLabel(expense)),
                       const SizedBox(height: 10),
                       _PersonCard(
-                        name: nameOf[expense.payerParticipantId] ?? expense.payerParticipantId,
+                        name:
+                            nameOf[expense.payerParticipantId] ??
+                            expense.payerParticipantId,
                         amountCents: expense.amountCents,
                         currencyCode: expense.currencyCode,
                       ),
                       const SizedBox(height: 24),
                       _SectionLabel(
-                        label: expense.transactionType == TransactionType.transfer
+                        label:
+                            expense.transactionType == TransactionType.transfer
                             ? 'to'.tr()
                             : 'participants'.tr(),
                       ),
                       const SizedBox(height: 10),
-                      ..._participantShares(expense, participants, nameOf)
-                          .map((e) => Padding(
-                                padding: const EdgeInsets.only(bottom: 10),
-                                child: _PersonCard(
-                                  name: e.name,
-                                  amountCents: e.cents,
-                                  currencyCode: expense.currencyCode,
-                                ),
-                              )),
+                      ..._participantShares(expense, participants, nameOf).map(
+                        (e) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _PersonCard(
+                            name: e.name,
+                            amountCents: e.cents,
+                            currencyCode: expense.currencyCode,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 );
               },
-              loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-              error: (_, __) => const Scaffold(body: Center(child: CircularProgressIndicator())),
+              loading: () => const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              ),
+              error: (_, _) => const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              ),
             );
           },
-          loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+          loading: () =>
+              const Scaffold(body: Center(child: CircularProgressIndicator())),
           error: (e, _) => Scaffold(body: Center(child: Text('$e'))),
         );
       },
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => Scaffold(
-        appBar: AppBar(leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop())),
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.pop(),
+          ),
+        ),
         body: Center(child: Text('$e')),
       ),
     );
@@ -166,22 +218,35 @@ class ExpenseDetailPage extends ConsumerWidget {
     if (shares.isEmpty) return [];
     return participants
         .where((p) => shares.containsKey(p.id) && (shares[p.id] ?? 0) > 0)
-        .map((p) => _ShareEntry(name: nameOf[p.id] ?? p.id, cents: shares[p.id]!))
+        .map(
+          (p) => _ShareEntry(name: nameOf[p.id] ?? p.id, cents: shares[p.id]!),
+        )
         .toList();
   }
 
-  Future<void> _confirmDelete(BuildContext context, WidgetRef ref, Expense expense) async {
+  Future<void> _confirmDelete(
+    BuildContext context,
+    WidgetRef ref,
+    Expense expense,
+  ) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Delete expense?'),
-        content: Text('${expense.title} – ${CurrencyFormatter.formatCents(expense.amountCents, expense.currencyCode)}'),
+        title: const Text('Delete expense?'),
+        content: Text(
+          '${expense.title} – ${CurrencyFormatter.formatCents(expense.amountCents, expense.currencyCode)}',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error),
-            child: Text('Delete'),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            child: const Text('Delete'),
           ),
         ],
       ),
@@ -216,7 +281,9 @@ class _ExpenseHeader extends StatelessWidget {
         const SizedBox(height: 12),
         Text(
           expense.title,
-          style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 4),
