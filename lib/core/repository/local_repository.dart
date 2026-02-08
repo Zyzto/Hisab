@@ -248,7 +248,9 @@ class LocalExpenseRepository implements IExpenseRepository {
       toParticipantId: toIntId != null ? Value(toIntId) : const Value.absent(),
     );
     final id = await _expenseDao.insertExpense(companion);
-    return intToLocalId(id);
+    final domainId = intToLocalId(id);
+    Log.info('Expense created: id=$domainId groupId=${expense.groupId} title="${expense.title}" amountCents=${expense.amountCents} currencyCode=${expense.currencyCode}');
+    return domainId;
   }
 
   @override
@@ -274,12 +276,16 @@ class LocalExpenseRepository implements IExpenseRepository {
       updatedAt: expense.updatedAt,
     );
     await _expenseDao.updateExpense(row);
+    Log.info('Expense updated: id=${expense.id} title="${expense.title}" amountCents=${expense.amountCents}');
   }
 
   @override
   Future<void> delete(String id) async {
     final intId = localIdToInt(id);
-    if (intId != null) await _expenseDao.deleteExpense(intId);
+    if (intId != null) {
+      await _expenseDao.deleteExpense(intId);
+      Log.info('Expense deleted: id=$id');
+    }
   }
 
   Expense _toDomain(db.Expense row) {

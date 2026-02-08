@@ -23,13 +23,15 @@ class GroupDetailPage extends ConsumerWidget {
       value: groupAsync,
       data: (context, group) {
         if (group == null) {
-          if (context.mounted) {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go(RoutePaths.home);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted) {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go(RoutePaths.home);
+              }
             }
-          }
+          });
           return const SizedBox.shrink();
         }
         return _GroupDetailContent(group: group);
@@ -430,10 +432,15 @@ class _ExpensesTab extends ConsumerWidget {
                       ),
                     ),
                     ...list.map(
-                      (expense) => ExpenseListTile(
-                        expense: expense,
-                        payerName: nameOf[expense.payerParticipantId] ??
-                            expense.payerParticipantId,
+                      (expense) => InkWell(
+                        onTap: () => context.push(
+                          RoutePaths.groupExpenseDetail(groupId, expense.id),
+                        ),
+                        child: ExpenseListTile(
+                          expense: expense,
+                          payerName: nameOf[expense.payerParticipantId] ??
+                              expense.payerParticipantId,
+                        ),
                       ),
                     ),
                   ];

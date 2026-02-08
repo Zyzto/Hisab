@@ -26,8 +26,9 @@ final _decimalOnlyFormatter = _DecimalOnlyFormatter();
 
 class ExpenseFormPage extends ConsumerStatefulWidget {
   final String groupId;
+  final String? expenseId;
 
-  const ExpenseFormPage({super.key, required this.groupId});
+  const ExpenseFormPage({super.key, required this.groupId, this.expenseId});
 
   @override
   ConsumerState<ExpenseFormPage> createState() => _ExpenseFormPageState();
@@ -44,6 +45,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   SplitType _splitType = SplitType.equal;
   TransactionType _transactionType = TransactionType.expense;
   bool _saving = false;
+  /// When editing, the loaded expense (for id and createdAt on update).
+  Expense? _initialExpense;
+  bool _editLoaded = false;
   /// Participant ids included in the split (default all). Unchecking excludes them.
   final Set<String> _includedInSplitIds = {};
   /// Participant ids we've already seen (so we only auto-include newly added participants).
@@ -54,6 +58,50 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   final Map<String, FocusNode> _splitFocusNodes = {};
   /// Once user edits any amount field, we stop auto-updating amounts from total (avoids grabbing first digit while typing total).
   bool _amountsFieldsTouched = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.expenseId != null) {
+      _loadExpenseForEdit();
+    }
+  }
+
+  Future<void> _loadExpenseForEdit() async {
+    final expense = await ref.read(expenseRepositoryProvider).getById(widget.expenseId!);
+    if (!mounted || expense == null || expense.groupId != widget.groupId) return;
+    final participants = await ref.read(participantRepositoryProvider).getByGroupId(widget.groupId);
+    if (!mounted) return;
+    setState(() {
+      _initialExpense = expense;
+      _currencyCode = expense.currencyCode;
+      _titleController.text = expense.title;
+      _amountController.text = (expense.amountCents / 100).toStringAsFixed(2);
+      _date = expense.date;
+      _payerParticipantId = expense.payerParticipantId;
+      _transactionType = expense.transactionType;
+      _splitType = expense.splitType;
+      _toParticipantId = expense.toParticipantId;
+      _includedInSplitIds.addAll(expense.splitShares.keys);
+      _previousParticipantIds = participants.map((p) => p.id).toSet();
+      final total = expense.amountCents;
+      if (expense.splitType == SplitType.amounts) {
+        for (final entry in expense.splitShares.entries) {
+          _customSplitValues[entry.key] = (entry.value / 100).toStringAsFixed(2);
+        }
+      } else if (expense.splitType == SplitType.parts && total > 0) {
+        final sum = expense.splitShares.values.fold<int>(0, (a, b) => a + b);
+        if (sum > 0) {
+          for (final entry in expense.splitShares.entries) {
+            final part = (entry.value * 10 / sum).round().clamp(1, 999);
+            _customSplitValues[entry.key] = part.toString();
+          }
+        }
+      }
+      _amountsFieldsTouched = true;
+      _editLoaded = true;
+    });
+  }
 
   @override
   void dispose() {
@@ -171,8 +219,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('amounts_must_equal_total'.tr())),
               );
+              setState(() => _saving = false);
             }
-            setState(() => _saving = false);
             return;
           }
           break;
@@ -180,12 +228,13 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     }
 
     setState(() => _saving = true);
+    var didPop = false;
     try {
       final title = isTransfer
           ? 'Transfer'
           : _titleController.text.trim();
       final expense = Expense(
-        id: '',
+        id: _initialExpense?.id ?? '',
         groupId: widget.groupId,
         payerParticipantId: payerId,
         amountCents: amount.toInt(),
@@ -194,15 +243,21 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         date: _date,
         splitType: isTransfer ? SplitType.equal : _splitType,
         splitShares: splitShares,
-        createdAt: DateTime.now(),
+        createdAt: _initialExpense?.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
         transactionType: _transactionType,
         toParticipantId: isTransfer ? _toParticipantId : null,
       );
-      await ref.read(expenseRepositoryProvider).create(expense);
-      if (mounted) context.pop();
+      if (_initialExpense != null) {
+        await ref.read(expenseRepositoryProvider).update(expense);
+      } else {
+        await ref.read(expenseRepositoryProvider).create(expense);
+      }
+      if (!mounted) return;
+      context.pop();
+      didPop = true;
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (!didPop && mounted) setState(() => _saving = false);
     }
   }
 
@@ -367,7 +422,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     return groupAsync.when(
       data: (group) {
         if (group == null) {
-          context.pop();
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) context.pop();
+          });
           return const SizedBox.shrink();
         }
         final currencyCode = group.currencyCode;
@@ -375,9 +432,20 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         return participantsAsync.when(
           data: (participants) {
             _currencyCode = group.currencyCode;
+            if (widget.expenseId != null && !_editLoaded) {
+              return Scaffold(
+                appBar: AppBar(
+                  title: Text('edit_expense'.tr()),
+                  leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+                ),
+                body: const Center(child: CircularProgressIndicator()),
+              );
+            }
             if (participants.isEmpty) {
               return Scaffold(
-                appBar: AppBar(title: Text('add_expense'.tr())),
+                appBar: AppBar(
+                  title: Text((widget.expenseId != null ? 'edit_expense' : 'add_expense').tr()),
+                ),
                 body: Center(child: Text('add_participants_first'.tr())),
               );
             }
@@ -414,7 +482,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
 
             return Scaffold(
               appBar: AppBar(
-                title: Text('add_expense'.tr()),
+                title: Text((widget.expenseId != null ? 'edit_expense' : 'add_expense').tr()),
                 leading: IconButton(
                   icon: const Icon(Icons.arrow_back),
                   onPressed: () => context.pop(),
@@ -454,7 +522,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                 width: 24,
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
-                            : Text('add_expense'.tr()),
+                            : Text((widget.expenseId != null ? 'submit' : 'add_expense').tr()),
                       ),
                     ),
                   ],
@@ -658,7 +726,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'payer'.tr(),
+                'paid_by_label'.tr(),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -884,7 +952,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           children: [
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Text('payer'.tr(), style: Theme.of(ctx).textTheme.titleMedium),
+              child: Text('paid_by_label'.tr(), style: Theme.of(ctx).textTheme.titleMedium),
             ),
             ...participants.map((p) => ListTile(
                   title: Text(p.name),

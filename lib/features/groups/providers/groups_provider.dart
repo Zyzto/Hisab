@@ -20,6 +20,11 @@ final expensesByGroupProvider = StreamProvider.family<List<Expense>, String>((
   return ref.watch(expenseRepositoryProvider).watchByGroupId(groupId);
 });
 
+final futureExpenseProvider =
+    FutureProvider.family<Expense?, String>((ref, expenseId) async {
+  return ref.read(expenseRepositoryProvider).getById(expenseId);
+});
+
 final participantsByGroupProvider =
     StreamProvider.family<List<Participant>, String>((ref, groupId) {
       return ref.watch(participantRepositoryProvider).watchByGroupId(groupId);

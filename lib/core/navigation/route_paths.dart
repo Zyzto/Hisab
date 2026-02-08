@@ -6,6 +6,8 @@ class RoutePaths {
   static String groupExpenses(String groupId) => '/groups/$groupId/expenses';
   static String groupExpenseAdd(String groupId) =>
       '/groups/$groupId/expenses/add';
+  static String groupExpenseDetail(String groupId, String expenseId) =>
+      '/groups/$groupId/expenses/$expenseId';
   static String groupExpenseEdit(String groupId, String expenseId) =>
       '/groups/$groupId/expenses/$expenseId/edit';
   static String groupBalance(String groupId) => '/groups/$groupId/balance';

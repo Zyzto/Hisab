@@ -219,7 +219,9 @@ class ConvexExpenseRepository implements IExpenseRepository {
       name: 'expenses:create',
       args: args,
     );
-    return raw as String? ?? '';
+    final id = raw as String? ?? '';
+    Log.info('Expense created: id=$id groupId=${expense.groupId} title="${expense.title}" amountCents=${expense.amountCents} currencyCode=${expense.currencyCode}');
+    return id;
   }
 
   @override
@@ -235,6 +237,7 @@ class ConvexExpenseRepository implements IExpenseRepository {
         'updatedAt': expense.updatedAt.millisecondsSinceEpoch,
       },
     );
+    Log.info('Expense updated: id=${expense.id} title="${expense.title}" amountCents=${expense.amountCents}');
   }
 
   @override
@@ -243,6 +246,7 @@ class ConvexExpenseRepository implements IExpenseRepository {
       name: 'expenses:remove',
       args: {'id': id},
     );
+    Log.info('Expense deleted: id=$id');
   }
 
   Expense _expenseFromJson(Map<String, dynamic> j) {

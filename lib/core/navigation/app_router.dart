@@ -6,6 +6,7 @@ import '../../features/settings/routes.dart';
 import '../../features/groups/pages/group_create_page.dart';
 import '../../features/groups/pages/group_detail_page.dart';
 import '../../features/expenses/pages/expense_form_page.dart';
+import '../../features/expenses/pages/expense_detail_page.dart';
 import 'main_scaffold.dart';
 
 part 'app_router.g.dart';
@@ -46,6 +47,22 @@ GoRouter router(Ref ref) {
         builder: (context, state) {
           final groupId = state.pathParameters['id'] ?? '';
           return ExpenseFormPage(groupId: groupId);
+        },
+      ),
+      GoRoute(
+        path: '/groups/:id/expenses/:eid',
+        builder: (context, state) {
+          final groupId = state.pathParameters['id'] ?? '';
+          final expenseId = state.pathParameters['eid'] ?? '';
+          return ExpenseDetailPage(groupId: groupId, expenseId: expenseId);
+        },
+      ),
+      GoRoute(
+        path: '/groups/:id/expenses/:eid/edit',
+        builder: (context, state) {
+          final groupId = state.pathParameters['id'] ?? '';
+          final expenseId = state.pathParameters['eid'] ?? '';
+          return ExpenseFormPage(groupId: groupId, expenseId: expenseId);
         },
       ),
     ],
