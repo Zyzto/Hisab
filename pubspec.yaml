@@ -1,0 +1,69 @@
+name: hisab
+description: "Group expense splitting and settle-up app (Tricount-style)."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.10.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # State management (match mizaniyah)
+  flutter_riverpod: ^3.0.1
+  riverpod_annotation: ^3.0.0
+
+  # Navigation
+  go_router: ^17.0.0
+
+  # Localization
+  easy_localization: ^3.0.7
+
+  # Local storage
+  shared_preferences: ^2.3.3
+
+  # Backend & database
+  drift: ^2.18.0
+  drift_flutter: ^0.2.8
+  sqlite3_flutter_libs: ^0.5.20
+  path_provider: ^2.1.2
+  path: ^1.9.0
+
+  # Cloud – real-time
+  convex_flutter: ^3.0.0
+
+  # Collections & utilities
+  collection: ^1.18.0
+
+  # UI & animations
+  animations: ^2.1.0
+
+  # Date & currency
+  intl: ^0.20.2
+
+  # Logging (match mizaniyah)
+  easy_logger: ^0.0.2
+  flutter_logging_service:
+    git:
+      url: https://github.com/Zyzto/siglat.git
+      ref: main
+
+  # Settings (match mizaniyah – for theme + "Local Only" toggle)
+  flutter_settings_framework:
+    path: ../edadat
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  drift_dev: ^2.18.0
+  build_runner: ^2.4.9
+  riverpod_generator: ^3.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/translations/
