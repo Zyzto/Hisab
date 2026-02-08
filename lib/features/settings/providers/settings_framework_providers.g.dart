@@ -253,3 +253,165 @@ final class OpenaiApiKeyProvider
 }
 
 String _$openaiApiKeyHash() => r'9e80deccbe891639df1748997134aff5cd3213a9';
+
+@ProviderFor(themeMode)
+final themeModeProvider = ThemeModeProvider._();
+
+final class ThemeModeProvider
+    extends $FunctionalProvider<String, String, String>
+    with $Provider<String> {
+  ThemeModeProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'themeModeProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$themeModeHash();
+
+  @$internal
+  @override
+  $ProviderElement<String> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  String create(Ref ref) {
+    return themeMode(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String>(value),
+    );
+  }
+}
+
+String _$themeModeHash() => r'667cf4a837745c594e2c5a0d7647113817220a52';
+
+@ProviderFor(themeColor)
+final themeColorProvider = ThemeColorProvider._();
+
+final class ThemeColorProvider extends $FunctionalProvider<int, int, int>
+    with $Provider<int> {
+  ThemeColorProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'themeColorProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$themeColorHash();
+
+  @$internal
+  @override
+  $ProviderElement<int> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  int create(Ref ref) {
+    return themeColor(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(int value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<int>(value),
+    );
+  }
+}
+
+String _$themeColorHash() => r'd8de53787da6f4df3d07c8e9a820442f47544809';
+
+@ProviderFor(language)
+final languageProvider = LanguageProvider._();
+
+final class LanguageProvider extends $FunctionalProvider<String, String, String>
+    with $Provider<String> {
+  LanguageProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'languageProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$languageHash();
+
+  @$internal
+  @override
+  $ProviderElement<String> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  String create(Ref ref) {
+    return language(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String>(value),
+    );
+  }
+}
+
+String _$languageHash() => r'05ad185bfb07d659823019923fe5b9475dc962b7';
+
+@ProviderFor(fontSizeScale)
+final fontSizeScaleProvider = FontSizeScaleProvider._();
+
+final class FontSizeScaleProvider
+    extends $FunctionalProvider<String, String, String>
+    with $Provider<String> {
+  FontSizeScaleProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'fontSizeScaleProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$fontSizeScaleHash();
+
+  @$internal
+  @override
+  $ProviderElement<String> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  String create(Ref ref) {
+    return fontSizeScale(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String>(value),
+    );
+  }
+}
+
+String _$fontSizeScaleHash() => r'8a20204a46a361746e07cba5a1f0c6c1b3187e6f';

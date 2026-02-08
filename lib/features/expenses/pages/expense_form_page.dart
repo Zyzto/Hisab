@@ -641,7 +641,16 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       if (_receiptImagePath != null) ...[
                         const SizedBox(height: 8),
                         _buildReceiptAttachedChip(context),
-                        buildReceiptImageView(_receiptImagePath, maxHeight: 180),
+                        GestureDetector(
+                          onTap: () => showReceiptImageFullScreen(
+                            context,
+                            _receiptImagePath!,
+                          ),
+                          child: buildReceiptImageView(
+                            _receiptImagePath,
+                            maxHeight: 180,
+                          ),
+                        ),
                       ],
                       const SizedBox(height: 20),
                       _buildDescriptionSection(context),

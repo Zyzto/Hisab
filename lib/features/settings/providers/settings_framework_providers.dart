@@ -122,3 +122,67 @@ String openaiApiKey(Ref ref) {
     return '';
   }
 }
+
+@riverpod
+String themeMode(Ref ref) {
+  try {
+    final settings = ref.watch(hisabSettingsProvidersProvider);
+    if (settings == null) return 'system';
+    return ref.watch(settings.provider(themeModeSettingDef));
+  } catch (e, stackTrace) {
+    Log.warning(
+      'themeMode read failed, defaulting to system',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return 'system';
+  }
+}
+
+@riverpod
+int themeColor(Ref ref) {
+  try {
+    final settings = ref.watch(hisabSettingsProvidersProvider);
+    if (settings == null) return 0xFF2E7D32;
+    return ref.watch(settings.provider(themeColorSettingDef));
+  } catch (e, stackTrace) {
+    Log.warning(
+      'themeColor read failed, defaulting to green',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return 0xFF2E7D32;
+  }
+}
+
+@riverpod
+String language(Ref ref) {
+  try {
+    final settings = ref.watch(hisabSettingsProvidersProvider);
+    if (settings == null) return 'en';
+    return ref.watch(settings.provider(languageSettingDef));
+  } catch (e, stackTrace) {
+    Log.warning(
+      'language read failed, defaulting to en',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return 'en';
+  }
+}
+
+@riverpod
+String fontSizeScale(Ref ref) {
+  try {
+    final settings = ref.watch(hisabSettingsProvidersProvider);
+    if (settings == null) return 'normal';
+    return ref.watch(settings.provider(fontSizeScaleSettingDef));
+  } catch (e, stackTrace) {
+    Log.warning(
+      'fontSizeScale read failed, defaulting to normal',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return 'normal';
+  }
+}

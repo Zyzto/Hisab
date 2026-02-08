@@ -62,6 +62,12 @@ dependencies:
   flutter_settings_framework:
     path: ../edadat
 
+  # About (version, licenses)
+  package_info_plus: ^8.0.0
+
+  # Backup (file picker for export/import)
+  file_picker: ^8.1.6
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

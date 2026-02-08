@@ -128,9 +128,15 @@ class ExpenseDetailPage extends ConsumerWidget {
                             ),
                           ),
                         ),
-                        buildReceiptImageView(
-                          expense.receiptImagePath,
-                          maxHeight: 280,
+                        GestureDetector(
+                          onTap: () => showReceiptImageFullScreen(
+                            context,
+                            expense.receiptImagePath!,
+                          ),
+                          child: buildReceiptImageView(
+                            expense.receiptImagePath,
+                            maxHeight: 280,
+                          ),
                         ),
                       ],
                       const SizedBox(height: 28),

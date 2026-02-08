@@ -1,5 +1,24 @@
 import 'package:flutter/material.dart';
 
+/// Full-screen view not available on web (no file access). Shows a message.
+void showReceiptImageFullScreen(BuildContext context, String imagePath) {
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Receipt'),
+      content: const Text(
+        'Receipt image attached. Full preview is available in the mobile app.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('OK'),
+        ),
+      ],
+    ),
+  );
+}
+
 /// Placeholder when dart:io is not available (e.g. web). Shows a chip that receipt is attached.
 Widget buildReceiptImageView(String? imagePath, {double? maxHeight, BoxFit fit = BoxFit.cover}) {
   if (imagePath == null || imagePath.isEmpty) return const SizedBox.shrink();

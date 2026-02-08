@@ -30,6 +30,27 @@ final receiptAiSection = const SettingSection(
   order: 3,
 );
 
+final loggingSection = const SettingSection(
+  key: 'logging',
+  titleKey: 'logging',
+  icon: Icons.description,
+  order: 4,
+);
+
+final backupSection = const SettingSection(
+  key: 'backup',
+  titleKey: 'backup',
+  icon: Icons.backup,
+  order: 5,
+);
+
+final aboutSection = const SettingSection(
+  key: 'about',
+  titleKey: 'about',
+  icon: Icons.info,
+  order: 6,
+);
+
 final themeModeSettingDef = const EnumSetting(
   'theme_mode',
   defaultValue: 'system',
@@ -148,7 +169,15 @@ final openaiApiKeySettingDef = const StringSetting(
   order: 4,
 );
 
-final allSections = [generalSection, appearanceSection, dataSection, receiptAiSection];
+final allSections = [
+  generalSection,
+  appearanceSection,
+  dataSection,
+  receiptAiSection,
+  loggingSection,
+  backupSection,
+  aboutSection,
+];
 
 final allSettings = <SettingDefinition>[
   themeModeSettingDef,

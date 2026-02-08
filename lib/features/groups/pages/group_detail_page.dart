@@ -8,6 +8,7 @@ import '../../../core/navigation/route_paths.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/widgets/async_value_builder.dart';
 import '../../expenses/widgets/expense_list_tile.dart';
+import '../../expenses/category_icons.dart';
 import '../../balance/widgets/balance_list.dart';
 import '../../../domain/domain.dart';
 
@@ -305,6 +306,8 @@ class _ExpensesTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final expensesAsync = ref.watch(expensesByGroupProvider(groupId));
     final participantsAsync = ref.watch(participantsByGroupProvider(groupId));
+    final tagsAsync = ref.watch(tagsByGroupProvider(groupId));
+    final customTags = tagsAsync.value ?? [];
 
     return participantsAsync.when(
       data: (participants) {
@@ -436,6 +439,7 @@ class _ExpensesTab extends ConsumerWidget {
                           payerName:
                               nameOf[expense.payerParticipantId] ??
                               expense.payerParticipantId,
+                          icon: iconForExpenseTag(expense.tag, customTags),
                         ),
                       ),
                     ),

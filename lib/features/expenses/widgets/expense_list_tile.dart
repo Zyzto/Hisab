@@ -2,20 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../../domain/domain.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../category_icons.dart';
 
 class ExpenseListTile extends StatelessWidget {
   final Expense expense;
   final String payerName;
+  /// Icon for the expense (e.g. from [iconForExpenseTag]). When null, uses [defaultExpenseIcon].
+  final IconData? icon;
 
   const ExpenseListTile({
     super.key,
     required this.expense,
     required this.payerName,
+    this.icon,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final effectiveIcon = icon ?? defaultExpenseIcon;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -24,7 +29,7 @@ class ExpenseListTile extends StatelessWidget {
         child: Row(
           children: [
             Icon(
-              Icons.receipt_long,
+              effectiveIcon,
               size: 28,
               color: theme.colorScheme.onSurfaceVariant,
             ),
