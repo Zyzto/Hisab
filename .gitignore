@@ -12,53 +12,44 @@
 .swiftpm/
 migrate_working_dir/
 
-# IntelliJ related
+# IDEs
 *.iml
 *.ipr
 *.iws
 .idea/
+#.vscode/  # Uncomment to ignore; launch configs are often shared
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
-# Flutter/Dart/Pub related
+# Flutter / Dart
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
+.flutter-plugins
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
 /build/
 /coverage/
+lcov.info
 
-# Symbolication related
+# Symbolication / obfuscation
 app.*.symbols
-
-# Obfuscation related
 app.*.map.json
 
-# Android Studio will place build artifacts here
+# Android (build artifacts; android/.gitignore has local.properties, key.properties)
 /android/app/debug
 /android/app/profile
 /android/app/release
 
-# Environment and secrets (e.g. Convex deployment URL override, API keys)
+# Secrets (copy from *_example files)
+lib/core/constants/app_secrets.dart
+android/secrets.properties
+
+# Environment (Convex deployment URL override, API keys)
 .env
 .env.*
 !.env.example
 
-# App secrets (copy from app_secrets_example.dart)
-lib/core/constants/app_secrets.dart
-
-# Android Auth0 manifest placeholders
-android/secrets.properties
-
-# Convex CLI generated files
+# Convex / Node
+node_modules/
 convex/_generated/
 convex/.tmp/
-
-# Flutter generated (in addition to .flutter-plugins-dependencies)
-.flutter-plugins
-node_modules/
