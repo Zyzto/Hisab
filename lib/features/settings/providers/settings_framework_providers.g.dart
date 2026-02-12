@@ -8,6 +8,61 @@ part of 'settings_framework_providers.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
+/// App-owned provider for [SettingsProviders]. Override in main with the result of [initializeHisabSettings].
+/// Use this in UI (e.g. settings page) to avoid depending on the framework's provider symbol.
+
+@ProviderFor(hisabSettingsProviders)
+final hisabSettingsProvidersProvider = HisabSettingsProvidersProvider._();
+
+/// App-owned provider for [SettingsProviders]. Override in main with the result of [initializeHisabSettings].
+/// Use this in UI (e.g. settings page) to avoid depending on the framework's provider symbol.
+
+final class HisabSettingsProvidersProvider
+    extends
+        $FunctionalProvider<
+          SettingsProviders?,
+          SettingsProviders?,
+          SettingsProviders?
+        >
+    with $Provider<SettingsProviders?> {
+  /// App-owned provider for [SettingsProviders]. Override in main with the result of [initializeHisabSettings].
+  /// Use this in UI (e.g. settings page) to avoid depending on the framework's provider symbol.
+  HisabSettingsProvidersProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'hisabSettingsProvidersProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$hisabSettingsProvidersHash();
+
+  @$internal
+  @override
+  $ProviderElement<SettingsProviders?> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  SettingsProviders? create(Ref ref) {
+    return hisabSettingsProviders(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(SettingsProviders? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<SettingsProviders?>(value),
+    );
+  }
+}
+
+String _$hisabSettingsProvidersHash() =>
+    r'dda64f95490bc8e73116dfc4b674c47cd8bfefb0';
 
 @ProviderFor(localOnly)
 final localOnlyProvider = LocalOnlyProvider._();

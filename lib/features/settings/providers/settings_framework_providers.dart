@@ -1,4 +1,3 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
@@ -8,9 +7,8 @@ part 'settings_framework_providers.g.dart';
 
 /// App-owned provider for [SettingsProviders]. Override in main with the result of [initializeHisabSettings].
 /// Use this in UI (e.g. settings page) to avoid depending on the framework's provider symbol.
-final hisabSettingsProvidersProvider = Provider<SettingsProviders?>(
-  (ref) => null,
-);
+@riverpod
+SettingsProviders? hisabSettingsProviders(Ref ref) => null;
 
 Future<SettingsProviders?> initializeHisabSettings() async {
   try {

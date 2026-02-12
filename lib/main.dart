@@ -7,6 +7,7 @@ import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 import 'package:convex_flutter/convex_flutter.dart';
 import 'core/constants/convex_config.dart';
 import 'features/settings/providers/settings_framework_providers.dart';
+import 'features/settings/settings_definitions.dart';
 import 'app.dart';
 
 void main() async {
@@ -77,11 +78,18 @@ void main() async {
     Log.warning('Settings framework init returned null, using defaults');
   }
 
+  // Use saved language from settings; we persist via our settings, not EasyLocalization
+  final startLocale = settingsProviders != null
+      ? Locale(settingsProviders.controller.get(languageSettingDef))
+      : const Locale('en');
+
   runApp(
     EasyLocalization(
       supportedLocales: const [Locale('en'), Locale('ar')],
       path: 'assets/translations',
       fallbackLocale: const Locale('en'),
+      startLocale: startLocale,
+      saveLocale: false,
       child: ProviderScope(
         overrides: [
           if (settingsProviders != null) ...[
