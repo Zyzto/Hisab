@@ -57,6 +57,8 @@ android/secrets.properties
 
 # Convex CLI generated files
 convex/_generated/
+convex/.tmp/
 
 # Flutter generated (in addition to .flutter-plugins-dependencies)
 .flutter-plugins
+node_modules/

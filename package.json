@@ -1,0 +1,11 @@
+{
+  "name": "hisab",
+  "private": true,
+  "scripts": {
+    "convex:dev": "CONVEX_TMPDIR=./convex/.tmp convex dev",
+    "convex:deploy": "CONVEX_TMPDIR=./convex/.tmp convex deploy"
+  },
+  "dependencies": {
+    "convex": "^1.19.0"
+  }
+}
