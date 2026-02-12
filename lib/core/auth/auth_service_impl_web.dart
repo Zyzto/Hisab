@@ -45,7 +45,8 @@ Future<String?> auth0GetAccessToken() async {
   try {
     final auth0Web = Auth0Web(auth0Domain, auth0ClientId);
     final credentials = await auth0Web.credentials();
-    return credentials.accessToken;
+    // Convex Auth0 expects the ID token for authenticated requests (not access token).
+    return credentials.idToken ?? credentials.accessToken;
   } catch (e) {
     Log.debug('Auth0 getAccessToken failed: $e');
     return null;
