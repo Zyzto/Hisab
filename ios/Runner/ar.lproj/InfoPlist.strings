@@ -1,0 +1,8 @@
+/* 
+  InfoPlist.strings
+  Runner
+
+  Created for Arabic localization support.
+*/
+
+CFBundleDisplayName = "حساب";

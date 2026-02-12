@@ -1,4 +1,4 @@
-package com.example.hisab
+package com.shenepoy.hisab
 
 import io.flutter.embedding.android.FlutterActivity
 

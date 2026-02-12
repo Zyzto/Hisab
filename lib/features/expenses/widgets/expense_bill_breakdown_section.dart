@@ -7,11 +7,11 @@ import '../constants/expense_form_constants.dart';
 class ExpenseBillBreakdownSection extends StatelessWidget {
   final List<ReceiptLineItem> lineItems;
   final List<({TextEditingController desc, TextEditingController amount})>
-      lineItemControllers;
+  lineItemControllers;
   final VoidCallback onAddItem;
   final void Function(int index) onRemoveItem;
   final void Function(int index, String description, int amountCents)
-      onItemChanged;
+  onItemChanged;
 
   const ExpenseBillBreakdownSection({
     super.key,
@@ -88,7 +88,9 @@ class ExpenseBillBreakdownSection extends StatelessWidget {
                             ),
                           ),
                           onChanged: (v) {
-                            final cents = ((double.tryParse(amountCtrl.text) ?? 0) * 100).round();
+                            final cents =
+                                ((double.tryParse(amountCtrl.text) ?? 0) * 100)
+                                    .round();
                             onItemChanged(i, v.trim(), cents);
                           },
                         ),
@@ -107,13 +109,13 @@ class ExpenseBillBreakdownSection extends StatelessWidget {
                               vertical: 10,
                             ),
                           ),
-                          keyboardType:
-                              const TextInputType.numberWithOptions(
+                          keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                           ),
                           inputFormatters: [decimalOnlyFormatter],
                           onChanged: (v) {
-                            final cents = ((double.tryParse(v) ?? 0) * 100).round();
+                            final cents = ((double.tryParse(v) ?? 0) * 100)
+                                .round();
                             onItemChanged(i, descCtrl.text.trim(), cents);
                           },
                         ),

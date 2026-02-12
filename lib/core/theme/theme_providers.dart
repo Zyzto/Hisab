@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'app_theme.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
+
+part 'theme_providers.g.dart';
 
 /// Holds both light and dark themes. Built once per theme-setting change.
 class AppThemes {
@@ -12,7 +14,8 @@ class AppThemes {
 }
 
 /// Theme data provider. Rebuilds only when themeMode, themeColor, or fontSizeScale change.
-final appThemesProvider = Provider<AppThemes>((ref) {
+@riverpod
+AppThemes appThemes(Ref ref) {
   final themeModeValue = ref.watch(themeModeProvider);
   final themeColorValue = ref.watch(themeColorProvider);
   final fontSizeScaleValue = ref.watch(fontSizeScaleProvider);
@@ -29,16 +32,14 @@ final appThemesProvider = Provider<AppThemes>((ref) {
           seedColor: themeColor,
           fontSizeScale: fontSizeScale,
         )
-      : AppTheme.darkTheme(
-          seedColor: themeColor,
-          fontSizeScale: fontSizeScale,
-        );
+      : AppTheme.darkTheme(seedColor: themeColor, fontSizeScale: fontSizeScale);
 
   return AppThemes(light: lightTheme, dark: darkTheme);
-});
+}
 
 /// ThemeMode for MaterialApp. Separate so locale changes don't trigger theme rebuild.
-final appThemeModeProvider = Provider<ThemeMode>((ref) {
+@riverpod
+ThemeMode appThemeMode(Ref ref) {
   final value = ref.watch(themeModeProvider);
   switch (value) {
     case 'light':
@@ -49,4 +50,4 @@ final appThemeModeProvider = Provider<ThemeMode>((ref) {
     default:
       return ThemeMode.system;
   }
-});
+}

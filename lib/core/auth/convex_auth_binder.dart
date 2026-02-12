@@ -71,10 +71,10 @@ class _ConvexAuthBinderState extends ConsumerState<ConvexAuthBinder> {
 
   @override
   Widget build(BuildContext context) {
-    final localOnly = ref.watch(localOnlyProvider);
+    final localOnly = ref.watch(effectiveLocalOnlyProvider);
     final onlineAvailable = ref.watch(auth0ConfigAvailableProvider);
 
-    ref.listen<bool>(localOnlyProvider, (previous, next) {
+    ref.listen<bool>(effectiveLocalOnlyProvider, (previous, next) {
       if (next == true) {
         _disposeAuth();
         ConvexClient.instance.clearAuth();

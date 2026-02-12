@@ -38,11 +38,10 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
       final id = await repo.create(name, currencyCode);
       Log.info('Group created: id=$id name="$name" currencyCode=$currencyCode');
       try {
-        TelemetryService.sendEvent(
-          'group_created',
-          {'groupId': id, 'currencyCode': currencyCode},
-          enabled: ref.read(telemetryEnabledProvider),
-        );
+        TelemetryService.sendEvent('group_created', {
+          'groupId': id,
+          'currencyCode': currencyCode,
+        }, enabled: ref.read(telemetryEnabledProvider));
       } catch (_) {}
       if (mounted) context.go(RoutePaths.groupDetail(id));
     } catch (e, st) {

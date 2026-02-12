@@ -1,13 +1,15 @@
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/services/settle_up_service.dart';
 import '../../../domain/domain.dart';
 import '../../groups/providers/groups_provider.dart';
 
+part 'balance_provider.g.dart';
+
 /// Computed provider for group balances and settlements. Caches computation
 /// and recomputes when group, participants, or expenses change.
-final groupBalanceProvider =
-    Provider.family<AsyncValue<GroupBalanceResult?>, String>((ref, groupId) {
+@riverpod
+AsyncValue<GroupBalanceResult?> groupBalance(Ref ref, String groupId) {
   final groupAsync = ref.watch(futureGroupProvider(groupId));
   final participantsAsync = ref.watch(participantsByGroupProvider(groupId));
   final expensesAsync = ref.watch(expensesByGroupProvider(groupId));
@@ -84,4 +86,4 @@ final groupBalanceProvider =
     loading: () => const AsyncValue.loading(),
     error: (e, s) => AsyncValue.error(e, s),
   );
-});
+}

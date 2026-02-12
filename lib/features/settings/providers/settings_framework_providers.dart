@@ -2,6 +2,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import '../settings_definitions.dart';
+import '../../onboarding/providers/onboarding_providers.dart';
 
 part 'settings_framework_providers.g.dart';
 
@@ -55,6 +56,14 @@ bool localOnly(Ref ref) {
     );
     return true;
   }
+}
+
+/// When true, app uses only local storage. When config is missing, effectively true.
+@riverpod
+bool effectiveLocalOnly(Ref ref) {
+  final local = ref.watch(localOnlyProvider);
+  final onlineAvailable = ref.watch(auth0ConfigAvailableProvider);
+  return local || !onlineAvailable;
 }
 
 @riverpod

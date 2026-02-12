@@ -281,7 +281,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
           .update(
             group.copyWith(settlementMethod: method, updatedAt: DateTime.now()),
           );
-      Log.info('Settlement method changed: groupId=${widget.groupId} method=$method');
+      Log.info(
+        'Settlement method changed: groupId=${widget.groupId} method=$method',
+      );
       ref.invalidate(futureGroupProvider(widget.groupId));
     } catch (e, st) {
       Log.warning('Settlement method change failed', error: e, stackTrace: st);
@@ -306,7 +308,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
               updatedAt: DateTime.now(),
             ),
           );
-      Log.info('Treasurer changed: groupId=${widget.groupId} treasurerId=$treasurerId');
+      Log.info(
+        'Treasurer changed: groupId=${widget.groupId} treasurerId=$treasurerId',
+      );
       ref.invalidate(futureGroupProvider(widget.groupId));
     } catch (e, st) {
       Log.warning('Treasurer change failed', error: e, stackTrace: st);

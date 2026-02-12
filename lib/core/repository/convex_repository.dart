@@ -243,7 +243,9 @@ class ConvexParticipantRepository implements IParticipantRepository {
           'updatedAt': participant.updatedAt.millisecondsSinceEpoch,
         },
       );
-      Log.info('Participant updated: id=${participant.id} name="${participant.name}"');
+      Log.info(
+        'Participant updated: id=${participant.id} name="${participant.name}"',
+      );
     } catch (e, st) {
       Log.error('Convex participant update failed', error: e, stackTrace: st);
       rethrow;
@@ -369,7 +371,8 @@ class ConvexExpenseRepository implements IExpenseRepository {
           'updatedAt': expense.updatedAt.millisecondsSinceEpoch,
           'tag': expense.tag,
           'description': expense.description ?? '',
-          'lineItemsJson': expense.lineItems == null || expense.lineItems!.isEmpty
+          'lineItemsJson':
+              expense.lineItems == null || expense.lineItems!.isEmpty
               ? '[]'
               : jsonEncode(expense.lineItems!.map((e) => e.toJson()).toList()),
           'receiptImagePath': expense.receiptImagePath ?? '',

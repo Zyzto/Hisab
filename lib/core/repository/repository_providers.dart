@@ -13,7 +13,7 @@ part 'repository_providers.g.dart';
 
 @riverpod
 IGroupRepository groupRepository(Ref ref) {
-  final useLocal = ref.watch(localOnlyProvider);
+  final useLocal = ref.watch(effectiveLocalOnlyProvider);
   Log.debug('Using ${useLocal ? "local" : "Convex"} repository');
   if (useLocal) {
     return LocalGroupRepository(ref.watch(groupDaoProvider));
@@ -23,7 +23,7 @@ IGroupRepository groupRepository(Ref ref) {
 
 @riverpod
 IParticipantRepository participantRepository(Ref ref) {
-  final useLocal = ref.watch(localOnlyProvider);
+  final useLocal = ref.watch(effectiveLocalOnlyProvider);
   if (useLocal) {
     return LocalParticipantRepository(ref.watch(participantDaoProvider));
   }
@@ -32,7 +32,7 @@ IParticipantRepository participantRepository(Ref ref) {
 
 @riverpod
 IExpenseRepository expenseRepository(Ref ref) {
-  final useLocal = ref.watch(localOnlyProvider);
+  final useLocal = ref.watch(effectiveLocalOnlyProvider);
   if (useLocal) {
     return LocalExpenseRepository(ref.watch(expenseDaoProvider));
   }
@@ -41,7 +41,7 @@ IExpenseRepository expenseRepository(Ref ref) {
 
 @riverpod
 ITagRepository tagRepository(Ref ref) {
-  final useLocal = ref.watch(localOnlyProvider);
+  final useLocal = ref.watch(effectiveLocalOnlyProvider);
   if (useLocal) {
     return LocalTagRepository(ref.watch(expenseTagDaoProvider));
   }

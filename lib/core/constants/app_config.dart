@@ -1,5 +1,3 @@
-/// URL for "Report issue" (e.g. GitHub issues). Empty = copy-only, no URL open.
-const String reportIssueUrl = '';
-
-/// Telemetry endpoint URL. Empty = telemetry disabled. Set when server is ready.
-const String telemetryEndpointUrl = '';
+// Report issue URL and telemetry endpoint. Empty = disabled.
+// Values come from app_secrets.dart (gitignored).
+export 'app_secrets.dart' show reportIssueUrl, telemetryEndpointUrl;

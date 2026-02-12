@@ -141,6 +141,17 @@ final onboardingOnlinePendingSettingDef = const BoolSetting(
   order: -2, // Internal, not shown in settings UI
 );
 
+/// When true, user switched to online in settings; Auth0 redirect in progress (web).
+/// Cleared when app loads after redirect and localOnly is set to false.
+final settingsOnlinePendingSettingDef = const BoolSetting(
+  'settings_online_pending',
+  defaultValue: false,
+  titleKey: 'settings_online_pending',
+  icon: Icons.pending,
+  section: 'general',
+  order: -3, // Internal, not shown in settings UI
+);
+
 /// When true, app uses only local storage (Drift). When false, uses Convex.
 final localOnlySettingDef = const BoolSetting(
   'local_only',
@@ -221,6 +232,7 @@ final allSections = [
 final allSettings = <SettingDefinition>[
   onboardingCompletedSettingDef,
   onboardingOnlinePendingSettingDef,
+  settingsOnlinePendingSettingDef,
   themeModeSettingDef,
   themeColorSettingDef,
   languageSettingDef,

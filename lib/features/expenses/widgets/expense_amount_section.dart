@@ -71,10 +71,13 @@ class ExpenseAmountSection extends StatelessWidget {
                   decimal: true,
                 ),
                 inputFormatters: [decimalOnlyFormatter],
-                validator: validator ??
+                validator:
+                    validator ??
                     (v) {
                       if (v == null || v.trim().isEmpty) return 'required'.tr();
-                      if (double.tryParse(v) == null) return 'invalid_number'.tr();
+                      if (double.tryParse(v) == null) {
+                        return 'invalid_number'.tr();
+                      }
                       return null;
                     },
               ),

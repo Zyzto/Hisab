@@ -49,6 +49,12 @@ app.*.map.json
 .env.*
 !.env.example
 
+# App secrets (copy from app_secrets_example.dart)
+lib/core/constants/app_secrets.dart
+
+# Android Auth0 manifest placeholders
+android/secrets.properties
+
 # Convex CLI generated files
 convex/_generated/
 

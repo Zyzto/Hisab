@@ -48,7 +48,8 @@ class ExpenseSplitSection extends StatelessWidget {
     String value,
     List<Participant> includedList,
     TextEditingController? controller,
-  ) onAmountChanged;
+  )
+  onAmountChanged;
   final void Function(Participant p, String value) onPartsChanged;
   final int Function() amountsSumCents;
 
@@ -75,8 +76,9 @@ class ExpenseSplitSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final includedList =
-        participants.where((p) => includedInSplitIds.contains(p.id)).toList();
+    final includedList = participants
+        .where((p) => includedInSplitIds.contains(p.id))
+        .toList();
     final isCustomSplit =
         splitType == SplitType.parts || splitType == SplitType.amounts;
 
@@ -112,8 +114,8 @@ class ExpenseSplitSection extends StatelessWidget {
                           splitType == SplitType.equal
                               ? 'equal'.tr()
                               : splitType == SplitType.parts
-                                  ? 'parts'.tr()
-                                  : 'amounts'.tr(),
+                              ? 'parts'.tr()
+                              : 'amounts'.tr(),
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: theme.colorScheme.primary,
                             fontWeight: FontWeight.w500,
@@ -188,22 +190,23 @@ class ExpenseSplitSection extends StatelessWidget {
                                         controller: controller,
                                         keyboardType:
                                             TextInputType.numberWithOptions(
-                                          decimal:
-                                              splitType == SplitType.amounts,
-                                        ),
+                                              decimal:
+                                                  splitType ==
+                                                  SplitType.amounts,
+                                            ),
                                         inputFormatters:
                                             splitType == SplitType.amounts
-                                                ? [decimalOnlyFormatter]
-                                                : [
-                                                    FilteringTextInputFormatter
-                                                        .digitsOnly,
-                                                  ],
+                                            ? [decimalOnlyFormatter]
+                                            : [
+                                                FilteringTextInputFormatter
+                                                    .digitsOnly,
+                                              ],
                                         textAlign: TextAlign.center,
                                         style: theme.textTheme.bodyMedium
                                             ?.copyWith(
-                                          fontWeight: FontWeight.w500,
-                                          height: 1.0,
-                                        ),
+                                              fontWeight: FontWeight.w500,
+                                              height: 1.0,
+                                            ),
                                         decoration: _splitInputDecoration(
                                           theme,
                                         ),
@@ -235,11 +238,11 @@ class ExpenseSplitSection extends StatelessWidget {
                                       ),
                                       style: theme.textTheme.bodyMedium
                                           ?.copyWith(
-                                        fontWeight: FontWeight.w500,
-                                        color: theme
-                                            .colorScheme
-                                            .onSurfaceVariant,
-                                      ),
+                                            fontWeight: FontWeight.w500,
+                                            color: theme
+                                                .colorScheme
+                                                .onSurfaceVariant,
+                                          ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),

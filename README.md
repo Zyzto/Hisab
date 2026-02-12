@@ -33,14 +33,27 @@ For web (Chrome): ensure `web/sqlite3.wasm` and `web/drift_worker.dart.js` are p
   - **Cloud** — Convex via `Convex*Repository` when Local Only is off.
 - **Domain** — `lib/domain/`: Group, Participant, Expense (amounts in cents), SplitType, SettlementTransaction.
 
-## Convex (optional)
+## Convex & Auth0 (optional)
 
-1. Install [Convex CLI](https://docs.convex.dev) and create a project.
-2. From project root: `npx convex dev` to push schema and functions from `convex/`.
-3. Set your deployment URL in `lib/core/constants/convex_config.dart` (`convexDeploymentUrl`).
-4. Turn off **Local Only** in Settings to use Convex.
+For **online sync**, configure both Convex and Auth0. See **[CONFIGURATION.md](CONFIGURATION.md)** for step-by-step setup.
 
-If `convexDeploymentUrl` is empty, Convex is not initialized and the app runs in Local Only mode only.
+**First-time:** Copy example files (secrets are gitignored):
+
+```bash
+cp lib/core/constants/app_secrets_example.dart lib/core/constants/app_secrets.dart
+cp android/secrets.properties.example android/secrets.properties
+```
+
+- **Convex** — `npx convex dev`, set `convexDeploymentUrl` in `app_secrets.dart`.
+- **Auth0** — Native app in Auth0 Dashboard; set `auth0Domain` and `auth0ClientId` in `app_secrets.dart`; set `auth0Domain` and `auth0Scheme` in `android/secrets.properties`.
+
+If `convexDeploymentUrl` is empty or Auth0 is not configured, the app runs in **Local Only** mode (Drift only).
+
+### Keeping secrets out of git
+
+`app_secrets.dart` and `android/secrets.properties` are gitignored. Never commit them. Use `app_secrets_example.dart` and `secrets.properties.example` as templates.
+
+If secrets were already committed, use [git-filter-repo](https://github.com/newren/git-filter-repo) or [BFG Repo-Cleaner](https://rtyley.github.io/bfg-repo-cleaner/) to rewrite history, then rotate any exposed credentials.
 
 ## License
 

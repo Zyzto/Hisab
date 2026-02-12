@@ -38,8 +38,9 @@ class ExpenseTitleSection extends StatelessWidget {
     final tagIcon = preset != null
         ? preset.icon
         : (customTag != null
-            ? (selectableExpenseIcons[customTag.iconName] ?? Icons.label_outlined)
-            : Icons.label_outlined);
+              ? (selectableExpenseIcons[customTag.iconName] ??
+                    Icons.label_outlined)
+              : Icons.label_outlined);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -88,7 +89,9 @@ class ExpenseTitleSection extends StatelessWidget {
               ],
             ),
           ),
-          validator: validator ?? (v) => v == null || v.trim().isEmpty ? 'required'.tr() : null,
+          validator:
+              validator ??
+              (v) => v == null || v.trim().isEmpty ? 'required'.tr() : null,
         ),
       ],
     );

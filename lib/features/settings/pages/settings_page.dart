@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +11,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/auth/auth_service.dart';
 import '../../../core/constants/app_config.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../onboarding/providers/onboarding_providers.dart';
@@ -348,6 +350,66 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
   }
 
+  Future<void> _handleLocalOnlyChanged(
+    BuildContext context,
+    WidgetRef ref,
+    SettingsProviders settings,
+    bool v,
+  ) async {
+    // Switching to local: user decided; set immediately.
+    if (v == true) {
+      ref.read(settings.provider(localOnlySettingDef).notifier).set(true);
+      ref.read(settings.provider(settingsOnlinePendingSettingDef).notifier).set(false);
+      return;
+    }
+
+    // Switching to online: show dialog, user decides.
+    final onlineAvailable = ref.read(auth0ConfigAvailableProvider);
+    if (!onlineAvailable) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('sign_in'.tr()),
+        content: Text('onboarding_online_requires_sign_in'.tr()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('cancel'.tr()),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('sign_in'.tr()),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    // User chose Sign in. Check if already signed in.
+    final signedIn = await auth0HasValidCredentials();
+    if (signedIn) {
+      ref.read(settings.provider(localOnlySettingDef).notifier).set(false);
+      return;
+    }
+
+    if (kIsWeb) {
+      ref.read(settings.provider(settingsOnlinePendingSettingDef).notifier).set(true);
+      await auth0SignIn();
+      return;
+    }
+
+    final token = await auth0SignIn();
+    if (token != null && context.mounted) {
+      ref.read(settings.provider(localOnlySettingDef).notifier).set(false);
+    } else if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('onboarding_online_requires_sign_in'.tr())),
+      );
+    }
+  }
+
   Widget _buildLocalOnlyTile(
     BuildContext context,
     WidgetRef ref,
@@ -364,11 +426,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       title: 'local_only'.tr(),
       subtitle: subtitle,
       value: value,
-      onChanged: (v) {
-        if (v == false && !onlineAvailable) return;
-        ref.read(settings.provider(localOnlySettingDef).notifier).set(v);
-      },
-      enabled: onlineAvailable || value,
+      onChanged: (v) => _handleLocalOnlyChanged(context, ref, settings, v),
+      enabled: onlineAvailable,
     );
   }
 

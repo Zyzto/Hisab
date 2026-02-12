@@ -56,35 +56,47 @@ void main() async {
   EasyLocalization.logger.enableBuildModes = [];
   Log.debug('Easy Localization initialized');
 
-  if (convexDeploymentUrl.isNotEmpty) {
-    try {
-      await ConvexClient.initialize(
-        // ignore: prefer_const_constructors - deploymentUrl is a variable
-        ConvexConfig(deploymentUrl: convexDeploymentUrl, clientId: 'hisab-1.0'),
-      );
-      Log.debug('Convex client initialized');
-    } catch (e, stackTrace) {
-      Log.error(
-        'Convex client initialization failed',
-        error: e,
-        stackTrace: stackTrace,
-      );
-    }
-  }
-
   final settingsProviders = await initializeHisabSettings();
   if (settingsProviders != null) {
     Log.debug('Settings framework initialized');
 
-    // Web: process Auth0 redirect callback; if returning from sign-in with pending onboarding, complete it
-    if (kIsWeb && auth0ConfigAvailable) {
+    // Initialize Convex only when online is configured (Auth0 + Convex both set)
+    if (auth0ConfigAvailable && convexDeploymentUrl.isNotEmpty) {
+      try {
+        await ConvexClient.initialize(
+          // ignore: prefer_const_constructors - deploymentUrl is a variable
+          ConvexConfig(deploymentUrl: convexDeploymentUrl, clientId: 'hisab-1.0'),
+        );
+        Log.debug('Convex client initialized');
+      } catch (e, stackTrace) {
+        Log.error(
+          'Convex client initialization failed',
+          error: e,
+          stackTrace: stackTrace,
+        );
+      }
+    }
+
+    // Web: process Auth0 redirect callback only when we might need it
+    final onboardingPending = settingsProviders.controller.get(onboardingOnlinePendingSettingDef);
+    final settingsPending = settingsProviders.controller.get(settingsOnlinePendingSettingDef);
+    final localOnly = settingsProviders.controller.get(localOnlySettingDef);
+    final needAuth0OnLoad = kIsWeb &&
+        auth0ConfigAvailable &&
+        (onboardingPending == true || settingsPending == true || localOnly == false);
+
+    if (needAuth0OnLoad) {
       final credentials = await auth0OnLoad();
       if (credentials != null) {
-        final pending = settingsProviders.controller.get(onboardingOnlinePendingSettingDef);
-        if (pending == true) {
+        if (onboardingPending == true) {
           settingsProviders.controller.set(onboardingCompletedSettingDef, true);
           settingsProviders.controller.set(onboardingOnlinePendingSettingDef, false);
           Log.info('Onboarding completed after Auth0 redirect');
+        }
+        if (settingsPending == true) {
+          settingsProviders.controller.set(localOnlySettingDef, false);
+          settingsProviders.controller.set(settingsOnlinePendingSettingDef, false);
+          Log.info('Settings: switched to online after Auth0 redirect');
         }
       }
     }

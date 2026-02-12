@@ -1,5 +1,3 @@
-/// Set this to your Convex deployment URL when using cloud sync.
-/// e.g. 'https://your-deployment.convex.cloud'
-/// When empty, Convex is not initialized and "Local Only" mode is effectively required.
-const String convexDeploymentUrl =
-    'https://REDACTED.convex.cloud';
+// Convex deployment URL for cloud sync. When empty, Local Only mode is required.
+// Value comes from app_secrets.dart (gitignored).
+export 'app_secrets.dart' show convexDeploymentUrl;

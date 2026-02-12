@@ -46,4 +46,9 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index('by_group', ['groupId']),
+  telemetry: defineTable({
+    event: v.string(),
+    timestamp: v.string(),
+    data: v.optional(v.any()),
+  }).index('by_event', ['event']),
 });

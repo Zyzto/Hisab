@@ -68,7 +68,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
 
   /// Controllers for bill breakdown rows (one desc + amount per line).
   final List<({TextEditingController desc, TextEditingController amount})>
-      _lineItemControllers = [];
+  _lineItemControllers = [];
 
   /// Path to attached receipt image (when AI not configured or LLM failed).
   String? _receiptImagePath;
@@ -127,16 +127,14 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           ? List.from(expense.lineItems!)
           : [];
       for (final item in _lineItems) {
-        _lineItemControllers.add(
-          (
-            desc: TextEditingController(text: item.description),
-            amount: TextEditingController(
-              text: item.amountCents > 0
-                  ? (item.amountCents / 100).toStringAsFixed(2)
-                  : '',
-            ),
+        _lineItemControllers.add((
+          desc: TextEditingController(text: item.description),
+          amount: TextEditingController(
+            text: item.amountCents > 0
+                ? (item.amountCents / 100).toStringAsFixed(2)
+                : '',
           ),
-        );
+        ));
       }
       _receiptImagePath = expense.receiptImagePath;
       _editLoaded = true;
@@ -312,14 +310,10 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           'Expense created: id=$id groupId=${expense.groupId} title="${expense.title}" amountCents=${expense.amountCents} currencyCode=${expense.currencyCode}',
         );
         try {
-          TelemetryService.sendEvent(
-            'expense_created',
-            {
-              'groupId': expense.groupId,
-              'amountCents': expense.amountCents,
-            },
-            enabled: ref.read(telemetryEnabledProvider),
-          );
+          TelemetryService.sendEvent('expense_created', {
+            'groupId': expense.groupId,
+            'amountCents': expense.amountCents,
+          }, enabled: ref.read(telemetryEnabledProvider));
         } catch (_) {}
       }
       if (!mounted) return;
@@ -727,14 +721,15 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                         onAddItem: () {
                           setState(() {
                             _lineItems.add(
-                              const ReceiptLineItem(description: '', amountCents: 0),
-                            );
-                            _lineItemControllers.add(
-                              (
-                                desc: TextEditingController(),
-                                amount: TextEditingController(),
+                              const ReceiptLineItem(
+                                description: '',
+                                amountCents: 0,
                               ),
                             );
+                            _lineItemControllers.add((
+                              desc: TextEditingController(),
+                              amount: TextEditingController(),
+                            ));
                           });
                         },
                         onRemoveItem: (i) {
@@ -759,11 +754,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                         listenable: _amountController,
                         builder: (context, _) {
                           final amountCents =
-                              (double.tryParse(
-                                    _amountController.text.trim(),
-                                  ) ??
-                                      0) *
-                                  100;
+                              (double.tryParse(_amountController.text.trim()) ??
+                                  0) *
+                              100;
                           final amountCentsInt = amountCents.toInt();
                           if (_splitType == SplitType.parts ||
                               _splitType == SplitType.amounts) {
@@ -783,9 +776,12 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                         participants,
                                       ))
                               : <int>[];
-                          final participantIds =
-                              participants.map((e) => e.id).toSet();
-                          for (final id in List.from(_splitEditControllers.keys)) {
+                          final participantIds = participants
+                              .map((e) => e.id)
+                              .toSet();
+                          for (final id in List.from(
+                            _splitEditControllers.keys,
+                          )) {
                             if (!participantIds.contains(id)) {
                               _splitEditControllers[id]?.dispose();
                               _splitEditControllers.remove(id);
@@ -863,12 +859,11 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                     ListenableBuilder(
                       listenable: _amountController,
                       builder: (context, _) {
-                        final amountCentsInt = ((double.tryParse(
-                                  _amountController.text.trim(),
-                                ) ??
-                                    0) *
-                                100)
-                            .toInt();
+                        final amountCentsInt =
+                            ((double.tryParse(_amountController.text.trim()) ??
+                                        0) *
+                                    100)
+                                .toInt();
                         return SizedBox(
                           height: 52,
                           child: FilledButton(
@@ -877,8 +872,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                     (_splitType == SplitType.amounts &&
                                         _amountsSumCents(participants) !=
                                             amountCentsInt))
-                                    ? null
-                                    : _save,
+                                ? null
+                                : _save,
                             child: _saving
                                 ? const SizedBox(
                                     height: 24,
@@ -981,7 +976,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                   ...customTags.map((tag) {
                     final selected = _selectedTag == tag.id;
                     final iconData =
-                        selectableExpenseIcons[tag.iconName] ?? Icons.label_outlined;
+                        selectableExpenseIcons[tag.iconName] ??
+                        Icons.label_outlined;
                     return InkWell(
                       onTap: () {
                         setState(() => _selectedTag = tag.id);
@@ -1211,9 +1207,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       final result = await processReceiptFile(file, ref, _date);
       if (!mounted) return;
       if (result == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('receipt_no_text'.tr())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('receipt_no_text'.tr())));
         return;
       }
       switch (result) {
@@ -1223,18 +1219,18 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
             _date = result.date;
             _amountController.text = result.total.toStringAsFixed(2);
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('receipt_scan_applied'.tr())),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('receipt_scan_applied'.tr())));
         case ReceiptScanFallback():
           setState(() {
             _titleController.text = 'Receipt';
             _descriptionController.text = result.ocrText;
             _receiptImagePath = result.receiptImagePath;
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('receipt_attached'.tr())),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('receipt_attached'.tr())));
       }
     } catch (e, stack) {
       if (mounted) {

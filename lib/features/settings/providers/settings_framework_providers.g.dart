@@ -146,6 +146,53 @@ final class LocalOnlyProvider extends $FunctionalProvider<bool, bool, bool>
 
 String _$localOnlyHash() => r'593d279a7cb81d4a3cdd1104e8ea7439ced5990c';
 
+/// When true, app uses only local storage. When config is missing, effectively true.
+
+@ProviderFor(effectiveLocalOnly)
+final effectiveLocalOnlyProvider = EffectiveLocalOnlyProvider._();
+
+/// When true, app uses only local storage. When config is missing, effectively true.
+
+final class EffectiveLocalOnlyProvider
+    extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  /// When true, app uses only local storage. When config is missing, effectively true.
+  EffectiveLocalOnlyProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'effectiveLocalOnlyProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$effectiveLocalOnlyHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return effectiveLocalOnly(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$effectiveLocalOnlyHash() =>
+    r'2845740a9b1f275e00d0ac3a6000f3d8b0721967';
+
 @ProviderFor(receiptOcrEnabled)
 final receiptOcrEnabledProvider = ReceiptOcrEnabledProvider._();
 

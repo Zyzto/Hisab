@@ -29,10 +29,7 @@ class ReceiptScanFallback extends ReceiptScanResult {
   final String ocrText;
   final String? receiptImagePath;
 
-  ReceiptScanFallback({
-    required this.ocrText,
-    this.receiptImagePath,
-  });
+  ReceiptScanFallback({required this.ocrText, this.receiptImagePath});
 }
 
 /// Parse LLM JSON response (vendor, date, total). Strips markdown code fences. Returns null on failure.
@@ -109,8 +106,8 @@ Future<ReceiptScanResult?> processReceiptFile(
     final configured = provider == 'gemini'
         ? geminiKey.isNotEmpty
         : provider == 'openai'
-            ? openaiKey.isNotEmpty
-            : false;
+        ? openaiKey.isNotEmpty
+        : false;
 
     if (!aiEnabled || provider == 'none' || !configured) {
       Log.debug('Receipt scan: AI disabled or not configured, OCR text only');
@@ -146,10 +143,7 @@ Future<ReceiptScanResult?> processReceiptFile(
     }
 
     final storedPath = await copyReceiptToAppStorage(file.path);
-    return ReceiptScanFallback(
-      ocrText: ocrText,
-      receiptImagePath: storedPath,
-    );
+    return ReceiptScanFallback(ocrText: ocrText, receiptImagePath: storedPath);
   } catch (e, st) {
     Log.error('Receipt scan failed', error: e, stackTrace: st);
     rethrow;

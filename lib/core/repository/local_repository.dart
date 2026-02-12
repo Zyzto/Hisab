@@ -72,7 +72,9 @@ class LocalGroupRepository implements IGroupRepository {
     );
     final id = await _groupDao.insertGroup(companion);
     final domainId = intToLocalId(id);
-    Log.info('Group created: id=$domainId name="$name" currencyCode=$currencyCode');
+    Log.info(
+      'Group created: id=$domainId name="$name" currencyCode=$currencyCode',
+    );
     return domainId;
   }
 
@@ -222,7 +224,9 @@ class LocalParticipantRepository implements IParticipantRepository {
       updatedAt: participant.updatedAt,
     );
     await _participantDao.updateParticipant(row);
-    Log.info('Participant updated: id=${participant.id} name="${participant.name}"');
+    Log.info(
+      'Participant updated: id=${participant.id} name="${participant.name}"',
+    );
   }
 
   @override

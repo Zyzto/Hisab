@@ -320,7 +320,7 @@ class _ExpensesTab extends ConsumerWidget {
                         expense: expense,
                         payerName:
                             nameOf[expense.payerParticipantId] ??
-                                expense.payerParticipantId,
+                            expense.payerParticipantId,
                         icon: iconForExpenseTag(expense.tag, customTags),
                       ),
                     );
