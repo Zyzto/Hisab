@@ -26,6 +26,22 @@ Future<SettingsProviders?> initializeHisabSettings() async {
 }
 
 @riverpod
+bool onboardingCompleted(Ref ref) {
+  try {
+    final settings = ref.watch(hisabSettingsProvidersProvider);
+    if (settings == null) return false;
+    return ref.watch(settings.provider(onboardingCompletedSettingDef));
+  } catch (e, stackTrace) {
+    Log.warning(
+      'onboardingCompleted read failed, defaulting to false',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return false;
+  }
+}
+
+@riverpod
 bool localOnly(Ref ref) {
   try {
     final settings = ref.watch(hisabSettingsProvidersProvider);

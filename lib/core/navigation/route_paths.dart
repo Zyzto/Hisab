@@ -1,6 +1,7 @@
 class RoutePaths {
   static const String home = '/';
   static const String settings = '/settings';
+  static const String onboarding = '/onboarding';
 
   static String groupDetail(String groupId) => '/groups/$groupId';
   static String groupExpenses(String groupId) => '/groups/$groupId/expenses';

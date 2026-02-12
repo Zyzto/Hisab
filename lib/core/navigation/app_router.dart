@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'route_paths.dart';
 import '../../features/home/routes.dart';
 import '../../features/settings/routes.dart';
+import '../../features/onboarding/routes.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
 import '../../features/groups/pages/group_create_page.dart';
 import '../../features/groups/pages/group_detail_page.dart';
@@ -26,10 +27,23 @@ ValueNotifier<String> localeRefreshNotifier(Ref ref) {
 @riverpod
 GoRouter router(Ref ref) {
   final refreshNotifier = ref.watch(localeRefreshProvider);
+  final onboardingCompleted = ref.watch(onboardingCompletedProvider);
+
   return GoRouter(
     refreshListenable: refreshNotifier,
     initialLocation: RoutePaths.home,
+    redirect: (context, state) {
+      final onOnboarding = state.matchedLocation == RoutePaths.onboarding;
+      if (!onboardingCompleted && !onOnboarding) {
+        return RoutePaths.onboarding;
+      }
+      if (onboardingCompleted && onOnboarding) {
+        return RoutePaths.home;
+      }
+      return null;
+    },
     routes: [
+      ...getOnboardingRoutes(),
       ShellRoute(
         builder: (context, state, child) {
           final location = state.uri.path;

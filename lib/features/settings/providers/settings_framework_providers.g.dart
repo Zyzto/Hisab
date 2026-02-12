@@ -64,6 +64,48 @@ final class HisabSettingsProvidersProvider
 String _$hisabSettingsProvidersHash() =>
     r'dda64f95490bc8e73116dfc4b674c47cd8bfefb0';
 
+@ProviderFor(onboardingCompleted)
+final onboardingCompletedProvider = OnboardingCompletedProvider._();
+
+final class OnboardingCompletedProvider
+    extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  OnboardingCompletedProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'onboardingCompletedProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$onboardingCompletedHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return onboardingCompleted(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$onboardingCompletedHash() =>
+    r'2b1c03b667c5c731cecfaf7616d08e1f6d4be699';
+
 @ProviderFor(localOnly)
 final localOnlyProvider = LocalOnlyProvider._();
 

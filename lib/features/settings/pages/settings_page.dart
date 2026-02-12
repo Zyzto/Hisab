@@ -8,8 +8,11 @@ import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_config.dart';
+import '../../../core/navigation/route_paths.dart';
+import '../../onboarding/providers/onboarding_providers.dart';
 import '../settings_definitions.dart';
 import '../providers/settings_framework_providers.dart';
 import '../backup_helper.dart';
@@ -94,15 +97,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
           ]),
           _buildSection(context, ref, settings, dataSection, [
-            SwitchSettingsTile.fromSetting(
-              setting: localOnlySettingDef,
-              title: 'local_only'.tr(),
-              subtitle: 'local_only_description'.tr(),
-              value: ref.watch(settings.provider(localOnlySettingDef)),
-              onChanged: (v) => ref
-                  .read(settings.provider(localOnlySettingDef).notifier)
-                  .set(v),
-            ),
+            _buildLocalOnlyTile(context, ref, settings),
           ]),
           _buildSection(context, ref, settings, receiptAiSection, [
             SwitchSettingsTile.fromSetting(
@@ -192,6 +187,26 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               onTap: () => _importData(context, ref),
             ),
           ]),
+          _buildSection(context, ref, settings, advancedSection, [
+            ActionSettingsTile(
+              leading: const Icon(Icons.replay),
+              title: Text('return_to_onboarding'.tr()),
+              subtitle: Text('return_to_onboarding_description'.tr()),
+              onTap: () => _resetToOnboarding(context, ref, settings),
+            ),
+            ActionSettingsTile(
+              leading: const Icon(Icons.restore),
+              title: Text('reset_all_settings'.tr()),
+              subtitle: Text('reset_all_settings_description'.tr()),
+              onTap: () => _resetAllSettings(context, ref, settings),
+            ),
+            ActionSettingsTile(
+              leading: const Icon(Icons.delete_forever),
+              title: Text('delete_all_data'.tr()),
+              subtitle: Text('delete_all_data_description'.tr()),
+              onTap: () => _deleteAllData(context, ref),
+            ),
+          ]),
           _buildAboutSection(context, ref, settings),
         ],
       ),
@@ -217,6 +232,143 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           _onExpansionChanged(section.key, expanded),
       isLandscape: false,
       children: children,
+    );
+  }
+
+  static Future<void> _resetToOnboarding(
+    BuildContext context,
+    WidgetRef ref,
+    SettingsProviders settings,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('return_to_onboarding'.tr()),
+        content: Text('return_to_onboarding_confirm'.tr()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('cancel'.tr()),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('return_to_onboarding'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && context.mounted) {
+      ref
+          .read(settings.provider(onboardingCompletedSettingDef).notifier)
+          .set(false);
+      if (context.mounted) {
+        context.go(RoutePaths.onboarding);
+      }
+    }
+  }
+
+  static Future<void> _resetAllSettings(
+    BuildContext context,
+    WidgetRef ref,
+    SettingsProviders settings,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('reset_all_settings'.tr()),
+        content: Text('reset_all_settings_confirm'.tr()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('cancel'.tr()),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('reset_all_settings'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    await settings.controller.resetAll();
+    if (!context.mounted) return;
+    final langCode = settings.controller.get(languageSettingDef);
+    await context.setLocale(Locale(langCode));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('reset_all_settings_done'.tr())),
+    );
+  }
+
+  static Future<void> _deleteAllData(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('delete_all_data'.tr()),
+        content: Text('delete_all_data_confirm'.tr()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('cancel'.tr()),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('delete_all_data'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && context.mounted) {
+      try {
+        final groupDao = ref.read(groupDaoProvider);
+        await groupDao.deleteAllGroups();
+        if (context.mounted) {
+          final settings = ref.read(hisabSettingsProvidersProvider);
+          if (settings != null) {
+            ref
+                .read(settings.provider(onboardingCompletedSettingDef).notifier)
+                .set(false);
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('delete_all_data_done'.tr())),
+          );
+          context.go(RoutePaths.onboarding);
+        }
+      } catch (e, st) {
+        Log.warning('Delete all data failed', error: e, stackTrace: st);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('delete_all_data_failed'.tr())),
+          );
+        }
+      }
+    }
+  }
+
+  Widget _buildLocalOnlyTile(
+    BuildContext context,
+    WidgetRef ref,
+    SettingsProviders settings,
+  ) {
+    final onlineAvailable = ref.watch(auth0ConfigAvailableProvider);
+    final value = ref.watch(settings.provider(localOnlySettingDef));
+    String subtitle = 'local_only_description'.tr();
+    if (!onlineAvailable) {
+      subtitle = '$subtitle\n${'onboarding_online_unavailable'.tr()}';
+    }
+    return SwitchSettingsTile.fromSetting(
+      setting: localOnlySettingDef,
+      title: 'local_only'.tr(),
+      subtitle: subtitle,
+      value: value,
+      onChanged: (v) {
+        if (v == false && !onlineAvailable) return;
+        ref.read(settings.provider(localOnlySettingDef).notifier).set(v);
+      },
+      enabled: onlineAvailable || value,
     );
   }
 

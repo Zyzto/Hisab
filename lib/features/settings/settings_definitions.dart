@@ -51,6 +51,13 @@ final backupSection = const SettingSection(
   key: 'backup',
   titleKey: 'backup',
   icon: Icons.backup,
+  order: 6,
+);
+
+final advancedSection = const SettingSection(
+  key: 'advanced',
+  titleKey: 'advanced',
+  icon: Icons.build,
   order: 5,
 );
 
@@ -58,7 +65,7 @@ final aboutSection = const SettingSection(
   key: 'about',
   titleKey: 'about',
   icon: Icons.info,
-  order: 6,
+  order: 7,
 );
 
 final themeModeSettingDef = const EnumSetting(
@@ -111,6 +118,27 @@ final fontSizeScaleSettingDef = const EnumSetting(
   icon: Icons.text_fields,
   section: 'appearance',
   order: 0,
+);
+
+/// When true, user has completed first-launch onboarding.
+final onboardingCompletedSettingDef = const BoolSetting(
+  'onboarding_completed',
+  defaultValue: false,
+  titleKey: 'onboarding_completed',
+  icon: Icons.check_circle_outline,
+  section: 'general',
+  order: -1, // Internal, not shown in settings UI
+);
+
+/// When true, user selected Online and tapped Complete; Auth0 redirect in progress (web).
+/// Cleared when app loads after redirect and onboarding is completed.
+final onboardingOnlinePendingSettingDef = const BoolSetting(
+  'onboarding_online_pending',
+  defaultValue: false,
+  titleKey: 'onboarding_online_pending',
+  icon: Icons.pending,
+  section: 'general',
+  order: -2, // Internal, not shown in settings UI
 );
 
 /// When true, app uses only local storage (Drift). When false, uses Convex.
@@ -186,10 +214,13 @@ final allSections = [
   receiptAiSection,
   loggingSection,
   backupSection,
+  advancedSection,
   aboutSection,
 ];
 
 final allSettings = <SettingDefinition>[
+  onboardingCompletedSettingDef,
+  onboardingOnlinePendingSettingDef,
   themeModeSettingDef,
   themeColorSettingDef,
   languageSettingDef,

@@ -41,4 +41,9 @@ class GroupDao extends DatabaseAccessor<AppDatabase>
   Future<int> deleteGroup(int id) async {
     return (delete(db.groups)..where((t) => t.id.equals(id))).go();
   }
+
+  /// Deletes all groups. Cascades to participants, expenses, and expense_tags.
+  Future<int> deleteAllGroups() async {
+    return delete(db.groups).go();
+  }
 }

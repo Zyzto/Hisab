@@ -5,6 +5,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 import 'package:convex_flutter/convex_flutter.dart';
+import 'core/auth/auth_service.dart';
 import 'core/constants/convex_config.dart';
 import 'features/settings/providers/settings_framework_providers.dart';
 import 'features/settings/settings_definitions.dart';
@@ -74,6 +75,19 @@ void main() async {
   final settingsProviders = await initializeHisabSettings();
   if (settingsProviders != null) {
     Log.debug('Settings framework initialized');
+
+    // Web: process Auth0 redirect callback; if returning from sign-in with pending onboarding, complete it
+    if (kIsWeb && auth0ConfigAvailable) {
+      final credentials = await auth0OnLoad();
+      if (credentials != null) {
+        final pending = settingsProviders.controller.get(onboardingOnlinePendingSettingDef);
+        if (pending == true) {
+          settingsProviders.controller.set(onboardingCompletedSettingDef, true);
+          settingsProviders.controller.set(onboardingOnlinePendingSettingDef, false);
+          Log.info('Onboarding completed after Auth0 redirect');
+        }
+      }
+    }
   } else {
     Log.warning('Settings framework init returned null, using defaults');
   }
