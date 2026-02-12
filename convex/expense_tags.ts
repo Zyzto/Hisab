@@ -3,6 +3,13 @@ import { mutation, query } from './_generated/server';
 // @ts-ignore
 import { v } from 'convex/values';
 
+// convex_flutter sends all args as strings; accept both for compatibility
+const numArg = () => v.union(v.string(), v.number());
+
+function toNum(x: string | number): number {
+  return typeof x === 'string' ? parseFloat(x) : x;
+}
+
 export const listByGroup = query({
   args: { groupId: v.id('groups') },
   handler: async (ctx, { groupId }) => {
@@ -44,11 +51,11 @@ export const update = mutation({
     id: v.id('expense_tags'),
     label: v.string(),
     iconName: v.string(),
-    updatedAt: v.number(),
+    updatedAt: numArg(),
   },
   handler: async (ctx, args) => {
-    const { id, ...patch } = args;
-    await ctx.db.patch(id, patch);
+    const { id, ...rest } = args;
+    await ctx.db.patch(id, { ...rest, updatedAt: toNum(rest.updatedAt) });
     return id;
   },
 });

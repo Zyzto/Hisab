@@ -3,6 +3,13 @@ import { mutation, query } from './_generated/server';
 // @ts-ignore
 import { v } from 'convex/values';
 
+// convex_flutter sends all args as strings; accept both for compatibility
+const numArg = () => v.union(v.string(), v.number());
+
+function toNum(x: string | number): number {
+  return typeof x === 'string' ? parseFloat(x) : x;
+}
+
 export const listByGroup = query({
   args: { groupId: v.id('groups') },
   handler: async (ctx, { groupId }) => {
@@ -22,13 +29,13 @@ export const get = query({
 });
 
 export const create = mutation({
-  args: { groupId: v.id('groups'), name: v.string(), order: v.number() },
+  args: { groupId: v.id('groups'), name: v.string(), order: numArg() },
   handler: async (ctx, { groupId, name, order }) => {
     const now = Date.now();
     return await ctx.db.insert('participants', {
       groupId,
       name,
-      order,
+      order: toNum(order),
       createdAt: now,
       updatedAt: now,
     });
@@ -39,12 +46,16 @@ export const update = mutation({
   args: {
     id: v.id('participants'),
     name: v.string(),
-    order: v.number(),
-    updatedAt: v.number(),
+    order: numArg(),
+    updatedAt: numArg(),
   },
   handler: async (ctx, args) => {
-    const { id, ...patch } = args;
-    await ctx.db.patch(id, patch);
+    const { id, ...rest } = args;
+    await ctx.db.patch(id, {
+      ...rest,
+      order: toNum(rest.order),
+      updatedAt: toNum(rest.updatedAt),
+    });
     return id;
   },
 });

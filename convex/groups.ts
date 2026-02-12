@@ -3,6 +3,13 @@ import { mutation, query } from './_generated/server';
 // @ts-ignore
 import { v } from 'convex/values';
 
+// convex_flutter sends all args as strings; accept both for compatibility
+const numArg = () => v.union(v.string(), v.number());
+
+function toNum(x: string | number): number {
+  return typeof x === 'string' ? parseFloat(x) : x;
+}
+
 export const list = query({
   args: {},
   handler: async (ctx) => {
@@ -38,10 +45,10 @@ export const update = mutation({
     id: v.id('groups'),
     name: v.string(),
     currencyCode: v.string(),
-    updatedAt: v.number(),
+    updatedAt: numArg(),
     settlementMethod: v.optional(v.string()),
     treasurerParticipantId: v.optional(v.id('participants')),
-    settlementFreezeAt: v.optional(v.number()),
+    settlementFreezeAt: v.optional(numArg()),
     settlementSnapshotJson: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -49,11 +56,12 @@ export const update = mutation({
     const patch: Record<string, unknown> = {
       name,
       currencyCode,
-      updatedAt,
+      updatedAt: toNum(updatedAt),
     };
     if (rest.settlementMethod !== undefined) patch.settlementMethod = rest.settlementMethod;
     if (rest.treasurerParticipantId !== undefined) patch.treasurerParticipantId = rest.treasurerParticipantId;
-    if (rest.settlementFreezeAt !== undefined) patch.settlementFreezeAt = rest.settlementFreezeAt;
+    if (rest.settlementFreezeAt !== undefined)
+      patch.settlementFreezeAt = toNum(rest.settlementFreezeAt);
     if (rest.settlementSnapshotJson !== undefined) patch.settlementSnapshotJson = rest.settlementSnapshotJson;
     await ctx.db.patch(id, patch);
     return id;
@@ -64,12 +72,12 @@ export const freezeSettlement = mutation({
   args: {
     id: v.id('groups'),
     settlementSnapshotJson: v.string(),
-    settlementFreezeAt: v.number(),
+    settlementFreezeAt: numArg(),
   },
   handler: async (ctx, { id, settlementSnapshotJson, settlementFreezeAt }) => {
     await ctx.db.patch(id, {
       settlementSnapshotJson,
-      settlementFreezeAt,
+      settlementFreezeAt: toNum(settlementFreezeAt),
       updatedAt: Date.now(),
     });
     return id;
