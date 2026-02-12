@@ -65,15 +65,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               title: 'theme'.tr(),
               value: ref.watch(settings.provider(themeModeSettingDef)),
               labelBuilder: (v) => v.tr(),
-              onChanged: (v) =>
-                  ref.read(settings.provider(themeModeSettingDef).notifier).set(v),
+              onChanged: (v) => ref
+                  .read(settings.provider(themeModeSettingDef).notifier)
+                  .set(v),
             ),
             ColorSettingsTile.fromSetting(
               setting: themeColorSettingDef,
               title: 'select_theme_color'.tr(),
               value: ref.watch(settings.provider(themeColorSettingDef)),
-              onChanged: (v) =>
-                  ref.read(settings.provider(themeColorSettingDef).notifier).set(v),
+              onChanged: (v) => ref
+                  .read(settings.provider(themeColorSettingDef).notifier)
+                  .set(v),
             ),
           ]),
           _buildSection(context, ref, settings, appearanceSection, [
@@ -93,8 +95,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               title: 'local_only'.tr(),
               subtitle: 'local_only_description'.tr(),
               value: ref.watch(settings.provider(localOnlySettingDef)),
-              onChanged: (v) =>
-                  ref.read(settings.provider(localOnlySettingDef).notifier).set(v),
+              onChanged: (v) => ref
+                  .read(settings.provider(localOnlySettingDef).notifier)
+                  .set(v),
             ),
           ]),
           _buildSection(context, ref, settings, receiptAiSection, [
@@ -198,7 +201,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       icon: icon,
       sectionId: section.key,
       isExpanded: isExpanded,
-      onExpansionChanged: (expanded) => _onExpansionChanged(section.key, expanded),
+      onExpansionChanged: (expanded) =>
+          _onExpansionChanged(section.key, expanded),
       isLandscape: false,
       children: children,
     );
@@ -214,7 +218,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       leading: Icon(languageSettingDef.icon),
       title: Text('language'.tr()),
       subtitle: Text(
-        currentLang == 'ar' ? _localeDisplayName(const Locale('ar')) : _localeDisplayName(const Locale('en')),
+        currentLang == 'ar'
+            ? _localeDisplayName(const Locale('ar'))
+            : _localeDisplayName(const Locale('en')),
       ),
       onTap: () async {
         final chosen = await showModalBottomSheet<Locale>(
@@ -242,7 +248,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         );
         if (chosen != null && context.mounted) {
           final langCode = chosen.languageCode;
-          ref.read(settings.provider(languageSettingDef).notifier).set(langCode);
+          ref
+              .read(settings.provider(languageSettingDef).notifier)
+              .set(langCode);
           await context.setLocale(chosen);
         }
       },
@@ -259,7 +267,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       icon: aboutSection.icon ?? Icons.info,
       sectionId: aboutSection.key,
       isExpanded: _isExpanded(aboutSection),
-      onExpansionChanged: (expanded) => _onExpansionChanged(aboutSection.key, expanded),
+      onExpansionChanged: (expanded) =>
+          _onExpansionChanged(aboutSection.key, expanded),
       isLandscape: false,
       children: [
         FutureBuilder<PackageInfo>(
@@ -378,7 +387,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       final jsonString = const JsonEncoder.withIndent('  ').convert(data);
       final result = await FilePicker.platform.saveFile(
         dialogTitle: 'export_data'.tr(),
-        fileName: 'hisab_backup_${DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first}.json',
+        fileName:
+            'hisab_backup_${DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first}.json',
         type: FileType.custom,
         allowedExtensions: ['json'],
         bytes: Uint8List.fromList(utf8.encode(jsonString)),
@@ -386,21 +396,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       if (context.mounted) {
         if (result != null && result.isNotEmpty) {
           Log.info('Backup exported to $result');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('export_success'.tr())),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('export_success'.tr())));
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('export_cancelled'.tr())),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('export_cancelled'.tr())));
         }
       }
     } catch (e, st) {
       Log.warning('Backup export failed', error: e, stackTrace: st);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('export_failed'.tr())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('export_failed'.tr())));
       }
     }
   }
@@ -433,18 +443,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       if (result == null || result.files.isEmpty || !context.mounted) return;
       final bytes = result.files.single.bytes;
       if (bytes == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('import_failed'.tr())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('import_failed'.tr())));
         return;
       }
       final jsonString = utf8.decode(bytes);
       final backup = parseBackupJson(jsonString);
       if (backup == null) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('import_invalid_file'.tr())),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('import_invalid_file'.tr())));
         }
         return;
       }
@@ -464,11 +474,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       final participantIds = <String, String>{};
       for (final g in backup.groups) {
         final newGroupId = idMap[g.id]!;
-        final oldParticipants =
-            backup.participants.where((e) => e.groupId == g.id).toList();
+        final oldParticipants = backup.participants
+            .where((e) => e.groupId == g.id)
+            .toList();
         for (final p in oldParticipants) {
-          final newId =
-              await participantRepo.create(newGroupId, p.name, p.order);
+          final newId = await participantRepo.create(
+            newGroupId,
+            p.name,
+            p.order,
+          );
           participantIds[p.id] = newId;
         }
       }
@@ -509,16 +523,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       }
       Log.info('Backup import completed');
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('import_success'.tr())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('import_success'.tr())));
       }
     } catch (e, st) {
       Log.warning('Backup import failed', error: e, stackTrace: st);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('import_failed'.tr())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('import_failed'.tr())));
       }
     }
   }

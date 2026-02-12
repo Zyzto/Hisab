@@ -662,7 +662,7 @@ packages:
     source: hosted
     version: "4.10.0"
   langchain_core:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: langchain_core
       sha256: fce3cd0e31dcbac80d209f6361207936a58b05506b800f13227cbe83f6e3e721

@@ -1,5 +1,5 @@
 name: hisab
-description: "Group expense splitting and settle-up app (Tricount-style)."
+description: "Group expense splitting and settle-up app."
 publish_to: 'none'
 version: 0.1.0+1
 
@@ -11,7 +11,7 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
 
-  # State management (match mizaniyah)
+  # State management
   flutter_riverpod: ^3.0.1
   riverpod_annotation: ^4.0.0
 
@@ -51,14 +51,14 @@ dependencies:
   langchain_google: ^0.7.1
   langchain_openai: ^0.8.1+1
 
-  # Logging (match mizaniyah)
+  # Logging
   easy_logger: ^0.0.2
   flutter_logging_service:
     git:
       url: https://github.com/Zyzto/siglat.git
       ref: main
 
-  # Settings (match mizaniyah – for theme + "Local Only" toggle)
+  # Settings (theme + "Local Only" toggle)
   flutter_settings_framework:
     path: ../edadat
 
@@ -67,6 +67,7 @@ dependencies:
 
   # Backup (file picker for export/import)
   file_picker: ^8.1.6
+  langchain_core: ^0.4.1
 
 dev_dependencies:
   flutter_test:

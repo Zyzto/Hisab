@@ -1,6 +1,6 @@
 # Hisab
 
-Group expense splitting and settle-up app (Tricount-style). Built with Flutter, Riverpod, GoRouter, Drift (local), and optional Convex (cloud).
+Group expense splitting and settle-up app. Built with Flutter, Riverpod, GoRouter, Drift (local), and optional Convex (cloud).
 
 ## Features
 
@@ -50,6 +50,3 @@ This project is licensed under **Creative Commons Attribution-NonCommercial-Shar
 - Full legal text: [LICENSE](LICENSE) in this repo, or [legalcode](https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode) on the CC site.
 - Human-readable summary: [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).
 
-## Credits
-
-Architecture and UI patterns follow the [mizaniyah](https://github.com/your-repo/mizaniyah) reference app.

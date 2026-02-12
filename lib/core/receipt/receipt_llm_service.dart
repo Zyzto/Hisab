@@ -33,10 +33,7 @@ Future<String> extractReceiptFromImage(
   final base64Image = base64Encode(imageBytes);
   final content = ChatMessageContent.multiModal([
     ChatMessageContent.text(_receiptExtractionPrompt),
-    ChatMessageContent.image(
-      data: base64Image,
-      mimeType: 'image/jpeg',
-    ),
+    ChatMessageContent.image(data: base64Image, mimeType: 'image/jpeg'),
   ]);
   final message = ChatMessage.human(content);
   final prompt = PromptValue.chat([message]);

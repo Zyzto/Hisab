@@ -20,7 +20,11 @@ void showReceiptImageFullScreen(BuildContext context, String imagePath) {
 }
 
 /// Placeholder when dart:io is not available (e.g. web). Shows a chip that receipt is attached.
-Widget buildReceiptImageView(String? imagePath, {double? maxHeight, BoxFit fit = BoxFit.cover}) {
+Widget buildReceiptImageView(
+  String? imagePath, {
+  double? maxHeight,
+  BoxFit fit = BoxFit.cover,
+}) {
   if (imagePath == null || imagePath.isEmpty) return const SizedBox.shrink();
   return Padding(
     padding: const EdgeInsets.only(top: 8),

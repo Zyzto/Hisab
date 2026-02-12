@@ -7,6 +7,7 @@ import '../category_icons.dart';
 class ExpenseListTile extends StatelessWidget {
   final Expense expense;
   final String payerName;
+
   /// Icon for the expense (e.g. from [iconForExpenseTag]). When null, uses [defaultExpenseIcon].
   final IconData? icon;
 

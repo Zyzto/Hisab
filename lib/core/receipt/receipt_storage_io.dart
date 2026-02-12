@@ -10,8 +10,9 @@ Future<String> copyReceiptToAppStorage(String sourcePath) async {
   if (!await receiptsDir.exists()) {
     await receiptsDir.create(recursive: true);
   }
-  final ext =
-      path.extension(sourcePath).isEmpty ? '.jpg' : path.extension(sourcePath);
+  final ext = path.extension(sourcePath).isEmpty
+      ? '.jpg'
+      : path.extension(sourcePath);
   final name = '${DateTime.now().millisecondsSinceEpoch}$ext';
   final destPath = path.join(receiptsDir.path, name);
   await File(sourcePath).copy(destPath);

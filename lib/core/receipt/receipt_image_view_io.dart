@@ -32,7 +32,11 @@ void showReceiptImageFullScreen(BuildContext context, String imagePath) {
 }
 
 /// Shows the receipt image from a local file path. Use when dart:io is available.
-Widget buildReceiptImageView(String? imagePath, {double? maxHeight, BoxFit fit = BoxFit.cover}) {
+Widget buildReceiptImageView(
+  String? imagePath, {
+  double? maxHeight,
+  BoxFit fit = BoxFit.cover,
+}) {
   if (imagePath == null || imagePath.isEmpty) return const SizedBox.shrink();
   final file = File(imagePath);
   if (!file.existsSync()) {
@@ -72,7 +76,11 @@ Widget buildReceiptImageView(String? imagePath, {double? maxHeight, BoxFit fit =
                 padding: EdgeInsets.all(16),
                 child: Row(
                   children: [
-                    Icon(Icons.broken_image_outlined, size: 40, color: Colors.grey),
+                    Icon(
+                      Icons.broken_image_outlined,
+                      size: 40,
+                      color: Colors.grey,
+                    ),
                     SizedBox(width: 12),
                     Text('Could not load image'),
                   ],
