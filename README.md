@@ -35,7 +35,7 @@ For web (Chrome): ensure `web/sqlite3.wasm` and `web/drift_worker.dart.js` are p
 
 ## Convex & Auth0 (optional)
 
-For **online sync**, configure both Convex and Auth0. See **[CONFIGURATION.md](CONFIGURATION.md)** for step-by-step setup.
+For **online sync**, configure both Convex and Auth0. See **[CONFIGURATION.md](CONFIGURATION.md)** for step-by-step setup and troubleshooting.
 
 **First-time:** Copy example files (secrets are gitignored):
 
@@ -44,10 +44,23 @@ cp lib/core/constants/app_secrets_example.dart lib/core/constants/app_secrets.da
 cp android/secrets.properties.example android/secrets.properties
 ```
 
-- **Convex** — `npx convex dev`, set `convexDeploymentUrl` in `app_secrets.dart`.
-- **Auth0** — Native app in Auth0 Dashboard; set `auth0Domain` and `auth0ClientId` in `app_secrets.dart`; set `auth0Domain` and `auth0Scheme` in `android/secrets.properties`.
+- **Convex** — `npx convex dev` from project root; set `convexDeploymentUrl` in `app_secrets.dart`. Add `AUTH0_DOMAIN` and `AUTH0_CLIENT_ID` in [Convex Dashboard](https://dashboard.convex.dev) → your project → **Dev** deployment → Settings → Environment variables.
+- **Auth0** — Native app in Auth0 Dashboard; set `auth0Domain` and `auth0ClientId` in `app_secrets.dart`; set `auth0Domain` and `auth0Scheme` in `android/secrets.properties`. For Android, use a custom scheme (e.g. `com.shenepoy.hisab`) for reliable redirects.
 
 If `convexDeploymentUrl` is empty or Auth0 is not configured, the app runs in **Local Only** mode (Drift only).
+
+### Common issues
+
+| Issue | Quick fix |
+|-------|-----------|
+| **Auth0 callback mismatch** | Add callback URL to Auth0 Dashboard (see [CONFIGURATION.md](CONFIGURATION.md#5-troubleshooting)) |
+| **Auth0 "not found" on Android** | Use custom scheme `auth0Scheme=com.shenepoy.hisab` in secrets |
+| **Convex "convex/server" resolve error** | `convex` in dependencies, `npm install`, `CONVEX_TMPDIR=./convex/.tmp` if needed |
+| **"Could not find public function"** | Set AUTH0_DOMAIN/AUTH0_CLIENT_ID in Convex Dashboard, run `npx convex dev` |
+| **Mutation timeout** | Convex uses Auth0 **ID token** (not access token); sign out and back in if needed |
+| **ArgumentValidationError (numbers)** | convex_flutter sends args as strings; Convex validators accept string \| number (already applied) |
+
+Full troubleshooting: [CONFIGURATION.md §5](CONFIGURATION.md#5-troubleshooting).
 
 ### Keeping secrets out of git
 

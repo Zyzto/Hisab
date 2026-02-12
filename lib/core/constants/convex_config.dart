@@ -1,3 +1,8 @@
 // Convex deployment URL for cloud sync. When empty, Local Only mode is required.
-// Value comes from app_secrets.dart (gitignored).
-export 'app_secrets.dart' show convexDeploymentUrl;
+// Debug builds use dev; release builds use prod.
+import 'package:flutter/foundation.dart';
+
+import 'app_secrets.dart';
+
+String get convexDeploymentUrl =>
+    kDebugMode ? convexDeploymentUrlDev : convexDeploymentUrlProd;

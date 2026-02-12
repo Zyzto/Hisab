@@ -3,9 +3,21 @@
 ///
 ///   cp lib/core/constants/app_secrets_example.dart lib/core/constants/app_secrets.dart
 ///
-const String auth0Domain = '';
-const String auth0ClientId = '';
-const String convexDeploymentUrl = '';
-const String reportIssueUrl = '';
-/// Telemetry: use Convex HTTP action URL, e.g. https://<deployment>.convex.site/telemetry
-const String telemetryEndpointUrl = '';
+/// Debug builds use dev values; release builds use prod values.
+
+// === Dev (debug builds) ===
+const String auth0DomainDev = '';
+const String auth0ClientIdDev = '';
+const String convexDeploymentUrlDev = '';
+const String telemetryEndpointUrlDev = '';
+
+// === Prod (release builds) ===
+const String auth0DomainProd = '';
+const String auth0ClientIdProd = '';
+const String convexDeploymentUrlProd = '';
+const String telemetryEndpointUrlProd = '';
+
+// === Shared ===
+/// Custom scheme for Android redirect. Must match android/secrets.properties auth0Scheme.
+const String auth0Scheme = 'com.shenepoy.hisab';
+const String reportIssueUrl = 'https://github.com/Zyzto/Hisab/issues/new';
