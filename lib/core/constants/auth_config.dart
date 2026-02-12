@@ -3,8 +3,7 @@
 import 'package:flutter/foundation.dart';
 
 import 'app_secrets.dart';
+export 'app_secrets.dart' show auth0Scheme;
 
 String get auth0Domain => kDebugMode ? auth0DomainDev : auth0DomainProd;
 String get auth0ClientId => kDebugMode ? auth0ClientIdDev : auth0ClientIdProd;
-// Custom scheme for Android redirect. Same for both.
-export 'app_secrets.dart' show auth0Scheme;
