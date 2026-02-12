@@ -73,6 +73,50 @@ class $GroupsTable extends Groups with TableInfo<$GroupsTable, Group> {
     requiredDuringInsert: false,
     defaultValue: currentDateAndTime,
   );
+  static const VerificationMeta _settlementMethodMeta = const VerificationMeta(
+    'settlementMethod',
+  );
+  @override
+  late final GeneratedColumn<String> settlementMethod = GeneratedColumn<String>(
+    'settlement_method',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('greedy'),
+  );
+  static const VerificationMeta _treasurerParticipantIdMeta =
+      const VerificationMeta('treasurerParticipantId');
+  @override
+  late final GeneratedColumn<int> treasurerParticipantId = GeneratedColumn<int>(
+    'treasurer_participant_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _settlementFreezeAtMeta =
+      const VerificationMeta('settlementFreezeAt');
+  @override
+  late final GeneratedColumn<DateTime> settlementFreezeAt =
+      GeneratedColumn<DateTime>(
+        'settlement_freeze_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _settlementSnapshotJsonMeta =
+      const VerificationMeta('settlementSnapshotJson');
+  @override
+  late final GeneratedColumn<String> settlementSnapshotJson =
+      GeneratedColumn<String>(
+        'settlement_snapshot_json',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -80,6 +124,10 @@ class $GroupsTable extends Groups with TableInfo<$GroupsTable, Group> {
     currencyCode,
     createdAt,
     updatedAt,
+    settlementMethod,
+    treasurerParticipantId,
+    settlementFreezeAt,
+    settlementSnapshotJson,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -127,6 +175,42 @@ class $GroupsTable extends Groups with TableInfo<$GroupsTable, Group> {
         updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
       );
     }
+    if (data.containsKey('settlement_method')) {
+      context.handle(
+        _settlementMethodMeta,
+        settlementMethod.isAcceptableOrUnknown(
+          data['settlement_method']!,
+          _settlementMethodMeta,
+        ),
+      );
+    }
+    if (data.containsKey('treasurer_participant_id')) {
+      context.handle(
+        _treasurerParticipantIdMeta,
+        treasurerParticipantId.isAcceptableOrUnknown(
+          data['treasurer_participant_id']!,
+          _treasurerParticipantIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('settlement_freeze_at')) {
+      context.handle(
+        _settlementFreezeAtMeta,
+        settlementFreezeAt.isAcceptableOrUnknown(
+          data['settlement_freeze_at']!,
+          _settlementFreezeAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('settlement_snapshot_json')) {
+      context.handle(
+        _settlementSnapshotJsonMeta,
+        settlementSnapshotJson.isAcceptableOrUnknown(
+          data['settlement_snapshot_json']!,
+          _settlementSnapshotJsonMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -156,6 +240,22 @@ class $GroupsTable extends Groups with TableInfo<$GroupsTable, Group> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
       )!,
+      settlementMethod: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}settlement_method'],
+      )!,
+      treasurerParticipantId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}treasurer_participant_id'],
+      ),
+      settlementFreezeAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}settlement_freeze_at'],
+      ),
+      settlementSnapshotJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}settlement_snapshot_json'],
+      ),
     );
   }
 
@@ -171,12 +271,20 @@ class Group extends DataClass implements Insertable<Group> {
   final String currencyCode;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String settlementMethod;
+  final int? treasurerParticipantId;
+  final DateTime? settlementFreezeAt;
+  final String? settlementSnapshotJson;
   const Group({
     required this.id,
     required this.name,
     required this.currencyCode,
     required this.createdAt,
     required this.updatedAt,
+    required this.settlementMethod,
+    this.treasurerParticipantId,
+    this.settlementFreezeAt,
+    this.settlementSnapshotJson,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -186,6 +294,18 @@ class Group extends DataClass implements Insertable<Group> {
     map['currency_code'] = Variable<String>(currencyCode);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['settlement_method'] = Variable<String>(settlementMethod);
+    if (!nullToAbsent || treasurerParticipantId != null) {
+      map['treasurer_participant_id'] = Variable<int>(treasurerParticipantId);
+    }
+    if (!nullToAbsent || settlementFreezeAt != null) {
+      map['settlement_freeze_at'] = Variable<DateTime>(settlementFreezeAt);
+    }
+    if (!nullToAbsent || settlementSnapshotJson != null) {
+      map['settlement_snapshot_json'] = Variable<String>(
+        settlementSnapshotJson,
+      );
+    }
     return map;
   }
 
@@ -196,6 +316,16 @@ class Group extends DataClass implements Insertable<Group> {
       currencyCode: Value(currencyCode),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
+      settlementMethod: Value(settlementMethod),
+      treasurerParticipantId: treasurerParticipantId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(treasurerParticipantId),
+      settlementFreezeAt: settlementFreezeAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(settlementFreezeAt),
+      settlementSnapshotJson: settlementSnapshotJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(settlementSnapshotJson),
     );
   }
 
@@ -210,6 +340,16 @@ class Group extends DataClass implements Insertable<Group> {
       currencyCode: serializer.fromJson<String>(json['currencyCode']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      settlementMethod: serializer.fromJson<String>(json['settlementMethod']),
+      treasurerParticipantId: serializer.fromJson<int?>(
+        json['treasurerParticipantId'],
+      ),
+      settlementFreezeAt: serializer.fromJson<DateTime?>(
+        json['settlementFreezeAt'],
+      ),
+      settlementSnapshotJson: serializer.fromJson<String?>(
+        json['settlementSnapshotJson'],
+      ),
     );
   }
   @override
@@ -221,6 +361,12 @@ class Group extends DataClass implements Insertable<Group> {
       'currencyCode': serializer.toJson<String>(currencyCode),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'settlementMethod': serializer.toJson<String>(settlementMethod),
+      'treasurerParticipantId': serializer.toJson<int?>(treasurerParticipantId),
+      'settlementFreezeAt': serializer.toJson<DateTime?>(settlementFreezeAt),
+      'settlementSnapshotJson': serializer.toJson<String?>(
+        settlementSnapshotJson,
+      ),
     };
   }
 
@@ -230,12 +376,26 @@ class Group extends DataClass implements Insertable<Group> {
     String? currencyCode,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? settlementMethod,
+    Value<int?> treasurerParticipantId = const Value.absent(),
+    Value<DateTime?> settlementFreezeAt = const Value.absent(),
+    Value<String?> settlementSnapshotJson = const Value.absent(),
   }) => Group(
     id: id ?? this.id,
     name: name ?? this.name,
     currencyCode: currencyCode ?? this.currencyCode,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
+    settlementMethod: settlementMethod ?? this.settlementMethod,
+    treasurerParticipantId: treasurerParticipantId.present
+        ? treasurerParticipantId.value
+        : this.treasurerParticipantId,
+    settlementFreezeAt: settlementFreezeAt.present
+        ? settlementFreezeAt.value
+        : this.settlementFreezeAt,
+    settlementSnapshotJson: settlementSnapshotJson.present
+        ? settlementSnapshotJson.value
+        : this.settlementSnapshotJson,
   );
   Group copyWithCompanion(GroupsCompanion data) {
     return Group(
@@ -246,6 +406,18 @@ class Group extends DataClass implements Insertable<Group> {
           : this.currencyCode,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      settlementMethod: data.settlementMethod.present
+          ? data.settlementMethod.value
+          : this.settlementMethod,
+      treasurerParticipantId: data.treasurerParticipantId.present
+          ? data.treasurerParticipantId.value
+          : this.treasurerParticipantId,
+      settlementFreezeAt: data.settlementFreezeAt.present
+          ? data.settlementFreezeAt.value
+          : this.settlementFreezeAt,
+      settlementSnapshotJson: data.settlementSnapshotJson.present
+          ? data.settlementSnapshotJson.value
+          : this.settlementSnapshotJson,
     );
   }
 
@@ -256,13 +428,27 @@ class Group extends DataClass implements Insertable<Group> {
           ..write('name: $name, ')
           ..write('currencyCode: $currencyCode, ')
           ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('settlementMethod: $settlementMethod, ')
+          ..write('treasurerParticipantId: $treasurerParticipantId, ')
+          ..write('settlementFreezeAt: $settlementFreezeAt, ')
+          ..write('settlementSnapshotJson: $settlementSnapshotJson')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, currencyCode, createdAt, updatedAt);
+  int get hashCode => Object.hash(
+    id,
+    name,
+    currencyCode,
+    createdAt,
+    updatedAt,
+    settlementMethod,
+    treasurerParticipantId,
+    settlementFreezeAt,
+    settlementSnapshotJson,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -271,7 +457,11 @@ class Group extends DataClass implements Insertable<Group> {
           other.name == this.name &&
           other.currencyCode == this.currencyCode &&
           other.createdAt == this.createdAt &&
-          other.updatedAt == this.updatedAt);
+          other.updatedAt == this.updatedAt &&
+          other.settlementMethod == this.settlementMethod &&
+          other.treasurerParticipantId == this.treasurerParticipantId &&
+          other.settlementFreezeAt == this.settlementFreezeAt &&
+          other.settlementSnapshotJson == this.settlementSnapshotJson);
 }
 
 class GroupsCompanion extends UpdateCompanion<Group> {
@@ -280,12 +470,20 @@ class GroupsCompanion extends UpdateCompanion<Group> {
   final Value<String> currencyCode;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
+  final Value<String> settlementMethod;
+  final Value<int?> treasurerParticipantId;
+  final Value<DateTime?> settlementFreezeAt;
+  final Value<String?> settlementSnapshotJson;
   const GroupsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.currencyCode = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.settlementMethod = const Value.absent(),
+    this.treasurerParticipantId = const Value.absent(),
+    this.settlementFreezeAt = const Value.absent(),
+    this.settlementSnapshotJson = const Value.absent(),
   });
   GroupsCompanion.insert({
     this.id = const Value.absent(),
@@ -293,6 +491,10 @@ class GroupsCompanion extends UpdateCompanion<Group> {
     required String currencyCode,
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.settlementMethod = const Value.absent(),
+    this.treasurerParticipantId = const Value.absent(),
+    this.settlementFreezeAt = const Value.absent(),
+    this.settlementSnapshotJson = const Value.absent(),
   }) : name = Value(name),
        currencyCode = Value(currencyCode);
   static Insertable<Group> custom({
@@ -301,6 +503,10 @@ class GroupsCompanion extends UpdateCompanion<Group> {
     Expression<String>? currencyCode,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
+    Expression<String>? settlementMethod,
+    Expression<int>? treasurerParticipantId,
+    Expression<DateTime>? settlementFreezeAt,
+    Expression<String>? settlementSnapshotJson,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -308,6 +514,13 @@ class GroupsCompanion extends UpdateCompanion<Group> {
       if (currencyCode != null) 'currency_code': currencyCode,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (settlementMethod != null) 'settlement_method': settlementMethod,
+      if (treasurerParticipantId != null)
+        'treasurer_participant_id': treasurerParticipantId,
+      if (settlementFreezeAt != null)
+        'settlement_freeze_at': settlementFreezeAt,
+      if (settlementSnapshotJson != null)
+        'settlement_snapshot_json': settlementSnapshotJson,
     });
   }
 
@@ -317,6 +530,10 @@ class GroupsCompanion extends UpdateCompanion<Group> {
     Value<String>? currencyCode,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
+    Value<String>? settlementMethod,
+    Value<int?>? treasurerParticipantId,
+    Value<DateTime?>? settlementFreezeAt,
+    Value<String?>? settlementSnapshotJson,
   }) {
     return GroupsCompanion(
       id: id ?? this.id,
@@ -324,6 +541,12 @@ class GroupsCompanion extends UpdateCompanion<Group> {
       currencyCode: currencyCode ?? this.currencyCode,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      settlementMethod: settlementMethod ?? this.settlementMethod,
+      treasurerParticipantId:
+          treasurerParticipantId ?? this.treasurerParticipantId,
+      settlementFreezeAt: settlementFreezeAt ?? this.settlementFreezeAt,
+      settlementSnapshotJson:
+          settlementSnapshotJson ?? this.settlementSnapshotJson,
     );
   }
 
@@ -345,6 +568,24 @@ class GroupsCompanion extends UpdateCompanion<Group> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (settlementMethod.present) {
+      map['settlement_method'] = Variable<String>(settlementMethod.value);
+    }
+    if (treasurerParticipantId.present) {
+      map['treasurer_participant_id'] = Variable<int>(
+        treasurerParticipantId.value,
+      );
+    }
+    if (settlementFreezeAt.present) {
+      map['settlement_freeze_at'] = Variable<DateTime>(
+        settlementFreezeAt.value,
+      );
+    }
+    if (settlementSnapshotJson.present) {
+      map['settlement_snapshot_json'] = Variable<String>(
+        settlementSnapshotJson.value,
+      );
+    }
     return map;
   }
 
@@ -355,7 +596,11 @@ class GroupsCompanion extends UpdateCompanion<Group> {
           ..write('name: $name, ')
           ..write('currencyCode: $currencyCode, ')
           ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('settlementMethod: $settlementMethod, ')
+          ..write('treasurerParticipantId: $treasurerParticipantId, ')
+          ..write('settlementFreezeAt: $settlementFreezeAt, ')
+          ..write('settlementSnapshotJson: $settlementSnapshotJson')
           ..write(')'))
         .toString();
   }
@@ -2215,6 +2460,10 @@ typedef $$GroupsTableCreateCompanionBuilder =
       required String currencyCode,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
+      Value<String> settlementMethod,
+      Value<int?> treasurerParticipantId,
+      Value<DateTime?> settlementFreezeAt,
+      Value<String?> settlementSnapshotJson,
     });
 typedef $$GroupsTableUpdateCompanionBuilder =
     GroupsCompanion Function({
@@ -2223,6 +2472,10 @@ typedef $$GroupsTableUpdateCompanionBuilder =
       Value<String> currencyCode,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
+      Value<String> settlementMethod,
+      Value<int?> treasurerParticipantId,
+      Value<DateTime?> settlementFreezeAt,
+      Value<String?> settlementSnapshotJson,
     });
 
 final class $$GroupsTableReferences
@@ -2316,6 +2569,26 @@ class $$GroupsTableFilterComposer
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get settlementMethod => $composableBuilder(
+    column: $table.settlementMethod,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get treasurerParticipantId => $composableBuilder(
+    column: $table.treasurerParticipantId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get settlementFreezeAt => $composableBuilder(
+    column: $table.settlementFreezeAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get settlementSnapshotJson => $composableBuilder(
+    column: $table.settlementSnapshotJson,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2428,6 +2701,26 @@ class $$GroupsTableOrderingComposer
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get settlementMethod => $composableBuilder(
+    column: $table.settlementMethod,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get treasurerParticipantId => $composableBuilder(
+    column: $table.treasurerParticipantId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get settlementFreezeAt => $composableBuilder(
+    column: $table.settlementFreezeAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get settlementSnapshotJson => $composableBuilder(
+    column: $table.settlementSnapshotJson,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$GroupsTableAnnotationComposer
@@ -2455,6 +2748,26 @@ class $$GroupsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get settlementMethod => $composableBuilder(
+    column: $table.settlementMethod,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get treasurerParticipantId => $composableBuilder(
+    column: $table.treasurerParticipantId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get settlementFreezeAt => $composableBuilder(
+    column: $table.settlementFreezeAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get settlementSnapshotJson => $composableBuilder(
+    column: $table.settlementSnapshotJson,
+    builder: (column) => column,
+  );
 
   Expression<T> participantsRefs<T extends Object>(
     Expression<T> Function($$ParticipantsTableAnnotationComposer a) f,
@@ -2569,12 +2882,20 @@ class $$GroupsTableTableManager
                 Value<String> currencyCode = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
+                Value<String> settlementMethod = const Value.absent(),
+                Value<int?> treasurerParticipantId = const Value.absent(),
+                Value<DateTime?> settlementFreezeAt = const Value.absent(),
+                Value<String?> settlementSnapshotJson = const Value.absent(),
               }) => GroupsCompanion(
                 id: id,
                 name: name,
                 currencyCode: currencyCode,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
+                settlementMethod: settlementMethod,
+                treasurerParticipantId: treasurerParticipantId,
+                settlementFreezeAt: settlementFreezeAt,
+                settlementSnapshotJson: settlementSnapshotJson,
               ),
           createCompanionCallback:
               ({
@@ -2583,12 +2904,20 @@ class $$GroupsTableTableManager
                 required String currencyCode,
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
+                Value<String> settlementMethod = const Value.absent(),
+                Value<int?> treasurerParticipantId = const Value.absent(),
+                Value<DateTime?> settlementFreezeAt = const Value.absent(),
+                Value<String?> settlementSnapshotJson = const Value.absent(),
               }) => GroupsCompanion.insert(
                 id: id,
                 name: name,
                 currencyCode: currencyCode,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
+                settlementMethod: settlementMethod,
+                treasurerParticipantId: treasurerParticipantId,
+                settlementFreezeAt: settlementFreezeAt,
+                settlementSnapshotJson: settlementSnapshotJson,
               ),
           withReferenceMapper: (p0) => p0
               .map(

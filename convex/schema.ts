@@ -9,6 +9,10 @@ export default defineSchema({
     currencyCode: v.string(),
     createdAt: v.number(),
     updatedAt: v.number(),
+    settlementMethod: v.optional(v.string()),
+    treasurerParticipantId: v.optional(v.id('participants')),
+    settlementFreezeAt: v.optional(v.number()),
+    settlementSnapshotJson: v.optional(v.string()),
   }),
   participants: defineTable({
     groupId: v.id('groups'),

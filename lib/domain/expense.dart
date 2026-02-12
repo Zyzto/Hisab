@@ -18,6 +18,7 @@ class Expense {
   final int amountCents;
   final String currencyCode;
   final String title;
+
   /// Optional longer description (e.g. full OCR text from receipt).
   final String? description;
   final DateTime date;

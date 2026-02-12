@@ -51,50 +51,54 @@ Future<Map<String, dynamic>> exportLocalDataToJson({
 }
 
 Map<String, dynamic> _groupToMap(Group g) => {
-      'id': g.id,
-      'name': g.name,
-      'currencyCode': g.currencyCode,
-      'createdAt': g.createdAt.toIso8601String(),
-      'updatedAt': g.updatedAt.toIso8601String(),
-    };
+  'id': g.id,
+  'name': g.name,
+  'currencyCode': g.currencyCode,
+  'createdAt': g.createdAt.toIso8601String(),
+  'updatedAt': g.updatedAt.toIso8601String(),
+  'settlementMethod': g.settlementMethod.name,
+  'treasurerParticipantId': g.treasurerParticipantId,
+  'settlementFreezeAt': g.settlementFreezeAt?.millisecondsSinceEpoch,
+  'settlementSnapshotJson': g.settlementSnapshotJson,
+};
 
 Map<String, dynamic> _participantToMap(Participant p) => {
-      'id': p.id,
-      'groupId': p.groupId,
-      'name': p.name,
-      'order': p.order,
-      'createdAt': p.createdAt.toIso8601String(),
-      'updatedAt': p.updatedAt.toIso8601String(),
-    };
+  'id': p.id,
+  'groupId': p.groupId,
+  'name': p.name,
+  'order': p.order,
+  'createdAt': p.createdAt.toIso8601String(),
+  'updatedAt': p.updatedAt.toIso8601String(),
+};
 
 Map<String, dynamic> _expenseToMap(Expense e) => {
-      'id': e.id,
-      'groupId': e.groupId,
-      'payerParticipantId': e.payerParticipantId,
-      'amountCents': e.amountCents,
-      'currencyCode': e.currencyCode,
-      'title': e.title,
-      'description': e.description,
-      'date': e.date.toIso8601String(),
-      'splitType': e.splitType.name,
-      'splitShares': e.splitShares,
-      'createdAt': e.createdAt.toIso8601String(),
-      'updatedAt': e.updatedAt.toIso8601String(),
-      'transactionType': e.transactionType.name,
-      'toParticipantId': e.toParticipantId,
-      'tag': e.tag,
-      'lineItems': e.lineItems?.map((l) => l.toJson()).toList(),
-      'receiptImagePath': e.receiptImagePath,
-    };
+  'id': e.id,
+  'groupId': e.groupId,
+  'payerParticipantId': e.payerParticipantId,
+  'amountCents': e.amountCents,
+  'currencyCode': e.currencyCode,
+  'title': e.title,
+  'description': e.description,
+  'date': e.date.toIso8601String(),
+  'splitType': e.splitType.name,
+  'splitShares': e.splitShares,
+  'createdAt': e.createdAt.toIso8601String(),
+  'updatedAt': e.updatedAt.toIso8601String(),
+  'transactionType': e.transactionType.name,
+  'toParticipantId': e.toParticipantId,
+  'tag': e.tag,
+  'lineItems': e.lineItems?.map((l) => l.toJson()).toList(),
+  'receiptImagePath': e.receiptImagePath,
+};
 
 Map<String, dynamic> _tagToMap(ExpenseTag t) => {
-      'id': t.id,
-      'groupId': t.groupId,
-      'label': t.label,
-      'iconName': t.iconName,
-      'createdAt': t.createdAt.toIso8601String(),
-      'updatedAt': t.updatedAt.toIso8601String(),
-    };
+  'id': t.id,
+  'groupId': t.groupId,
+  'label': t.label,
+  'iconName': t.iconName,
+  'createdAt': t.createdAt.toIso8601String(),
+  'updatedAt': t.updatedAt.toIso8601String(),
+};
 
 /// Validate and parse backup JSON. Returns null if invalid.
 BackupData? parseBackupJson(String jsonString) {
@@ -103,19 +107,23 @@ BackupData? parseBackupJson(String jsonString) {
     if (map == null) return null;
     final version = map['version'] as int?;
     if (version == null || version != 1) return null;
-    final groups = (map['groups'] as List<dynamic>?)
+    final groups =
+        (map['groups'] as List<dynamic>?)
             ?.map((e) => _mapToGroup(e as Map<String, dynamic>))
             .toList() ??
         [];
-    final participants = (map['participants'] as List<dynamic>?)
+    final participants =
+        (map['participants'] as List<dynamic>?)
             ?.map((e) => _mapToParticipant(e as Map<String, dynamic>))
             .toList() ??
         [];
-    final expenses = (map['expenses'] as List<dynamic>?)
+    final expenses =
+        (map['expenses'] as List<dynamic>?)
             ?.map((e) => _mapToExpense(e as Map<String, dynamic>))
             .toList() ??
         [];
-    final expenseTags = (map['expense_tags'] as List<dynamic>?)
+    final expenseTags =
+        (map['expense_tags'] as List<dynamic>?)
             ?.map((e) => _mapToTag(e as Map<String, dynamic>))
             .toList() ??
         [];
@@ -131,22 +139,48 @@ BackupData? parseBackupJson(String jsonString) {
   }
 }
 
-Group _mapToGroup(Map<String, dynamic> m) => Group(
-      id: m['id'] as String,
-      name: m['name'] as String,
-      currencyCode: m['currencyCode'] as String,
-      createdAt: DateTime.parse(m['createdAt'] as String),
-      updatedAt: DateTime.parse(m['updatedAt'] as String),
-    );
+Group _mapToGroup(Map<String, dynamic> m) {
+  SettlementMethod method = SettlementMethod.greedy;
+  final methodStr = m['settlementMethod'] as String?;
+  if (methodStr != null) {
+    switch (methodStr) {
+      case 'pairwise':
+        method = SettlementMethod.pairwise;
+        break;
+      case 'greedy':
+        method = SettlementMethod.greedy;
+        break;
+      case 'consolidated':
+        method = SettlementMethod.consolidated;
+        break;
+      case 'treasurer':
+        method = SettlementMethod.treasurer;
+        break;
+    }
+  }
+  return Group(
+    id: m['id'] as String,
+    name: m['name'] as String,
+    currencyCode: m['currencyCode'] as String,
+    createdAt: DateTime.parse(m['createdAt'] as String),
+    updatedAt: DateTime.parse(m['updatedAt'] as String),
+    settlementMethod: method,
+    treasurerParticipantId: m['treasurerParticipantId'] as String?,
+    settlementFreezeAt: m['settlementFreezeAt'] != null
+        ? DateTime.fromMillisecondsSinceEpoch(m['settlementFreezeAt'] as int)
+        : null,
+    settlementSnapshotJson: m['settlementSnapshotJson'] as String?,
+  );
+}
 
 Participant _mapToParticipant(Map<String, dynamic> m) => Participant(
-      id: m['id'] as String,
-      groupId: m['groupId'] as String,
-      name: m['name'] as String,
-      order: m['order'] as int,
-      createdAt: DateTime.parse(m['createdAt'] as String),
-      updatedAt: DateTime.parse(m['updatedAt'] as String),
-    );
+  id: m['id'] as String,
+  groupId: m['groupId'] as String,
+  name: m['name'] as String,
+  order: m['order'] as int,
+  createdAt: DateTime.parse(m['createdAt'] as String),
+  updatedAt: DateTime.parse(m['updatedAt'] as String),
+);
 
 Expense _mapToExpense(Map<String, dynamic> m) {
   final lineItems = m['lineItems'] as List<dynamic>?;
@@ -163,7 +197,8 @@ Expense _mapToExpense(Map<String, dynamic> m) {
       (e) => e.name == m['splitType'],
       orElse: () => SplitType.equal,
     ),
-    splitShares: (m['splitShares'] as Map<String, dynamic>?)?.map(
+    splitShares:
+        (m['splitShares'] as Map<String, dynamic>?)?.map(
           (k, v) => MapEntry(k, (v as num).toInt()),
         ) ??
         {},
@@ -183,13 +218,13 @@ Expense _mapToExpense(Map<String, dynamic> m) {
 }
 
 ExpenseTag _mapToTag(Map<String, dynamic> m) => ExpenseTag(
-      id: m['id'] as String,
-      groupId: m['groupId'] as String,
-      label: m['label'] as String,
-      iconName: m['iconName'] as String,
-      createdAt: DateTime.parse(m['createdAt'] as String),
-      updatedAt: DateTime.parse(m['updatedAt'] as String),
-    );
+  id: m['id'] as String,
+  groupId: m['groupId'] as String,
+  label: m['label'] as String,
+  iconName: m['iconName'] as String,
+  createdAt: DateTime.parse(m['createdAt'] as String),
+  updatedAt: DateTime.parse(m['updatedAt'] as String),
+);
 
 class BackupData {
   const BackupData({

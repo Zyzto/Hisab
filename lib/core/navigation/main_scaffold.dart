@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../features/home/pages/home_page.dart';
 import '../../features/settings/pages/settings_page.dart';
+import '../../features/settings/providers/settings_framework_providers.dart';
 import '../widgets/floating_nav_bar.dart';
 import 'route_paths.dart';
 
@@ -50,6 +51,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(languageProvider);
     final showNavBar = _shouldShowNavBar();
 
     return Scaffold(

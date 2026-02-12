@@ -79,12 +79,15 @@ class _SegmentedTabBarState extends State<SegmentedTabBar> {
       child: Material(
         type: MaterialType.transparency,
         child: InkWell(
-          onTap: () {}, // Absorb tap at bar level; segments handle via GestureDetector
+          onTap:
+              () {}, // Absorb tap at bar level; segments handle via GestureDetector
           splashColor: Colors.transparent,
           highlightColor: Colors.transparent,
           child: Container(
             decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              color: theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.5,
+              ),
               borderRadius: BorderRadius.circular(10),
             ),
             padding: const EdgeInsets.all(4),

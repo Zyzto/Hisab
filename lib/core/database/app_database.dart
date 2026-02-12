@@ -12,7 +12,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -31,6 +31,28 @@ class AppDatabase extends _$AppDatabase {
         }
         try {
           await m.addColumn(expenses, expenses.receiptImagePath);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column name')) rethrow;
+        }
+      }
+      if (from < 4) {
+        try {
+          await m.addColumn(groups, groups.settlementMethod);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column name')) rethrow;
+        }
+        try {
+          await m.addColumn(groups, groups.treasurerParticipantId);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column name')) rethrow;
+        }
+        try {
+          await m.addColumn(groups, groups.settlementFreezeAt);
+        } catch (e) {
+          if (!e.toString().contains('duplicate column name')) rethrow;
+        }
+        try {
+          await m.addColumn(groups, groups.settlementSnapshotJson);
         } catch (e) {
           if (!e.toString().contains('duplicate column name')) rethrow;
         }

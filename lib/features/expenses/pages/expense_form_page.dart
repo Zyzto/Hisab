@@ -543,6 +543,43 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           });
           return const SizedBox.shrink();
         }
+        if (group.isSettlementFrozen && widget.expenseId == null) {
+          return Scaffold(
+            appBar: AppBar(
+              title: Text('add_expense'.tr()),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => context.pop(),
+              ),
+            ),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.pause_circle_outline,
+                      size: 64,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'add_expense_blocked_frozen'.tr(),
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyLarge,
+                    ),
+                    const SizedBox(height: 24),
+                    FilledButton(
+                      onPressed: () => context.pop(),
+                      child: Text('done'.tr()),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
         final currencyCode = group.currencyCode;
 
         return participantsAsync.when(
@@ -1122,9 +1159,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         final storedPath = await copyReceiptToAppStorage(file.path);
         if (!mounted) return;
         setState(() => _receiptImagePath = storedPath);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('receipt_attached'.tr())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('receipt_attached'.tr())));
         return;
       }
 
@@ -1136,9 +1173,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       final ocrText = recognized.text.trim();
       if (ocrText.isEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('receipt_no_text'.tr())),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('receipt_no_text'.tr())));
         }
         return;
       }
@@ -1150,8 +1187,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       final bool configured = provider == 'gemini'
           ? geminiKey.isNotEmpty
           : provider == 'openai'
-              ? openaiKey.isNotEmpty
-              : false;
+          ? openaiKey.isNotEmpty
+          : false;
 
       if (!aiEnabled || provider == 'none' || !configured) {
         setState(() {
@@ -1162,9 +1199,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         final storedPath = await copyReceiptToAppStorage(file.path);
         if (!mounted) return;
         setState(() => _receiptImagePath = storedPath);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('receipt_attached'.tr())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('receipt_attached'.tr())));
         return;
       }
 
@@ -1180,9 +1217,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         debugPrint('Receipt LLM error: $e');
         debugPrintStack(stackTrace: stack);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('receipt_ai_failed'.tr())),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('receipt_ai_failed'.tr())));
           setState(() {
             _titleController.text = 'Receipt';
             _descriptionController.text = ocrText;
@@ -1198,15 +1235,16 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       final parsed = _parseReceiptJson(responseText);
       if (parsed != null) {
         setState(() {
-          _titleController.text =
-              parsed.vendor.isNotEmpty ? parsed.vendor : 'Receipt';
+          _titleController.text = parsed.vendor.isNotEmpty
+              ? parsed.vendor
+              : 'Receipt';
           _date = parsed.date;
           _amountController.text = parsed.total.toStringAsFixed(2);
         });
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('receipt_scan_applied'.tr())),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('receipt_scan_applied'.tr())));
         }
       } else {
         setState(() {
@@ -1217,9 +1255,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         final storedPath = await copyReceiptToAppStorage(file.path);
         if (!mounted) return;
         setState(() => _receiptImagePath = storedPath);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('receipt_ai_failed'.tr())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('receipt_ai_failed'.tr())));
       }
     } catch (e, stack) {
       if (mounted) {
@@ -1234,7 +1272,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   }
 
   /// Parse LLM JSON response (vendor, date, total). Strips markdown code fences. Returns null on failure.
-  ({String vendor, DateTime date, double total})? _parseReceiptJson(String raw) {
+  ({String vendor, DateTime date, double total})? _parseReceiptJson(
+    String raw,
+  ) {
     String s = raw.trim();
     final codeBlock = RegExp(r'^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$');
     final match = codeBlock.firstMatch(s);
@@ -1267,7 +1307,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     if (e == null) return 'Unknown error';
     final s = e.toString().replaceFirst(RegExp(r'^Exception:?\s*'), '').trim();
     final firstLine = s.split(RegExp(r'[\n\r]')).first.trim();
-    return firstLine.length > 120 ? '${firstLine.substring(0, 117)}...' : firstLine;
+    return firstLine.length > 120
+        ? '${firstLine.substring(0, 117)}...'
+        : firstLine;
   }
 
   /// Line items to persist: exclude rows that are both empty description and zero amount.
@@ -1295,7 +1337,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
             TextButton.icon(
               onPressed: () {
                 setState(() {
-                  _lineItems.add(const ReceiptLineItem(description: '', amountCents: 0));
+                  _lineItems.add(
+                    const ReceiptLineItem(description: '', amountCents: 0),
+                  );
                 });
               },
               icon: const Icon(Icons.add, size: 20),
@@ -1307,9 +1351,14 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         ...(_lineItems.isEmpty
             ? [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                    color: theme.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.5,
+                    ),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -1321,60 +1370,80 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                 ),
               ]
             : List.generate(_lineItems.length, (i) {
-            final item = _lineItems[i];
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: TextFormField(
-                      initialValue: item.description,
-                      decoration: InputDecoration(
-                        hintText: 'item_description'.tr(),
-                        isDense: true,
-                        border: const OutlineInputBorder(),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                final item = _lineItems[i];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: TextFormField(
+                          initialValue: item.description,
+                          decoration: InputDecoration(
+                            hintText: 'item_description'.tr(),
+                            isDense: true,
+                            border: const OutlineInputBorder(),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                          ),
+                          onChanged: (v) {
+                            setState(() {
+                              _lineItems[i] = ReceiptLineItem(
+                                description: v.trim(),
+                                amountCents: item.amountCents,
+                              );
+                            });
+                          },
+                        ),
                       ),
-                      onChanged: (v) {
-                        setState(() {
-                          _lineItems[i] = ReceiptLineItem(description: v.trim(), amountCents: item.amountCents);
-                        });
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: 100,
-                    child: TextFormField(
-                      initialValue: item.amountCents > 0 ? (item.amountCents / 100).toStringAsFixed(2) : '',
-                      decoration: const InputDecoration(
-                        hintText: '0',
-                        isDense: true,
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 100,
+                        child: TextFormField(
+                          initialValue: item.amountCents > 0
+                              ? (item.amountCents / 100).toStringAsFixed(2)
+                              : '',
+                          decoration: const InputDecoration(
+                            hintText: '0',
+                            isDense: true,
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          inputFormatters: [_decimalOnlyFormatter],
+                          onChanged: (v) {
+                            final cents = ((double.tryParse(v) ?? 0) * 100)
+                                .round();
+                            setState(() {
+                              _lineItems[i] = ReceiptLineItem(
+                                description: item.description,
+                                amountCents: cents,
+                              );
+                            });
+                          },
+                        ),
                       ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [_decimalOnlyFormatter],
-                      onChanged: (v) {
-                        final cents = ((double.tryParse(v) ?? 0) * 100).round();
-                        setState(() {
-                          _lineItems[i] = ReceiptLineItem(description: item.description, amountCents: cents);
-                        });
-                      },
-                    ),
+                      IconButton(
+                        icon: Icon(
+                          Icons.remove_circle_outline,
+                          color: theme.colorScheme.error,
+                        ),
+                        onPressed: () {
+                          setState(() => _lineItems.removeAt(i));
+                        },
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    icon: Icon(Icons.remove_circle_outline, color: theme.colorScheme.error),
-                    onPressed: () {
-                      setState(() => _lineItems.removeAt(i));
-                    },
-                  ),
-                ],
-              ),
-            );
-          })),
+                );
+              })),
       ],
     );
   }
@@ -1423,15 +1492,20 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.receipt_long, size: 18, color: theme.colorScheme.primary),
-            const SizedBox(width: 8),
-            Text(
-              'receipt_attached'.tr(),
-              style: theme.textTheme.bodySmall,
+            Icon(
+              Icons.receipt_long,
+              size: 18,
+              color: theme.colorScheme.primary,
             ),
+            const SizedBox(width: 8),
+            Text('receipt_attached'.tr(), style: theme.textTheme.bodySmall),
             const SizedBox(width: 4),
             IconButton(
-              icon: Icon(Icons.close, size: 18, color: theme.colorScheme.onSurfaceVariant),
+              icon: Icon(
+                Icons.close,
+                size: 18,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               onPressed: () => setState(() => _receiptImagePath = null),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 32, minHeight: 32),

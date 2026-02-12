@@ -7,4 +7,6 @@ abstract class IGroupRepository {
   Future<String> create(String name, String currencyCode);
   Future<void> update(Group group);
   Future<void> delete(String id);
+  Future<void> freezeSettlement(String groupId, SettlementSnapshot snapshot);
+  Future<void> unfreezeSettlement(String groupId);
 }

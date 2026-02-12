@@ -62,15 +62,24 @@ class ConvexGroupRepository implements IGroupRepository {
 
   @override
   Future<void> update(Group group) async {
-    await ConvexClient.instance.mutation(
-      name: 'groups:update',
-      args: {
-        'id': group.id,
-        'name': group.name,
-        'currencyCode': group.currencyCode,
-        'updatedAt': group.updatedAt.millisecondsSinceEpoch,
-      },
-    );
+    final args = <String, dynamic>{
+      'id': group.id,
+      'name': group.name,
+      'currencyCode': group.currencyCode,
+      'updatedAt': group.updatedAt.millisecondsSinceEpoch,
+      'settlementMethod': group.settlementMethod.name,
+    };
+    if (group.treasurerParticipantId != null) {
+      args['treasurerParticipantId'] = group.treasurerParticipantId;
+    }
+    if (group.settlementFreezeAt != null) {
+      args['settlementFreezeAt'] =
+          group.settlementFreezeAt!.millisecondsSinceEpoch;
+    }
+    if (group.settlementSnapshotJson != null) {
+      args['settlementSnapshotJson'] = group.settlementSnapshotJson;
+    }
+    await ConvexClient.instance.mutation(name: 'groups:update', args: args);
   }
 
   @override
@@ -79,6 +88,45 @@ class ConvexGroupRepository implements IGroupRepository {
       name: 'groups:remove',
       args: {'id': id},
     );
+  }
+
+  @override
+  Future<void> freezeSettlement(
+    String groupId,
+    SettlementSnapshot snapshot,
+  ) async {
+    await ConvexClient.instance.mutation(
+      name: 'groups:freezeSettlement',
+      args: {
+        'id': groupId,
+        'settlementSnapshotJson': snapshot.toJsonString(),
+        'settlementFreezeAt': snapshot.frozenAt.millisecondsSinceEpoch,
+      },
+    );
+  }
+
+  @override
+  Future<void> unfreezeSettlement(String groupId) async {
+    await ConvexClient.instance.mutation(
+      name: 'groups:unfreezeSettlement',
+      args: {'id': groupId},
+    );
+  }
+
+  SettlementMethod _parseSettlementMethod(String? s) {
+    if (s == null) return SettlementMethod.greedy;
+    switch (s) {
+      case 'pairwise':
+        return SettlementMethod.pairwise;
+      case 'greedy':
+        return SettlementMethod.greedy;
+      case 'consolidated':
+        return SettlementMethod.consolidated;
+      case 'treasurer':
+        return SettlementMethod.treasurer;
+      default:
+        return SettlementMethod.greedy;
+    }
   }
 
   Group _groupFromJson(Map<String, dynamic> j) {
@@ -92,6 +140,16 @@ class ConvexGroupRepository implements IGroupRepository {
       updatedAt: DateTime.fromMillisecondsSinceEpoch(
         (j['updatedAt'] as num?)?.toInt() ?? 0,
       ),
+      settlementMethod: _parseSettlementMethod(
+        j['settlementMethod'] as String?,
+      ),
+      treasurerParticipantId: j['treasurerParticipantId'] as String?,
+      settlementFreezeAt: j['settlementFreezeAt'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(
+              (j['settlementFreezeAt'] as num).toInt(),
+            )
+          : null,
+      settlementSnapshotJson: j['settlementSnapshotJson'] as String?,
     );
   }
 }

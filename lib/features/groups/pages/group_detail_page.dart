@@ -116,12 +116,12 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
   Widget? _buildFAB(BuildContext context, int index) {
     final theme = Theme.of(context);
     if (index == 0) {
+      if (widget.group.isSettlementFrozen) return null;
       return _FABWithLabel(
         icon: Icons.add,
         label: 'add_expense'.tr(),
         theme: theme,
-        onTap: () =>
-            context.push(RoutePaths.groupExpenseAdd(widget.group.id)),
+        onTap: () => context.push(RoutePaths.groupExpenseAdd(widget.group.id)),
       );
     }
     if (index == 2) {
@@ -133,7 +133,10 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
           context,
           ref,
           widget.group.id,
-          ref.read(participantsByGroupProvider(widget.group.id)).value?.length ??
+          ref
+                  .read(participantsByGroupProvider(widget.group.id))
+                  .value
+                  ?.length ??
               0,
         ),
       );
@@ -158,6 +161,11 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
         ),
         title: _buildAppBarTitle(context),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () =>
+                context.push(RoutePaths.groupSettings(widget.group.id)),
+          ),
           IconButton(icon: const Icon(Icons.refresh), onPressed: _onRefresh),
         ],
       ),
@@ -165,11 +173,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
         children: [
           SegmentedTabBar(
             controller: _tabController,
-            labels: [
-              'expenses'.tr(),
-              'balance'.tr(),
-              'participants'.tr(),
-            ],
+            labels: ['expenses'.tr(), 'balance'.tr(), 'participants'.tr()],
             currentIndexNotifier: _tabIndexNotifier,
           ),
           Expanded(

@@ -78,12 +78,19 @@ class LocalGroupRepository implements IGroupRepository {
   Future<void> update(Group group) async {
     final intId = localIdToInt(group.id);
     if (intId == null) return;
+    final treasurerInt = group.treasurerParticipantId != null
+        ? localIdToInt(group.treasurerParticipantId!)
+        : null;
     final row = db.Group(
       id: intId,
       name: group.name,
       currencyCode: group.currencyCode,
       createdAt: group.createdAt,
       updatedAt: group.updatedAt,
+      settlementMethod: group.settlementMethod.name,
+      treasurerParticipantId: treasurerInt,
+      settlementFreezeAt: group.settlementFreezeAt,
+      settlementSnapshotJson: group.settlementSnapshotJson,
     );
     await _groupDao.updateGroup(row);
   }
@@ -94,6 +101,44 @@ class LocalGroupRepository implements IGroupRepository {
     if (intId != null) await _groupDao.deleteGroup(intId);
   }
 
+  @override
+  Future<void> freezeSettlement(
+    String groupId,
+    SettlementSnapshot snapshot,
+  ) async {
+    final group = await getById(groupId);
+    if (group == null) return;
+    await update(
+      group.copyWith(
+        settlementFreezeAt: snapshot.frozenAt,
+        settlementSnapshotJson: snapshot.toJsonString(),
+      ),
+    );
+  }
+
+  @override
+  Future<void> unfreezeSettlement(String groupId) async {
+    final group = await getById(groupId);
+    if (group == null) return;
+    await update(group.copyWithUnfreeze());
+  }
+
+  SettlementMethod _parseSettlementMethod(String? s) {
+    if (s == null) return SettlementMethod.greedy;
+    switch (s) {
+      case 'pairwise':
+        return SettlementMethod.pairwise;
+      case 'greedy':
+        return SettlementMethod.greedy;
+      case 'consolidated':
+        return SettlementMethod.consolidated;
+      case 'treasurer':
+        return SettlementMethod.treasurer;
+      default:
+        return SettlementMethod.greedy;
+    }
+  }
+
   Group _toDomain(db.Group row) {
     return Group(
       id: intToLocalId(row.id),
@@ -101,6 +146,12 @@ class LocalGroupRepository implements IGroupRepository {
       currencyCode: row.currencyCode,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
+      settlementMethod: _parseSettlementMethod(row.settlementMethod),
+      treasurerParticipantId: row.treasurerParticipantId != null
+          ? intToLocalId(row.treasurerParticipantId!)
+          : null,
+      settlementFreezeAt: row.settlementFreezeAt,
+      settlementSnapshotJson: row.settlementSnapshotJson,
     );
   }
 }
@@ -263,7 +314,8 @@ class LocalExpenseRepository implements IExpenseRepository {
       amountCents: expense.amountCents,
       currencyCode: expense.currencyCode,
       title: expense.title,
-      description: expense.description != null && expense.description!.isNotEmpty
+      description:
+          expense.description != null && expense.description!.isNotEmpty
           ? Value(expense.description!)
           : const Value.absent(),
       date: expense.date,
@@ -275,7 +327,8 @@ class LocalExpenseRepository implements IExpenseRepository {
       lineItemsJson: lineItemsEnc != null
           ? Value(lineItemsEnc)
           : const Value.absent(),
-      receiptImagePath: expense.receiptImagePath != null &&
+      receiptImagePath:
+          expense.receiptImagePath != null &&
               expense.receiptImagePath!.isNotEmpty
           ? Value(expense.receiptImagePath!)
           : const Value.absent(),

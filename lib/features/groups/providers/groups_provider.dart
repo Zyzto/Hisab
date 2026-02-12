@@ -1,40 +1,35 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../domain/domain.dart';
 
-final groupsProvider = StreamProvider<List<Group>>((ref) {
+part 'groups_provider.g.dart';
+
+@riverpod
+Stream<List<Group>> groups(Ref ref) {
   return ref.watch(groupRepositoryProvider).watchAll();
-});
+}
 
-final futureGroupProvider = FutureProvider.family<Group?, String>((
-  ref,
-  groupId,
-) async {
+@riverpod
+Future<Group?> futureGroup(Ref ref, String groupId) async {
   return ref.read(groupRepositoryProvider).getById(groupId);
-});
+}
 
-final expensesByGroupProvider = StreamProvider.family<List<Expense>, String>((
-  ref,
-  groupId,
-) {
+@riverpod
+Stream<List<Expense>> expensesByGroup(Ref ref, String groupId) {
   return ref.watch(expenseRepositoryProvider).watchByGroupId(groupId);
-});
+}
 
-final futureExpenseProvider = FutureProvider.family<Expense?, String>((
-  ref,
-  expenseId,
-) async {
+@riverpod
+Future<Expense?> futureExpense(Ref ref, String expenseId) async {
   return ref.read(expenseRepositoryProvider).getById(expenseId);
-});
+}
 
-final participantsByGroupProvider =
-    StreamProvider.family<List<Participant>, String>((ref, groupId) {
-      return ref.watch(participantRepositoryProvider).watchByGroupId(groupId);
-    });
+@riverpod
+Stream<List<Participant>> participantsByGroup(Ref ref, String groupId) {
+  return ref.watch(participantRepositoryProvider).watchByGroupId(groupId);
+}
 
-final tagsByGroupProvider = StreamProvider.family<List<ExpenseTag>, String>((
-  ref,
-  groupId,
-) {
+@riverpod
+Stream<List<ExpenseTag>> tagsByGroup(Ref ref, String groupId) {
   return ref.watch(tagRepositoryProvider).watchByGroupId(groupId);
-});
+}
