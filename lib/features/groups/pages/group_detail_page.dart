@@ -251,66 +251,81 @@ class _ExpensesTab extends ConsumerWidget {
             final dateFormat = DateFormat('MMMM d, yyyy');
             final theme = Theme.of(context);
 
-            return ListView(
+            // Flatten for ListView.builder: [summary] + for each date [header, ...expenses]
+            final flattenedItems = <_ExpenseListItem>[
+              _ExpenseListSummaryItem(
+                myExpensesCents: myExpensesCents,
+                totalCents: totalCents,
+              ),
+            ];
+            for (final dateKey in dateKeys) {
+              flattenedItems.add(_ExpenseListDateHeaderItem(dateKey));
+              for (final e in byDate[dateKey]!) {
+                flattenedItems.add(_ExpenseListExpenseItem(e));
+              }
+            }
+
+            return ListView.builder(
               padding: const EdgeInsets.only(bottom: 24),
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _ExpenseSummaryCard(
-                          label: 'my_expenses'.tr(),
-                          value:
-                              '${CurrencyFormatter.formatCompactCents(myExpensesCents)} $currencyCode',
-                          theme: theme,
-                        ),
+              itemCount: flattenedItems.length,
+              itemBuilder: (context, index) {
+                final item = flattenedItems[index];
+                switch (item) {
+                  case _ExpenseListSummaryItem():
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _ExpenseSummaryCard(
-                          label: 'total_expenses'.tr(),
-                          value:
-                              '${CurrencyFormatter.formatCompactCents(totalCents)} $currencyCode',
-                          theme: theme,
-                        ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _ExpenseSummaryCard(
+                              label: 'my_expenses'.tr(),
+                              value:
+                                  '${CurrencyFormatter.formatCompactCents(item.myExpensesCents)} $currencyCode',
+                              theme: theme,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _ExpenseSummaryCard(
+                              label: 'total_expenses'.tr(),
+                              value:
+                                  '${CurrencyFormatter.formatCompactCents(item.totalCents)} $currencyCode',
+                              theme: theme,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-                ...dateKeys.expand((dateKey) {
-                  final list = byDate[dateKey]!;
-                  return [
-                    Padding(
+                    );
+                  case _ExpenseListDateHeaderItem():
+                    return Padding(
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
                       child: Text(
-                        dateFormat.format(dateKey),
+                        dateFormat.format(item.date),
                         style: theme.textTheme.titleSmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
-                    ),
-                    ...list.map(
-                      (expense) => InkWell(
-                        key: ValueKey(expense.id),
-                        onTap: () => context.push(
-                          RoutePaths.groupExpenseDetail(groupId, expense.id),
-                        ),
-                        child: ExpenseListTile(
-                          expense: expense,
-                          payerName:
-                              nameOf[expense.payerParticipantId] ??
-                              expense.payerParticipantId,
-                          icon: iconForExpenseTag(expense.tag, customTags),
-                        ),
+                    );
+                  case _ExpenseListExpenseItem():
+                    final expense = item.expense;
+                    return InkWell(
+                      key: ValueKey(expense.id),
+                      onTap: () => context.push(
+                        RoutePaths.groupExpenseDetail(groupId, expense.id),
                       ),
-                    ),
-                  ];
-                }),
-              ],
+                      child: ExpenseListTile(
+                        expense: expense,
+                        payerName:
+                            nameOf[expense.payerParticipantId] ??
+                                expense.payerParticipantId,
+                        icon: iconForExpenseTag(expense.tag, customTags),
+                      ),
+                    );
+                }
+              },
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
@@ -380,6 +395,30 @@ class _ParticipantsTab extends ConsumerWidget {
       },
     );
   }
+}
+
+/// Sealed-like item types for virtualized expense list.
+sealed class _ExpenseListItem {
+  const _ExpenseListItem();
+}
+
+class _ExpenseListSummaryItem extends _ExpenseListItem {
+  final int myExpensesCents;
+  final int totalCents;
+  _ExpenseListSummaryItem({
+    required this.myExpensesCents,
+    required this.totalCents,
+  }) : super();
+}
+
+class _ExpenseListDateHeaderItem extends _ExpenseListItem {
+  final DateTime date;
+  _ExpenseListDateHeaderItem(this.date) : super();
+}
+
+class _ExpenseListExpenseItem extends _ExpenseListItem {
+  final Expense expense;
+  _ExpenseListExpenseItem(this.expense) : super();
 }
 
 /// Summary card for my/total expenses in the expenses tab.
