@@ -12,6 +12,18 @@ import 'tag_repository.dart';
 /// Convex implementation. Uses ConvexClient.instance (must be initialized when Local Only is off).
 /// Convex ids are strings; no mapping needed.
 
+/// Normalizes Convex ID: strips JSON string encoding if present (e.g. "\"xyz\"" -> "xyz").
+String _normalizeConvexId(String id) {
+  if (id.length >= 2 && id.startsWith('"') && id.endsWith('"')) {
+    try {
+      return jsonDecode(id) as String;
+    } catch (_) {
+      return id;
+    }
+  }
+  return id;
+}
+
 SplitType _parseSplitType(String? s) {
   switch (s) {
     case 'equal':
@@ -45,7 +57,10 @@ class ConvexGroupRepository implements IGroupRepository {
 
   @override
   Future<Group?> getById(String id) async {
-    final raw = await ConvexClient.instance.query('groups:get', {'id': id});
+    final raw = await ConvexClient.instance.query(
+      'groups:get',
+      {'id': _normalizeConvexId(id)},
+    );
     if (raw.isEmpty) return null;
     final map = jsonDecode(raw) as Map<String, dynamic>?;
     return map != null ? _groupFromJson(map) : null;
@@ -71,14 +86,15 @@ class ConvexGroupRepository implements IGroupRepository {
   Future<void> update(Group group) async {
     try {
       final args = <String, dynamic>{
-        'id': group.id,
+        'id': _normalizeConvexId(group.id),
         'name': group.name,
         'currencyCode': group.currencyCode,
         'updatedAt': group.updatedAt.millisecondsSinceEpoch,
         'settlementMethod': group.settlementMethod.name,
       };
       if (group.treasurerParticipantId != null) {
-        args['treasurerParticipantId'] = group.treasurerParticipantId;
+        args['treasurerParticipantId'] =
+            _normalizeConvexId(group.treasurerParticipantId!);
       }
       if (group.settlementFreezeAt != null) {
         args['settlementFreezeAt'] =
@@ -100,7 +116,7 @@ class ConvexGroupRepository implements IGroupRepository {
     try {
       await ConvexClient.instance.mutation(
         name: 'groups:remove',
-        args: {'id': id},
+        args: {'id': _normalizeConvexId(id)},
       );
       Log.info('Group deleted: id=$id');
     } catch (e, st) {
@@ -118,7 +134,7 @@ class ConvexGroupRepository implements IGroupRepository {
       await ConvexClient.instance.mutation(
         name: 'groups:freezeSettlement',
         args: {
-          'id': groupId,
+          'id': _normalizeConvexId(groupId),
           'settlementSnapshotJson': snapshot.toJsonString(),
           'settlementFreezeAt': snapshot.frozenAt.millisecondsSinceEpoch,
         },
@@ -135,7 +151,7 @@ class ConvexGroupRepository implements IGroupRepository {
     try {
       await ConvexClient.instance.mutation(
         name: 'groups:unfreezeSettlement',
-        args: {'id': groupId},
+        args: {'id': _normalizeConvexId(groupId)},
       );
       Log.info('Settlement unfrozen: groupId=$groupId');
     } catch (e, st) {
@@ -162,7 +178,7 @@ class ConvexGroupRepository implements IGroupRepository {
 
   Group _groupFromJson(Map<String, dynamic> j) {
     return Group(
-      id: j['_id'] as String? ?? '',
+      id: _normalizeConvexId(j['_id'] as String? ?? ''),
       name: j['name'] as String? ?? '',
       currencyCode: j['currencyCode'] as String? ?? 'USD',
       createdAt: DateTime.fromMillisecondsSinceEpoch(
@@ -189,7 +205,7 @@ class ConvexParticipantRepository implements IParticipantRepository {
   @override
   Future<List<Participant>> getByGroupId(String groupId) async {
     final raw = await ConvexClient.instance.query('participants:listByGroup', {
-      'groupId': groupId,
+      'groupId': _normalizeConvexId(groupId),
     });
     final list =
         jsonDecode(raw.isNotEmpty ? raw : '[]') as List<dynamic>? ?? [];
@@ -201,14 +217,14 @@ class ConvexParticipantRepository implements IParticipantRepository {
   @override
   Stream<List<Participant>> watchByGroupId(String groupId) {
     return _subscribeList('participants:listByGroup', {
-      'groupId': groupId,
+      'groupId': _normalizeConvexId(groupId),
     }, _participantFromJson);
   }
 
   @override
   Future<Participant?> getById(String id) async {
     final raw = await ConvexClient.instance.query('participants:get', {
-      'id': id,
+      'id': _normalizeConvexId(id),
     });
     if (raw.isEmpty) return null;
     final map = jsonDecode(raw) as Map<String, dynamic>?;
@@ -218,9 +234,13 @@ class ConvexParticipantRepository implements IParticipantRepository {
   @override
   Future<String> create(String groupId, String name, int order) async {
     try {
-      final raw = await ConvexClient.instance.mutation(
+      final raw =       await ConvexClient.instance.mutation(
         name: 'participants:create',
-        args: {'groupId': groupId, 'name': name, 'order': order},
+        args: {
+          'groupId': _normalizeConvexId(groupId),
+          'name': name,
+          'order': order,
+        },
       );
       final id = raw as String? ?? '';
       Log.info('Participant created: id=$id groupId=$groupId name="$name"');
@@ -237,7 +257,7 @@ class ConvexParticipantRepository implements IParticipantRepository {
       await ConvexClient.instance.mutation(
         name: 'participants:update',
         args: {
-          'id': participant.id,
+          'id': _normalizeConvexId(participant.id),
           'name': participant.name,
           'order': participant.order,
           'updatedAt': participant.updatedAt.millisecondsSinceEpoch,
@@ -257,7 +277,7 @@ class ConvexParticipantRepository implements IParticipantRepository {
     try {
       await ConvexClient.instance.mutation(
         name: 'participants:remove',
-        args: {'id': id},
+        args: {'id': _normalizeConvexId(id)},
       );
       Log.info('Participant deleted: id=$id');
     } catch (e, st) {
@@ -268,8 +288,8 @@ class ConvexParticipantRepository implements IParticipantRepository {
 
   Participant _participantFromJson(Map<String, dynamic> j) {
     return Participant(
-      id: j['_id'] as String? ?? '',
-      groupId: j['groupId'] as String? ?? '',
+      id: _normalizeConvexId(j['_id'] as String? ?? ''),
+      groupId: _normalizeConvexId(j['groupId'] as String? ?? ''),
       name: j['name'] as String? ?? '',
       order: (j['order'] as num?)?.toInt() ?? 0,
       createdAt: DateTime.fromMillisecondsSinceEpoch(
@@ -286,7 +306,7 @@ class ConvexExpenseRepository implements IExpenseRepository {
   @override
   Future<List<Expense>> getByGroupId(String groupId) async {
     final raw = await ConvexClient.instance.query('expenses:listByGroup', {
-      'groupId': groupId,
+      'groupId': _normalizeConvexId(groupId),
     });
     final list =
         jsonDecode(raw.isNotEmpty ? raw : '[]') as List<dynamic>? ?? [];
@@ -298,13 +318,16 @@ class ConvexExpenseRepository implements IExpenseRepository {
   @override
   Stream<List<Expense>> watchByGroupId(String groupId) {
     return _subscribeList('expenses:listByGroup', {
-      'groupId': groupId,
+      'groupId': _normalizeConvexId(groupId),
     }, _expenseFromJson);
   }
 
   @override
   Future<Expense?> getById(String id) async {
-    final raw = await ConvexClient.instance.query('expenses:get', {'id': id});
+    final raw = await ConvexClient.instance.query(
+      'expenses:get',
+      {'id': _normalizeConvexId(id)},
+    );
     if (raw.isEmpty) return null;
     final map = jsonDecode(raw) as Map<String, dynamic>?;
     return map != null ? _expenseFromJson(map) : null;
@@ -314,8 +337,8 @@ class ConvexExpenseRepository implements IExpenseRepository {
   Future<String> create(Expense expense) async {
     try {
       final args = <String, dynamic>{
-        'groupId': expense.groupId,
-        'payerParticipantId': expense.payerParticipantId,
+        'groupId': _normalizeConvexId(expense.groupId),
+        'payerParticipantId': _normalizeConvexId(expense.payerParticipantId),
         'amountCents': expense.amountCents,
         'currencyCode': expense.currencyCode,
         'title': expense.title,
@@ -325,7 +348,8 @@ class ConvexExpenseRepository implements IExpenseRepository {
         'type': expense.transactionType.name,
       };
       if (expense.toParticipantId != null) {
-        args['toParticipantId'] = expense.toParticipantId;
+        args['toParticipantId'] =
+            _normalizeConvexId(expense.toParticipantId!);
       }
       if (expense.tag != null) {
         args['tag'] = expense.tag;
@@ -363,7 +387,7 @@ class ConvexExpenseRepository implements IExpenseRepository {
       await ConvexClient.instance.mutation(
         name: 'expenses:update',
         args: {
-          'id': expense.id,
+          'id': _normalizeConvexId(expense.id),
           'title': expense.title,
           'amountCents': expense.amountCents,
           'date': expense.date.millisecondsSinceEpoch,
@@ -392,7 +416,7 @@ class ConvexExpenseRepository implements IExpenseRepository {
     try {
       await ConvexClient.instance.mutation(
         name: 'expenses:remove',
-        args: {'id': id},
+        args: {'id': _normalizeConvexId(id)},
       );
       Log.info('Expense deleted: id=$id');
     } catch (e, st) {
@@ -433,9 +457,10 @@ class ConvexExpenseRepository implements IExpenseRepository {
       Log.debug('Convex expense lineItems parse failed: $e');
     }
     return Expense(
-      id: j['_id'] as String? ?? '',
-      groupId: j['groupId'] as String? ?? '',
-      payerParticipantId: j['payerParticipantId'] as String? ?? '',
+      id: _normalizeConvexId(j['_id'] as String? ?? ''),
+      groupId: _normalizeConvexId(j['groupId'] as String? ?? ''),
+      payerParticipantId:
+          _normalizeConvexId(j['payerParticipantId'] as String? ?? ''),
       amountCents: (j['amountCents'] as num?)?.toInt() ?? 0,
       currencyCode: j['currencyCode'] as String? ?? 'USD',
       title: j['title'] as String? ?? '',
@@ -457,7 +482,7 @@ class ConvexExpenseRepository implements IExpenseRepository {
         (e) => e.name == typeStr,
         orElse: () => TransactionType.expense,
       ),
-      toParticipantId: toId,
+      toParticipantId: toId != null ? _normalizeConvexId(toId) : null,
       tag: j['tag'] as String?,
       lineItems: lineItems,
       receiptImagePath: (j['receiptImagePath'] as String?)?.isEmpty ?? true
@@ -471,7 +496,7 @@ class ConvexTagRepository implements ITagRepository {
   @override
   Future<List<ExpenseTag>> getByGroupId(String groupId) async {
     final raw = await ConvexClient.instance.query('expense_tags:listByGroup', {
-      'groupId': groupId,
+      'groupId': _normalizeConvexId(groupId),
     });
     final list =
         jsonDecode(raw.isNotEmpty ? raw : '[]') as List<dynamic>? ?? [];
@@ -481,14 +506,14 @@ class ConvexTagRepository implements ITagRepository {
   @override
   Stream<List<ExpenseTag>> watchByGroupId(String groupId) {
     return _subscribeList('expense_tags:listByGroup', {
-      'groupId': groupId,
+      'groupId': _normalizeConvexId(groupId),
     }, _tagFromJson);
   }
 
   @override
   Future<ExpenseTag?> getById(String id) async {
     final raw = await ConvexClient.instance.query('expense_tags:get', {
-      'id': id,
+      'id': _normalizeConvexId(id),
     });
     if (raw.isEmpty) return null;
     final map = jsonDecode(raw) as Map<String, dynamic>?;
@@ -499,7 +524,11 @@ class ConvexTagRepository implements ITagRepository {
   Future<String> create(String groupId, String label, String iconName) async {
     final raw = await ConvexClient.instance.mutation(
       name: 'expense_tags:create',
-      args: {'groupId': groupId, 'label': label, 'iconName': iconName},
+      args: {
+        'groupId': _normalizeConvexId(groupId),
+        'label': label,
+        'iconName': iconName,
+      },
     );
     return raw as String? ?? '';
   }
@@ -509,7 +538,7 @@ class ConvexTagRepository implements ITagRepository {
     await ConvexClient.instance.mutation(
       name: 'expense_tags:update',
       args: {
-        'id': tag.id,
+        'id': _normalizeConvexId(tag.id),
         'label': tag.label,
         'iconName': tag.iconName,
         'updatedAt': tag.updatedAt.millisecondsSinceEpoch,
@@ -521,14 +550,14 @@ class ConvexTagRepository implements ITagRepository {
   Future<void> delete(String id) async {
     await ConvexClient.instance.mutation(
       name: 'expense_tags:remove',
-      args: {'id': id},
+      args: {'id': _normalizeConvexId(id)},
     );
   }
 
   ExpenseTag _tagFromJson(Map<String, dynamic> j) {
     return ExpenseTag(
-      id: j['_id'] as String? ?? '',
-      groupId: j['groupId'] as String? ?? '',
+      id: _normalizeConvexId(j['_id'] as String? ?? ''),
+      groupId: _normalizeConvexId(j['groupId'] as String? ?? ''),
       label: j['label'] as String? ?? '',
       iconName: j['iconName'] as String? ?? 'label',
       createdAt: DateTime.fromMillisecondsSinceEpoch(
