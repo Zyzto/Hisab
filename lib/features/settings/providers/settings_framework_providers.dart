@@ -184,3 +184,19 @@ String fontSizeScale(Ref ref) {
     return 'normal';
   }
 }
+
+@riverpod
+bool telemetryEnabled(Ref ref) {
+  try {
+    final settings = ref.watch(hisabSettingsProvidersProvider);
+    if (settings == null) return true;
+    return ref.watch(settings.provider(telemetryEnabledSettingDef));
+  } catch (e, stackTrace) {
+    Log.warning(
+      'telemetryEnabled read failed, defaulting to true',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return true;
+  }
+}

@@ -1,15 +1,19 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../../core/constants/app_config.dart';
 import '../settings_definitions.dart';
 import '../providers/settings_framework_providers.dart';
 import '../backup_helper.dart';
+import '../widgets/logs_viewer_dialog.dart';
 import '../../../core/database/providers/dao_providers.dart';
 import '../../../core/repository/local_repository.dart';
 import '../../../domain/domain.dart';
@@ -162,6 +166,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
           ]),
           _buildSection(context, ref, settings, loggingSection, [
+            SwitchSettingsTile.fromSetting(
+              setting: telemetryEnabledSettingDef,
+              title: 'telemetry_enabled'.tr(),
+              value: ref.watch(settings.provider(telemetryEnabledSettingDef)),
+              onChanged: (v) => ref
+                  .read(settings.provider(telemetryEnabledSettingDef).notifier)
+                  .set(v),
+            ),
             ActionSettingsTile(
               leading: const Icon(Icons.description),
               title: Text('view_logs'.tr()),
@@ -354,22 +366,120 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       content = 'logs_not_available'.tr();
     }
     if (!context.mounted) return;
+    final scaffoldContext = context;
     await showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('view_logs'.tr()),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: SelectableText(content),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('done'.tr()),
-          ),
-        ],
+      builder: (ctx) => LogsViewerDialog(
+        content: content,
+        onCopy: () async {
+          await Clipboard.setData(ClipboardData(text: content));
+          if (scaffoldContext.mounted) {
+            ScaffoldMessenger.of(
+              scaffoldContext,
+            ).showSnackBar(SnackBar(content: Text('logs_copied'.tr())));
+          }
+        },
+        onClear: () async {
+          final confirmed = await showDialog<bool>(
+            context: ctx,
+            builder: (c) => AlertDialog(
+              title: Text('clear_logs'.tr()),
+              content: Text('clear_logs_confirm'.tr()),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(c, false),
+                  child: Text('cancel'.tr()),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(c, true),
+                  child: Text('clear_logs'.tr()),
+                ),
+              ],
+            ),
+          );
+          if (confirmed == true) {
+            try {
+              await LoggingService.clearLogs();
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (scaffoldContext.mounted) {
+                ScaffoldMessenger.of(
+                  scaffoldContext,
+                ).showSnackBar(SnackBar(content: Text('logs_cleared'.tr())));
+              }
+            } catch (e) {
+              if (scaffoldContext.mounted) {
+                ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+                  SnackBar(content: Text('logs_not_available'.tr())),
+                );
+              }
+            }
+          }
+        },
+        onReportIssue: () => _handleReportIssue(ctx, scaffoldContext, content),
+        onClose: () => Navigator.pop(ctx),
       ),
     );
+  }
+
+  static Future<void> _handleReportIssue(
+    BuildContext dialogContext,
+    BuildContext scaffoldContext,
+    String logsContent,
+  ) async {
+    String description = '';
+    if (reportIssueUrl.isNotEmpty) {
+      final controller = TextEditingController();
+      final result = await showDialog<String?>(
+        context: dialogContext,
+        builder: (c) => AlertDialog(
+          title: Text('report_issue'.tr()),
+          content: TextField(
+            controller: controller,
+            decoration: InputDecoration(
+              hintText: 'report_issue_description_hint'.tr(),
+              border: const OutlineInputBorder(),
+            ),
+            maxLines: 3,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(c, null),
+              child: Text('cancel'.tr()),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(c, controller.text.trim()),
+              child: Text('done'.tr()),
+            ),
+          ],
+        ),
+      );
+      if (result == null) return;
+      description = result;
+    }
+    try {
+      final formatted = await LoggingService.formatLogsForGitHub(description);
+      await Clipboard.setData(ClipboardData(text: formatted));
+      if (reportIssueUrl.isNotEmpty) {
+        await launchUrl(Uri.parse(reportIssueUrl));
+      }
+      if (scaffoldContext.mounted) {
+        ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+          SnackBar(
+            content: Text(
+              reportIssueUrl.isEmpty
+                  ? 'logs_copied_paste'.tr()
+                  : 'logs_copied'.tr(),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (scaffoldContext.mounted) {
+        ScaffoldMessenger.of(
+          scaffoldContext,
+        ).showSnackBar(SnackBar(content: Text('logs_not_available'.tr())));
+      }
+    }
   }
 
   static Future<void> _exportData(BuildContext context, WidgetRef ref) async {

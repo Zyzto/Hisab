@@ -470,3 +470,44 @@ final class FontSizeScaleProvider
 }
 
 String _$fontSizeScaleHash() => r'8a20204a46a361746e07cba5a1f0c6c1b3187e6f';
+
+@ProviderFor(telemetryEnabled)
+final telemetryEnabledProvider = TelemetryEnabledProvider._();
+
+final class TelemetryEnabledProvider
+    extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  TelemetryEnabledProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'telemetryEnabledProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$telemetryEnabledHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return telemetryEnabled(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$telemetryEnabledHash() => r'a6a0a33d9a26855661d54d6f71e68d5ec7cab33c';

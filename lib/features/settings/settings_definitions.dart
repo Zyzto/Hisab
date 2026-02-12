@@ -37,6 +37,16 @@ final loggingSection = const SettingSection(
   order: 4,
 );
 
+/// When true, send anonymous usage data to telemetry endpoint. No-op if endpoint is empty.
+final telemetryEnabledSettingDef = const BoolSetting(
+  'telemetry_enabled',
+  defaultValue: true,
+  titleKey: 'telemetry_enabled',
+  icon: Icons.analytics,
+  section: 'logging',
+  order: 0,
+);
+
 final backupSection = const SettingSection(
   key: 'backup',
   titleKey: 'backup',
@@ -190,6 +200,7 @@ final allSettings = <SettingDefinition>[
   receiptAiProviderSettingDef,
   geminiApiKeySettingDef,
   openaiApiKeySettingDef,
+  telemetryEnabledSettingDef,
 ];
 
 SettingsRegistry createHisabSettingsRegistry() {

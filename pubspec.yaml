@@ -69,6 +69,10 @@ dependencies:
   file_picker: ^8.1.6
   langchain_core: ^0.4.1
 
+  # Log handling and telemetry
+  http: ^1.2.0
+  url_launcher: ^6.2.5
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
