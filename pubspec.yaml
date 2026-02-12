@@ -63,10 +63,10 @@ dependencies:
     path: ../edadat
 
   # About (version, licenses)
-  package_info_plus: ^8.0.0
+  package_info_plus: ^9.0.0
 
   # Backup (file picker for export/import)
-  file_picker: ^8.1.6
+  file_picker: ^10.3.10
   langchain_core: ^0.4.1
 
   # Log handling and telemetry
