@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/telemetry/telemetry_service.dart';
+import '../../settings/providers/settings_framework_providers.dart';
 
 class GroupCreatePage extends ConsumerStatefulWidget {
   const GroupCreatePage({super.key});
@@ -29,12 +32,21 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
+      final name = _nameController.text.trim();
+      final currencyCode = _currencyController.text.trim().toUpperCase();
       final repo = ref.read(groupRepositoryProvider);
-      final id = await repo.create(
-        _nameController.text.trim(),
-        _currencyController.text.trim().toUpperCase(),
-      );
+      final id = await repo.create(name, currencyCode);
+      Log.info('Group created: id=$id name="$name" currencyCode=$currencyCode');
+      try {
+        TelemetryService.sendEvent(
+          'group_created',
+          {'groupId': id, 'currencyCode': currencyCode},
+          enabled: ref.read(telemetryEnabledProvider),
+        );
+      } catch (_) {}
       if (mounted) context.go(RoutePaths.groupDetail(id));
+    } catch (e, st) {
+      Log.warning('Group create failed', error: e, stackTrace: st);
     } finally {
       if (mounted) setState(() => _saving = false);
     }

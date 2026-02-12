@@ -71,7 +71,9 @@ class LocalGroupRepository implements IGroupRepository {
       currencyCode: currencyCode,
     );
     final id = await _groupDao.insertGroup(companion);
-    return intToLocalId(id);
+    final domainId = intToLocalId(id);
+    Log.info('Group created: id=$domainId name="$name" currencyCode=$currencyCode');
+    return domainId;
   }
 
   @override
@@ -93,12 +95,16 @@ class LocalGroupRepository implements IGroupRepository {
       settlementSnapshotJson: group.settlementSnapshotJson,
     );
     await _groupDao.updateGroup(row);
+    Log.info('Group updated: id=${group.id} name="${group.name}"');
   }
 
   @override
   Future<void> delete(String id) async {
     final intId = localIdToInt(id);
-    if (intId != null) await _groupDao.deleteGroup(intId);
+    if (intId != null) {
+      await _groupDao.deleteGroup(intId);
+      Log.info('Group deleted: id=$id');
+    }
   }
 
   @override
@@ -114,6 +120,7 @@ class LocalGroupRepository implements IGroupRepository {
         settlementSnapshotJson: snapshot.toJsonString(),
       ),
     );
+    Log.info('Settlement frozen: groupId=$groupId');
   }
 
   @override
@@ -121,6 +128,7 @@ class LocalGroupRepository implements IGroupRepository {
     final group = await getById(groupId);
     if (group == null) return;
     await update(group.copyWithUnfreeze());
+    Log.info('Settlement unfrozen: groupId=$groupId');
   }
 
   SettlementMethod _parseSettlementMethod(String? s) {
@@ -196,7 +204,9 @@ class LocalParticipantRepository implements IParticipantRepository {
       order: Value(order),
     );
     final id = await _participantDao.insertParticipant(companion);
-    return intToLocalId(id);
+    final domainId = intToLocalId(id);
+    Log.info('Participant created: id=$domainId groupId=$groupId name="$name"');
+    return domainId;
   }
 
   @override
@@ -212,12 +222,16 @@ class LocalParticipantRepository implements IParticipantRepository {
       updatedAt: participant.updatedAt,
     );
     await _participantDao.updateParticipant(row);
+    Log.info('Participant updated: id=${participant.id} name="${participant.name}"');
   }
 
   @override
   Future<void> delete(String id) async {
     final intId = localIdToInt(id);
-    if (intId != null) await _participantDao.deleteParticipant(intId);
+    if (intId != null) {
+      await _participantDao.deleteParticipant(intId);
+      Log.info('Participant deleted: id=$id');
+    }
   }
 
   Participant _toDomain(db.Participant row) {

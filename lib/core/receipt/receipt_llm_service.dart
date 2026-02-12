@@ -1,9 +1,16 @@
 import 'dart:convert';
 import 'dart:typed_data';
+
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:langchain_core/chat_models.dart';
 import 'package:langchain_core/prompts.dart';
 import 'package:langchain_google/langchain_google.dart';
 import 'package:langchain_openai/langchain_openai.dart';
+
+/// Cache key for LLM clients: (provider, apiKey) -> model. Reused across calls.
+final _llmClientCache = <String, dynamic>{};
+
+String _cacheKey(String provider, String apiKey) => '$provider:$apiKey';
 
 /// Extraction prompt sent to the LLM for receipt parsing.
 const String _receiptExtractionPrompt = '''
@@ -39,27 +46,45 @@ Future<String> extractReceiptFromImage(
   final prompt = PromptValue.chat([message]);
 
   if (provider == 'gemini') {
-    final chatModel = ChatGoogleGenerativeAI(
+    final key = _cacheKey(provider, apiKey);
+    var chatModel = _llmClientCache[key] as ChatGoogleGenerativeAI?;
+    chatModel ??= ChatGoogleGenerativeAI(
       apiKey: apiKey,
       defaultOptions: const ChatGoogleGenerativeAIOptions(
         model: 'gemini-2.0-flash',
         temperature: 0,
       ),
     );
-    final result = await chatModel.invoke(prompt);
-    return result.outputAsString.trim();
+    _llmClientCache[key] = chatModel;
+    Log.debug('Receipt LLM: invoking Gemini gemini-2.0-flash');
+    try {
+      final result = await chatModel.invoke(prompt);
+      return result.outputAsString.trim();
+    } catch (e, st) {
+      Log.error('Receipt LLM Gemini invoke failed', error: e, stackTrace: st);
+      rethrow;
+    }
   }
 
   if (provider == 'openai') {
-    final chatModel = ChatOpenAI(
+    final key = _cacheKey(provider, apiKey);
+    var chatModel = _llmClientCache[key] as ChatOpenAI?;
+    chatModel ??= ChatOpenAI(
       apiKey: apiKey,
       defaultOptions: const ChatOpenAIOptions(
         model: 'gpt-4o-mini',
         temperature: 0,
       ),
     );
-    final result = await chatModel.invoke(prompt);
-    return result.outputAsString.trim();
+    _llmClientCache[key] = chatModel;
+    Log.debug('Receipt LLM: invoking OpenAI gpt-4o-mini');
+    try {
+      final result = await chatModel.invoke(prompt);
+      return result.outputAsString.trim();
+    } catch (e, st) {
+      Log.error('Receipt LLM OpenAI invoke failed', error: e, stackTrace: st);
+      rethrow;
+    }
   }
 
   throw ArgumentError('Unsupported receipt AI provider: $provider');

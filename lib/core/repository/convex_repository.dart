@@ -53,41 +53,60 @@ class ConvexGroupRepository implements IGroupRepository {
 
   @override
   Future<String> create(String name, String currencyCode) async {
-    final raw = await ConvexClient.instance.mutation(
-      name: 'groups:create',
-      args: {'name': name, 'currencyCode': currencyCode},
-    );
-    return raw as String? ?? '';
+    try {
+      final raw = await ConvexClient.instance.mutation(
+        name: 'groups:create',
+        args: {'name': name, 'currencyCode': currencyCode},
+      );
+      final id = raw as String? ?? '';
+      Log.info('Group created: id=$id name="$name" currencyCode=$currencyCode');
+      return id;
+    } catch (e, st) {
+      Log.error('Convex group create failed', error: e, stackTrace: st);
+      rethrow;
+    }
   }
 
   @override
   Future<void> update(Group group) async {
-    final args = <String, dynamic>{
-      'id': group.id,
-      'name': group.name,
-      'currencyCode': group.currencyCode,
-      'updatedAt': group.updatedAt.millisecondsSinceEpoch,
-      'settlementMethod': group.settlementMethod.name,
-    };
-    if (group.treasurerParticipantId != null) {
-      args['treasurerParticipantId'] = group.treasurerParticipantId;
+    try {
+      final args = <String, dynamic>{
+        'id': group.id,
+        'name': group.name,
+        'currencyCode': group.currencyCode,
+        'updatedAt': group.updatedAt.millisecondsSinceEpoch,
+        'settlementMethod': group.settlementMethod.name,
+      };
+      if (group.treasurerParticipantId != null) {
+        args['treasurerParticipantId'] = group.treasurerParticipantId;
+      }
+      if (group.settlementFreezeAt != null) {
+        args['settlementFreezeAt'] =
+            group.settlementFreezeAt!.millisecondsSinceEpoch;
+      }
+      if (group.settlementSnapshotJson != null) {
+        args['settlementSnapshotJson'] = group.settlementSnapshotJson;
+      }
+      await ConvexClient.instance.mutation(name: 'groups:update', args: args);
+      Log.info('Group updated: id=${group.id} name="${group.name}"');
+    } catch (e, st) {
+      Log.error('Convex group update failed', error: e, stackTrace: st);
+      rethrow;
     }
-    if (group.settlementFreezeAt != null) {
-      args['settlementFreezeAt'] =
-          group.settlementFreezeAt!.millisecondsSinceEpoch;
-    }
-    if (group.settlementSnapshotJson != null) {
-      args['settlementSnapshotJson'] = group.settlementSnapshotJson;
-    }
-    await ConvexClient.instance.mutation(name: 'groups:update', args: args);
   }
 
   @override
   Future<void> delete(String id) async {
-    await ConvexClient.instance.mutation(
-      name: 'groups:remove',
-      args: {'id': id},
-    );
+    try {
+      await ConvexClient.instance.mutation(
+        name: 'groups:remove',
+        args: {'id': id},
+      );
+      Log.info('Group deleted: id=$id');
+    } catch (e, st) {
+      Log.error('Convex group delete failed', error: e, stackTrace: st);
+      rethrow;
+    }
   }
 
   @override
@@ -95,22 +114,34 @@ class ConvexGroupRepository implements IGroupRepository {
     String groupId,
     SettlementSnapshot snapshot,
   ) async {
-    await ConvexClient.instance.mutation(
-      name: 'groups:freezeSettlement',
-      args: {
-        'id': groupId,
-        'settlementSnapshotJson': snapshot.toJsonString(),
-        'settlementFreezeAt': snapshot.frozenAt.millisecondsSinceEpoch,
-      },
-    );
+    try {
+      await ConvexClient.instance.mutation(
+        name: 'groups:freezeSettlement',
+        args: {
+          'id': groupId,
+          'settlementSnapshotJson': snapshot.toJsonString(),
+          'settlementFreezeAt': snapshot.frozenAt.millisecondsSinceEpoch,
+        },
+      );
+      Log.info('Settlement frozen: groupId=$groupId');
+    } catch (e, st) {
+      Log.error('Convex freezeSettlement failed', error: e, stackTrace: st);
+      rethrow;
+    }
   }
 
   @override
   Future<void> unfreezeSettlement(String groupId) async {
-    await ConvexClient.instance.mutation(
-      name: 'groups:unfreezeSettlement',
-      args: {'id': groupId},
-    );
+    try {
+      await ConvexClient.instance.mutation(
+        name: 'groups:unfreezeSettlement',
+        args: {'id': groupId},
+      );
+      Log.info('Settlement unfrozen: groupId=$groupId');
+    } catch (e, st) {
+      Log.error('Convex unfreezeSettlement failed', error: e, stackTrace: st);
+      rethrow;
+    }
   }
 
   SettlementMethod _parseSettlementMethod(String? s) {
@@ -186,32 +217,51 @@ class ConvexParticipantRepository implements IParticipantRepository {
 
   @override
   Future<String> create(String groupId, String name, int order) async {
-    final raw = await ConvexClient.instance.mutation(
-      name: 'participants:create',
-      args: {'groupId': groupId, 'name': name, 'order': order},
-    );
-    return raw as String? ?? '';
+    try {
+      final raw = await ConvexClient.instance.mutation(
+        name: 'participants:create',
+        args: {'groupId': groupId, 'name': name, 'order': order},
+      );
+      final id = raw as String? ?? '';
+      Log.info('Participant created: id=$id groupId=$groupId name="$name"');
+      return id;
+    } catch (e, st) {
+      Log.error('Convex participant create failed', error: e, stackTrace: st);
+      rethrow;
+    }
   }
 
   @override
   Future<void> update(Participant participant) async {
-    await ConvexClient.instance.mutation(
-      name: 'participants:update',
-      args: {
-        'id': participant.id,
-        'name': participant.name,
-        'order': participant.order,
-        'updatedAt': participant.updatedAt.millisecondsSinceEpoch,
-      },
-    );
+    try {
+      await ConvexClient.instance.mutation(
+        name: 'participants:update',
+        args: {
+          'id': participant.id,
+          'name': participant.name,
+          'order': participant.order,
+          'updatedAt': participant.updatedAt.millisecondsSinceEpoch,
+        },
+      );
+      Log.info('Participant updated: id=${participant.id} name="${participant.name}"');
+    } catch (e, st) {
+      Log.error('Convex participant update failed', error: e, stackTrace: st);
+      rethrow;
+    }
   }
 
   @override
   Future<void> delete(String id) async {
-    await ConvexClient.instance.mutation(
-      name: 'participants:remove',
-      args: {'id': id},
-    );
+    try {
+      await ConvexClient.instance.mutation(
+        name: 'participants:remove',
+        args: {'id': id},
+      );
+      Log.info('Participant deleted: id=$id');
+    } catch (e, st) {
+      Log.error('Convex participant delete failed', error: e, stackTrace: st);
+      rethrow;
+    }
   }
 
   Participant _participantFromJson(Map<String, dynamic> j) {
@@ -260,77 +310,92 @@ class ConvexExpenseRepository implements IExpenseRepository {
 
   @override
   Future<String> create(Expense expense) async {
-    final args = <String, dynamic>{
-      'groupId': expense.groupId,
-      'payerParticipantId': expense.payerParticipantId,
-      'amountCents': expense.amountCents,
-      'currencyCode': expense.currencyCode,
-      'title': expense.title,
-      'date': expense.date.millisecondsSinceEpoch,
-      'splitType': expense.splitType.name,
-      'splitSharesJson': jsonEncode(expense.splitShares),
-      'type': expense.transactionType.name,
-    };
-    if (expense.toParticipantId != null) {
-      args['toParticipantId'] = expense.toParticipantId;
-    }
-    if (expense.tag != null) {
-      args['tag'] = expense.tag;
-    }
-    if (expense.description != null && expense.description!.isNotEmpty) {
-      args['description'] = expense.description;
-    }
-    if (expense.lineItems != null && expense.lineItems!.isNotEmpty) {
-      args['lineItemsJson'] = jsonEncode(
-        expense.lineItems!.map((e) => e.toJson()).toList(),
+    try {
+      final args = <String, dynamic>{
+        'groupId': expense.groupId,
+        'payerParticipantId': expense.payerParticipantId,
+        'amountCents': expense.amountCents,
+        'currencyCode': expense.currencyCode,
+        'title': expense.title,
+        'date': expense.date.millisecondsSinceEpoch,
+        'splitType': expense.splitType.name,
+        'splitSharesJson': jsonEncode(expense.splitShares),
+        'type': expense.transactionType.name,
+      };
+      if (expense.toParticipantId != null) {
+        args['toParticipantId'] = expense.toParticipantId;
+      }
+      if (expense.tag != null) {
+        args['tag'] = expense.tag;
+      }
+      if (expense.description != null && expense.description!.isNotEmpty) {
+        args['description'] = expense.description;
+      }
+      if (expense.lineItems != null && expense.lineItems!.isNotEmpty) {
+        args['lineItemsJson'] = jsonEncode(
+          expense.lineItems!.map((e) => e.toJson()).toList(),
+        );
+      }
+      if (expense.receiptImagePath != null &&
+          expense.receiptImagePath!.isNotEmpty) {
+        args['receiptImagePath'] = expense.receiptImagePath;
+      }
+      final raw = await ConvexClient.instance.mutation(
+        name: 'expenses:create',
+        args: args,
       );
+      final id = raw as String? ?? '';
+      Log.info(
+        'Expense created: id=$id groupId=${expense.groupId} title="${expense.title}" amountCents=${expense.amountCents} currencyCode=${expense.currencyCode}',
+      );
+      return id;
+    } catch (e, st) {
+      Log.error('Convex expense create failed', error: e, stackTrace: st);
+      rethrow;
     }
-    if (expense.receiptImagePath != null &&
-        expense.receiptImagePath!.isNotEmpty) {
-      args['receiptImagePath'] = expense.receiptImagePath;
-    }
-    final raw = await ConvexClient.instance.mutation(
-      name: 'expenses:create',
-      args: args,
-    );
-    final id = raw as String? ?? '';
-    Log.info(
-      'Expense created: id=$id groupId=${expense.groupId} title="${expense.title}" amountCents=${expense.amountCents} currencyCode=${expense.currencyCode}',
-    );
-    return id;
   }
 
   @override
   Future<void> update(Expense expense) async {
-    await ConvexClient.instance.mutation(
-      name: 'expenses:update',
-      args: {
-        'id': expense.id,
-        'title': expense.title,
-        'amountCents': expense.amountCents,
-        'date': expense.date.millisecondsSinceEpoch,
-        'splitSharesJson': jsonEncode(expense.splitShares),
-        'updatedAt': expense.updatedAt.millisecondsSinceEpoch,
-        'tag': expense.tag,
-        'description': expense.description ?? '',
-        'lineItemsJson': expense.lineItems == null || expense.lineItems!.isEmpty
-            ? '[]'
-            : jsonEncode(expense.lineItems!.map((e) => e.toJson()).toList()),
-        'receiptImagePath': expense.receiptImagePath ?? '',
-      },
-    );
-    Log.info(
-      'Expense updated: id=${expense.id} title="${expense.title}" amountCents=${expense.amountCents}',
-    );
+    try {
+      await ConvexClient.instance.mutation(
+        name: 'expenses:update',
+        args: {
+          'id': expense.id,
+          'title': expense.title,
+          'amountCents': expense.amountCents,
+          'date': expense.date.millisecondsSinceEpoch,
+          'splitSharesJson': jsonEncode(expense.splitShares),
+          'updatedAt': expense.updatedAt.millisecondsSinceEpoch,
+          'tag': expense.tag,
+          'description': expense.description ?? '',
+          'lineItemsJson': expense.lineItems == null || expense.lineItems!.isEmpty
+              ? '[]'
+              : jsonEncode(expense.lineItems!.map((e) => e.toJson()).toList()),
+          'receiptImagePath': expense.receiptImagePath ?? '',
+        },
+      );
+      Log.info(
+        'Expense updated: id=${expense.id} title="${expense.title}" amountCents=${expense.amountCents}',
+      );
+    } catch (e, st) {
+      Log.error('Convex expense update failed', error: e, stackTrace: st);
+      rethrow;
+    }
   }
 
   @override
   Future<void> delete(String id) async {
-    await ConvexClient.instance.mutation(
-      name: 'expenses:remove',
-      args: {'id': id},
-    );
-    Log.info('Expense deleted: id=$id');
+    try {
+      await ConvexClient.instance.mutation(
+        name: 'expenses:remove',
+        args: {'id': id},
+      );
+      Log.info('Expense deleted: id=$id');
+    } catch (e, st) {
+      Log.error('Convex expense delete failed', error: e, stackTrace: st);
+      rethrow;
+    }
   }
 
   Expense _expenseFromJson(Map<String, dynamic> j) {
@@ -479,6 +544,17 @@ Stream<List<T>> _subscribeList<T>(
   T Function(Map<String, dynamic>) fromJson,
 ) {
   final controller = StreamController<List<T>>.broadcast(sync: true);
+  var cancelled = false;
+  dynamic convexSub;
+
+  controller.onCancel = () {
+    if (convexSub != null) {
+      convexSub.cancel();
+    } else {
+      cancelled = true;
+    }
+  };
+
   ConvexClient.instance
       .subscribe(
         name: name,
@@ -505,7 +581,8 @@ Stream<List<T>> _subscribeList<T>(
         },
       )
       .then((sub) {
-        controller.onCancel = () => sub.cancel();
+        convexSub = sub;
+        if (cancelled) sub.cancel();
       });
   return controller.stream;
 }

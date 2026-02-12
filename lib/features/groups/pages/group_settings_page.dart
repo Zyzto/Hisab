@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../providers/groups_provider.dart';
@@ -280,7 +281,10 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
           .update(
             group.copyWith(settlementMethod: method, updatedAt: DateTime.now()),
           );
+      Log.info('Settlement method changed: groupId=${widget.groupId} method=$method');
       ref.invalidate(futureGroupProvider(widget.groupId));
+    } catch (e, st) {
+      Log.warning('Settlement method change failed', error: e, stackTrace: st);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -302,7 +306,10 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
               updatedAt: DateTime.now(),
             ),
           );
+      Log.info('Treasurer changed: groupId=${widget.groupId} treasurerId=$treasurerId');
       ref.invalidate(futureGroupProvider(widget.groupId));
+    } catch (e, st) {
+      Log.warning('Treasurer change failed', error: e, stackTrace: st);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -323,7 +330,10 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
       await ref
           .read(groupRepositoryProvider)
           .freezeSettlement(widget.groupId, snapshot);
+      Log.info('Settlement frozen: groupId=${widget.groupId}');
       ref.invalidate(futureGroupProvider(widget.groupId));
+    } catch (e, st) {
+      Log.warning('Settlement freeze failed', error: e, stackTrace: st);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -335,7 +345,10 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
       await ref
           .read(groupRepositoryProvider)
           .unfreezeSettlement(widget.groupId);
+      Log.info('Settlement unfrozen: groupId=${widget.groupId}');
       ref.invalidate(futureGroupProvider(widget.groupId));
+    } catch (e, st) {
+      Log.warning('Settlement unfreeze failed', error: e, stackTrace: st);
     } finally {
       if (mounted) setState(() => _saving = false);
     }

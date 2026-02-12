@@ -53,7 +53,7 @@ final class GroupRepositoryProvider
   }
 }
 
-String _$groupRepositoryHash() => r'c1f624b861b3fdb3dcaa7294e5e5ad26b642b1ba';
+String _$groupRepositoryHash() => r'44ff75816de1bf1a360524495372bce2a3e94944';
 
 @ProviderFor(participantRepository)
 final participantRepositoryProvider = ParticipantRepositoryProvider._();

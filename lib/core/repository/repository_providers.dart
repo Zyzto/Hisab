@@ -1,3 +1,4 @@
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../database/providers/dao_providers.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
@@ -13,6 +14,7 @@ part 'repository_providers.g.dart';
 @riverpod
 IGroupRepository groupRepository(Ref ref) {
   final useLocal = ref.watch(localOnlyProvider);
+  Log.debug('Using ${useLocal ? "local" : "Convex"} repository');
   if (useLocal) {
     return LocalGroupRepository(ref.watch(groupDaoProvider));
   }
