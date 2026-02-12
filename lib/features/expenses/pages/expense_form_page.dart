@@ -1,78 +1,23 @@
-import 'dart:convert';
-
-import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/receipt/receipt_image_view.dart';
-import '../../../core/receipt/receipt_llm_service.dart';
-import '../../../core/receipt/receipt_storage.dart';
+import '../../../core/receipt/receipt_scan_service.dart';
 import '../../../core/repository/repository_providers.dart';
-import '../../../core/utils/currency_formatter.dart';
+import '../../../core/telemetry/telemetry_service.dart';
+import '../../../features/settings/providers/settings_framework_providers.dart';
 import '../../groups/providers/groups_provider.dart';
-import '../../settings/providers/settings_framework_providers.dart';
+import '../constants/expense_form_constants.dart';
+import '../widgets/expense_amount_section.dart';
+import '../widgets/expense_bill_breakdown_section.dart';
+import '../widgets/expense_title_section.dart';
+import '../widgets/expense_split_section.dart';
+import '../widgets/expense_transaction_type_pill.dart';
 import '../../../domain/domain.dart';
-
-/// Restricts input to digits and at most one decimal point (e.g. 12.34).
-class _DecimalOnlyFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    final t = newValue.text;
-    if (t.isEmpty) return newValue;
-    if (RegExp(r'^\d*\.?\d*$').hasMatch(t)) return newValue;
-    return oldValue;
-  }
-}
-
-final _decimalOnlyFormatter = _DecimalOnlyFormatter();
-
-/// Preset expense categories with Material icons. [id] is stored when selected.
-const List<({String id, String label, IconData icon})> _presetTags = [
-  (id: 'food', label: 'Food', icon: Icons.restaurant),
-  (id: 'groceries', label: 'Groceries', icon: Icons.shopping_cart),
-  (id: 'transport', label: 'Transport', icon: Icons.directions_car),
-  (id: 'shopping', label: 'Shopping', icon: Icons.shopping_bag),
-  (id: 'entertainment', label: 'Entertainment', icon: Icons.movie_outlined),
-  (id: 'bills', label: 'Bills & Utilities', icon: Icons.receipt_long),
-  (id: 'health', label: 'Health', icon: Icons.local_hospital_outlined),
-  (id: 'personal', label: 'Personal', icon: Icons.person_outline),
-  (id: 'coffee', label: 'Coffee & Drinks', icon: Icons.coffee),
-  (id: 'travel', label: 'Travel', icon: Icons.flight),
-  (id: 'subscriptions', label: 'Subscriptions', icon: Icons.subscriptions),
-  (id: 'education', label: 'Education', icon: Icons.school_outlined),
-  (id: 'gifts', label: 'Gifts & Donations', icon: Icons.card_giftcard_outlined),
-];
-
-/// Icon names for custom tag icon picker. Keys stored in [ExpenseTag.iconName].
-const Map<String, IconData> _selectableIcons = {
-  'restaurant': Icons.restaurant,
-  'shopping_cart': Icons.shopping_cart,
-  'directions_car': Icons.directions_car,
-  'shopping_bag': Icons.shopping_bag,
-  'movie_outlined': Icons.movie_outlined,
-  'receipt_long': Icons.receipt_long,
-  'local_hospital_outlined': Icons.local_hospital_outlined,
-  'person_outline': Icons.person_outline,
-  'coffee': Icons.coffee,
-  'flight': Icons.flight,
-  'subscriptions': Icons.subscriptions,
-  'school_outlined': Icons.school_outlined,
-  'card_giftcard_outlined': Icons.card_giftcard_outlined,
-  'label': Icons.label_outlined,
-  'home': Icons.home_outlined,
-  'fitness': Icons.fitness_center,
-  'pets': Icons.pets,
-  'local_gas_station': Icons.local_gas_station,
-  'restaurant_menu': Icons.restaurant_menu,
-};
 
 class ExpenseFormPage extends ConsumerStatefulWidget {
   final String groupId;
@@ -120,6 +65,10 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
 
   /// Optional bill/receipt breakdown (description + amount per line).
   List<ReceiptLineItem> _lineItems = [];
+
+  /// Controllers for bill breakdown rows (one desc + amount per line).
+  final List<({TextEditingController desc, TextEditingController amount})>
+      _lineItemControllers = [];
 
   /// Path to attached receipt image (when AI not configured or LLM failed).
   String? _receiptImagePath;
@@ -177,6 +126,18 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       _lineItems = expense.lineItems != null
           ? List.from(expense.lineItems!)
           : [];
+      for (final item in _lineItems) {
+        _lineItemControllers.add(
+          (
+            desc: TextEditingController(text: item.description),
+            amount: TextEditingController(
+              text: item.amountCents > 0
+                  ? (item.amountCents / 100).toStringAsFixed(2)
+                  : '',
+            ),
+          ),
+        );
+      }
       _receiptImagePath = expense.receiptImagePath;
       _editLoaded = true;
     });
@@ -195,6 +156,11 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       f.dispose();
     }
     _splitFocusNodes.clear();
+    for (final c in _lineItemControllers) {
+      c.desc.dispose();
+      c.amount.dispose();
+    }
+    _lineItemControllers.clear();
     super.dispose();
   }
 
@@ -337,12 +303,30 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       );
       if (_initialExpense != null) {
         await ref.read(expenseRepositoryProvider).update(expense);
+        Log.info(
+          'Expense updated: id=${expense.id} title="${expense.title}" amountCents=${expense.amountCents}',
+        );
       } else {
-        await ref.read(expenseRepositoryProvider).create(expense);
+        final id = await ref.read(expenseRepositoryProvider).create(expense);
+        Log.info(
+          'Expense created: id=$id groupId=${expense.groupId} title="${expense.title}" amountCents=${expense.amountCents} currencyCode=${expense.currencyCode}',
+        );
+        try {
+          TelemetryService.sendEvent(
+            'expense_created',
+            {
+              'groupId': expense.groupId,
+              'amountCents': expense.amountCents,
+            },
+            enabled: ref.read(telemetryEnabledProvider),
+          );
+        } catch (_) {}
       }
       if (!mounted) return;
       context.pop();
       didPop = true;
+    } catch (e, st) {
+      Log.warning('Expense save failed', error: e, stackTrace: st);
     } finally {
       if (!didPop && mounted) setState(() => _saving = false);
     }
@@ -609,18 +593,6 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
               );
             }
             final payerId = _payerParticipantId ?? participants.first.id;
-            final amountCents =
-                (double.tryParse(_amountController.text.trim()) ?? 0) * 100;
-            final amountCentsInt = amountCents.toInt();
-            if (_splitType == SplitType.parts ||
-                _splitType == SplitType.amounts) {
-              _ensureCustomSplitValues(amountCentsInt, participants);
-            }
-            final shares = amountCentsInt > 0
-                ? (_splitType == SplitType.equal
-                      ? _splitSharesPreview(amountCentsInt, participants)
-                      : _customSharesPreview(amountCentsInt, participants))
-                : <int>[];
             // Only add newly added participants to split by default (don't re-add unchecked)
             final currentIds = participants.map((p) => p.id).toSet();
             final newIds = currentIds.difference(_previousParticipantIds);
@@ -671,10 +643,48 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                     vertical: 12,
                   ),
                   children: [
-                    _buildSegmentedPill(context),
+                    ExpenseTransactionTypePill(
+                      value: _transactionType,
+                      onChanged: (type) {
+                        setState(() {
+                          _transactionType = type;
+                          if (type == TransactionType.transfer &&
+                              _toParticipantId == null) {
+                            final participants =
+                                ref
+                                    .read(
+                                      participantsByGroupProvider(
+                                        widget.groupId,
+                                      ),
+                                    )
+                                    .value ??
+                                [];
+                            final payerId =
+                                _payerParticipantId ??
+                                (participants.isNotEmpty
+                                    ? participants.first.id
+                                    : null);
+                            if (participants.length > 1 && payerId != null) {
+                              _toParticipantId = participants
+                                  .firstWhere(
+                                    (p) => p.id != payerId,
+                                    orElse: () => participants.first,
+                                  )
+                                  .id;
+                            }
+                          }
+                        });
+                      },
+                    ),
                     const SizedBox(height: 24),
                     if (!isTransfer) ...[
-                      _buildTitleSection(context, customTags),
+                      ExpenseTitleSection(
+                        controller: _titleController,
+                        selectedTag: _selectedTag,
+                        customTags: customTags,
+                        onTagPicker: () => _showTagPicker(customTags),
+                        onPickReceipt: _pickReceiptImage,
+                      ),
                       if (_receiptImagePath != null) ...[
                         const SizedBox(height: 8),
                         _buildReceiptAttachedChip(context),
@@ -693,7 +703,10 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       _buildDescriptionSection(context),
                       const SizedBox(height: 20),
                     ],
-                    _buildAmountSection(context, currencyCode),
+                    ExpenseAmountSection(
+                      controller: _amountController,
+                      currencyCode: currencyCode,
+                    ),
                     const SizedBox(height: 20),
                     if (isTransfer) ...[
                       _buildTransferFromToRow(
@@ -708,43 +721,181 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       _buildPaidByAndWhenRow(context, participants, payerId),
                     if (!isTransfer) ...[
                       const SizedBox(height: 20),
-                      _buildBillBreakdownSection(context, currencyCode),
+                      ExpenseBillBreakdownSection(
+                        lineItems: _lineItems,
+                        lineItemControllers: _lineItemControllers,
+                        onAddItem: () {
+                          setState(() {
+                            _lineItems.add(
+                              const ReceiptLineItem(description: '', amountCents: 0),
+                            );
+                            _lineItemControllers.add(
+                              (
+                                desc: TextEditingController(),
+                                amount: TextEditingController(),
+                              ),
+                            );
+                          });
+                        },
+                        onRemoveItem: (i) {
+                          setState(() {
+                            _lineItemControllers[i].desc.dispose();
+                            _lineItemControllers[i].amount.dispose();
+                            _lineItemControllers.removeAt(i);
+                            _lineItems.removeAt(i);
+                          });
+                        },
+                        onItemChanged: (i, desc, amountCents) {
+                          setState(() {
+                            _lineItems[i] = ReceiptLineItem(
+                              description: desc,
+                              amountCents: amountCents,
+                            );
+                          });
+                        },
+                      ),
                       const SizedBox(height: 24),
-                      _buildSplitSection(
-                        context,
-                        theme,
-                        participants,
-                        shares,
-                        amountCentsInt,
-                        currencyCode,
+                      ListenableBuilder(
+                        listenable: _amountController,
+                        builder: (context, _) {
+                          final amountCents =
+                              (double.tryParse(
+                                    _amountController.text.trim(),
+                                  ) ??
+                                      0) *
+                                  100;
+                          final amountCentsInt = amountCents.toInt();
+                          if (_splitType == SplitType.parts ||
+                              _splitType == SplitType.amounts) {
+                            _ensureCustomSplitValues(
+                              amountCentsInt,
+                              participants,
+                            );
+                          }
+                          final shares = amountCentsInt > 0
+                              ? (_splitType == SplitType.equal
+                                    ? _splitSharesPreview(
+                                        amountCentsInt,
+                                        participants,
+                                      )
+                                    : _customSharesPreview(
+                                        amountCentsInt,
+                                        participants,
+                                      ))
+                              : <int>[];
+                          final participantIds =
+                              participants.map((e) => e.id).toSet();
+                          for (final id in List.from(_splitEditControllers.keys)) {
+                            if (!participantIds.contains(id)) {
+                              _splitEditControllers[id]?.dispose();
+                              _splitEditControllers.remove(id);
+                              _splitFocusNodes[id]?.dispose();
+                              _splitFocusNodes.remove(id);
+                            }
+                          }
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ExpenseSplitSection(
+                                participants: participants,
+                                sharesCents: shares,
+                                amountCents: amountCentsInt,
+                                currencyCode: currencyCode,
+                                splitType: _splitType,
+                                includedInSplitIds: _includedInSplitIds,
+                                customSplitValues: _customSplitValues,
+                                splitEditControllers: _splitEditControllers,
+                                splitFocusNodes: _splitFocusNodes,
+                                getOrCreateController: (p) {
+                                  var c = _splitEditControllers[p.id];
+                                  if (c == null &&
+                                      (_splitType == SplitType.parts ||
+                                          _splitType == SplitType.amounts)) {
+                                    c = TextEditingController(
+                                      text: _customSplitValues[p.id] ?? '1',
+                                    );
+                                    _splitEditControllers[p.id] = c;
+                                    _splitFocusNodes[p.id] ??= FocusNode();
+                                  }
+                                  return c;
+                                },
+                                getOrCreateFocusNode: (p) =>
+                                    _splitFocusNodes[p.id],
+                                onSplitTypeTap: () =>
+                                    _showSplitTypePicker(context),
+                                onIncludeChanged: (p, included) {
+                                  setState(() {
+                                    if (included) {
+                                      _includedInSplitIds.add(p.id);
+                                    } else {
+                                      _includedInSplitIds.remove(p.id);
+                                      _customSplitValues.remove(p.id);
+                                      _splitEditControllers[p.id]?.dispose();
+                                      _splitEditControllers.remove(p.id);
+                                      _splitFocusNodes[p.id]?.dispose();
+                                      _splitFocusNodes.remove(p.id);
+                                    }
+                                  });
+                                },
+                                onAmountChanged: (p, v, includedList, ctrl) {
+                                  setState(() {
+                                    _applyAmountsChange(
+                                      p,
+                                      v,
+                                      amountCentsInt,
+                                      includedList,
+                                      ctrl,
+                                    );
+                                  });
+                                },
+                                onPartsChanged: (p, v) {
+                                  setState(() => _customSplitValues[p.id] = v);
+                                },
+                                amountsSumCents: () =>
+                                    _amountsSumCents(participants),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ],
                     const SizedBox(height: 32),
-                    SizedBox(
-                      height: 52,
-                      child: FilledButton(
-                        onPressed:
-                            (_saving ||
-                                (_splitType == SplitType.amounts &&
-                                    _amountsSumCents(participants) !=
-                                        amountCentsInt))
-                            ? null
-                            : _save,
-                        child: _saving
-                            ? const SizedBox(
-                                height: 24,
-                                width: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Text(
-                                (widget.expenseId != null
-                                        ? 'submit'
-                                        : 'add_expense')
-                                    .tr(),
-                              ),
-                      ),
+                    ListenableBuilder(
+                      listenable: _amountController,
+                      builder: (context, _) {
+                        final amountCentsInt = ((double.tryParse(
+                                  _amountController.text.trim(),
+                                ) ??
+                                    0) *
+                                100)
+                            .toInt();
+                        return SizedBox(
+                          height: 52,
+                          child: FilledButton(
+                            onPressed:
+                                (_saving ||
+                                    (_splitType == SplitType.amounts &&
+                                        _amountsSumCents(participants) !=
+                                            amountCentsInt))
+                                    ? null
+                                    : _save,
+                            child: _saving
+                                ? const SizedBox(
+                                    height: 24,
+                                    width: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Text(
+                                    (widget.expenseId != null
+                                            ? 'submit'
+                                            : 'add_expense')
+                                        .tr(),
+                                  ),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -759,98 +910,6 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => Scaffold(body: Center(child: Text('$e'))),
-    );
-  }
-
-  Widget _buildSegmentedPill(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          _segmentChip(
-            context,
-            theme,
-            TransactionType.expense,
-            'expenses'.tr(),
-          ),
-          _segmentChip(context, theme, TransactionType.income, 'income'.tr()),
-          _segmentChip(
-            context,
-            theme,
-            TransactionType.transfer,
-            'transfer'.tr(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _segmentChip(
-    BuildContext context,
-    ThemeData theme,
-    TransactionType type,
-    String label,
-  ) {
-    final selected = _transactionType == type;
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () {
-              setState(() {
-                _transactionType = type;
-                if (type == TransactionType.transfer &&
-                    _toParticipantId == null) {
-                  final participants =
-                      ref
-                          .read(participantsByGroupProvider(widget.groupId))
-                          .value ??
-                      [];
-                  final payerId =
-                      _payerParticipantId ??
-                      (participants.isNotEmpty ? participants.first.id : null);
-                  if (participants.length > 1 && payerId != null) {
-                    _toParticipantId = participants
-                        .firstWhere(
-                          (p) => p.id != payerId,
-                          orElse: () => participants.first,
-                        )
-                        .id;
-                  }
-                }
-              });
-            },
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: selected
-                    ? theme.colorScheme.primaryContainer
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Center(
-                child: Text(
-                  label,
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: selected
-                        ? theme.colorScheme.onPrimaryContainer
-                        : theme.colorScheme.onSurfaceVariant,
-                    fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 
@@ -876,7 +935,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                 spacing: 10,
                 runSpacing: 10,
                 children: [
-                  ..._presetTags.map((preset) {
+                  ...presetExpenseTags.map((preset) {
                     final selected = _selectedTag == preset.id;
                     return InkWell(
                       onTap: () {
@@ -922,7 +981,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                   ...customTags.map((tag) {
                     final selected = _selectedTag == tag.id;
                     final iconData =
-                        _selectableIcons[tag.iconName] ?? Icons.label_outlined;
+                        selectableExpenseIcons[tag.iconName] ?? Icons.label_outlined;
                     return InkWell(
                       onTap: () {
                         setState(() => _selectedTag = tag.id);
@@ -1016,7 +1075,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
 
   Future<ExpenseTag?> _showCreateTagDialog() async {
     final nameController = TextEditingController();
-    String selectedIconName = _selectableIcons.keys.first;
+    String selectedIconName = selectableExpenseIcons.keys.first;
     return showDialog<ExpenseTag>(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -1046,7 +1105,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: _selectableIcons.entries.map((e) {
+                    children: selectableExpenseIcons.entries.map((e) {
                       final selected = selectedIconName == e.key;
                       return InkWell(
                         onTap: () =>
@@ -1140,9 +1199,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       ),
     );
     if (source == null || !mounted) return;
-    final picker = ImagePicker();
     const double maxDimension = 1920;
-    final XFile? file = await picker.pickImage(
+    final XFile? file = await ImagePicker().pickImage(
       source: source,
       imageQuality: 100,
       maxWidth: maxDimension,
@@ -1150,118 +1208,37 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     );
     if (file == null || !mounted) return;
     try {
-      final ocrEnabled = ref.read(receiptOcrEnabledProvider);
-      if (!ocrEnabled) {
-        setState(() {
-          _titleController.text = 'Receipt';
-          _receiptImagePath = null;
-        });
-        final storedPath = await copyReceiptToAppStorage(file.path);
-        if (!mounted) return;
-        setState(() => _receiptImagePath = storedPath);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('receipt_attached'.tr())));
-        return;
-      }
-
-      final inputImage = InputImage.fromFilePath(file.path);
-      final recognizer = TextRecognizer(script: TextRecognitionScript.latin);
-      final recognized = await recognizer.processImage(inputImage);
-      await recognizer.close();
+      final result = await processReceiptFile(file, ref, _date);
       if (!mounted) return;
-      final ocrText = recognized.text.trim();
-      if (ocrText.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('receipt_no_text'.tr())));
-        }
-        return;
-      }
-
-      final aiEnabled = ref.read(receiptAiEnabledProvider);
-      final provider = ref.read(receiptAiProviderProvider);
-      final geminiKey = ref.read(geminiApiKeyProvider).trim();
-      final openaiKey = ref.read(openaiApiKeyProvider).trim();
-      final bool configured = provider == 'gemini'
-          ? geminiKey.isNotEmpty
-          : provider == 'openai'
-          ? openaiKey.isNotEmpty
-          : false;
-
-      if (!aiEnabled || provider == 'none' || !configured) {
-        setState(() {
-          _titleController.text = 'Receipt';
-          _descriptionController.text = ocrText;
-          _receiptImagePath = null;
-        });
-        final storedPath = await copyReceiptToAppStorage(file.path);
-        if (!mounted) return;
-        setState(() => _receiptImagePath = storedPath);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('receipt_attached'.tr())));
-        return;
-      }
-
-      final imageBytes = await file.readAsBytes();
-      String? responseText;
-      try {
-        responseText = await extractReceiptFromImage(
-          imageBytes,
-          provider,
-          provider == 'gemini' ? geminiKey : openaiKey,
+      if (result == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('receipt_no_text'.tr())),
         );
-      } catch (e, stack) {
-        debugPrint('Receipt LLM error: $e');
-        debugPrintStack(stackTrace: stack);
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('receipt_ai_failed'.tr())));
+        return;
+      }
+      switch (result) {
+        case ReceiptScanParsed():
+          setState(() {
+            _titleController.text = result.vendor;
+            _date = result.date;
+            _amountController.text = result.total.toStringAsFixed(2);
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('receipt_scan_applied'.tr())),
+          );
+        case ReceiptScanFallback():
           setState(() {
             _titleController.text = 'Receipt';
-            _descriptionController.text = ocrText;
-            _receiptImagePath = null;
+            _descriptionController.text = result.ocrText;
+            _receiptImagePath = result.receiptImagePath;
           });
-          final storedPath = await copyReceiptToAppStorage(file.path);
-          if (!mounted) return;
-          setState(() => _receiptImagePath = storedPath);
-        }
-        return;
-      }
-
-      final parsed = _parseReceiptJson(responseText);
-      if (parsed != null) {
-        setState(() {
-          _titleController.text = parsed.vendor.isNotEmpty
-              ? parsed.vendor
-              : 'Receipt';
-          _date = parsed.date;
-          _amountController.text = parsed.total.toStringAsFixed(2);
-        });
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('receipt_scan_applied'.tr())));
-        }
-      } else {
-        setState(() {
-          _titleController.text = 'Receipt';
-          _descriptionController.text = ocrText;
-          _receiptImagePath = null;
-        });
-        final storedPath = await copyReceiptToAppStorage(file.path);
-        if (!mounted) return;
-        setState(() => _receiptImagePath = storedPath);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('receipt_ai_failed'.tr())));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('receipt_attached'.tr())),
+          );
       }
     } catch (e, stack) {
       if (mounted) {
-        final msg = _shortErrorMessage(e);
+        final msg = shortReceiptErrorMessage(e);
         debugPrint('Receipt scan error: $e');
         debugPrintStack(stackTrace: stack);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1271,181 +1248,12 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     }
   }
 
-  /// Parse LLM JSON response (vendor, date, total). Strips markdown code fences. Returns null on failure.
-  ({String vendor, DateTime date, double total})? _parseReceiptJson(
-    String raw,
-  ) {
-    String s = raw.trim();
-    final codeBlock = RegExp(r'^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$');
-    final match = codeBlock.firstMatch(s);
-    if (match != null) s = match.group(1)?.trim() ?? s;
-    try {
-      final map = jsonDecode(s) as Map<String, dynamic>?;
-      if (map == null) return null;
-      final vendor = (map['vendor'] as String?)?.trim() ?? '';
-      final dateStr = (map['date'] as String?)?.trim();
-      DateTime date = _date;
-      if (dateStr != null && dateStr.isNotEmpty) {
-        final parsed = DateTime.tryParse(dateStr);
-        if (parsed != null) date = parsed;
-      }
-      final totalVal = map['total'];
-      double total = 0;
-      if (totalVal is num) {
-        total = totalVal.toDouble();
-      } else if (totalVal is String) {
-        total = double.tryParse(totalVal.trim()) ?? 0;
-      }
-      return (vendor: vendor, date: date, total: total);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  /// One-line, length-capped message for user-facing error display.
-  static String _shortErrorMessage(Object? e) {
-    if (e == null) return 'Unknown error';
-    final s = e.toString().replaceFirst(RegExp(r'^Exception:?\s*'), '').trim();
-    final firstLine = s.split(RegExp(r'[\n\r]')).first.trim();
-    return firstLine.length > 120
-        ? '${firstLine.substring(0, 117)}...'
-        : firstLine;
-  }
-
   /// Line items to persist: exclude rows that are both empty description and zero amount.
   List<ReceiptLineItem>? _effectiveLineItemsForSave() {
     final filtered = _lineItems
         .where((e) => e.description.trim().isNotEmpty || e.amountCents > 0)
         .toList();
     return filtered.isEmpty ? null : filtered;
-  }
-
-  Widget _buildBillBreakdownSection(BuildContext context, String currencyCode) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              'bill_breakdown'.tr(),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const Spacer(),
-            TextButton.icon(
-              onPressed: () {
-                setState(() {
-                  _lineItems.add(
-                    const ReceiptLineItem(description: '', amountCents: 0),
-                  );
-                });
-              },
-              icon: const Icon(Icons.add, size: 20),
-              label: Text('add_item'.tr()),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        ...(_lineItems.isEmpty
-            ? [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest.withValues(
-                      alpha: 0.5,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'bill_breakdown_hint'.tr(),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ]
-            : List.generate(_lineItems.length, (i) {
-                final item = _lineItems[i];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: TextFormField(
-                          initialValue: item.description,
-                          decoration: InputDecoration(
-                            hintText: 'item_description'.tr(),
-                            isDense: true,
-                            border: const OutlineInputBorder(),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
-                            ),
-                          ),
-                          onChanged: (v) {
-                            setState(() {
-                              _lineItems[i] = ReceiptLineItem(
-                                description: v.trim(),
-                                amountCents: item.amountCents,
-                              );
-                            });
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      SizedBox(
-                        width: 100,
-                        child: TextFormField(
-                          initialValue: item.amountCents > 0
-                              ? (item.amountCents / 100).toStringAsFixed(2)
-                              : '',
-                          decoration: const InputDecoration(
-                            hintText: '0',
-                            isDense: true,
-                            border: OutlineInputBorder(),
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
-                            ),
-                          ),
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          inputFormatters: [_decimalOnlyFormatter],
-                          onChanged: (v) {
-                            final cents = ((double.tryParse(v) ?? 0) * 100)
-                                .round();
-                            setState(() {
-                              _lineItems[i] = ReceiptLineItem(
-                                description: item.description,
-                                amountCents: cents,
-                              );
-                            });
-                          },
-                        ),
-                      ),
-                      IconButton(
-                        icon: Icon(
-                          Icons.remove_circle_outline,
-                          color: theme.colorScheme.error,
-                        ),
-                        onPressed: () {
-                          setState(() => _lineItems.removeAt(i));
-                        },
-                      ),
-                    ],
-                  ),
-                );
-              })),
-      ],
-    );
   }
 
   Widget _buildDescriptionSection(BuildContext context) {
@@ -1513,145 +1321,6 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildTitleSection(BuildContext context, List<ExpenseTag> customTags) {
-    final theme = Theme.of(context);
-    final preset = _selectedTag != null
-        ? _presetTags.where((p) => p.id == _selectedTag).firstOrNull
-        : null;
-    final customTag = _selectedTag != null
-        ? customTags.where((t) => t.id == _selectedTag).firstOrNull
-        : null;
-    final tagLabel = preset != null
-        ? preset.label
-        : (customTag != null ? customTag.label : _selectedTag);
-    final tagIcon = preset != null
-        ? preset.icon
-        : (customTag != null
-              ? (_selectableIcons[customTag.iconName] ?? Icons.label_outlined)
-              : Icons.label_outlined);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'title'.tr(),
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 6),
-        TextFormField(
-          controller: _titleController,
-          decoration: InputDecoration(
-            hintText: 'title'.tr(),
-            filled: true,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
-            ),
-            suffixIcon: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: Icon(
-                    tagIcon,
-                    color: _selectedTag != null
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.onSurfaceVariant,
-                  ),
-                  onPressed: () => _showTagPicker(customTags),
-                  tooltip: tagLabel ?? 'category'.tr(),
-                ),
-                IconButton(
-                  icon: Icon(
-                    Icons.camera_alt_outlined,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  onPressed: _pickReceiptImage,
-                  tooltip: 'scan_receipt'.tr(),
-                ),
-              ],
-            ),
-          ),
-          validator: (v) =>
-              v == null || v.trim().isEmpty ? 'required'.tr() : null,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAmountSection(BuildContext context, String currencyCode) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'amount'.tr(),
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              height: 52,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              alignment: AlignmentDirectional.centerStart,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(currencyCode, style: theme.textTheme.titleMedium),
-                  const SizedBox(width: 4),
-                  Icon(
-                    Icons.arrow_drop_down,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextFormField(
-                controller: _amountController,
-                decoration: InputDecoration(
-                  hintText: '0',
-                  filled: true,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
-                  ),
-                ),
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                inputFormatters: [_decimalOnlyFormatter],
-                onChanged: (_) => setState(() {}),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'required'.tr();
-                  if (double.tryParse(v) == null) return 'invalid_number'.tr();
-                  return null;
-                },
-              ),
-            ),
-          ],
-        ),
-      ],
     );
   }
 
@@ -1984,328 +1653,6 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       ),
     );
     if (chosen != null) setState(() => _payerParticipantId = chosen);
-  }
-
-  static const double _kSplitRadius = 4;
-
-  InputDecoration _splitInputDecoration(ThemeData theme) {
-    return InputDecoration(
-      isDense: true,
-      filled: true,
-      fillColor: theme.colorScheme.surfaceContainerHighest,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(_kSplitRadius),
-        borderSide: BorderSide.none,
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(_kSplitRadius),
-        borderSide: BorderSide.none,
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(_kSplitRadius),
-        borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
-      ),
-    );
-  }
-
-  Widget _buildSplitSection(
-    BuildContext context,
-    ThemeData theme,
-    List<Participant> participants,
-    List<int> sharesCents,
-    int amountCents,
-    String currencyCode,
-  ) {
-    final participantIds = participants.map((e) => e.id).toSet();
-    for (final id in List.from(_splitEditControllers.keys)) {
-      if (!participantIds.contains(id)) {
-        _splitEditControllers[id]?.dispose();
-        _splitEditControllers.remove(id);
-        _splitFocusNodes[id]?.dispose();
-        _splitFocusNodes.remove(id);
-      }
-    }
-    final includedList = participants
-        .where((p) => _includedInSplitIds.contains(p.id))
-        .toList();
-    final includedCount = includedList.length;
-    final isCustomSplit =
-        _splitType == SplitType.parts || _splitType == SplitType.amounts;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsetsDirectional.only(start: 4, bottom: 8),
-          child: Row(
-            children: [
-              Text(
-                'split'.tr(),
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.onSurface,
-                ),
-              ),
-              const Spacer(),
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () => _showSplitTypePicker(context),
-                  borderRadius: BorderRadius.circular(20),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 8,
-                      horizontal: 12,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          _splitType == SplitType.equal
-                              ? 'equal'.tr()
-                              : _splitType == SplitType.parts
-                              ? 'parts'.tr()
-                              : 'amounts'.tr(),
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.primary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.arrow_drop_down,
-                          size: 20,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        Material(
-          color: theme.colorScheme.surfaceContainerHighest.withValues(
-            alpha: 0.5,
-          ),
-          borderRadius: BorderRadius.circular(_kSplitRadius),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(_kSplitRadius),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 320),
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: participants.length,
-                itemBuilder: (context, i) {
-                  final p = participants[i];
-                  final cents = i < sharesCents.length ? sharesCents[i] : 0;
-                  final included = _includedInSplitIds.contains(p.id);
-                  final defaultAmountStr =
-                      '1'; // parts (e.g. 1, 2, 1 → total distributed by ratio)
-                  final defaultAmountCurrencyStr = includedCount > 0
-                      ? (amountCents / 100 / includedCount).toStringAsFixed(2)
-                      : '0.00';
-                  final defaultStr = _splitType == SplitType.parts
-                      ? defaultAmountStr
-                      : defaultAmountCurrencyStr;
-                  final valueStr = _customSplitValues[p.id] ?? defaultStr;
-
-                  TextEditingController? controller =
-                      _splitEditControllers[p.id];
-                  FocusNode? focusNode = _splitFocusNodes[p.id];
-                  if (isCustomSplit && controller == null) {
-                    controller = TextEditingController(text: valueStr);
-                    _splitEditControllers[p.id] = controller;
-                    focusNode = FocusNode();
-                    _splitFocusNodes[p.id] = focusNode;
-                  }
-
-                  // Fixed widths so layout doesn't shift when numbers change length
-                  const double kSplitInputWidth = 88;
-                  const double kSplitAmountWidth = 100;
-                  const double kMinTapHeight = 48;
-
-                  Widget trailing;
-                  if (isCustomSplit && included) {
-                    trailing = Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () => focusNode?.requestFocus(),
-                        borderRadius: BorderRadius.circular(_kSplitRadius),
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(
-                            minHeight: kMinTapHeight,
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(
-                                    _kSplitRadius,
-                                  ),
-                                  child: SizedBox(
-                                    width: kSplitInputWidth,
-                                    height: kMinTapHeight - 12,
-                                    child: Align(
-                                      alignment: Alignment.center,
-                                      child: TextField(
-                                        focusNode: focusNode,
-                                        controller: controller,
-                                        keyboardType:
-                                            TextInputType.numberWithOptions(
-                                              decimal:
-                                                  _splitType ==
-                                                  SplitType.amounts,
-                                            ),
-                                        inputFormatters:
-                                            _splitType == SplitType.amounts
-                                            ? [_decimalOnlyFormatter]
-                                            : [
-                                                FilteringTextInputFormatter
-                                                    .digitsOnly,
-                                              ],
-                                        textAlign: TextAlign.center,
-                                        style: theme.textTheme.bodyMedium
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w500,
-                                              height: 1.0,
-                                            ),
-                                        decoration: _splitInputDecoration(
-                                          theme,
-                                        ),
-                                        onChanged: (v) {
-                                          setState(() {
-                                            if (_splitType ==
-                                                SplitType.amounts) {
-                                              _applyAmountsChange(
-                                                p,
-                                                v,
-                                                amountCents,
-                                                includedList,
-                                                controller,
-                                              );
-                                            } else {
-                                              _customSplitValues[p.id] = v;
-                                            }
-                                          });
-                                        },
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                SizedBox(
-                                  width: kSplitAmountWidth,
-                                  child: Align(
-                                    alignment: AlignmentDirectional.centerEnd,
-                                    child: Text(
-                                      CurrencyFormatter.formatCents(
-                                        cents,
-                                        currencyCode,
-                                      ),
-                                      style: theme.textTheme.bodyMedium
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w500,
-                                            color: theme
-                                                .colorScheme
-                                                .onSurfaceVariant,
-                                          ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  } else {
-                    trailing = SizedBox(
-                      width: kSplitAmountWidth,
-                      child: Align(
-                        alignment: AlignmentDirectional.centerEnd,
-                        child: Text(
-                          CurrencyFormatter.formatCents(cents, currencyCode),
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: included
-                                ? theme.colorScheme.onSurface
-                                : theme.colorScheme.onSurfaceVariant,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    );
-                  }
-
-                  return CheckboxListTile(
-                    value: included,
-                    onChanged: (value) {
-                      setState(() {
-                        if (value == true) {
-                          _includedInSplitIds.add(p.id);
-                        } else {
-                          _includedInSplitIds.remove(p.id);
-                          _customSplitValues.remove(p.id);
-                          _splitEditControllers[p.id]?.dispose();
-                          _splitEditControllers.remove(p.id);
-                          _splitFocusNodes[p.id]?.dispose();
-                          _splitFocusNodes.remove(p.id);
-                        }
-                      });
-                    },
-                    title: Text(
-                      p.name,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: included
-                            ? theme.colorScheme.onSurface
-                            : theme.colorScheme.onSurfaceVariant,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    secondary: trailing,
-                    controlAffinity: ListTileControlAffinity.leading,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 4,
-                    ),
-                    dense: true,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(0),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-        ),
-        if (_splitType == SplitType.amounts && includedList.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Builder(
-            builder: (context) {
-              final sumCents = _amountsSumCents(participants);
-              final ok = sumCents == amountCents;
-              return Text(
-                '${'total'.tr()}: ${(sumCents / 100).toStringAsFixed(2)} / ${(amountCents / 100).toStringAsFixed(2)}${ok ? '' : ' (${'amounts_must_equal_total'.tr()})'}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: ok
-                      ? theme.colorScheme.onSurfaceVariant
-                      : theme.colorScheme.error,
-                ),
-              );
-            },
-          ),
-        ],
-      ],
-    );
   }
 
   Future<void> _showSplitTypePicker(BuildContext context) async {
