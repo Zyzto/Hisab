@@ -57,6 +57,7 @@ class HomePage extends ConsumerWidget {
             itemBuilder: (context, index) {
               final group = groups[index];
               return GroupCard(
+                key: ValueKey(group.id),
                 group: group,
                 onTap: () => context.push(RoutePaths.groupDetail(group.id)),
               );

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../providers/groups_provider.dart';
+import '../widgets/segmented_tab_bar.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -56,19 +57,18 @@ class _GroupDetailContent extends ConsumerStatefulWidget {
 class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  late ValueNotifier<int> _tabIndexNotifier;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _tabController.addListener(_onTabIndexChanged);
+    _tabIndexNotifier = ValueNotifier<int>(0);
   }
-
-  void _onTabIndexChanged() => setState(() {});
 
   @override
   void dispose() {
-    _tabController.removeListener(_onTabIndexChanged);
+    _tabIndexNotifier.dispose();
     _tabController.dispose();
     super.dispose();
   }
@@ -77,6 +77,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
     ref.invalidate(futureGroupProvider(widget.group.id));
     ref.invalidate(expensesByGroupProvider(widget.group.id));
     ref.invalidate(participantsByGroupProvider(widget.group.id));
+    ref.invalidate(tagsByGroupProvider(widget.group.id));
   }
 
   Widget _buildAppBarTitle(BuildContext context) {
@@ -112,143 +113,29 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
     );
   }
 
-  Widget _buildSegmentedTabs(BuildContext context) {
+  Widget? _buildFAB(BuildContext context, int index) {
     final theme = Theme.of(context);
-    final selectedIndex = _tabController.index;
-    final labels = ['expenses'.tr(), 'balance'.tr(), 'participants'.tr()];
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Container(
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withValues(
-            alpha: 0.5,
-          ),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        padding: const EdgeInsets.all(4),
-        child: Row(
-          children: List.generate(3, (i) {
-            final selected = selectedIndex == i;
-            return Expanded(
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(8),
-                  onTap: () => _tabController.animateTo(i),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? theme.colorScheme.surface
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(8),
-                      boxShadow: selected
-                          ? [
-                              BoxShadow(
-                                color: theme.colorScheme.shadow.withValues(
-                                  alpha: 0.08,
-                                ),
-                                blurRadius: 2,
-                                offset: const Offset(0, 1),
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: Center(
-                      child: Text(
-                        labels[i],
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: selected
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.onSurfaceVariant,
-                          fontWeight: selected
-                              ? FontWeight.w600
-                              : FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }),
-        ),
-      ),
-    );
-  }
-
-  Widget? _buildFAB(BuildContext context) {
-    final theme = Theme.of(context);
-    final index = _tabController.index;
     if (index == 0) {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Material(
-            color: theme.colorScheme.primary,
-            borderRadius: BorderRadius.circular(16),
-            elevation: 4,
-            shadowColor: theme.colorScheme.shadow,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(16),
-              onTap: () =>
-                  context.push(RoutePaths.groupExpenseAdd(widget.group.id)),
-              child: const SizedBox(
-                width: 56,
-                height: 56,
-                child: Icon(Icons.add, color: Colors.white, size: 28),
-              ),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'add_expense'.tr(),
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurface,
-            ),
-          ),
-        ],
+      return _FABWithLabel(
+        icon: Icons.add,
+        label: 'add_expense'.tr(),
+        theme: theme,
+        onTap: () =>
+            context.push(RoutePaths.groupExpenseAdd(widget.group.id)),
       );
     }
     if (index == 2) {
-      final participantsAsync = ref.watch(
-        participantsByGroupProvider(widget.group.id),
-      );
-      final participantCount = participantsAsync.value?.length ?? 0;
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Material(
-            color: theme.colorScheme.primary,
-            borderRadius: BorderRadius.circular(16),
-            elevation: 4,
-            shadowColor: theme.colorScheme.shadow,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(16),
-              onTap: () => _showAddParticipant(
-                context,
-                ref,
-                widget.group.id,
-                participantCount,
-              ),
-              child: const SizedBox(
-                width: 56,
-                height: 56,
-                child: Icon(Icons.person_add, color: Colors.white, size: 28),
-              ),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'add_participant'.tr(),
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurface,
-            ),
-          ),
-        ],
+      return _FABWithLabel(
+        icon: Icons.person_add,
+        label: 'add_participant'.tr(),
+        theme: theme,
+        onTap: () => _showAddParticipant(
+          context,
+          ref,
+          widget.group.id,
+          ref.read(participantsByGroupProvider(widget.group.id)).value?.length ??
+              0,
+        ),
       );
     }
     return null;
@@ -276,7 +163,15 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
       ),
       body: Column(
         children: [
-          _buildSegmentedTabs(context),
+          SegmentedTabBar(
+            controller: _tabController,
+            labels: [
+              'expenses'.tr(),
+              'balance'.tr(),
+              'participants'.tr(),
+            ],
+            currentIndexNotifier: _tabIndexNotifier,
+          ),
           Expanded(
             child: TabBarView(
               controller: _tabController,
@@ -289,7 +184,11 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
           ),
         ],
       ),
-      floatingActionButton: _buildFAB(context),
+      floatingActionButton: ValueListenableBuilder<int>(
+        valueListenable: _tabIndexNotifier,
+        builder: (context, index, _) =>
+            _buildFAB(context, index) ?? const SizedBox.shrink(),
+      ),
     );
   }
 }
@@ -330,22 +229,19 @@ class _ExpensesTab extends ConsumerWidget {
             final sorted = List<Expense>.from(expenses)
               ..sort((a, b) => b.date.compareTo(a.date));
             final byDate = <DateTime, List<Expense>>{};
+            int myExpensesCents = 0;
+            int totalCents = 0;
             for (final e in sorted) {
               final key = _dateOnly(e.date);
               byDate.putIfAbsent(key, () => []).add(e);
-            }
-            final dateKeys = byDate.keys.toList()
-              ..sort((a, b) => b.compareTo(a));
-
-            int myExpensesCents = 0;
-            int totalCents = 0;
-            for (final e in expenses) {
               totalCents += e.amountCents;
               if (firstParticipantId != null &&
                   e.payerParticipantId == firstParticipantId) {
                 myExpensesCents += e.amountCents;
               }
             }
+            final dateKeys = byDate.keys.toList()
+              ..sort((a, b) => b.compareTo(a));
 
             final currencyCode = group.currencyCode;
             final dateFormat = DateFormat('MMMM d, yyyy');
@@ -362,56 +258,20 @@ class _ExpensesTab extends ConsumerWidget {
                   child: Row(
                     children: [
                       Expanded(
-                        child: Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'my_expenses'.tr(),
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${CurrencyFormatter.formatCompactCents(myExpensesCents)} $currencyCode',
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                        child: _ExpenseSummaryCard(
+                          label: 'my_expenses'.tr(),
+                          value:
+                              '${CurrencyFormatter.formatCompactCents(myExpensesCents)} $currencyCode',
+                          theme: theme,
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'total_expenses'.tr(),
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${CurrencyFormatter.formatCompactCents(totalCents)} $currencyCode',
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                        child: _ExpenseSummaryCard(
+                          label: 'total_expenses'.tr(),
+                          value:
+                              '${CurrencyFormatter.formatCompactCents(totalCents)} $currencyCode',
+                          theme: theme,
                         ),
                       ),
                     ],
@@ -431,6 +291,7 @@ class _ExpensesTab extends ConsumerWidget {
                     ),
                     ...list.map(
                       (expense) => InkWell(
+                        key: ValueKey(expense.id),
                         onTap: () => context.push(
                           RoutePaths.groupExpenseDetail(groupId, expense.id),
                         ),
@@ -493,7 +354,7 @@ class _ParticipantsTab extends ConsumerWidget {
         if (participants.isEmpty) {
           return Center(
             child: Text(
-              'participants'.tr(),
+              'add_participants_first'.tr(),
               style: Theme.of(context).textTheme.bodyLarge,
             ),
           );
@@ -504,12 +365,103 @@ class _ParticipantsTab extends ConsumerWidget {
           itemBuilder: (context, index) {
             final p = participants[index];
             return ListTile(
+              key: ValueKey(p.id),
+              leading: CircleAvatar(
+                child: Text(p.name.isNotEmpty ? p.name[0].toUpperCase() : '?'),
+              ),
               title: Text(p.name),
-              subtitle: Text('${'participants'.tr()} ${index + 1}'),
             );
           },
         );
       },
+    );
+  }
+}
+
+/// Summary card for my/total expenses in the expenses tab.
+class _ExpenseSummaryCard extends StatelessWidget {
+  const _ExpenseSummaryCard({
+    required this.label,
+    required this.value,
+    required this.theme,
+  });
+
+  final String label;
+  final String value;
+  final ThemeData theme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// FAB with label below (add expense / add participant).
+class _FABWithLabel extends StatelessWidget {
+  const _FABWithLabel({
+    required this.icon,
+    required this.label,
+    required this.theme,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final ThemeData theme;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Material(
+          color: theme.colorScheme.primary,
+          borderRadius: BorderRadius.circular(16),
+          elevation: 4,
+          shadowColor: theme.colorScheme.shadow,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: onTap,
+            child: SizedBox(
+              width: 56,
+              height: 56,
+              child: Icon(icon, color: Colors.white, size: 28),
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -521,33 +473,37 @@ Future<void> _showAddParticipant(
   int currentCount,
 ) async {
   final nameController = TextEditingController();
-  final name = await showDialog<String>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text('participants'.tr()),
-      content: TextField(
-        controller: nameController,
-        decoration: InputDecoration(
-          labelText: 'participants'.tr(),
-          hintText: 'Name',
+  try {
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('add_participant'.tr()),
+        content: TextField(
+          controller: nameController,
+          decoration: InputDecoration(
+            labelText: 'participants'.tr(),
+            hintText: 'Name',
+          ),
+          autofocus: true,
         ),
-        autofocus: true,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('cancel'.tr()),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(nameController.text.trim()),
+            child: Text('done'.tr()),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(ctx).pop(nameController.text.trim()),
-          child: const Text('Add'),
-        ),
-      ],
-    ),
-  );
-  if (name != null && name.isNotEmpty && context.mounted) {
-    await ref
-        .read(participantRepositoryProvider)
-        .create(groupId, name, currentCount);
+    );
+    if (name != null && name.isNotEmpty && context.mounted) {
+      await ref
+          .read(participantRepositoryProvider)
+          .create(groupId, name, currentCount);
+    }
+  } finally {
+    nameController.dispose();
   }
 }
