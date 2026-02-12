@@ -4,6 +4,7 @@
 ///   cp lib/core/constants/app_secrets_example.dart lib/core/constants/app_secrets.dart
 ///
 /// Debug builds use dev values; release builds use prod values.
+library;
 
 // === Dev (debug builds) ===
 const String auth0DomainDev = '';
