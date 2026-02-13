@@ -1,0 +1,8 @@
+# Local development overrides — this file is auto-gitignored by pub.
+# It redirects git dependencies back to local paths so you can iterate
+# on siglat / edadat without pushing to GitHub first.
+dependency_overrides:
+  flutter_logging_service:
+    path: ../siglat
+  flutter_settings_framework:
+    path: ../edadat

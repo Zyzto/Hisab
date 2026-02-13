@@ -51,11 +51,13 @@ dependencies:
   # Logging
   easy_logger: ^0.0.2
   flutter_logging_service:
-    path: ../siglat
+    git:
+      url: https://github.com/Zyzto/siglat.git
 
   # Settings (theme + "Local Only" toggle)
   flutter_settings_framework:
-    path: ../edadat
+    git:
+      url: https://github.com/Zyzto/edadat.git
 
   # About (version, licenses)
   package_info_plus: ^9.0.0
@@ -70,6 +72,8 @@ dependencies:
   material_symbols_icons: ^4.2906.0
   pretty_qr_code: ^3.6.0
   connectivity_plus: ^7.0.0
+  app_links: ^6.3.2
+  currency_picker: ^2.0.21
 
 dev_dependencies:
   flutter_test:
