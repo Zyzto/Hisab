@@ -236,6 +236,18 @@ final allSections = [
   aboutSection,
 ];
 
+/// User's custom favourite currencies for the currency picker.
+/// Stored as comma-separated ISO 4217 codes, e.g. "SAR,JPY,EUR".
+/// Empty string means use the default list from CurrencyHelpers.
+final favoriteCurrenciesSettingDef = const StringSetting(
+  'favorite_currencies',
+  defaultValue: '',
+  titleKey: 'favorite_currencies',
+  icon: Icons.star_outline,
+  section: 'appearance',
+  order: 4,
+);
+
 final allSettings = <SettingDefinition>[
   onboardingCompletedSettingDef,
   onboardingOnlinePendingSettingDef,
@@ -245,6 +257,7 @@ final allSettings = <SettingDefinition>[
   themeColorSettingDef,
   languageSettingDef,
   fontSizeScaleSettingDef,
+  favoriteCurrenciesSettingDef,
   localOnlySettingDef,
   receiptOcrEnabledSettingDef,
   receiptAiEnabledSettingDef,

@@ -187,13 +187,11 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   bool get _isDifferentCurrency => _currencyCode != _groupCurrencyCode;
 
   void _openExpenseCurrencyPicker() {
-    showCurrencyPicker(
+    final stored = ref.read(favoriteCurrenciesProvider);
+    final favorites = CurrencyHelpers.getEffectiveFavorites(stored);
+    CurrencyHelpers.showPicker(
       context: context,
-      favorite: CurrencyHelpers.favoriteCurrencies,
-      showFlag: true,
-      showSearchField: true,
-      showCurrencyName: true,
-      showCurrencyCode: true,
+      favorite: favorites,
       onSelect: (Currency currency) {
         if (currency.code == _currencyCode) return;
         setState(() {

@@ -4,14 +4,13 @@ import 'currency_helpers.dart';
 
 /// Format amounts. [amountCents] is in smallest unit (e.g. cents).
 /// Uses currency_picker's data for proper symbol, decimal digits, and placement.
-/// Applies overrides for the Saudi Riyal symbol (U+20C1) per SAMA guidelines.
 class CurrencyFormatter {
-  /// Format with symbol: "$12.34" or "⃁ 12.34" depending on currency.
+  /// Format with symbol: "$12.34" or "12.34 ﷼" depending on currency.
   static String formatCents(int amountCents, String currencyCode) {
     final currency = CurrencyHelpers.fromCode(currencyCode);
     final decimalDigits = currency?.decimalDigits ?? 2;
-    final symbol = CurrencyHelpers.symbolFor(currencyCode);
-    final onLeft = CurrencyHelpers.symbolOnLeft(currencyCode);
+    final symbol = currency?.symbol ?? currencyCode;
+    final onLeft = currency?.symbolOnLeft ?? true;
     final divisor = _divisor(decimalDigits);
     final amount = amountCents / divisor;
     final formatter = NumberFormat.currency(
@@ -27,12 +26,12 @@ class CurrencyFormatter {
     }
   }
 
-  /// Format with both symbol and code: "$12.34 USD" or "⃁ 12.34 SAR".
+  /// Format with both symbol and code: "$12.34 USD" or "12.34 ﷼ SAR".
   static String formatWithCode(int amountCents, String currencyCode) {
     final currency = CurrencyHelpers.fromCode(currencyCode);
     final decimalDigits = currency?.decimalDigits ?? 2;
-    final symbol = CurrencyHelpers.symbolFor(currencyCode);
-    final onLeft = CurrencyHelpers.symbolOnLeft(currencyCode);
+    final symbol = currency?.symbol ?? currencyCode;
+    final onLeft = currency?.symbolOnLeft ?? true;
     final divisor = _divisor(decimalDigits);
     final amount = amountCents / divisor;
     final formatter = NumberFormat.currency(

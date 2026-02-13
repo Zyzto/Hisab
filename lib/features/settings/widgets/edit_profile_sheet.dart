@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 
+import 'package:flutter_logging_service/flutter_logging_service.dart';
+
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/auth/auth_user_profile.dart';
 import '../../../core/auth/predefined_avatars.dart';
+import '../../../core/repository/repository_providers.dart';
 
 /// Bottom sheet to edit display name and avatar. Updates Supabase user_metadata.
 Future<void> showEditProfileSheet(
@@ -64,12 +67,32 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
     });
     try {
       final authService = ref.read(authServiceProvider);
+      final newName = _nameController.text.trim();
       await authService.updateProfile(
-        name: _nameController.text.trim().isEmpty
-            ? null
-            : _nameController.text.trim(),
+        name: newName.isEmpty ? null : newName,
         avatarId: _selectedAvatarId,
       );
+      // Sync participant names and avatars across all groups
+      if (newName.isNotEmpty) {
+        final userId = authService.currentUser?.id;
+        if (userId != null) {
+          try {
+            await ref
+                .read(participantRepositoryProvider)
+                .updateProfileByUserId(
+                  userId,
+                  newName,
+                  avatarId: _selectedAvatarId,
+                );
+          } catch (e, st) {
+            Log.warning(
+              'Failed to sync participant profile',
+              error: e,
+              stackTrace: st,
+            );
+          }
+        }
+      }
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {

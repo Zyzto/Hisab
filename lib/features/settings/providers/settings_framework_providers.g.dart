@@ -519,6 +519,48 @@ final class LanguageProvider extends $FunctionalProvider<String, String, String>
 
 String _$languageHash() => r'05ad185bfb07d659823019923fe5b9475dc962b7';
 
+@ProviderFor(favoriteCurrencies)
+final favoriteCurrenciesProvider = FavoriteCurrenciesProvider._();
+
+final class FavoriteCurrenciesProvider
+    extends $FunctionalProvider<String, String, String>
+    with $Provider<String> {
+  FavoriteCurrenciesProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'favoriteCurrenciesProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$favoriteCurrenciesHash();
+
+  @$internal
+  @override
+  $ProviderElement<String> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  String create(Ref ref) {
+    return favoriteCurrencies(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String>(value),
+    );
+  }
+}
+
+String _$favoriteCurrenciesHash() =>
+    r'9306918f4bdde5c7aaa548a24133f65222b74e67';
+
 @ProviderFor(fontSizeScale)
 final fontSizeScaleProvider = FontSizeScaleProvider._();
 

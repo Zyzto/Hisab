@@ -12,6 +12,10 @@ class Participant {
 
   /// Auth user id this participant belongs to. Null for standalone participants.
   final String? userId;
+
+  /// Avatar identifier (matches a key in [predefinedAvatars]).
+  /// Null means the user hasn't set one (falls back to initials).
+  final String? avatarId;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -21,6 +25,7 @@ class Participant {
     required this.name,
     required this.order,
     this.userId,
+    this.avatarId,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -31,6 +36,7 @@ class Participant {
     String? name,
     int? order,
     String? userId,
+    String? avatarId,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -40,6 +46,7 @@ class Participant {
       name: name ?? this.name,
       order: order ?? this.order,
       userId: userId ?? this.userId,
+      avatarId: avatarId ?? this.avatarId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

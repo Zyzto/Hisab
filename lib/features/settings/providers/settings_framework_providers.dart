@@ -196,6 +196,22 @@ String language(Ref ref) {
 }
 
 @riverpod
+String favoriteCurrencies(Ref ref) {
+  try {
+    final settings = ref.watch(hisabSettingsProvidersProvider);
+    if (settings == null) return '';
+    return ref.watch(settings.provider(favoriteCurrenciesSettingDef));
+  } catch (e, stackTrace) {
+    Log.warning(
+      'favoriteCurrencies read failed, defaulting to empty',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return '';
+  }
+}
+
+@riverpod
 String fontSizeScale(Ref ref) {
   try {
     final settings = ref.watch(hisabSettingsProvidersProvider);

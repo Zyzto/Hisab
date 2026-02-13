@@ -1,4 +1,5 @@
 # Hisab
+<img src="assets/Hisab.png" width="150" />
 
 Group expense splitting and settle-up app. Built with Flutter, Riverpod, GoRouter, and Supabase.
 
@@ -19,6 +20,12 @@ Group expense splitting and settle-up app. Built with Flutter, Riverpod, GoRoute
 | **Online** (with Supabase) | **Everything** + invites, members, cross-device sync | Supabase + local SQLite cache |
 
 When in Online mode and temporarily offline, you can still add expenses (queued for later sync). Other features like invites and member management require connectivity.
+
+## Screenshots
+
+<img src="screenshots/2.png" width="200" /><img src="screenshots/3.png" width="200" /><img src="screenshots/4.png" width="200" />
+
+<img src="screenshots/5.png" width="200" /><img src="screenshots/6.gif" width="200" /><img src="screenshots/7.png" width="200" /><img src="screenshots/8.png" width="200" />
 
 ## Requirements
 

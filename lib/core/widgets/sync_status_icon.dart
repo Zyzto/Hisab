@@ -113,24 +113,26 @@ class _SyncStatusChipState extends ConsumerState<SyncStatusChip> {
   }
 
   _ChipData _chipData(SyncStatus status, ColorScheme cs) {
+    // Use onXxxContainer / xxxContainer pairs for guaranteed contrast
+    // across all themes (light, dark, AMOLED, custom seed colors).
     return switch (status) {
       SyncStatus.connected => _ChipData(
           icon: Icons.cloud_done_outlined,
           label: 'sync_connected'.tr(),
-          foregroundColor: cs.primary,
-          backgroundColor: cs.primaryContainer.withValues(alpha: 0.6),
+          foregroundColor: cs.onPrimaryContainer,
+          backgroundColor: cs.primaryContainer,
         ),
       SyncStatus.syncing => _ChipData(
           icon: Icons.sync,
           label: 'sync_syncing'.tr(),
-          foregroundColor: cs.tertiary,
-          backgroundColor: cs.tertiaryContainer.withValues(alpha: 0.6),
+          foregroundColor: cs.onTertiaryContainer,
+          backgroundColor: cs.tertiaryContainer,
         ),
       SyncStatus.offline => _ChipData(
           icon: Icons.cloud_off_outlined,
           label: 'sync_offline'.tr(),
-          foregroundColor: cs.error,
-          backgroundColor: cs.errorContainer.withValues(alpha: 0.8),
+          foregroundColor: cs.onErrorContainer,
+          backgroundColor: cs.errorContainer,
         ),
       SyncStatus.localOnly => _ChipData(
           icon: Icons.storage,
