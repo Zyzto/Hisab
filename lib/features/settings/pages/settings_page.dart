@@ -24,6 +24,9 @@ import '../settings_definitions.dart';
 import '../providers/settings_framework_providers.dart';
 import '../backup_helper.dart';
 import '../widgets/logs_viewer_dialog.dart';
+import '../widgets/edit_profile_sheet.dart';
+import '../../../core/auth/predefined_avatars.dart';
+import '../../../core/widgets/sync_status_icon.dart';
 import '../../../domain/domain.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
@@ -61,13 +64,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final settings = ref.watch(hisabSettingsProvidersProvider);
     if (settings == null) {
       return Scaffold(
-        appBar: AppBar(title: Text('settings'.tr())),
+        appBar: AppBar(
+          title: Text('settings'.tr()),
+          actions: const [
+            SyncStatusChip(),
+            SizedBox(width: 12),
+          ],
+        ),
         body: Center(child: Text('settings_unavailable'.tr())),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text('settings'.tr())),
+      appBar: AppBar(
+        title: Text('settings'.tr()),
+        actions: const [
+          SyncStatusChip(),
+          SizedBox(width: 12),
+        ],
+      ),
       body: ListView(
         children: [
           _buildAccountSection(context, ref, settings),
@@ -319,20 +334,27 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
         final initials = _getInitials(profile.name, profile.email);
         final provider = _getProviderLabel(user);
+        final hasAvatarId =
+            profile.avatarId != null && profile.avatarId!.isNotEmpty;
 
         return [
-          // User info card
+          // User info card (tappable to edit profile)
           ListTile(
             leading: CircleAvatar(
-              backgroundColor: colorScheme.primary,
-              foregroundColor: colorScheme.onPrimary,
-              child: Text(
-                initials,
-                style: textTheme.titleSmall?.copyWith(
-                  color: colorScheme.onPrimary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              backgroundColor: colorScheme.primaryContainer,
+              foregroundColor: colorScheme.onPrimaryContainer,
+              child: hasAvatarId
+                  ? Text(
+                      avatarEmoji(profile.avatarId),
+                      style: const TextStyle(fontSize: 24),
+                    )
+                  : Text(
+                      initials,
+                      style: textTheme.titleSmall?.copyWith(
+                        color: colorScheme.onPrimaryContainer,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
             ),
             title: Text(
               profile.name ?? profile.email ?? profile.sub,
@@ -341,6 +363,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
             ),
             subtitle: profile.email != null ? Text(profile.email!) : null,
+            trailing: const Icon(Icons.edit_outlined),
+            onTap: () => showEditProfileSheet(context, ref, profile),
           ),
           // Sync status & provider
           _buildAccountSyncTile(context, syncStatus, provider),
@@ -596,9 +620,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (confirmed != true || !context.mounted) return;
     await settings.controller.resetAll();
     if (!context.mounted) return;
-    final langCode = settings.controller.get(languageSettingDef);
-    await context.setLocale(Locale(langCode));
-    if (!context.mounted) return;
+    // _LocaleSync handles locale sync automatically via languageProvider
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text('reset_all_settings_done'.tr())));
@@ -812,10 +834,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         );
         if (chosen != null && context.mounted) {
           final langCode = chosen.languageCode;
-          ref
+          await ref
               .read(settings.provider(languageSettingDef).notifier)
               .set(langCode);
-          await context.setLocale(chosen);
+          // _LocaleSync will call setLocale when it sees provider != context.locale
         }
       },
     );
@@ -856,6 +878,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           leading: const Icon(Icons.person_outline),
           title: Text('about_me'.tr()),
           onTap: () => _showAboutMe(context),
+        ),
+        NavigationSettingsTile(
+          leading: const Icon(Icons.favorite_outline),
+          title: Text('donate'.tr()),
+          subtitle: Text('donate_description'.tr()),
+          onTap: () => _openDonateLink(context),
         ),
       ],
     );
@@ -1193,6 +1221,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   static void _showLicenses(BuildContext context) {
     showLicensePage(context: context, applicationName: 'Hisab');
+  }
+
+  static const String _donateUrl = 'https://github.com/Zyzto';
+
+  static Future<void> _openDonateLink(BuildContext context) async {
+    final uri = Uri.parse(_donateUrl);
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('donate'.tr())),
+        );
+      }
+    }
   }
 
   static void _showAboutMe(BuildContext context) {

@@ -149,6 +149,17 @@ final settingsOnlinePendingSettingDef = const BoolSetting(
   order: -3, // Internal, not shown in settings UI
 );
 
+/// Pending invite token from deep link; cleared when user reaches invite page or completes accept.
+/// Persists across onboarding and OAuth redirects.
+final pendingInviteTokenSettingDef = const StringSetting(
+  'pending_invite_token',
+  defaultValue: '',
+  titleKey: 'pending_invite_token',
+  icon: Icons.link,
+  section: 'appearance',
+  order: -4, // Internal, not shown in settings UI
+);
+
 /// When true, app uses only local storage (PowerSync SQLite). When false, syncs with Supabase.
 final localOnlySettingDef = const BoolSetting(
   'local_only',
@@ -229,6 +240,7 @@ final allSettings = <SettingDefinition>[
   onboardingCompletedSettingDef,
   onboardingOnlinePendingSettingDef,
   settingsOnlinePendingSettingDef,
+  pendingInviteTokenSettingDef,
   themeModeSettingDef,
   themeColorSettingDef,
   languageSettingDef,
