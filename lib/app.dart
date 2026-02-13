@@ -2,7 +2,9 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'core/auth/auth_providers.dart';
 import 'core/database/database_providers.dart';
+import 'core/services/notification_service.dart';
 import 'core/theme/app_scroll_behavior.dart';
 import 'core/theme/theme_providers.dart';
 import 'core/navigation/app_router.dart';
@@ -19,6 +21,22 @@ class App extends ConsumerWidget {
 
     // Watch DataSyncService to reactively fetch/push data
     ref.watch(dataSyncServiceProvider);
+
+    // Initialize push notifications when user authenticates.
+    // listen handles sign-in/sign-out transitions; watch handles initial state.
+    ref.listen(isAuthenticatedProvider, (prev, isAuth) {
+      if (isAuth && prev != true) {
+        ref.read(notificationServiceProvider.notifier).initialize();
+      } else if (!isAuth && prev == true) {
+        ref.read(notificationServiceProvider.notifier).unregisterToken();
+      }
+    });
+    // Handle already-authenticated on first build (initialize() is idempotent).
+    if (ref.read(isAuthenticatedProvider)) {
+      Future.microtask(
+        () => ref.read(notificationServiceProvider.notifier).initialize(),
+      );
+    }
 
     // Locale is read exclusively from EasyLocalization (context.locale) so that
     // locale: and localizationsDelegates always come from the same frame.

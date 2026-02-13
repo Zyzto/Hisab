@@ -159,10 +159,11 @@ The backend is entirely managed through Supabase. Database schema, RLS policies,
 
 | Component | Purpose |
 |-----------|---------|
-| Postgres tables | `groups`, `group_members`, `group_invites`, `participants`, `expenses`, `expense_tags`, `telemetry` |
+| Postgres tables | `groups`, `group_members`, `group_invites`, `participants`, `expenses`, `expense_tags`, `telemetry`, `device_tokens` |
 | RLS policies | Row-level security enforcing group membership and role-based access |
 | RPC functions | `accept_invite` (auto-creates/re-links participant), `transfer_ownership`, `leave_group`, `kick_member`, `create_invite`, etc. |
-| Edge Functions | `invite-redirect` (deep link redirect), `telemetry` (anonymous event collection) |
+| Edge Functions | `invite-redirect` (deep link redirect), `telemetry` (anonymous event collection), `send-notification` (FCM push) |
+| DB triggers | `notify_group_activity` on `expenses` (INSERT/UPDATE) and `group_members` (INSERT) — sends push notifications via `pg_net` |
 | Auth | Email/password, magic link, Google OAuth, GitHub OAuth |
 
 ## Data Sync Architecture
@@ -181,3 +182,50 @@ The backend is entirely managed through Supabase. Database schema, RLS policies,
                      │  - Periodic refresh (5 min)            │
                      └────────────────────────────────────────┘
 ```
+
+## Push Notification Architecture
+
+Push notifications alert group members when someone else creates/edits an expense or joins the group. Uses Firebase Cloud Messaging (FCM) on all platforms (Android, iOS, Web/PWA).
+
+### Flow
+
+```
+User A writes expense → Supabase Postgres
+  ↓ AFTER trigger (notify_group_activity)
+  ↓ pg_net async HTTP POST
+send-notification Edge Function
+  ↓ queries group_members + device_tokens (excluding actor)
+  ↓ FCM HTTP v1 API
+Firebase Cloud Messaging → push to User B's devices
+```
+
+### Components
+
+| Component | File | Role |
+|-----------|------|------|
+| `NotificationService` | `lib/core/services/notification_service.dart` | Riverpod `keepAlive` provider — FCM init, permission request, token management, foreground/background/tap handling |
+| Background handler | `lib/core/services/notification_service.dart` (top-level) | `firebaseMessagingBackgroundHandler` — required by FCM for background messages on mobile |
+| Firebase init | `lib/main.dart` | `Firebase.initializeApp()` + background handler registration |
+| Auth integration | `lib/app.dart` | `ref.listen(isAuthenticatedProvider)` — registers token on sign-in, unregisters on sign-out |
+| Service worker | `web/firebase-messaging-sw.js` | Handles background push on web/PWA; shows notifications and handles click-to-navigate |
+| Firebase SDK | `web/index.html` | Firebase compat scripts + app initialization for web |
+| VAPID key | `lib/core/constants/supabase_config.dart` | `fcmVapidKey` from `--dart-define=FCM_VAPID_KEY` — required for web push token |
+| DB trigger | Supabase (Migration 6) | `notify_group_activity()` on `expenses` INSERT/UPDATE and `group_members` INSERT |
+| Edge function | Supabase `send-notification` | Queries recipients, builds notification, sends via FCM HTTP v1 API |
+| Device tokens | Supabase `device_tokens` table | Stores FCM tokens per user/device with platform (android/ios/web) |
+
+### Notification Events
+
+| Event | Trigger | Message |
+|-------|---------|---------|
+| New expense | `expenses` INSERT | "{actor} added '{title}' ({amount})" |
+| Edited expense | `expenses` UPDATE | "{actor} edited '{title}'" |
+| Member joined | `group_members` INSERT | "{actor} joined the group" |
+
+### Lifecycle
+
+1. **App start**: Firebase initialized in `main.dart`
+2. **Auth sign-in**: `app.dart` detects auth change → calls `NotificationService.initialize()` → requests permission → registers FCM token in `device_tokens`
+3. **Token refresh**: FCM fires `onTokenRefresh` → token updated in `device_tokens`
+4. **Auth sign-out**: `app.dart` detects auth change → calls `unregisterToken()` → deletes token from `device_tokens`
+5. **Notification tap**: Extracts `group_id` from data payload → navigates to group detail via GoRouter

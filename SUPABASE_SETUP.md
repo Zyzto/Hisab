@@ -15,6 +15,8 @@ This guide walks you through setting up the Supabase backend for Hisab from scra
    - [Migration 2: Row Level Security (RLS) Policies](#migration-2-row-level-security-rls-policies)
    - [Migration 3: RPC Functions](#migration-3-rpc-functions)
    - [Migration 4: Security Hardening](#migration-4-security-hardening)
+   - [Migration 5: Device Tokens (Push Notifications)](#migration-5-device-tokens-push-notifications)
+   - [Migration 6: Notification Triggers](#migration-6-notification-triggers)
 4. [Configure Authentication](#4-configure-authentication)
 5. [Deploy Edge Functions](#5-deploy-edge-functions)
 6. [Configure the Flutter App](#6-configure-the-flutter-app)
@@ -711,6 +713,156 @@ ALTER FUNCTION public.assign_participant(UUID, UUID, UUID) SET search_path = '';
 ALTER FUNCTION public.create_invite(UUID, TEXT, TEXT) SET search_path = '';
 ```
 
+### Migration 5: Device Tokens (Push Notifications)
+
+Creates the `device_tokens` table for storing FCM push notification tokens per user/device.
+
+```sql
+-- Device tokens table for FCM push notifications
+CREATE TABLE device_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  token TEXT NOT NULL,
+  platform TEXT NOT NULL CHECK (platform IN ('android', 'ios', 'web')),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX idx_device_tokens_unique ON device_tokens(user_id, token);
+CREATE INDEX idx_device_tokens_user ON device_tokens(user_id);
+
+-- Trigger to auto-update updated_at
+CREATE TRIGGER set_device_tokens_updated_at
+  BEFORE UPDATE ON device_tokens
+  FOR EACH ROW EXECUTE FUNCTION handle_updated_at();
+
+-- RLS: users can only manage their own tokens
+ALTER TABLE device_tokens ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own tokens"
+  ON device_tokens FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own tokens"
+  ON device_tokens FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own tokens"
+  ON device_tokens FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own tokens"
+  ON device_tokens FOR DELETE
+  USING (auth.uid() = user_id);
+```
+
+### Migration 6: Notification Triggers
+
+Enables the `pg_net` extension and creates database triggers that asynchronously call the `send-notification` edge function when expenses are created/updated or members join a group.
+
+**Prerequisites:**
+1. Deploy the `send-notification` edge function (see [Section 5](#5-deploy-edge-functions)).
+2. Store the service role key in Supabase Vault:
+   ```sql
+   -- Run this in the SQL Editor (replace with your actual service role key from Dashboard > Settings > API)
+   SELECT vault.create_secret('YOUR_SERVICE_ROLE_KEY_HERE', 'service_role_key');
+   ```
+
+```sql
+-- Enable pg_net extension for async HTTP calls from triggers
+CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
+
+-- Trigger function: sends a notification payload to the send-notification
+-- edge function via pg_net (async, fire-and-forget).
+-- IMPORTANT: Replace YOUR_SUPABASE_URL with your actual project URL.
+CREATE OR REPLACE FUNCTION notify_group_activity()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+  v_group_id UUID;
+  v_actor_id UUID;
+  v_action TEXT;
+  v_expense_title TEXT;
+  v_amount_cents INTEGER;
+  v_currency_code TEXT;
+  v_supabase_url TEXT := 'YOUR_SUPABASE_URL';
+  v_service_role_key TEXT;
+BEGIN
+  -- Get the service role key from vault
+  SELECT decrypted_secret INTO v_service_role_key
+  FROM vault.decrypted_secrets
+  WHERE name = 'service_role_key'
+  LIMIT 1;
+
+  -- If no service role key in vault, skip gracefully
+  IF v_service_role_key IS NULL THEN
+    RAISE LOG 'notify_group_activity: service_role_key not found in vault, skipping';
+    RETURN NEW;
+  END IF;
+
+  -- Determine action and extract fields based on trigger source
+  IF TG_TABLE_NAME = 'expenses' THEN
+    v_group_id := NEW.group_id;
+    v_actor_id := auth.uid();
+    v_expense_title := NEW.title;
+    v_amount_cents := NEW.amount_cents;
+    v_currency_code := NEW.currency_code;
+
+    IF TG_OP = 'INSERT' THEN
+      v_action := 'expense_created';
+    ELSIF TG_OP = 'UPDATE' THEN
+      v_action := 'expense_updated';
+    END IF;
+
+  ELSIF TG_TABLE_NAME = 'group_members' THEN
+    v_group_id := NEW.group_id;
+    v_actor_id := NEW.user_id;
+    v_action := 'member_joined';
+  END IF;
+
+  -- Skip if we couldn't determine the action or actor
+  IF v_action IS NULL OR v_actor_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  -- Fire-and-forget HTTP POST to the edge function via pg_net
+  PERFORM net.http_post(
+    url := v_supabase_url || '/functions/v1/send-notification',
+    body := jsonb_build_object(
+      'group_id', v_group_id,
+      'actor_user_id', v_actor_id,
+      'action', v_action,
+      'expense_title', v_expense_title,
+      'amount_cents', v_amount_cents,
+      'currency_code', v_currency_code
+    ),
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || v_service_role_key
+    )
+  );
+
+  RETURN NEW;
+END;
+$$;
+
+-- Notify on new or edited expenses
+CREATE TRIGGER notify_on_expense_change
+  AFTER INSERT OR UPDATE ON expenses
+  FOR EACH ROW
+  EXECUTE FUNCTION notify_group_activity();
+
+-- Notify when a new member joins a group
+CREATE TRIGGER notify_on_member_join
+  AFTER INSERT ON group_members
+  FOR EACH ROW
+  EXECUTE FUNCTION notify_group_activity();
+```
+
 ---
 
 ## 4. Configure Authentication
@@ -759,7 +911,7 @@ To control the redirect from the app (e.g. when Site URL is wrong), pass `--dart
 
 ## 5. Deploy Edge Functions
 
-Hisab uses two Supabase Edge Functions. Deploy them using the Supabase CLI or dashboard.
+Hisab uses three Supabase Edge Functions. Deploy them using the Supabase CLI or dashboard.
 
 ### invite-redirect
 
@@ -906,6 +1058,34 @@ supabase functions deploy telemetry --no-verify-jwt
 
 > **Note**: `--no-verify-jwt` allows anonymous telemetry without requiring authentication.
 
+### send-notification
+
+Sends FCM push notifications to group members when expenses are created/updated or new members join. Called by the database trigger (Migration 6) via `pg_net`.
+
+**Prerequisites:**
+1. Create a Firebase project and add apps for Android, iOS, and Web.
+2. Generate a service account key (Project Settings > Service accounts > Generate new private key).
+3. Set the following Supabase secrets:
+
+```bash
+supabase secrets set FCM_PROJECT_ID=your-firebase-project-id
+supabase secrets set FCM_SERVICE_ACCOUNT_KEY='{"type":"service_account",...}'
+```
+
+4. Store the Supabase service role key in Vault (for the database trigger):
+
+```sql
+-- Run in SQL Editor (replace with your actual service role key from Dashboard > Settings > API)
+SELECT vault.create_secret('YOUR_SERVICE_ROLE_KEY_HERE', 'service_role_key');
+```
+
+**Deploy with CLI**:
+```bash
+supabase functions deploy send-notification --no-verify-jwt
+```
+
+> **Note**: `--no-verify-jwt` is used because the function validates the service role key in the request header instead.
+
 ---
 
 ## 6. Configure the Flutter App
@@ -920,6 +1100,7 @@ The app uses `--dart-define` parameters for build-time configuration. No hardcod
 | `SUPABASE_ANON_KEY` | Your Supabase anon/public key | `eyJhbGci...` |
 | `INVITE_BASE_URL` | Optional. Custom domain for invite links (no extra hosting). See [Custom Domains](https://supabase.com/docs/guides/platform/custom-domains). | `https://invite.yourdomain.com` |
 | `SITE_URL` | Optional. Redirect URL for auth emails (magic link, sign-up confirmation). Stops verification links from using localhost. Must be in Supabase Redirect URLs. | `https://yourdomain.com` |
+| `FCM_VAPID_KEY` | Optional. VAPID key for FCM web push notifications. Get from Firebase Console > Project Settings > Cloud Messaging > Web Push certificates. | `BPm...` |
 
 ### Running the App
 
