@@ -202,7 +202,19 @@ GroupInvite _inviteFromRow(Map<String, dynamic> row) => GroupInvite(
   inviteeEmail: row['invitee_email'] as String?,
   role: row['role'] as String? ?? 'member',
   createdAt: _parseDateTime(row['created_at']),
-  expiresAt: _parseDateTime(row['expires_at']),
+  expiresAt: _parseDateTimeNullable(row['expires_at']),
+  createdBy: row['created_by'] as String?,
+  label: row['label'] as String?,
+  maxUses: (row['max_uses'] as num?)?.toInt(),
+  useCount: (row['use_count'] as num?)?.toInt() ?? 0,
+  isActive: _parseBool(row['is_active']),
+);
+
+InviteUsage _inviteUsageFromRow(Map<String, dynamic> row) => InviteUsage(
+  id: row['id'] as String,
+  inviteId: row['invite_id'] as String,
+  userId: row['user_id'] as String,
+  acceptedAt: _parseDateTime(row['accepted_at']),
 );
 
 String _nowIso() => DateTime.now().toUtc().toIso8601String();
@@ -1104,7 +1116,7 @@ class PowerSyncGroupInviteRepository implements IGroupInviteRepository {
       inviteeEmail: row['invitee_email'] as String?,
       role: row['role'] as String? ?? 'member',
       createdAt: _parseDateTime(row['created_at']),
-      expiresAt: _parseDateTime(row['expires_at']),
+      expiresAt: _parseDateTimeNullable(row['expires_at']),
     );
     final group = Group(
       id: row['group_id'] as String,
@@ -1121,21 +1133,52 @@ class PowerSyncGroupInviteRepository implements IGroupInviteRepository {
     String groupId, {
     String? inviteeEmail,
     String? role,
+    String? label,
+    int? maxUses,
+    Duration? expiresIn,
   }) async {
     final client = supabaseClient;
     if (client == null) {
       throw UnsupportedError('createInvite requires online mode');
     }
-    final result = await client.rpc(
-      'create_invite',
-      params: {
-        'p_group_id': groupId,
-        'p_invitee_email': inviteeEmail,
-        'p_role': role ?? 'member',
-      },
-    );
+    final effectiveRole = role ?? 'member';
+    final params = <String, dynamic>{
+      'p_group_id': groupId,
+      'p_invitee_email': inviteeEmail,
+      'p_role': effectiveRole,
+      'p_label': label,
+      'p_max_uses': maxUses,
+    };
+    // Convert Duration to PostgreSQL interval string, or null for never
+    if (expiresIn == null) {
+      params['p_expires_in'] = null;
+    } else {
+      final totalSeconds = expiresIn.inSeconds;
+      params['p_expires_in'] = '$totalSeconds seconds';
+    }
+    final result = await client.rpc('create_invite', params: params);
     final row = result is List ? result.first : result;
-    return (id: row['id'] as String, token: row['token'] as String);
+    final id = row['id'] as String;
+    final token = row['token'] as String;
+
+    // Insert into local DB so watchers update immediately
+    final now = _nowIso();
+    final expiresAtIso = expiresIn != null
+        ? DateTime.now().toUtc().add(expiresIn).toIso8601String()
+        : null;
+    final createdBy = client.auth.currentUser?.id;
+    await _db.execute(
+      '''INSERT OR REPLACE INTO group_invites
+        (id, group_id, token, invitee_email, role, created_at, expires_at,
+         created_by, label, max_uses, use_count, is_active)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1)''',
+      [
+        id, groupId, token, inviteeEmail, effectiveRole, now, expiresAtIso,
+        createdBy, label, maxUses,
+      ],
+    );
+
+    return (id: id, token: token);
   }
 
   @override
@@ -1176,6 +1219,52 @@ class PowerSyncGroupInviteRepository implements IGroupInviteRepository {
 
   @override
   Future<void> revoke(String inviteId) async {
-    await _db.execute('DELETE FROM group_invites WHERE id = ?', [inviteId]);
+    final client = supabaseClient;
+    if (client != null) {
+      await client.rpc('revoke_invite', params: {'p_invite_id': inviteId});
+    }
+    // Always update local DB so watchers fire immediately
+    await _db.execute(
+      'UPDATE group_invites SET is_active = 0 WHERE id = ?',
+      [inviteId],
+    );
+  }
+
+  @override
+  Future<void> toggleActive(String inviteId, bool active) async {
+    final client = supabaseClient;
+    if (client != null) {
+      await client.rpc('toggle_invite_active', params: {
+        'p_invite_id': inviteId,
+        'p_active': active,
+      });
+    }
+    // Always update local DB so watchers fire immediately
+    await _db.execute(
+      'UPDATE group_invites SET is_active = ? WHERE id = ?',
+      [active ? 1 : 0, inviteId],
+    );
+  }
+
+  @override
+  Future<List<InviteUsage>> listUsages(String inviteId) async {
+    final rows = await _db.getAll(
+      'SELECT * FROM invite_usages WHERE invite_id = ? ORDER BY accepted_at DESC',
+      [inviteId],
+    );
+    return rows.map(_inviteUsageFromRow).toList();
+  }
+
+  @override
+  Stream<List<InviteUsage>> watchUsages(String inviteId) {
+    if (kIsWeb) {
+      return _pollStream(() => listUsages(inviteId));
+    }
+    return _db
+        .watch(
+          'SELECT * FROM invite_usages WHERE invite_id = ? ORDER BY accepted_at DESC',
+          parameters: [inviteId],
+        )
+        .map((rows) => rows.map(_inviteUsageFromRow).toList());
   }
 }

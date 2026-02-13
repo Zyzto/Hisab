@@ -176,6 +176,7 @@ class DataSyncService extends _$DataSyncService {
       await db.execute('DELETE FROM expenses');
       await db.execute('DELETE FROM expense_tags');
       await db.execute('DELETE FROM group_invites');
+      await db.execute('DELETE FROM invite_usages');
       return;
     }
 
@@ -205,6 +206,17 @@ class DataSyncService extends _$DataSyncService {
         .select()
         .inFilter('group_id', groupIds);
 
+    // Collect invite IDs to fetch usages
+    final inviteIds = invites
+        .map<String>((r) => r['id'] as String)
+        .toList();
+    final List<dynamic> inviteUsages = inviteIds.isNotEmpty
+        ? await client
+            .from('invite_usages')
+            .select()
+            .inFilter('invite_id', inviteIds)
+        : [];
+
     // Write to local DB in a batch
     await db.writeTransaction((tx) async {
       // Clear existing data for these groups
@@ -215,6 +227,8 @@ class DataSyncService extends _$DataSyncService {
         await tx.execute('DELETE FROM expense_tags WHERE group_id = ?', [gid]);
         await tx.execute('DELETE FROM group_invites WHERE group_id = ?', [gid]);
       }
+      // Clear invite usages for these invites (cascade via group)
+      await tx.execute('DELETE FROM invite_usages');
       // Remove groups that are in our set, plus any local groups no longer in the set
       await tx.execute('DELETE FROM groups');
 
@@ -318,7 +332,9 @@ class DataSyncService extends _$DataSyncService {
       }
       for (final inv in invites) {
         await tx.execute(
-          'INSERT INTO group_invites (id, group_id, token, invitee_email, role, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          '''INSERT INTO group_invites (id, group_id, token, invitee_email, role,
+            created_at, expires_at, created_by, label, max_uses, use_count, is_active)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
           [
             inv['id'],
             inv['group_id'],
@@ -327,6 +343,22 @@ class DataSyncService extends _$DataSyncService {
             inv['role'],
             inv['created_at'],
             inv['expires_at'],
+            inv['created_by'],
+            inv['label'],
+            inv['max_uses'],
+            inv['use_count'] ?? 0,
+            inv['is_active'] == true ? 1 : 0,
+          ],
+        );
+      }
+      for (final usage in inviteUsages) {
+        await tx.execute(
+          'INSERT INTO invite_usages (id, invite_id, user_id, accepted_at) VALUES (?, ?, ?, ?)',
+          [
+            usage['id'],
+            usage['invite_id'],
+            usage['user_id'],
+            usage['accepted_at'],
           ],
         );
       }

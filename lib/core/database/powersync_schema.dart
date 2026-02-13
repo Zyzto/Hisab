@@ -69,6 +69,16 @@ const schema = Schema([
     Column.text('role'),
     Column.text('created_at'),
     Column.text('expires_at'),
+    Column.text('created_by'),
+    Column.text('label'),
+    Column.integer('max_uses'),
+    Column.integer('use_count'),
+    Column.integer('is_active'),
+  ]),
+  Table('invite_usages', [
+    Column.text('invite_id'),
+    Column.text('user_id'),
+    Column.text('accepted_at'),
   ]),
 
   // ── Offline queue ────────────────────────────────────────────────────

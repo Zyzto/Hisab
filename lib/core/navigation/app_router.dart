@@ -11,6 +11,7 @@ import '../../features/groups/pages/group_create_page.dart';
 import '../../features/groups/pages/group_detail_page.dart';
 import '../../features/groups/pages/group_settings_page.dart';
 import '../../features/groups/pages/invite_accept_page.dart';
+import '../../features/groups/pages/invite_management_page.dart';
 import '../../features/expenses/pages/expense_form_page.dart';
 import '../../features/expenses/pages/expense_detail_page.dart';
 import '../../features/settings/widgets/privacy_policy_page.dart';
@@ -114,6 +115,13 @@ GoRouter router(Ref ref) {
         builder: (context, state) {
           final groupId = state.pathParameters['id'] ?? '';
           return GroupSettingsPage(groupId: groupId);
+        },
+      ),
+      GoRoute(
+        path: '/groups/:id/invites',
+        builder: (context, state) {
+          final groupId = state.pathParameters['id'] ?? '';
+          return InviteManagementPage(groupId: groupId);
         },
       ),
       GoRoute(

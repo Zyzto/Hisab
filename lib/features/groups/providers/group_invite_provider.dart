@@ -16,3 +16,8 @@ Future<({GroupInvite invite, Group group})?> inviteByToken(
 Stream<List<GroupInvite>> invitesByGroup(Ref ref, String groupId) {
   return ref.watch(groupInviteRepositoryProvider).watchByGroup(groupId);
 }
+
+@riverpod
+Stream<List<InviteUsage>> inviteUsages(Ref ref, String inviteId) {
+  return ref.watch(groupInviteRepositoryProvider).watchUsages(inviteId);
+}
