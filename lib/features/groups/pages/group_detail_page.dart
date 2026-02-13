@@ -7,7 +7,6 @@ import '../providers/groups_provider.dart';
 import '../providers/group_member_provider.dart';
 import '../widgets/segmented_tab_bar.dart';
 import '../widgets/invite_link_sheet.dart';
-import '../../../core/database/database_providers.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -16,7 +15,9 @@ import '../../expenses/widgets/expense_list_tile.dart';
 import '../../expenses/category_icons.dart';
 import '../../balance/widgets/balance_list.dart';
 import '../../settings/providers/settings_framework_providers.dart';
+import '../../../core/auth/predefined_avatars.dart';
 import '../../../domain/domain.dart';
+import '../utils/group_icon_utils.dart';
 
 class GroupDetailPage extends ConsumerWidget {
   final String groupId;
@@ -89,21 +90,31 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
 
   Widget _buildAppBarTitle(BuildContext context) {
     final theme = Theme.of(context);
+    final groupColor = widget.group.color != null
+        ? Color(widget.group.color!)
+        : theme.colorScheme.surfaceContainerHighest;
+    final iconData = groupIconFromKey(widget.group.icon);
+    final hasCustomColor = widget.group.color != null;
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         CircleAvatar(
           radius: 18,
-          backgroundColor: theme.colorScheme.surfaceContainerHighest,
-          child: Text(
-            widget.group.name.isNotEmpty
-                ? widget.group.name[0].toUpperCase()
-                : '?',
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: theme.colorScheme.onSurface,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          backgroundColor: groupColor,
+          child: iconData != null
+              ? Icon(iconData, size: 20, color: Colors.white)
+              : Text(
+                  widget.group.name.isNotEmpty
+                      ? widget.group.name[0].toUpperCase()
+                      : '?',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: hasCustomColor
+                        ? Colors.white
+                        : theme.colorScheme.onSurface,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
         ),
         const SizedBox(width: 10),
         Flexible(
@@ -422,17 +433,12 @@ class _PeopleTab extends ConsumerWidget {
     final myRoleAsync = localOnly
         ? const AsyncValue.data(null)
         : ref.watch(myRoleInGroupProvider(groupId));
-    final myMemberAsync = localOnly
-        ? const AsyncValue<GroupMember?>.data(null)
-        : ref.watch(myMemberInGroupProvider(groupId));
-
     return participantsAsync.when(
       data: (participants) {
         return membersAsync.when(
           data: (members) {
             final theme = Theme.of(context);
             final myRole = myRoleAsync.value;
-            final myMember = myMemberAsync.value;
             final isOwnerOrAdmin = localOnly ||
                 myRole == GroupRole.owner ||
                 myRole == GroupRole.admin;
@@ -454,10 +460,7 @@ class _PeopleTab extends ConsumerWidget {
               );
             }
 
-            return Column(
-              children: [
-                Expanded(
-                  child: ListView.builder(
+            return ListView.builder(
                     padding: const EdgeInsets.symmetric(
                       vertical: 8,
                       horizontal: 16,
@@ -470,22 +473,34 @@ class _PeopleTab extends ConsumerWidget {
                       final isActive = linkedMember != null;
                       final isLeft = hasUserId && !isActive;
 
+                      final emoji = avatarEmoji(p.avatarId);
+
                       return ListTile(
                         key: ValueKey(p.id),
                         leading: CircleAvatar(
                           backgroundColor: isLeft
                               ? theme.colorScheme.surfaceContainerHighest
                               : null,
-                          child: Text(
-                            p.name.isNotEmpty
-                                ? p.name[0].toUpperCase()
-                                : '?',
-                            style: isLeft
-                                ? TextStyle(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  )
-                                : null,
-                          ),
+                          child: emoji != null
+                              ? Text(
+                                  emoji,
+                                  style: TextStyle(
+                                    fontSize: 22,
+                                    color: isLeft
+                                        ? theme.colorScheme.onSurfaceVariant
+                                        : null,
+                                  ),
+                                )
+                              : Text(
+                                  p.name.isNotEmpty
+                                      ? p.name[0].toUpperCase()
+                                      : '?',
+                                  style: isLeft
+                                      ? TextStyle(
+                                          color: theme.colorScheme.onSurfaceVariant,
+                                        )
+                                      : null,
+                                ),
                         ),
                         title: Text(
                           p.name,
@@ -518,22 +533,7 @@ class _PeopleTab extends ConsumerWidget {
                         ),
                       );
                     },
-                  ),
-                ),
-                if (!localOnly && myMember != null)
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () => _showLeaveGroup(context, ref),
-                        icon: const Icon(Icons.exit_to_app),
-                        label: Text('leave_group'.tr()),
-                      ),
-                    ),
-                  ),
-              ],
-            );
+                  );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(child: Text('Error: $e')),
@@ -821,42 +821,6 @@ class _PeopleTab extends ConsumerWidget {
     }
   }
 
-  Future<void> _showLeaveGroup(BuildContext context, WidgetRef ref) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('leave_group'.tr()),
-        content: Text('leave_group_confirm'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('leave_group'.tr()),
-          ),
-        ],
-      ),
-    );
-    if (ok == true && context.mounted) {
-      try {
-        await ref.read(groupMemberRepositoryProvider).leave(groupId);
-        // Trigger immediate sync so the groups list reflects the change
-        ref
-            .read(dataSyncServiceProvider.notifier)
-            .syncNow();
-        if (context.mounted) context.go(RoutePaths.home);
-      } catch (e, st) {
-        Log.warning('Leave failed', error: e, stackTrace: st);
-        if (context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('$e')));
-        }
-      }
-    }
-  }
 }
 
 /// Sealed-like item types for virtualized expense list.
