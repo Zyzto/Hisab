@@ -55,13 +55,15 @@ jobs:
 
       # Write key.properties so build.gradle.kts picks it up.
       - name: Create key.properties
+        env:
+          STORE_FILE: ${{ github.workspace }}/android/app/release-keystore.jks
+          STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS_VAL: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD_VAL: ${{ secrets.KEY_PASSWORD }}
         run: |
-          cat > android/key.properties <<EOF
-          storeFile=${{ github.workspace }}/android/app/release-keystore.jks
-          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          EOF
+          printf 'storeFile=%s\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "$STORE_FILE" "$STORE_PASSWORD" "$KEY_ALIAS_VAL" "$KEY_PASSWORD_VAL" \
+            > android/key.properties
 
       - name: Flutter pub get
         run: flutter pub get
