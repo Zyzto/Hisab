@@ -20,6 +20,9 @@ migrate_working_dir/
 #.vscode/  # Uncomment to ignore; launch configs are often shared
 .cursor/
 
+# Pub dependency overrides (local dev paths)
+pubspec_overrides.yaml
+
 # Flutter / Dart
 **/doc/api/
 **/ios/Flutter/.last_build_id
