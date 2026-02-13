@@ -28,15 +28,28 @@ class AuthService {
     }
   }
 
-  Future<AuthResponse> signUpWithEmail(String email, String password) async {
+  Future<AuthResponse> signUpWithEmail(
+    String email,
+    String password, {
+    String? name,
+    String? avatarId,
+  }) async {
     Log.debug('Signing up with email');
     try {
+      final data = <String, dynamic>{};
+      if (name != null && name.trim().isNotEmpty) {
+        data['full_name'] = name.trim();
+      }
+      if (avatarId != null && avatarId.isNotEmpty) {
+        data['avatar_id'] = avatarId;
+      }
       final response = await _client.auth.signUp(
         email: email,
         password: password,
         emailRedirectTo: authRedirectUrl.trim().isNotEmpty
             ? authRedirectUrl.trim()
             : null,
+        data: data.isNotEmpty ? data : null,
       );
       Log.info('User signed up with email');
       return response;
@@ -44,6 +57,21 @@ class AuthService {
       Log.error('Email sign-up failed', error: e, stackTrace: st);
       rethrow;
     }
+  }
+
+  /// Update the current user's profile (name and/or avatar). Persists to Supabase user_metadata.
+  Future<void> updateProfile({String? name, String? avatarId}) async {
+    final user = currentUser;
+    if (user == null) return;
+    final existing = Map<String, dynamic>.from(user.userMetadata ?? {});
+    if (name != null) {
+      existing['full_name'] = name.trim().isEmpty ? null : name.trim();
+    }
+    if (avatarId != null) {
+      existing['avatar_id'] = avatarId.isEmpty ? null : avatarId;
+    }
+    await _client.auth.updateUser(UserAttributes(data: existing));
+    Log.info('Profile updated');
   }
 
   /// Resend the confirmation email for an unconfirmed account.
@@ -141,6 +169,7 @@ class AuthService {
           user.userMetadata?['name'] as String?,
       email: user.email,
       sub: user.id,
+      avatarId: user.userMetadata?['avatar_id'] as String?,
     );
   }
 }
