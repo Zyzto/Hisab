@@ -14,9 +14,7 @@ class Group {
   final String? settlementSnapshotJson;
   final String? ownerId;
   final bool allowMemberAddExpense;
-  final bool allowMemberAddParticipant;
   final bool allowMemberChangeSettings;
-  final bool requireParticipantAssignment;
 
   const Group({
     required this.id,
@@ -30,9 +28,7 @@ class Group {
     this.settlementSnapshotJson,
     this.ownerId,
     this.allowMemberAddExpense = true,
-    this.allowMemberAddParticipant = true,
     this.allowMemberChangeSettings = true,
-    this.requireParticipantAssignment = false,
   });
 
   bool get isSettlementFrozen => settlementFreezeAt != null;
@@ -49,9 +45,7 @@ class Group {
     String? settlementSnapshotJson,
     String? ownerId,
     bool? allowMemberAddExpense,
-    bool? allowMemberAddParticipant,
     bool? allowMemberChangeSettings,
-    bool? requireParticipantAssignment,
   }) {
     return Group(
       id: id ?? this.id,
@@ -68,12 +62,8 @@ class Group {
       ownerId: ownerId ?? this.ownerId,
       allowMemberAddExpense:
           allowMemberAddExpense ?? this.allowMemberAddExpense,
-      allowMemberAddParticipant:
-          allowMemberAddParticipant ?? this.allowMemberAddParticipant,
       allowMemberChangeSettings:
           allowMemberChangeSettings ?? this.allowMemberChangeSettings,
-      requireParticipantAssignment:
-          requireParticipantAssignment ?? this.requireParticipantAssignment,
     );
   }
 
@@ -90,8 +80,6 @@ class Group {
     settlementSnapshotJson: null,
     ownerId: ownerId,
     allowMemberAddExpense: allowMemberAddExpense,
-    allowMemberAddParticipant: allowMemberAddParticipant,
     allowMemberChangeSettings: allowMemberChangeSettings,
-    requireParticipantAssignment: requireParticipantAssignment,
   );
 }

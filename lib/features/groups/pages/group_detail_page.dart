@@ -66,7 +66,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _tabIndexNotifier = ValueNotifier<int>(0);
   }
 
@@ -129,8 +129,6 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
     final isOwnerOrAdmin =
         localOnly || myRole == GroupRole.owner || myRole == GroupRole.admin;
     final canAddExpense = isOwnerOrAdmin || widget.group.allowMemberAddExpense;
-    final canAddParticipant =
-        isOwnerOrAdmin || widget.group.allowMemberAddParticipant;
 
     if (index == 0) {
       if (widget.group.isSettlementFrozen || !canAddExpense) return null;
@@ -142,7 +140,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
       );
     }
     if (index == 2) {
-      if (!canAddParticipant) return null;
+      if (!isOwnerOrAdmin) return null;
       return _FABWithLabel(
         icon: Icons.person_add,
         label: 'add_participant'.tr(),
@@ -208,8 +206,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
             labels: [
               'expenses'.tr(),
               'balance'.tr(),
-              'participants'.tr(),
-              'members'.tr(),
+              'people'.tr(),
             ],
             currentIndexNotifier: _tabIndexNotifier,
           ),
@@ -219,8 +216,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
               children: [
                 _ExpensesTab(groupId: widget.group.id, group: widget.group),
                 _BalanceTab(groupId: widget.group.id),
-                _ParticipantsTab(groupId: widget.group.id),
-                _MembersTab(groupId: widget.group.id, group: widget.group),
+                _PeopleTab(groupId: widget.group.id, group: widget.group),
               ],
             ),
           ),
@@ -398,49 +394,11 @@ class _BalanceTab extends ConsumerWidget {
   }
 }
 
-class _ParticipantsTab extends ConsumerWidget {
-  final String groupId;
-
-  const _ParticipantsTab({required this.groupId});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final participantsAsync = ref.watch(participantsByGroupProvider(groupId));
-    return AsyncValueBuilder<List<Participant>>(
-      value: participantsAsync,
-      data: (context, participants) {
-        if (participants.isEmpty) {
-          return Center(
-            child: Text(
-              'add_participants_first'.tr(),
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
-          );
-        }
-        return ListView.builder(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-          itemCount: participants.length,
-          itemBuilder: (context, index) {
-            final p = participants[index];
-            return ListTile(
-              key: ValueKey(p.id),
-              leading: CircleAvatar(
-                child: Text(p.name.isNotEmpty ? p.name[0].toUpperCase() : '?'),
-              ),
-              title: Text(p.name),
-            );
-          },
-        );
-      },
-    );
-  }
-}
-
-class _MembersTab extends ConsumerWidget {
+class _PeopleTab extends ConsumerWidget {
   final String groupId;
   final Group group;
 
-  const _MembersTab({required this.groupId, required this.group});
+  const _PeopleTab({required this.groupId, required this.group});
 
   String _roleLabel(String role) {
     switch (role) {
@@ -456,109 +414,112 @@ class _MembersTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final localOnly = ref.watch(effectiveLocalOnlyProvider);
-    if (localOnly) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            'invite_requires_online'.tr(),
-            style: Theme.of(context).textTheme.bodyLarge,
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    }
-
-    final membersAsync = ref.watch(membersByGroupProvider(groupId));
     final participantsAsync = ref.watch(participantsByGroupProvider(groupId));
-    final myRoleAsync = ref.watch(myRoleInGroupProvider(groupId));
-    final myMemberAsync = ref.watch(myMemberInGroupProvider(groupId));
+    final membersAsync = localOnly
+        ? const AsyncValue<List<GroupMember>>.data([])
+        : ref.watch(membersByGroupProvider(groupId));
+    final myRoleAsync = localOnly
+        ? const AsyncValue.data(null)
+        : ref.watch(myRoleInGroupProvider(groupId));
+    final myMemberAsync = localOnly
+        ? const AsyncValue<GroupMember?>.data(null)
+        : ref.watch(myMemberInGroupProvider(groupId));
 
-    return membersAsync.when(
-      data: (members) {
-        return participantsAsync.when(
-          data: (participants) {
-            final participantMap = {for (final p in participants) p.id: p.name};
-            final myMember = myMemberAsync.value;
+    return participantsAsync.when(
+      data: (participants) {
+        return membersAsync.when(
+          data: (members) {
+            final theme = Theme.of(context);
             final myRole = myRoleAsync.value;
-            final isOwnerOrAdmin =
-                myRole == GroupRole.owner || myRole == GroupRole.admin;
+            final myMember = myMemberAsync.value;
+            final isOwnerOrAdmin = localOnly ||
+                myRole == GroupRole.owner ||
+                myRole == GroupRole.admin;
+
+            // Build lookup: participantId -> GroupMember
+            final memberByParticipantId = <String, GroupMember>{};
+            for (final m in members) {
+              if (m.participantId != null) {
+                memberByParticipantId[m.participantId!] = m;
+              }
+            }
+
+            if (participants.isEmpty) {
+              return Center(
+                child: Text(
+                  'add_participants_first'.tr(),
+                  style: theme.textTheme.bodyLarge,
+                ),
+              );
+            }
 
             return Column(
               children: [
                 Expanded(
-                  child: members.isEmpty
-                      ? Center(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 8,
+                      horizontal: 16,
+                    ),
+                    itemCount: participants.length,
+                    itemBuilder: (context, index) {
+                      final p = participants[index];
+                      final linkedMember = memberByParticipantId[p.id];
+                      final hasUserId = p.userId != null;
+                      final isActive = linkedMember != null;
+                      final isLeft = hasUserId && !isActive;
+
+                      return ListTile(
+                        key: ValueKey(p.id),
+                        leading: CircleAvatar(
+                          backgroundColor: isLeft
+                              ? theme.colorScheme.surfaceContainerHighest
+                              : null,
                           child: Text(
-                            'add_participants_first'.tr(),
-                            style: Theme.of(context).textTheme.bodyLarge,
+                            p.name.isNotEmpty
+                                ? p.name[0].toUpperCase()
+                                : '?',
+                            style: isLeft
+                                ? TextStyle(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  )
+                                : null,
                           ),
-                        )
-                      : ListView.builder(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 8,
-                            horizontal: 16,
-                          ),
-                          itemCount: members.length,
-                          itemBuilder: (context, index) {
-                            final m = members[index];
-                            final participantName = m.participantId != null
-                                ? participantMap[m.participantId]
-                                : null;
-                            return ListTile(
-                              key: ValueKey(m.id),
-                              leading: CircleAvatar(
-                                child: Text(
-                                  (participantName ?? m.userId)
-                                      .substring(0, 1)
-                                      .toUpperCase(),
-                                ),
-                              ),
-                              title: Text(
-                                participantName ??
-                                    '${m.userId.substring(0, 8)}...',
-                              ),
-                              subtitle: Text(_roleLabel(m.role)),
-                              trailing: (isOwnerOrAdmin && m.role != 'owner')
-                                  ? PopupMenuButton<String>(
-                                      onSelected: (v) => _onMemberAction(
-                                        context,
-                                        ref,
-                                        v,
-                                        m,
-                                        participants,
-                                      ),
-                                      itemBuilder: (ctx) => [
-                                        if (myRole == GroupRole.owner) ...[
-                                          PopupMenuItem(
-                                            value: 'assign',
-                                            child: Text(
-                                              'assign_participant'.tr(),
-                                            ),
-                                          ),
-                                          PopupMenuItem(
-                                            value: 'role',
-                                            child: Text('change_role'.tr()),
-                                          ),
-                                          PopupMenuItem(
-                                            value: 'transfer',
-                                            child: Text(
-                                              'transfer_ownership'.tr(),
-                                            ),
-                                          ),
-                                        ],
-                                        PopupMenuItem(
-                                          value: 'kick',
-                                          child: Text('kick_member'.tr()),
-                                        ),
-                                      ],
-                                    )
-                                  : null,
-                            );
-                          },
                         ),
+                        title: Text(
+                          p.name,
+                          style: isLeft
+                              ? TextStyle(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                )
+                              : null,
+                        ),
+                        subtitle: isActive
+                            ? Text(_roleLabel(linkedMember.role))
+                            : isLeft
+                                ? Text(
+                                    'left'.tr(),
+                                    style: TextStyle(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  )
+                                : null,
+                        trailing: _buildTrailing(
+                          context,
+                          ref,
+                          p,
+                          linkedMember,
+                          isActive,
+                          isLeft,
+                          isOwnerOrAdmin,
+                          myRole,
+                        ),
+                      );
+                    },
+                  ),
                 ),
-                if (myMember != null)
+                if (!localOnly && myMember != null)
                   Padding(
                     padding: const EdgeInsets.all(16),
                     child: SizedBox(
@@ -582,17 +543,49 @@ class _MembersTab extends ConsumerWidget {
     );
   }
 
+  Widget? _buildTrailing(
+    BuildContext context,
+    WidgetRef ref,
+    Participant participant,
+    GroupMember? linkedMember,
+    bool isActive,
+    bool isLeft,
+    bool isOwnerOrAdmin,
+    GroupRole? myRole,
+  ) {
+    // Active member with actions
+    if (isActive && isOwnerOrAdmin && linkedMember!.role != 'owner') {
+      return PopupMenuButton<String>(
+        onSelected: (v) =>
+            _onMemberAction(context, ref, v, linkedMember),
+        itemBuilder: (ctx) => [
+          if (myRole == GroupRole.owner) ...[
+            PopupMenuItem(
+              value: 'role',
+              child: Text('change_role'.tr()),
+            ),
+            PopupMenuItem(
+              value: 'transfer',
+              child: Text('transfer_ownership'.tr()),
+            ),
+          ],
+          PopupMenuItem(
+            value: 'kick',
+            child: Text('kick_member'.tr()),
+          ),
+        ],
+      );
+    }
+    return null;
+  }
+
   Future<void> _onMemberAction(
     BuildContext context,
     WidgetRef ref,
     String action,
     GroupMember member,
-    List<Participant> participants,
   ) async {
     switch (action) {
-      case 'assign':
-        await _showAssignParticipant(context, ref, member, participants);
-        break;
       case 'role':
         await _showChangeRole(context, ref, member);
         break;
@@ -602,49 +595,6 @@ class _MembersTab extends ConsumerWidget {
       case 'kick':
         await _showKickMember(context, ref, member);
         break;
-    }
-  }
-
-  Future<void> _showAssignParticipant(
-    BuildContext context,
-    WidgetRef ref,
-    GroupMember member,
-    List<Participant> participants,
-  ) async {
-    final chosen = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('assign_participant'.tr()),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: participants.length,
-            itemBuilder: (_, i) {
-              final p = participants[i];
-              return ListTile(
-                title: Text(p.name),
-                onTap: () => Navigator.pop(ctx, p.id),
-              );
-            },
-          ),
-        ),
-      ),
-    );
-    if (chosen != null && context.mounted) {
-      try {
-        await ref
-            .read(groupMemberRepositoryProvider)
-            .assignParticipant(groupId, member.id, chosen);
-        ref.invalidate(membersByGroupProvider(groupId));
-      } catch (e, st) {
-        Log.warning('Assign participant failed', error: e, stackTrace: st);
-        if (context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('$e')));
-        }
-      }
     }
   }
 
@@ -744,6 +694,7 @@ class _MembersTab extends ConsumerWidget {
             .read(groupMemberRepositoryProvider)
             .kickMember(groupId, member.id);
         ref.invalidate(membersByGroupProvider(groupId));
+        ref.invalidate(participantsByGroupProvider(groupId));
       } catch (e, st) {
         Log.warning('Kick failed', error: e, stackTrace: st);
         if (context.mounted) {

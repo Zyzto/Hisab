@@ -9,9 +9,4 @@ abstract class IGroupMemberRepository {
   Future<void> leave(String groupId);
   Future<void> updateRole(String groupId, String memberId, GroupRole role);
   Future<void> transferOwnership(String groupId, String newOwnerMemberId);
-  Future<void> assignParticipant(
-    String groupId,
-    String memberId,
-    String participantId,
-  );
 }

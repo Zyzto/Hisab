@@ -1,3 +1,4 @@
+import 'package:currency_picker/currency_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
@@ -10,6 +11,7 @@ import '../../../core/navigation/route_paths.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/services/settle_up_service.dart';
 import '../../../core/telemetry/telemetry_service.dart';
+import '../../../core/utils/currency_helpers.dart';
 import '../../../domain/domain.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 
@@ -70,6 +72,8 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              _buildCurrencySection(context, group, expensesAsync, ref),
+              const SizedBox(height: 24),
               _buildSettlementMethodSection(context, group, ref),
               const SizedBox(height: 24),
               if (group.settlementMethod == SettlementMethod.treasurer)
@@ -96,6 +100,131 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
         appBar: AppBar(title: Text('settlement_settings'.tr())),
         body: Center(child: Text('Error: $e')),
       ),
+    );
+  }
+
+  Widget _buildCurrencySection(
+    BuildContext context,
+    Group group,
+    AsyncValue<List<Expense>> expensesAsync,
+    WidgetRef ref,
+  ) {
+    final theme = Theme.of(context);
+    final currency = CurrencyHelpers.fromCode(group.currencyCode);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'group_currency'.tr(),
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: _saving
+              ? null
+              : () => _onCurrencyTap(group, expensesAsync, ref),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              border: Border.all(color: theme.colorScheme.outline),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                if (currency != null) ...[
+                  Text(
+                    CurrencyUtils.currencyToEmoji(currency),
+                    style: const TextStyle(fontSize: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      CurrencyHelpers.displayLabel(currency),
+                      style: theme.textTheme.bodyLarge,
+                    ),
+                  ),
+                ] else ...[
+                  Expanded(
+                    child: Text(
+                      group.currencyCode,
+                      style: theme.textTheme.bodyLarge,
+                    ),
+                  ),
+                ],
+                Icon(
+                  Icons.arrow_drop_down,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _onCurrencyTap(
+    Group group,
+    AsyncValue<List<Expense>> expensesAsync,
+    WidgetRef ref,
+  ) async {
+    showCurrencyPicker(
+      context: context,
+      favorite: CurrencyHelpers.favoriteCurrencies,
+      showFlag: true,
+      showSearchField: true,
+      showCurrencyName: true,
+      showCurrencyCode: true,
+      onSelect: (Currency currency) async {
+        if (currency.code == group.currencyCode) return;
+
+        // Warn if expenses exist
+        final expenses = expensesAsync.value;
+        if (expenses != null && expenses.isNotEmpty) {
+          final ok = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: Text('change_currency'.tr()),
+              content: Text('currency_change_warning'.tr()),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: Text('cancel'.tr()),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: Text('change_currency'.tr()),
+                ),
+              ],
+            ),
+          );
+          if (ok != true || !mounted) return;
+        }
+
+        setState(() => _saving = true);
+        try {
+          await ref
+              .read(groupRepositoryProvider)
+              .update(
+                group.copyWith(
+                  currencyCode: currency.code,
+                  updatedAt: DateTime.now(),
+                ),
+              );
+          Log.info(
+            'Currency changed: groupId=${widget.groupId} currency=${currency.code}',
+          );
+          ref.invalidate(futureGroupProvider(widget.groupId));
+        } catch (e, st) {
+          Log.warning('Currency change failed', error: e, stackTrace: st);
+        } finally {
+          if (mounted) setState(() => _saving = false);
+        }
+      },
     );
   }
 
@@ -405,17 +534,6 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                       ),
               ),
               SwitchListTile(
-                title: Text('allow_add_participant'.tr()),
-                value: group.allowMemberAddParticipant,
-                onChanged: _saving
-                    ? null
-                    : (v) => _onPermissionChanged(
-                        ref,
-                        group,
-                        allowMemberAddParticipant: v,
-                      ),
-              ),
-              SwitchListTile(
                 title: Text('allow_change_settings'.tr()),
                 value: group.allowMemberChangeSettings,
                 onChanged: _saving
@@ -424,18 +542,6 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                         ref,
                         group,
                         allowMemberChangeSettings: v,
-                      ),
-              ),
-              SwitchListTile(
-                title: Text('require_participant_assignment'.tr()),
-                subtitle: Text('require_participant_assignment_desc'.tr()),
-                value: group.requireParticipantAssignment,
-                onChanged: _saving
-                    ? null
-                    : (v) => _onPermissionChanged(
-                        ref,
-                        group,
-                        requireParticipantAssignment: v,
                       ),
               ),
               const SizedBox(height: 24),
@@ -491,9 +597,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     WidgetRef ref,
     Group group, {
     bool? allowMemberAddExpense,
-    bool? allowMemberAddParticipant,
     bool? allowMemberChangeSettings,
-    bool? requireParticipantAssignment,
   }) async {
     setState(() => _saving = true);
     try {
@@ -503,13 +607,8 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
             group.copyWith(
               allowMemberAddExpense:
                   allowMemberAddExpense ?? group.allowMemberAddExpense,
-              allowMemberAddParticipant:
-                  allowMemberAddParticipant ?? group.allowMemberAddParticipant,
               allowMemberChangeSettings:
                   allowMemberChangeSettings ?? group.allowMemberChangeSettings,
-              requireParticipantAssignment:
-                  requireParticipantAssignment ??
-                  group.requireParticipantAssignment,
               updatedAt: DateTime.now(),
             ),
           );
