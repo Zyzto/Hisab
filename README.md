@@ -27,6 +27,31 @@ When in Online mode and temporarily offline, you can still add expenses (queued 
 
 <img src="screenshots/5.png" width="200" /><img src="screenshots/6.gif" width="200" /><img src="screenshots/7.png" width="200" /><img src="screenshots/8.png" width="200" />
 
+## Install
+
+### Android
+
+**Option 1: Obtainium (Recommended) - Automatic Updates**
+
+<a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/Zyzto/Adati">
+<img src="https://raw.githubusercontent.com/ImranR98/Obtainium/refs/heads/main/assets/graphics/badge_obtainium.png" alt="Get it on Obtainium" height="60"/>
+</a>
+
+- **Manual Setup**: Install [Obtainium](https://github.com/ImranR98/Obtainium) from [F-Droid](https://f-droid.org/packages/com.imranr98.obtainium/) or [GitHub Releases](https://github.com/ImranR98/Obtainium/releases), then:
+  - Open Obtainium and tap the "+" button
+  - Select "GitHub Releases" as the source
+  - Enter repository: `Zyzto/Adati`
+- Obtainium will automatically track new releases and notify you of updates
+
+**Option 2: Google Play Store** **WIP**
+- Available on [Google Play Store](https://play.google.com/store/apps/details?id=com.shenepoy.hisab) (when published)
+- Automatic updates through Play Store
+
+**Option 3: Direct Install (APK)**
+- Download `adati-VERSION-android.apk` from [GitHub Releases](https://github.com/Zyzto/Hisab/releases/latest)
+- Enable "Install from unknown sources" in your Android settings
+- Tap the downloaded APK file to install
+
 ## Requirements
 
 - Flutter SDK ^3.10.0
