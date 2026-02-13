@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/material_symbols_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,12 +6,13 @@ import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/auth/auth_service.dart';
+import '../../../core/auth/auth_providers.dart';
+import '../../../core/auth/sign_in_sheet.dart';
+import '../../../core/constants/supabase_config.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 import '../../settings/settings_definitions.dart';
-import '../providers/onboarding_providers.dart';
 
 class OnboardingPage extends ConsumerStatefulWidget {
   const OnboardingPage({super.key});
@@ -53,7 +53,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(hisabSettingsProvidersProvider);
-    final onlineAvailable = ref.watch(auth0ConfigAvailableProvider);
+    final onlineAvailable = supabaseConfigAvailable;
 
     if (settings == null) {
       return Scaffold(body: Center(child: Text('settings_unavailable'.tr())));
@@ -272,58 +272,57 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-          const SizedBox(height: ThemeConfig.spacingS),
-          Text(
-            'onboarding_welcome'.tr(),
-            style: Theme.of(
-              context,
-            ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: ThemeConfig.spacingS),
-          Text(
-            'onboarding_what_is_hisab'.tr(),
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: ThemeConfig.spacingM),
-          Text(
-            'onboarding_how_it_works'.tr(),
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: ThemeConfig.spacingM),
-          _buildFeatureCard(
-            context,
-            icon: Icons.group_outlined,
-            title: 'onboarding_groups'.tr(),
-            subtitle: 'onboarding_groups_desc'.tr(),
-          ),
-          _buildFeatureCard(
-            context,
-            icon: Icons.person_outline,
-            title: 'onboarding_participants'.tr(),
-            subtitle: 'onboarding_participants_desc'.tr(),
-          ),
-          _buildFeatureCard(
-            context,
-            icon: Icons.receipt_long_outlined,
-            title: 'onboarding_expenses'.tr(),
-            subtitle: 'onboarding_expenses_desc'.tr(),
-          ),
-          _buildFeatureCard(
-            context,
-            icon: Icons.account_balance_wallet_outlined,
-            title: 'onboarding_balance'.tr(),
-            subtitle: 'onboarding_balance_desc'.tr(),
-          ),
-          _buildFeatureCard(
-            context,
-            icon: Icons.swap_horiz,
-            title: 'onboarding_settle_up'.tr(),
-            subtitle: 'onboarding_settle_up_desc'.tr(),
-          ),
+                    const SizedBox(height: ThemeConfig.spacingS),
+                    Text(
+                      'onboarding_welcome'.tr(),
+                      style: Theme.of(context).textTheme.headlineMedium
+                          ?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: ThemeConfig.spacingS),
+                    Text(
+                      'onboarding_what_is_hisab'.tr(),
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: ThemeConfig.spacingM),
+                    Text(
+                      'onboarding_how_it_works'.tr(),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: ThemeConfig.spacingM),
+                    _buildFeatureCard(
+                      context,
+                      icon: Icons.group_outlined,
+                      title: 'onboarding_groups'.tr(),
+                      subtitle: 'onboarding_groups_desc'.tr(),
+                    ),
+                    _buildFeatureCard(
+                      context,
+                      icon: Icons.person_outline,
+                      title: 'onboarding_participants'.tr(),
+                      subtitle: 'onboarding_participants_desc'.tr(),
+                    ),
+                    _buildFeatureCard(
+                      context,
+                      icon: Icons.receipt_long_outlined,
+                      title: 'onboarding_expenses'.tr(),
+                      subtitle: 'onboarding_expenses_desc'.tr(),
+                    ),
+                    _buildFeatureCard(
+                      context,
+                      icon: Icons.account_balance_wallet_outlined,
+                      title: 'onboarding_balance'.tr(),
+                      subtitle: 'onboarding_balance_desc'.tr(),
+                    ),
+                    _buildFeatureCard(
+                      context,
+                      icon: Icons.swap_horiz,
+                      title: 'onboarding_settle_up'.tr(),
+                      subtitle: 'onboarding_settle_up_desc'.tr(),
+                    ),
                   ],
                 ),
               ),
@@ -433,136 +432,151 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-            const SizedBox(height: ThemeConfig.spacingL),
-            Text(
-              'onboarding_connect'.tr(),
-              style: Theme.of(
-                context,
-              ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: ThemeConfig.spacingS),
-            Text(
-              'onboarding_offline_desc'.tr(),
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: ThemeConfig.spacingXL),
-            if (onlineAvailable) ...[
-              SegmentedButton<bool>(
-                style: ButtonStyle(
-                  padding: WidgetStateProperty.all(
-                    const EdgeInsets.symmetric(
-                      vertical: ThemeConfig.spacingM,
-                      horizontal: ThemeConfig.spacingS,
+                    const SizedBox(height: ThemeConfig.spacingL),
+                    Text(
+                      'onboarding_connect'.tr(),
+                      style: Theme.of(context).textTheme.headlineMedium
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
-                  ),
-                ),
-                segments: [
-                  ButtonSegment(
-                    value: true,
-                    label: Text('onboarding_offline'.tr()),
-                    icon: const Icon(Icons.storage_outlined),
-                  ),
-                  ButtonSegment(
-                    value: false,
-                    label: Text('onboarding_online'.tr()),
-                    icon: const Icon(Icons.cloud_outlined),
-                  ),
-                ],
-                selected: {isLocalOnly},
-                onSelectionChanged: (selection) {
-                  if (selection.isNotEmpty) {
-                    ref
-                        .read(settings.provider(localOnlySettingDef).notifier)
-                        .set(selection.first);
-                    if (!selection.first) {
-                      Log.info('User selected online mode at onboarding');
-                    }
-                  }
-                },
-              ),
-              if (!isLocalOnly) ...[
-                const SizedBox(height: ThemeConfig.spacingM),
-                Container(
-                  padding: const EdgeInsets.all(ThemeConfig.spacingM),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primaryContainer.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(ThemeConfig.radiusM),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline_rounded,
-                        size: 20,
-                        color: colorScheme.onPrimaryContainer,
+                    const SizedBox(height: ThemeConfig.spacingS),
+                    Text(
+                      'onboarding_offline_desc'.tr(),
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        height: 1.4,
                       ),
-                      const SizedBox(width: ThemeConfig.spacingM),
-                      Expanded(
-                        child: Text(
-                          'onboarding_online_requires_sign_in'.tr(),
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
+                    ),
+                    const SizedBox(height: ThemeConfig.spacingXL),
+                    if (onlineAvailable) ...[
+                      SegmentedButton<bool>(
+                        style: ButtonStyle(
+                          padding: WidgetStateProperty.all(
+                            const EdgeInsets.symmetric(
+                              vertical: ThemeConfig.spacingM,
+                              horizontal: ThemeConfig.spacingS,
+                            ),
+                          ),
+                        ),
+                        segments: [
+                          ButtonSegment(
+                            value: true,
+                            label: Text('onboarding_offline'.tr()),
+                            icon: const Icon(Icons.storage_outlined),
+                          ),
+                          ButtonSegment(
+                            value: false,
+                            label: Text('onboarding_online'.tr()),
+                            icon: const Icon(Icons.cloud_outlined),
+                          ),
+                        ],
+                        selected: {isLocalOnly},
+                        onSelectionChanged: (selection) {
+                          if (selection.isNotEmpty) {
+                            ref
+                                .read(
+                                  settings
+                                      .provider(localOnlySettingDef)
+                                      .notifier,
+                                )
+                                .set(selection.first);
+                            if (!selection.first) {
+                              Log.info(
+                                'User selected online mode at onboarding',
+                              );
+                            }
+                          }
+                        },
+                      ),
+                      if (!isLocalOnly) ...[
+                        const SizedBox(height: ThemeConfig.spacingM),
+                        Container(
+                          padding: const EdgeInsets.all(ThemeConfig.spacingM),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primaryContainer.withValues(
+                              alpha: 0.3,
+                            ),
+                            borderRadius: BorderRadius.circular(
+                              ThemeConfig.radiusM,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline_rounded,
+                                size: 20,
                                 color: colorScheme.onPrimaryContainer,
-                                fontWeight: FontWeight.w500,
                               ),
+                              const SizedBox(width: ThemeConfig.spacingM),
+                              Expanded(
+                                child: Text(
+                                  'onboarding_online_requires_sign_in'.tr(),
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: colorScheme.onPrimaryContainer,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ] else ...[
+                      Container(
+                        padding: const EdgeInsets.all(ThemeConfig.spacingM),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(
+                            ThemeConfig.radiusL,
+                          ),
+                          border: Border.all(
+                            color: colorScheme.outline.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: colorScheme.surfaceContainerHigh,
+                                borderRadius: BorderRadius.circular(
+                                  ThemeConfig.radiusM,
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.cloud_off_outlined,
+                                size: 24,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(width: ThemeConfig.spacingM),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'onboarding_online'.tr(),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.w600),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'onboarding_online_unavailable'.tr(),
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
-                  ),
-                ),
-              ],
-            ] else ...[
-              Container(
-                padding: const EdgeInsets.all(ThemeConfig.spacingM),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
-                  border: Border.all(
-                    color: colorScheme.outline.withValues(alpha: 0.2),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(
-                          ThemeConfig.radiusM,
-                        ),
-                      ),
-                      child: Icon(
-                        Icons.cloud_off_outlined,
-                        size: 24,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(width: ThemeConfig.spacingM),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'onboarding_online'.tr(),
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'onboarding_online_unavailable'.tr(),
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(color: colorScheme.onSurfaceVariant),
-                          ),
-                        ],
-                      ),
-                    ),
                   ],
-                ),
-              ),
-            ],
-          ],
                 ),
               ),
             ),
@@ -577,33 +591,35 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     SettingsProviders settings,
   ) async {
     final isLocalOnly = ref.read(settings.provider(localOnlySettingDef));
-    final onlineAvailable = ref.read(auth0ConfigAvailableProvider);
+    final onlineAvailable = supabaseConfigAvailable;
 
     if (!isLocalOnly && onlineAvailable) {
-      final signedIn = await auth0HasValidCredentials();
-      if (!signedIn) {
-        // On web, auth0SignIn redirects and returns null; set pending so we complete after redirect
-        if (kIsWeb) {
-          ref
-              .read(
-                settings.provider(onboardingOnlinePendingSettingDef).notifier,
-              )
-              .set(true);
-        }
-        final token = await auth0SignIn();
-        if (token == null) {
-          if (kIsWeb) {
-            // Redirect in progress; user will return and main() will complete onboarding
+      final authService = ref.read(authServiceProvider);
+      if (!authService.isAuthenticated) {
+        if (!mounted) return;
+        final result = await showSignInSheet(context, ref);
+        switch (result) {
+          case SignInResult.success:
+            // Auth completed, continue to finish onboarding
+            break;
+          case SignInResult.pendingRedirect:
+            // OAuth redirect on web — set pending flag, page will reload
+            ref
+                .read(
+                  settings.provider(onboardingOnlinePendingSettingDef).notifier,
+                )
+                .set(true);
+            Log.info('Onboarding OAuth redirect pending (web)');
+            return; // Page will reload, main.dart handles completion
+          case SignInResult.cancelled:
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('onboarding_online_requires_sign_in'.tr()),
+                ),
+              );
+            }
             return;
-          }
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('onboarding_online_requires_sign_in'.tr()),
-              ),
-            );
-          }
-          return;
         }
       }
     }

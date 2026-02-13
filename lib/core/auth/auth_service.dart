@@ -1,30 +1,149 @@
-import 'package:auth0_flutter/auth0_flutter.dart';
+import 'package:flutter_logging_service/flutter_logging_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../constants/auth_config.dart';
-import '../constants/convex_config.dart';
+import '../constants/supabase_config.dart';
+import 'auth_user_profile.dart';
 
-// Conditional imports for web vs native
-import 'auth_service_impl_native.dart'
-    if (dart.library.html) 'auth_service_impl_web.dart' as impl;
+/// Unified Supabase auth service. Works on all platforms — `supabase_flutter`
+/// handles web/native differences internally.
+class AuthService {
+  SupabaseClient get _client => Supabase.instance.client;
 
-/// Whether Auth0 is configured and online mode can be used.
-bool get auth0ConfigAvailable =>
-    auth0Domain.isNotEmpty &&
-    auth0ClientId.isNotEmpty &&
-    convexDeploymentUrl.isNotEmpty;
+  // ---------------------------------------------------------------------------
+  // Sign-in methods
+  // ---------------------------------------------------------------------------
 
-/// Sign in with Auth0. Returns access token or null.
-Future<String?> auth0SignIn() => impl.auth0SignIn();
+  Future<AuthResponse> signInWithEmail(String email, String password) async {
+    Log.debug('Signing in with email');
+    try {
+      final response = await _client.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+      Log.info('User signed in with email');
+      return response;
+    } catch (e, st) {
+      Log.error('Email sign-in failed', error: e, stackTrace: st);
+      rethrow;
+    }
+  }
 
-/// Sign out from Auth0.
-Future<void> auth0SignOut() => impl.auth0SignOut();
+  Future<AuthResponse> signUpWithEmail(String email, String password) async {
+    Log.debug('Signing up with email');
+    try {
+      final response = await _client.auth.signUp(
+        email: email,
+        password: password,
+        emailRedirectTo: authRedirectUrl.trim().isNotEmpty
+            ? authRedirectUrl.trim()
+            : null,
+      );
+      Log.info('User signed up with email');
+      return response;
+    } catch (e, st) {
+      Log.error('Email sign-up failed', error: e, stackTrace: st);
+      rethrow;
+    }
+  }
 
-/// Get current access token for Convex. Returns null if not signed in.
-Future<String?> auth0GetAccessToken() => impl.auth0GetAccessToken();
+  /// Resend the confirmation email for an unconfirmed account.
+  Future<void> resendConfirmation(String email) async {
+    Log.debug('Resending confirmation email');
+    try {
+      await _client.auth.resend(
+        type: OtpType.signup,
+        email: email,
+        emailRedirectTo: authRedirectUrl.trim().isNotEmpty
+            ? authRedirectUrl.trim()
+            : null,
+      );
+      Log.info('Confirmation email resent');
+    } catch (e, st) {
+      Log.error('Resend confirmation failed', error: e, stackTrace: st);
+      rethrow;
+    }
+  }
 
-/// Check if user has valid credentials.
-Future<bool> auth0HasValidCredentials() => impl.auth0HasValidCredentials();
+  Future<void> signInWithMagicLink(String email) async {
+    Log.debug('Sending magic link');
+    try {
+      await _client.auth.signInWithOtp(
+        email: email,
+        emailRedirectTo: authRedirectUrl.trim().isNotEmpty
+            ? authRedirectUrl.trim()
+            : null,
+      );
+      Log.info('Magic link sent');
+    } catch (e, st) {
+      Log.error('Magic link failed', error: e, stackTrace: st);
+      rethrow;
+    }
+  }
 
-/// (Web only) Process Auth0 redirect callback. Call on app load to restore session.
-/// Returns credentials if coming back from redirect, null otherwise.
-Future<Credentials?> auth0OnLoad() => impl.auth0OnLoad();
+  Future<bool> signInWithGoogle() async {
+    Log.debug('Signing in with Google OAuth');
+    try {
+      final ok = await _client.auth.signInWithOAuth(OAuthProvider.google);
+      return ok;
+    } catch (e, st) {
+      Log.error('Google sign-in failed', error: e, stackTrace: st);
+      rethrow;
+    }
+  }
+
+  Future<bool> signInWithGithub() async {
+    Log.debug('Signing in with GitHub OAuth');
+    try {
+      final ok = await _client.auth.signInWithOAuth(OAuthProvider.github);
+      return ok;
+    } catch (e, st) {
+      Log.error('GitHub sign-in failed', error: e, stackTrace: st);
+      rethrow;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sign-out
+  // ---------------------------------------------------------------------------
+
+  Future<void> signOut() async {
+    Log.info('User signing out');
+    try {
+      await _client.auth.signOut();
+      Log.info('User signed out');
+    } catch (e, st) {
+      Log.error('Sign-out failed', error: e, stackTrace: st);
+      rethrow;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Session & user getters
+  // ---------------------------------------------------------------------------
+
+  Session? get currentSession => _client.auth.currentSession;
+  User? get currentUser => _client.auth.currentUser;
+
+  bool get isAuthenticated => _client.auth.currentSession != null;
+
+  Stream<AuthState> get onAuthStateChange => _client.auth.onAuthStateChange;
+
+  // ---------------------------------------------------------------------------
+  // Profile helper (mirrors old AuthUserProfile)
+  // ---------------------------------------------------------------------------
+
+  AuthUserProfile? getUserProfile() {
+    final user = currentUser;
+    if (user == null) return null;
+    return AuthUserProfile(
+      name:
+          user.userMetadata?['full_name'] as String? ??
+          user.userMetadata?['name'] as String?,
+      email: user.email,
+      sub: user.id,
+    );
+  }
+}
+
+/// Whether Supabase is configured and online mode can be used.
+bool get supabaseOnlineAvailable => supabaseConfigAvailable;

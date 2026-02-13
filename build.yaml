@@ -5,5 +5,3 @@ targets:
         enabled: true
         options:
           auto_dispose: false
-      drift_dev|drift_dev:
-        enabled: true

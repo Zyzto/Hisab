@@ -1,6 +1,9 @@
 library;
 
 export 'group.dart';
+export 'group_member.dart';
+export 'group_invite.dart';
+export 'group_role.dart';
 export 'participant.dart';
 export 'expense.dart';
 export 'expense_tag.dart';

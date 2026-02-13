@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'core/auth/convex_auth_binder.dart';
+import 'core/database/database_providers.dart';
 import 'core/theme/app_scroll_behavior.dart';
 import 'core/theme/theme_providers.dart';
 import 'core/navigation/app_router.dart';
@@ -19,8 +19,10 @@ class App extends ConsumerWidget {
     final themeMode = ref.watch(appThemeModeProvider);
     final languageCode = ref.watch(languageProvider);
 
-    return ConvexAuthBinder(
-      child: MaterialApp.router(
+    // Watch DataSyncService to reactively fetch/push data
+    ref.watch(dataSyncServiceProvider);
+
+    return MaterialApp.router(
       title: 'Hisab',
       debugShowCheckedModeBanner: kDebugMode,
       scrollBehavior: AppScrollBehavior(),
@@ -38,7 +40,6 @@ class App extends ConsumerWidget {
       darkTheme: themes.dark,
       themeMode: themeMode,
       routerConfig: router,
-      ),
     );
   }
 }

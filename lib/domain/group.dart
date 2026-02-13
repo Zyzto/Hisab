@@ -1,7 +1,7 @@
 import 'settlement_method.dart';
 
 /// Domain entity: a group (trip/event) with participants and expenses.
-/// [id] is a string (Convex id or "local_$intId" for Drift).
+/// [id] is a UUID string.
 class Group {
   final String id;
   final String name;
@@ -12,6 +12,11 @@ class Group {
   final String? treasurerParticipantId;
   final DateTime? settlementFreezeAt;
   final String? settlementSnapshotJson;
+  final String? ownerId;
+  final bool allowMemberAddExpense;
+  final bool allowMemberAddParticipant;
+  final bool allowMemberChangeSettings;
+  final bool requireParticipantAssignment;
 
   const Group({
     required this.id,
@@ -23,6 +28,11 @@ class Group {
     this.treasurerParticipantId,
     this.settlementFreezeAt,
     this.settlementSnapshotJson,
+    this.ownerId,
+    this.allowMemberAddExpense = true,
+    this.allowMemberAddParticipant = true,
+    this.allowMemberChangeSettings = true,
+    this.requireParticipantAssignment = false,
   });
 
   bool get isSettlementFrozen => settlementFreezeAt != null;
@@ -37,6 +47,11 @@ class Group {
     String? treasurerParticipantId,
     DateTime? settlementFreezeAt,
     String? settlementSnapshotJson,
+    String? ownerId,
+    bool? allowMemberAddExpense,
+    bool? allowMemberAddParticipant,
+    bool? allowMemberChangeSettings,
+    bool? requireParticipantAssignment,
   }) {
     return Group(
       id: id ?? this.id,
@@ -50,6 +65,15 @@ class Group {
       settlementFreezeAt: settlementFreezeAt ?? this.settlementFreezeAt,
       settlementSnapshotJson:
           settlementSnapshotJson ?? this.settlementSnapshotJson,
+      ownerId: ownerId ?? this.ownerId,
+      allowMemberAddExpense:
+          allowMemberAddExpense ?? this.allowMemberAddExpense,
+      allowMemberAddParticipant:
+          allowMemberAddParticipant ?? this.allowMemberAddParticipant,
+      allowMemberChangeSettings:
+          allowMemberChangeSettings ?? this.allowMemberChangeSettings,
+      requireParticipantAssignment:
+          requireParticipantAssignment ?? this.requireParticipantAssignment,
     );
   }
 
@@ -64,5 +88,10 @@ class Group {
     treasurerParticipantId: treasurerParticipantId,
     settlementFreezeAt: null,
     settlementSnapshotJson: null,
+    ownerId: ownerId,
+    allowMemberAddExpense: allowMemberAddExpense,
+    allowMemberAddParticipant: allowMemberAddParticipant,
+    allowMemberChangeSettings: allowMemberChangeSettings,
+    requireParticipantAssignment: requireParticipantAssignment,
   );
 }

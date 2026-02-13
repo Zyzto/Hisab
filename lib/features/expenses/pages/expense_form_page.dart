@@ -11,6 +11,7 @@ import '../../../core/repository/repository_providers.dart';
 import '../../../core/telemetry/telemetry_service.dart';
 import '../../../features/settings/providers/settings_framework_providers.dart';
 import '../../groups/providers/groups_provider.dart';
+import '../../groups/providers/group_member_provider.dart';
 import '../constants/expense_form_constants.dart';
 import '../widgets/expense_amount_section.dart';
 import '../widgets/expense_bill_breakdown_section.dart';
@@ -559,6 +560,22 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           );
         }
         final currencyCode = group.currencyCode;
+        final localOnly = ref.watch(effectiveLocalOnlyProvider);
+        final myMemberAsync = localOnly
+            ? const AsyncValue.data(null)
+            : ref.watch(myMemberInGroupProvider(widget.groupId));
+        final payerLocked =
+            !localOnly &&
+            group.requireParticipantAssignment &&
+            myMemberAsync.value?.participantId != null;
+        final lockedPayerId = myMemberAsync.value?.participantId;
+        if (payerLocked &&
+            lockedPayerId != null &&
+            _payerParticipantId != lockedPayerId) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) setState(() => _payerParticipantId = lockedPayerId);
+          });
+        }
 
         return participantsAsync.when(
           data: (participants) {
@@ -708,11 +725,17 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                         participants,
                         payerId,
                         toId,
+                        payerLocked: payerLocked,
                       ),
                       const SizedBox(height: 20),
                       _buildWhenSection(context),
                     ] else
-                      _buildPaidByAndWhenRow(context, participants, payerId),
+                      _buildPaidByAndWhenRow(
+                        context,
+                        participants,
+                        payerId,
+                        payerLocked: payerLocked,
+                      ),
                     if (!isTransfer) ...[
                       const SizedBox(height: 20),
                       ExpenseBillBreakdownSection(
@@ -1323,8 +1346,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   Widget _buildPaidByAndWhenRow(
     BuildContext context,
     List<Participant> participants,
-    String payerId,
-  ) {
+    String payerId, {
+    bool payerLocked = false,
+  }) {
     final theme = Theme.of(context);
     final payer = participants.firstWhere(
       (p) => p.id == payerId,
@@ -1348,7 +1372,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
               ),
               const SizedBox(height: 6),
               InkWell(
-                onTap: () => _showPayerPicker(context, participants),
+                onTap: payerLocked
+                    ? null
+                    : () => _showPayerPicker(context, participants),
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
                   height: 52,
@@ -1367,10 +1393,11 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                           style: theme.textTheme.bodyLarge,
                         ),
                       ),
-                      Icon(
-                        Icons.arrow_drop_down,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+                      if (!payerLocked)
+                        Icon(
+                          Icons.arrow_drop_down,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                     ],
                   ),
                 ),
@@ -1437,8 +1464,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     BuildContext context,
     List<Participant> participants,
     String payerId,
-    String toId,
-  ) {
+    String toId, {
+    bool payerLocked = false,
+  }) {
     final theme = Theme.of(context);
     final payer = participants.firstWhere(
       (p) => p.id == payerId,
@@ -1465,7 +1493,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
               ),
               const SizedBox(height: 6),
               InkWell(
-                onTap: () => _showPayerPicker(context, participants),
+                onTap: payerLocked
+                    ? null
+                    : () => _showPayerPicker(context, participants),
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
                   height: 52,
@@ -1484,10 +1514,11 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                           style: theme.textTheme.bodyLarge,
                         ),
                       ),
-                      Icon(
-                        Icons.arrow_drop_down,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+                      if (!payerLocked)
+                        Icon(
+                          Icons.arrow_drop_down,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                     ],
                   ),
                 ),
