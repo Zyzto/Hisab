@@ -4,6 +4,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/widgets/async_value_builder.dart';
+import '../../../core/widgets/sync_status_icon.dart';
 import '../../groups/providers/groups_provider.dart';
 import '../../groups/widgets/group_card.dart';
 import '../../../domain/domain.dart';
@@ -16,7 +17,13 @@ class HomePage extends ConsumerWidget {
     final groupsAsync = ref.watch(groupsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text('app_name'.tr())),
+      appBar: AppBar(
+        title: Text('app_name'.tr()),
+        actions: const [
+          SyncStatusChip(),
+          SizedBox(width: 12),
+        ],
+      ),
       body: AsyncValueBuilder<List<Group>>(
         value: groupsAsync,
         data: (context, groups) {

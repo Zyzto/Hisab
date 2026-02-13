@@ -156,7 +156,9 @@ void main() async {
   }
 
   // --------------------------------------------------------------------------
-  // Run app
+  // Run app — EasyLocalization stays mounted (no key change) to avoid
+  // setState-after-dispose from its async asset loading. We sync locale
+  // by calling setLocale when languageProvider changes (_LocaleSync).
   // --------------------------------------------------------------------------
   final startLocale = settingsProviders != null
       ? Locale(settingsProviders.controller.get(languageSettingDef))
@@ -183,8 +185,27 @@ void main() async {
             hisabSettingsProvidersProvider.overrideWithValue(settingsProviders),
           ],
         ],
-        child: const App(),
+        child: const _LocaleSync(child: App()),
       ),
     ),
   );
+}
+
+/// Keeps Easy Localization's locale in sync with [languageProvider].
+/// Single place that calls setLocale to avoid RTL/LTR flicker and double updates.
+class _LocaleSync extends ConsumerWidget {
+  const _LocaleSync({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final languageCode = ref.watch(languageProvider);
+    if (context.locale.languageCode != languageCode) {
+      final locale = Locale(languageCode);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) context.setLocale(locale);
+      });
+    }
+    return child;
+  }
 }

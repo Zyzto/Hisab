@@ -145,10 +145,10 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
           ),
         );
         if (chosen != null && context.mounted) {
-          ref
+          await ref
               .read(settings.provider(languageSettingDef).notifier)
               .set(chosen.languageCode);
-          await context.setLocale(chosen);
+          // _LocaleSync will call setLocale when it sees provider != context.locale
         }
       },
       icon: const Icon(Icons.language),
@@ -629,6 +629,16 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
         .set(true);
     Log.info('Onboarding completed');
     if (!mounted) return;
-    context.go(RoutePaths.home);
+    final pendingToken = ref.read(
+      settings.provider(pendingInviteTokenSettingDef),
+    );
+    if (pendingToken.isNotEmpty) {
+      ref
+          .read(settings.provider(pendingInviteTokenSettingDef).notifier)
+          .set('');
+      context.go(RoutePaths.inviteAccept(pendingToken));
+    } else {
+      context.go(RoutePaths.home);
+    }
   }
 }

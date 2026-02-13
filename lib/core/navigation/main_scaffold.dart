@@ -5,8 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../features/home/pages/home_page.dart';
 import '../../features/settings/pages/settings_page.dart';
+import '../widgets/connection_banner.dart';
 import '../widgets/floating_nav_bar.dart';
-import '../widgets/sync_status_icon.dart';
 import 'route_paths.dart';
 
 class MainScaffold extends ConsumerStatefulWidget {
@@ -51,6 +51,11 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
 
   @override
   Widget build(BuildContext context) {
+    // Access context.locale to register as a dependent of EasyLocalization's
+    // InheritedWidget. This ensures the nav bar labels rebuild when locale changes.
+    // Without this, .tr() uses the global singleton but the widget never rebuilds.
+    context.locale;
+
     final showNavBar = _shouldShowNavBar();
 
     return Scaffold(
@@ -60,11 +65,12 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
             padding: EdgeInsets.only(bottom: showNavBar ? 100 : 0),
             child: _buildMainContent(),
           ),
-          // Sync status icon — top right, only visible in Online mode
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 8,
-            right: 16,
-            child: const SyncStatusIcon(),
+          // Connection banner — slides down when offline, auto-dismisses on reconnect
+          const Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: ConnectionBanner(),
           ),
           if (showNavBar)
             Positioned(

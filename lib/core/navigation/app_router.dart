@@ -6,6 +6,7 @@ import '../../features/home/routes.dart';
 import '../../features/settings/routes.dart';
 import '../../features/onboarding/routes.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
+import '../../features/settings/settings_definitions.dart';
 import '../../features/groups/pages/group_create_page.dart';
 import '../../features/groups/pages/group_detail_page.dart';
 import '../../features/groups/pages/group_settings_page.dart';
@@ -35,6 +36,19 @@ GoRouter router(Ref ref) {
     initialLocation: RoutePaths.home,
     redirect: (context, state) {
       final onOnboarding = state.matchedLocation == RoutePaths.onboarding;
+      // Pending invite from deep link: send to invite page and clear
+      final settings = ref.read(hisabSettingsProvidersProvider);
+      if (settings != null) {
+        final pendingToken = ref.read(
+          settings.provider(pendingInviteTokenSettingDef),
+        );
+        if (pendingToken.isNotEmpty && onboardingCompleted) {
+          ref
+              .read(settings.provider(pendingInviteTokenSettingDef).notifier)
+              .set('');
+          return RoutePaths.inviteAccept(pendingToken);
+        }
+      }
       if (!onboardingCompleted && !onOnboarding) {
         return RoutePaths.onboarding;
       }
@@ -59,6 +73,16 @@ GoRouter router(Ref ref) {
           );
         },
         routes: [...getHomeRoutes(), ...getSettingsRoutes()],
+      ),
+      GoRoute(
+        path: '/invite',
+        builder: (context, state) {
+          final token =
+              state.pathParameters['token'] ??
+              state.uri.queryParameters['token'] ??
+              '';
+          return InviteAcceptPage(token: token);
+        },
       ),
       GoRoute(
         path: '/invite/:token',
