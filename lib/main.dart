@@ -1,3 +1,5 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,17 +9,26 @@ import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:powersync/powersync.dart';
+import 'package:pwa_install/pwa_install.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/constants/supabase_config.dart';
 import 'core/database/database_providers.dart';
 import 'core/database/powersync_schema.dart' as ps;
+import 'core/services/notification_service.dart';
 import 'features/settings/providers/settings_framework_providers.dart';
 import 'features/settings/settings_definitions.dart';
 import 'app.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // PWA install prompt (web only)
+  if (kIsWeb) {
+    PWAInstall().setup(installCallback: () {
+      debugPrint('PWA installed!');
+    });
+  }
 
   // Log framework and async errors before logging service is ready
   FlutterError.onError = (FlutterErrorDetails details) {
@@ -153,6 +164,22 @@ void main() async {
     }
   } else {
     Log.info('Supabase not configured — running in local-only mode');
+  }
+
+  // --------------------------------------------------------------------------
+  // Firebase (for push notifications — only if Supabase is configured)
+  // --------------------------------------------------------------------------
+  if (supabaseConfigAvailable) {
+    try {
+      await Firebase.initializeApp();
+      FirebaseMessaging.onBackgroundMessage(
+        firebaseMessagingBackgroundHandler,
+      );
+      Log.info('Firebase initialized');
+    } catch (e, st) {
+      Log.warning('Firebase init failed (push notifications disabled)',
+          error: e, stackTrace: st);
+    }
   }
 
   // --------------------------------------------------------------------------
