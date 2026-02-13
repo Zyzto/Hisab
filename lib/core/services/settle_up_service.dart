@@ -257,6 +257,8 @@ SettlementSnapshot createSnapshot(
 
 /// Compute per-participant balances from expenses and participants.
 /// Balance = what they paid minus what they owe. Positive = owed to them.
+/// All amounts are normalized to the group's base currency using
+/// [Expense.effectiveBaseAmountCents] for multi-currency support.
 List<ParticipantBalance> computeBalances(
   List<Participant> participants,
   List<Expense> expenses,
@@ -271,8 +273,10 @@ List<ParticipantBalance> computeBalances(
   }
 
   for (final e in expenses) {
+    // Use base amount (group currency) for balance calculations
+    final effectiveAmount = e.effectiveBaseAmountCents;
     paid[e.payerParticipantId] =
-        (paid[e.payerParticipantId] ?? 0) + e.amountCents;
+        (paid[e.payerParticipantId] ?? 0) + effectiveAmount;
 
     final shares = _computeShares(e);
     for (final entry in shares.entries) {
@@ -292,15 +296,28 @@ List<ParticipantBalance> computeBalances(
 }
 
 /// For an expense, compute how much each participant owes (in cents).
+/// When the expense has a different currency from the group, shares are
+/// scaled to the base (group) currency using the stored exchange rate.
 Map<String, int> _computeShares(Expense e) {
+  final rawShares = <String, int>{};
   switch (e.splitType) {
     case SplitType.equal:
       if (e.splitShares.isEmpty) return {};
-      return Map.from(e.splitShares);
+      rawShares.addAll(e.splitShares);
     case SplitType.parts:
     case SplitType.amounts:
-      return Map.from(e.splitShares);
+      rawShares.addAll(e.splitShares);
   }
+
+  // If expense is in a different currency, convert shares to group currency
+  if (e.baseAmountCents != null && e.amountCents > 0) {
+    final conversionFactor = e.baseAmountCents! / e.amountCents;
+    return rawShares.map(
+      (id, cents) => MapEntry(id, (cents * conversionFactor).round()),
+    );
+  }
+
+  return rawShares;
 }
 
 // Legacy alias for backward compatibility.

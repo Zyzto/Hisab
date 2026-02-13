@@ -64,12 +64,8 @@ class MigrationService {
           'settlement_freeze_at': g['settlement_freeze_at'],
           'settlement_snapshot_json': g['settlement_snapshot_json'],
           'allow_member_add_expense': g['allow_member_add_expense'] == 1,
-          'allow_member_add_participant':
-              g['allow_member_add_participant'] == 1,
           'allow_member_change_settings':
               g['allow_member_change_settings'] == 1,
-          'require_participant_assignment':
-              g['require_participant_assignment'] == 1,
           'created_at': g['created_at'],
           'updated_at': g['updated_at'],
         });

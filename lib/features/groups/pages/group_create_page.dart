@@ -1,3 +1,4 @@
+import 'package:currency_picker/currency_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
@@ -6,6 +7,7 @@ import 'package:easy_localization/easy_localization.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/telemetry/telemetry_service.dart';
+import '../../../core/utils/currency_helpers.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 
 class GroupCreatePage extends ConsumerStatefulWidget {
@@ -18,14 +20,33 @@ class GroupCreatePage extends ConsumerStatefulWidget {
 class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _currencyController = TextEditingController(text: 'USD');
+  late Currency _selectedCurrency;
   bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedCurrency = CurrencyHelpers.defaultCurrencyForLocale();
+  }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _currencyController.dispose();
     super.dispose();
+  }
+
+  void _openCurrencyPicker() {
+    showCurrencyPicker(
+      context: context,
+      favorite: CurrencyHelpers.favoriteCurrencies,
+      showFlag: true,
+      showSearchField: true,
+      showCurrencyName: true,
+      showCurrencyCode: true,
+      onSelect: (Currency currency) {
+        setState(() => _selectedCurrency = currency);
+      },
+    );
   }
 
   Future<void> _save() async {
@@ -33,10 +54,12 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
     setState(() => _saving = true);
     try {
       final name = _nameController.text.trim();
-      final currencyCode = _currencyController.text.trim().toUpperCase();
+      final currencyCode = _selectedCurrency.code;
       final repo = ref.read(groupRepositoryProvider);
       final id = await repo.create(name, currencyCode);
-      Log.info('Group created: id=$id name="$name" currencyCode=$currencyCode');
+      Log.info(
+        'Group created: id=$id name="$name" currencyCode=$currencyCode',
+      );
       try {
         TelemetryService.sendEvent('group_created', {
           'groupId': id,
@@ -53,6 +76,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: Text('create_group'.tr()),
@@ -77,21 +101,45 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
               textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _currencyController,
-              decoration: InputDecoration(
-                labelText: 'currency'.tr(),
-                border: const OutlineInputBorder(),
-                hintText: 'e.g. USD, EUR',
+            Text(
+              'currency'.tr(),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
-              validator: (v) {
-                if (v == null || v.trim().length != 3) {
-                  return 'Use 3-letter code';
-                }
-                return null;
-              },
-              textCapitalization: TextCapitalization.characters,
-              maxLength: 3,
+            ),
+            const SizedBox(height: 6),
+            InkWell(
+              onTap: _openCurrencyPicker,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  border: Border.all(color: theme.colorScheme.outline),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Text(
+                      CurrencyUtils.currencyToEmoji(_selectedCurrency),
+                      style: const TextStyle(fontSize: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        CurrencyHelpers.displayLabel(_selectedCurrency),
+                        style: theme.textTheme.bodyLarge,
+                      ),
+                    ),
+                    Icon(
+                      Icons.arrow_drop_down,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: 24),
             FilledButton(

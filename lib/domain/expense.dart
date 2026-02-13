@@ -17,6 +17,18 @@ class Expense {
   final String payerParticipantId;
   final int amountCents;
   final String currencyCode;
+
+  /// Exchange rate from expense currency to group's base currency.
+  /// e.g. if expense is 5000 JPY and group is SAR with rate 39.5 JPY per SAR,
+  /// [exchangeRate] = 39.5 (meaning 1 SAR = 39.5 JPY).
+  /// Defaults to 1.0 when expense currency matches group currency.
+  final double exchangeRate;
+
+  /// The amount in the group's base currency (smallest unit, e.g. cents).
+  /// Pre-computed on save: amountCents / exchangeRate (adjusted for decimal differences).
+  /// `null` when expense currency matches group currency (same as amountCents).
+  final int? baseAmountCents;
+
   final String title;
 
   /// Optional longer description (e.g. full OCR text from receipt).
@@ -44,6 +56,8 @@ class Expense {
     required this.payerParticipantId,
     required this.amountCents,
     required this.currencyCode,
+    this.exchangeRate = 1.0,
+    this.baseAmountCents,
     required this.title,
     this.description,
     required this.date,
@@ -58,12 +72,18 @@ class Expense {
     this.receiptImagePath,
   });
 
+  /// Returns the effective amount in the group's base currency (in cents).
+  /// Uses [baseAmountCents] if available, otherwise falls back to [amountCents].
+  int get effectiveBaseAmountCents => baseAmountCents ?? amountCents;
+
   Expense copyWith({
     String? id,
     String? groupId,
     String? payerParticipantId,
     int? amountCents,
     String? currencyCode,
+    double? exchangeRate,
+    int? baseAmountCents,
     String? title,
     String? description,
     DateTime? date,
@@ -83,6 +103,8 @@ class Expense {
       payerParticipantId: payerParticipantId ?? this.payerParticipantId,
       amountCents: amountCents ?? this.amountCents,
       currencyCode: currencyCode ?? this.currencyCode,
+      exchangeRate: exchangeRate ?? this.exchangeRate,
+      baseAmountCents: baseAmountCents ?? this.baseAmountCents,
       title: title ?? this.title,
       description: description ?? this.description,
       date: date ?? this.date,

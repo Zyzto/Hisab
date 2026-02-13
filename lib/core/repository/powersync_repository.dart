@@ -124,11 +124,7 @@ Group _groupFromRow(Map<String, dynamic> row) => Group(
   settlementSnapshotJson: row['settlement_snapshot_json'] as String?,
   ownerId: row['owner_id'] as String?,
   allowMemberAddExpense: _parseBool(row['allow_member_add_expense']),
-  allowMemberAddParticipant: _parseBool(row['allow_member_add_participant']),
   allowMemberChangeSettings: _parseBool(row['allow_member_change_settings']),
-  requireParticipantAssignment: _parseBool(
-    row['require_participant_assignment'],
-  ),
 );
 
 Participant _participantFromRow(Map<String, dynamic> row) => Participant(
@@ -136,6 +132,7 @@ Participant _participantFromRow(Map<String, dynamic> row) => Participant(
   groupId: row['group_id'] as String,
   name: row['name'] as String? ?? '',
   order: (row['sort_order'] as num?)?.toInt() ?? 0,
+  userId: row['user_id'] as String?,
   createdAt: _parseDateTime(row['created_at']),
   updatedAt: _parseDateTime(row['updated_at']),
 );
@@ -146,6 +143,8 @@ Expense _expenseFromRow(Map<String, dynamic> row) => Expense(
   payerParticipantId: row['payer_participant_id'] as String,
   amountCents: (row['amount_cents'] as num).toInt(),
   currencyCode: row['currency_code'] as String? ?? 'USD',
+  exchangeRate: (row['exchange_rate'] as num?)?.toDouble() ?? 1.0,
+  baseAmountCents: (row['base_amount_cents'] as num?)?.toInt(),
   title: row['title'] as String? ?? '',
   description: row['description'] as String?,
   date: _parseDateTime(row['date']),
@@ -266,8 +265,14 @@ class PowerSyncGroupRepository implements IGroupRepository {
     final id = _uuid.v4();
     final now = _nowIso();
     String? ownerId;
+    String? ownerDisplayName;
     try {
-      ownerId = Supabase.instance.client.auth.currentUser?.id;
+      final user = Supabase.instance.client.auth.currentUser;
+      ownerId = user?.id;
+      ownerDisplayName =
+          user?.userMetadata?['display_name'] as String? ??
+          user?.email ??
+          'Owner';
     } catch (_) {}
 
     final groupData = <String, dynamic>{
@@ -279,10 +284,24 @@ class PowerSyncGroupRepository implements IGroupRepository {
       'updated_at': now,
     };
 
+    // Auto-create a participant for the owner
+    final participantId = _uuid.v4();
+    final participantName = ownerDisplayName ?? 'Owner';
+
     if (!_isLocalOnly && _isOnline && _client != null) {
       // Online: write to Supabase first
       await _client.from('groups').insert(groupData);
-      // Also create owner membership in Supabase
+      // Create participant for owner
+      await _client.from('participants').insert({
+        'id': participantId,
+        'group_id': id,
+        'name': participantName,
+        'sort_order': 0,
+        'user_id': ownerId,
+        'created_at': now,
+        'updated_at': now,
+      });
+      // Create owner membership linked to participant
       if (ownerId != null) {
         final memberId = _uuid.v4();
         await _client.from('group_members').insert({
@@ -290,6 +309,7 @@ class PowerSyncGroupRepository implements IGroupRepository {
           'group_id': id,
           'user_id': ownerId,
           'role': 'owner',
+          'participant_id': participantId,
           'joined_at': now,
         });
       }
@@ -300,11 +320,16 @@ class PowerSyncGroupRepository implements IGroupRepository {
       'INSERT INTO groups (id, name, currency_code, owner_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
       [id, name, currencyCode, ownerId, now, now],
     );
+    // Local participant for owner
+    await _db.execute(
+      'INSERT INTO participants (id, group_id, name, sort_order, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [participantId, id, participantName, 0, ownerId, now, now],
+    );
     if (ownerId != null) {
       final memberId = _uuid.v4();
       await _db.execute(
-        'INSERT INTO group_members (id, group_id, user_id, role, joined_at) VALUES (?, ?, ?, ?, ?)',
-        [memberId, id, ownerId, 'owner', now],
+        'INSERT INTO group_members (id, group_id, user_id, role, participant_id, joined_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [memberId, id, ownerId, 'owner', participantId, now],
       );
     }
 
@@ -326,9 +351,7 @@ class PowerSyncGroupRepository implements IGroupRepository {
           .toIso8601String(),
       'settlement_snapshot_json': group.settlementSnapshotJson,
       'allow_member_add_expense': group.allowMemberAddExpense,
-      'allow_member_add_participant': group.allowMemberAddParticipant,
       'allow_member_change_settings': group.allowMemberChangeSettings,
-      'require_participant_assignment': group.requireParticipantAssignment,
       'updated_at': now,
     };
 
@@ -341,8 +364,7 @@ class PowerSyncGroupRepository implements IGroupRepository {
         name = ?, currency_code = ?, settlement_method = ?,
         treasurer_participant_id = ?, settlement_freeze_at = ?,
         settlement_snapshot_json = ?, allow_member_add_expense = ?,
-        allow_member_add_participant = ?, allow_member_change_settings = ?,
-        require_participant_assignment = ?, updated_at = ?
+        allow_member_change_settings = ?, updated_at = ?
       WHERE id = ?''',
       [
         group.name,
@@ -352,9 +374,7 @@ class PowerSyncGroupRepository implements IGroupRepository {
         group.settlementFreezeAt?.toUtc().toIso8601String(),
         group.settlementSnapshotJson,
         group.allowMemberAddExpense ? 1 : 0,
-        group.allowMemberAddParticipant ? 1 : 0,
         group.allowMemberChangeSettings ? 1 : 0,
-        group.requireParticipantAssignment ? 1 : 0,
         now,
         group.id,
       ],
@@ -467,7 +487,7 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
   }
 
   @override
-  Future<String> create(String groupId, String name, int order) async {
+  Future<String> create(String groupId, String name, int order, {String? userId}) async {
     final id = _uuid.v4();
     final now = _nowIso();
     final data = <String, dynamic>{
@@ -475,6 +495,7 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
       'group_id': groupId,
       'name': name,
       'sort_order': order,
+      'user_id': userId,
       'created_at': now,
       'updated_at': now,
     };
@@ -484,8 +505,8 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
     }
 
     await _db.execute(
-      'INSERT INTO participants (id, group_id, name, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [id, groupId, name, order, now, now],
+      'INSERT INTO participants (id, group_id, name, sort_order, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [id, groupId, name, order, userId, now, now],
     );
     return id;
   }
@@ -583,6 +604,8 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
       'payer_participant_id': expense.payerParticipantId,
       'amount_cents': expense.amountCents,
       'currency_code': expense.currencyCode,
+      'exchange_rate': expense.exchangeRate,
+      'base_amount_cents': expense.baseAmountCents,
       'title': expense.title,
       'description': expense.description,
       'date': expense.date.toUtc().toIso8601String(),
@@ -614,16 +637,19 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
     // Always write to local DB
     await _db.execute(
       '''INSERT INTO expenses (id, group_id, payer_participant_id, amount_cents,
-        currency_code, title, description, date, split_type, split_shares_json,
+        currency_code, exchange_rate, base_amount_cents,
+        title, description, date, split_type, split_shares_json,
         type, to_participant_id, tag, line_items_json, receipt_image_path,
         created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
       [
         id,
         expense.groupId,
         expense.payerParticipantId,
         expense.amountCents,
         expense.currencyCode,
+        expense.exchangeRate,
+        expense.baseAmountCents,
         expense.title,
         expense.description,
         expense.date.toUtc().toIso8601String(),
@@ -655,6 +681,9 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
           .update({
             'title': expense.title,
             'amount_cents': expense.amountCents,
+            'currency_code': expense.currencyCode,
+            'exchange_rate': expense.exchangeRate,
+            'base_amount_cents': expense.baseAmountCents,
             'payer_participant_id': expense.payerParticipantId,
             'description': expense.description,
             'date': expense.date.toUtc().toIso8601String(),
@@ -672,7 +701,9 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
 
     await _db.execute(
       '''UPDATE expenses SET
-        title = ?, amount_cents = ?, payer_participant_id = ?,
+        title = ?, amount_cents = ?, currency_code = ?,
+        exchange_rate = ?, base_amount_cents = ?,
+        payer_participant_id = ?,
         description = ?, date = ?, split_type = ?, split_shares_json = ?,
         type = ?, to_participant_id = ?, tag = ?,
         line_items_json = ?, receipt_image_path = ?, updated_at = ?
@@ -680,6 +711,9 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
       [
         expense.title,
         expense.amountCents,
+        expense.currencyCode,
+        expense.exchangeRate,
+        expense.baseAmountCents,
         expense.payerParticipantId,
         expense.description,
         expense.date.toUtc().toIso8601String(),
@@ -948,27 +982,6 @@ class PowerSyncGroupMemberRepository implements IGroupMemberRepository {
     }
   }
 
-  @override
-  Future<void> assignParticipant(
-    String groupId,
-    String memberId,
-    String participantId,
-  ) async {
-    final client = _supabase;
-    if (client != null) {
-      await client.rpc(
-        'assign_participant',
-        params: {
-          'p_group_id': groupId,
-          'p_member_id': memberId,
-          'p_participant_id': participantId,
-        },
-      );
-      Log.info('Participant assigned via RPC');
-    } else {
-      throw UnsupportedError('assignParticipant requires online mode');
-    }
-  }
 }
 
 // =============================================================================
@@ -1035,22 +1048,14 @@ class PowerSyncGroupInviteRepository implements IGroupInviteRepository {
   }
 
   @override
-  Future<String> accept(
-    String token, {
-    String? participantId,
-    String? newParticipantName,
-  }) async {
+  Future<String> accept(String token) async {
     final client = supabaseClient;
     if (client == null) {
       throw UnsupportedError('accept requires online mode');
     }
     final result = await client.rpc(
       'accept_invite',
-      params: {
-        'p_token': token,
-        'p_participant_id': participantId,
-        'p_new_participant_name': newParticipantName,
-      },
+      params: {'p_token': token},
     );
     Log.info('Invite accepted');
     return result as String;

@@ -223,10 +223,9 @@ class DataSyncService extends _$DataSyncService {
         await tx.execute(
           '''INSERT INTO groups (id, name, currency_code, owner_id, settlement_method,
             treasurer_participant_id, settlement_freeze_at, settlement_snapshot_json,
-            allow_member_add_expense, allow_member_add_participant,
-            allow_member_change_settings, require_participant_assignment,
+            allow_member_add_expense, allow_member_change_settings,
             created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
           [
             g['id'],
             g['name'],
@@ -237,9 +236,7 @@ class DataSyncService extends _$DataSyncService {
             g['settlement_freeze_at'],
             g['settlement_snapshot_json'],
             g['allow_member_add_expense'] == true ? 1 : 0,
-            g['allow_member_add_participant'] == true ? 1 : 0,
             g['allow_member_change_settings'] == true ? 1 : 0,
-            g['require_participant_assignment'] == true ? 1 : 0,
             g['created_at'],
             g['updated_at'],
           ],
@@ -260,12 +257,13 @@ class DataSyncService extends _$DataSyncService {
       }
       for (final p in participants) {
         await tx.execute(
-          'INSERT INTO participants (id, group_id, name, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+          'INSERT INTO participants (id, group_id, name, sort_order, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
           [
             p['id'],
             p['group_id'],
             p['name'],
             p['sort_order'],
+            p['user_id'],
             p['created_at'],
             p['updated_at'],
           ],

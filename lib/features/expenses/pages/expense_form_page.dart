@@ -1,3 +1,4 @@
+import 'package:currency_picker/currency_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
@@ -8,10 +9,11 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/receipt/receipt_image_view.dart';
 import '../../../core/receipt/receipt_scan_service.dart';
 import '../../../core/repository/repository_providers.dart';
+import '../../../core/services/exchange_rate_service.dart';
 import '../../../core/telemetry/telemetry_service.dart';
+import '../../../core/utils/currency_helpers.dart';
 import '../../../features/settings/providers/settings_framework_providers.dart';
 import '../../groups/providers/groups_provider.dart';
-import '../../groups/providers/group_member_provider.dart';
 import '../constants/expense_form_constants.dart';
 import '../widgets/expense_amount_section.dart';
 import '../widgets/expense_bill_breakdown_section.dart';
@@ -36,12 +38,20 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   final _descriptionController = TextEditingController();
   final _amountController = TextEditingController();
   String _currencyCode = 'USD';
+  String _groupCurrencyCode = 'USD';
   DateTime _date = DateTime.now();
   String? _payerParticipantId;
   String? _toParticipantId;
   SplitType _splitType = SplitType.equal;
   TransactionType _transactionType = TransactionType.expense;
   bool _saving = false;
+
+  // Exchange rate state
+  final _exchangeRateController = TextEditingController();
+  final _baseAmountController = TextEditingController();
+  double _exchangeRate = 1.0;
+  bool _fetchingRate = false;
+  bool _groupCurrencyInitialized = false;
 
   /// When editing, the loaded expense (for id and createdAt on update).
   Expense? _initialExpense;
@@ -96,6 +106,15 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     setState(() {
       _initialExpense = expense;
       _currencyCode = expense.currencyCode;
+      _exchangeRate = expense.exchangeRate;
+      if (expense.exchangeRate != 1.0) {
+        _exchangeRateController.text =
+            expense.exchangeRate.toStringAsFixed(4);
+      }
+      if (expense.baseAmountCents != null) {
+        _baseAmountController.text =
+            (expense.baseAmountCents! / 100).toStringAsFixed(2);
+      }
       _titleController.text = expense.title;
       _descriptionController.text = expense.description ?? '';
       _amountController.text = (expense.amountCents / 100).toStringAsFixed(2);
@@ -147,6 +166,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     _titleController.dispose();
     _descriptionController.dispose();
     _amountController.dispose();
+    _exchangeRateController.dispose();
+    _baseAmountController.dispose();
     for (final c in _splitEditControllers.values) {
       c.dispose();
     }
@@ -161,6 +182,87 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     }
     _lineItemControllers.clear();
     super.dispose();
+  }
+
+  bool get _isDifferentCurrency => _currencyCode != _groupCurrencyCode;
+
+  void _openExpenseCurrencyPicker() {
+    showCurrencyPicker(
+      context: context,
+      favorite: CurrencyHelpers.favoriteCurrencies,
+      showFlag: true,
+      showSearchField: true,
+      showCurrencyName: true,
+      showCurrencyCode: true,
+      onSelect: (Currency currency) {
+        if (currency.code == _currencyCode) return;
+        setState(() {
+          _currencyCode = currency.code;
+          if (_isDifferentCurrency) {
+            _fetchLiveRate();
+          } else {
+            _exchangeRate = 1.0;
+            _exchangeRateController.clear();
+            _baseAmountController.clear();
+          }
+        });
+      },
+    );
+  }
+
+  Future<void> _fetchLiveRate() async {
+    setState(() => _fetchingRate = true);
+    try {
+      final service = ExchangeRateService();
+      final rate = await service.getRate(_currencyCode, _groupCurrencyCode);
+      if (!mounted) return;
+      if (rate != null && rate > 0) {
+        setState(() {
+          _exchangeRate = rate;
+          _exchangeRateController.text = rate.toStringAsFixed(4);
+          _recalcBaseAmount();
+        });
+      }
+    } catch (e) {
+      Log.debug('Exchange rate fetch failed: $e');
+    } finally {
+      if (mounted) setState(() => _fetchingRate = false);
+    }
+  }
+
+  void _onExchangeRateChanged(String value) {
+    final rate = double.tryParse(value);
+    if (rate == null || rate <= 0) return;
+    _exchangeRate = rate;
+    _recalcBaseAmount();
+  }
+
+  void _onBaseAmountChanged(String value) {
+    final baseAmount = double.tryParse(value);
+    final amount = double.tryParse(_amountController.text.trim());
+    if (baseAmount != null && baseAmount > 0 && amount != null && amount > 0) {
+      final newRate = amount / baseAmount;
+      setState(() {
+        _exchangeRate = newRate;
+        _exchangeRateController.text = newRate.toStringAsFixed(4);
+      });
+    }
+  }
+
+  /// Recalculate the base amount from current amount and exchange rate.
+  void _recalcBaseAmount() {
+    final amount = double.tryParse(_amountController.text.trim());
+    if (amount != null && amount > 0 && _exchangeRate > 0) {
+      final baseAmount = amount / _exchangeRate;
+      _baseAmountController.text = baseAmount.toStringAsFixed(2);
+    }
+  }
+
+  /// Recalculate base amount when the main amount field changes.
+  void _onAmountChangedForExchangeRate() {
+    if (_isDifferentCurrency && _exchangeRate > 0) {
+      _recalcBaseAmount();
+    }
   }
 
   Future<void> _save() async {
@@ -281,12 +383,30 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     try {
       final title = isTransfer ? 'Transfer' : _titleController.text.trim();
       final desc = _descriptionController.text.trim();
+
+      // Compute base amount in group currency when currencies differ
+      int? baseAmountCents;
+      double exchangeRate = 1.0;
+      if (_isDifferentCurrency && _exchangeRate > 0) {
+        exchangeRate = _exchangeRate;
+        final baseAmountText = _baseAmountController.text.trim();
+        final baseAmount = double.tryParse(baseAmountText);
+        if (baseAmount != null && baseAmount > 0) {
+          baseAmountCents = (baseAmount * 100).round();
+        } else {
+          // Fallback: compute from amount and rate
+          baseAmountCents = (amount / _exchangeRate).round();
+        }
+      }
+
       final expense = Expense(
         id: _initialExpense?.id ?? '',
         groupId: widget.groupId,
         payerParticipantId: payerId,
         amountCents: amount.toInt(),
         currencyCode: _currencyCode,
+        exchangeRate: exchangeRate,
+        baseAmountCents: baseAmountCents,
         title: title,
         description: desc.isEmpty ? null : desc,
         date: _date,
@@ -560,26 +680,17 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           );
         }
         final currencyCode = group.currencyCode;
-        final localOnly = ref.watch(effectiveLocalOnlyProvider);
-        final myMemberAsync = localOnly
-            ? const AsyncValue.data(null)
-            : ref.watch(myMemberInGroupProvider(widget.groupId));
-        final payerLocked =
-            !localOnly &&
-            group.requireParticipantAssignment &&
-            myMemberAsync.value?.participantId != null;
-        final lockedPayerId = myMemberAsync.value?.participantId;
-        if (payerLocked &&
-            lockedPayerId != null &&
-            _payerParticipantId != lockedPayerId) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) setState(() => _payerParticipantId = lockedPayerId);
-          });
-        }
 
         return participantsAsync.when(
           data: (participants) {
-            _currencyCode = group.currencyCode;
+            // Set group currency once; don't override user's expense currency selection
+            if (!_groupCurrencyInitialized) {
+              _groupCurrencyCode = group.currencyCode;
+              if (widget.expenseId == null) {
+                _currencyCode = group.currencyCode;
+              }
+              _groupCurrencyInitialized = true;
+            }
             if (widget.expenseId != null && !_editLoaded) {
               return Scaffold(
                 appBar: AppBar(
@@ -714,9 +825,23 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       _buildDescriptionSection(context),
                       const SizedBox(height: 20),
                     ],
-                    ExpenseAmountSection(
-                      controller: _amountController,
-                      currencyCode: currencyCode,
+                    ListenableBuilder(
+                      listenable: _amountController,
+                      builder: (context, _) {
+                        // Trigger base amount recalc when amount changes
+                        _onAmountChangedForExchangeRate();
+                        return ExpenseAmountSection(
+                          controller: _amountController,
+                          currencyCode: _currencyCode,
+                          onCurrencyTap: _openExpenseCurrencyPicker,
+                          groupCurrencyCode: _groupCurrencyCode,
+                          exchangeRateController: _exchangeRateController,
+                          baseAmountController: _baseAmountController,
+                          fetchingRate: _fetchingRate,
+                          onExchangeRateChanged: _onExchangeRateChanged,
+                          onBaseAmountChanged: _onBaseAmountChanged,
+                        );
+                      },
                     ),
                     const SizedBox(height: 20),
                     if (isTransfer) ...[
@@ -725,7 +850,6 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                         participants,
                         payerId,
                         toId,
-                        payerLocked: payerLocked,
                       ),
                       const SizedBox(height: 20),
                       _buildWhenSection(context),
@@ -734,7 +858,6 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                         context,
                         participants,
                         payerId,
-                        payerLocked: payerLocked,
                       ),
                     if (!isTransfer) ...[
                       const SizedBox(height: 20),
@@ -1346,9 +1469,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   Widget _buildPaidByAndWhenRow(
     BuildContext context,
     List<Participant> participants,
-    String payerId, {
-    bool payerLocked = false,
-  }) {
+    String payerId,
+  ) {
     final theme = Theme.of(context);
     final payer = participants.firstWhere(
       (p) => p.id == payerId,
@@ -1372,9 +1494,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
               ),
               const SizedBox(height: 6),
               InkWell(
-                onTap: payerLocked
-                    ? null
-                    : () => _showPayerPicker(context, participants),
+                onTap: () => _showPayerPicker(context, participants),
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
                   height: 52,
@@ -1393,11 +1513,10 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                           style: theme.textTheme.bodyLarge,
                         ),
                       ),
-                      if (!payerLocked)
-                        Icon(
-                          Icons.arrow_drop_down,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                      Icon(
+                        Icons.arrow_drop_down,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ],
                   ),
                 ),
@@ -1464,9 +1583,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     BuildContext context,
     List<Participant> participants,
     String payerId,
-    String toId, {
-    bool payerLocked = false,
-  }) {
+    String toId,
+  ) {
     final theme = Theme.of(context);
     final payer = participants.firstWhere(
       (p) => p.id == payerId,
@@ -1493,9 +1611,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
               ),
               const SizedBox(height: 6),
               InkWell(
-                onTap: payerLocked
-                    ? null
-                    : () => _showPayerPicker(context, participants),
+                onTap: () => _showPayerPicker(context, participants),
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
                   height: 52,
@@ -1514,11 +1630,10 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                           style: theme.textTheme.bodyLarge,
                         ),
                       ),
-                      if (!payerLocked)
-                        Icon(
-                          Icons.arrow_drop_down,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                      Icon(
+                        Icons.arrow_drop_down,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ],
                   ),
                 ),

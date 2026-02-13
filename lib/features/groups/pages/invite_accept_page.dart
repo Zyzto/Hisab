@@ -3,12 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
+import '../../../core/auth/auth_providers.dart';
+import '../../../core/auth/sign_in_sheet.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/telemetry/telemetry_service.dart';
 import '../../../domain/domain.dart';
 import '../providers/group_invite_provider.dart';
-import '../providers/groups_provider.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 
 class InviteAcceptPage extends ConsumerStatefulWidget {
@@ -21,9 +22,6 @@ class InviteAcceptPage extends ConsumerStatefulWidget {
 }
 
 class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
-  String? _selectedParticipantId;
-  String _newParticipantName = '';
-  bool _useNewParticipant = false;
   bool _accepting = false;
   String? _error;
 
@@ -103,8 +101,6 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
     GroupInvite invite,
     Group group,
   ) {
-    final participantsAsync = ref.watch(participantsByGroupProvider(group.id));
-    final requireChoice = group.requireParticipantAssignment;
     final theme = Theme.of(context);
 
     return SingleChildScrollView(
@@ -135,72 +131,6 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
               ),
             ),
           ),
-          const SizedBox(height: 24),
-          Text(
-            requireChoice
-                ? 'choose_your_participant'.tr()
-                : 'choose_your_participant_optional'.tr(),
-            style: theme.textTheme.titleMedium,
-          ),
-          const SizedBox(height: 12),
-          participantsAsync.when(
-            data: (participants) {
-              final groupValue = _useNewParticipant
-                  ? 'new'
-                  : _selectedParticipantId;
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  RadioGroup<String?>(
-                    groupValue: groupValue,
-                    onChanged: (v) {
-                      setState(() {
-                        if (v == 'new') {
-                          _useNewParticipant = true;
-                          _selectedParticipantId = null;
-                          _newParticipantName = '';
-                        } else {
-                          _useNewParticipant = false;
-                          _selectedParticipantId = v;
-                          _newParticipantName = '';
-                        }
-                      });
-                    },
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (participants.isNotEmpty)
-                          ...participants.map(
-                            (p) => RadioListTile<String?>(
-                              value: p.id,
-                              title: Text(p.name),
-                            ),
-                          ),
-                        RadioListTile<String?>(
-                          value: 'new',
-                          title: Text('create_new_participant'.tr()),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (_useNewParticipant)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 48, top: 8),
-                      child: TextField(
-                        decoration: InputDecoration(
-                          labelText: 'participant_name'.tr(),
-                          border: const OutlineInputBorder(),
-                        ),
-                        onChanged: (v) =>
-                            setState(() => _newParticipantName = v.trim()),
-                      ),
-                    ),
-                ],
-              );
-            },
-            loading: () => const CircularProgressIndicator(),
-            error: (e, _) => Text('$e'),
-          ),
           const SizedBox(height: 32),
           FilledButton(
             onPressed: _accepting ? null : () => _accept(context, group),
@@ -218,15 +148,19 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
   }
 
   Future<void> _accept(BuildContext context, Group group) async {
-    if (group.requireParticipantAssignment) {
-      if (_useNewParticipant) {
-        if (_newParticipantName.isEmpty) {
-          setState(() => _error = 'participant_name_required'.tr());
+    if (!ref.read(isAuthenticatedProvider)) {
+      final messenger = ScaffoldMessenger.of(context);
+      final result = await showSignInSheet(context, ref);
+      switch (result) {
+        case SignInResult.success:
+          break;
+        case SignInResult.pendingRedirect:
           return;
-        }
-      } else if (_selectedParticipantId == null) {
-        setState(() => _error = 'choose_your_participant'.tr());
-        return;
+        case SignInResult.cancelled:
+          messenger.showSnackBar(
+            SnackBar(content: Text('sign_in_required'.tr())),
+          );
+          return;
       }
     }
 
@@ -237,11 +171,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
 
     try {
       final repo = ref.read(groupInviteRepositoryProvider);
-      final groupId = await repo.accept(
-        widget.token,
-        participantId: _useNewParticipant ? null : _selectedParticipantId,
-        newParticipantName: _useNewParticipant ? _newParticipantName : null,
-      );
+      final groupId = await repo.accept(widget.token);
       TelemetryService.sendEvent('invite_accepted', {
         'groupId': groupId,
       }, enabled: ref.read(telemetryEnabledProvider));
