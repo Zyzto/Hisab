@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  FLUTTER_VERSION: "3.32.2" # keep in sync with your local SDK
+  FLUTTER_VERSION: "3.38.2" # keep in sync with your local SDK
   JAVA_VERSION: "17"
 
 jobs:
