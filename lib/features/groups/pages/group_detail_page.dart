@@ -553,12 +553,23 @@ class _PeopleTab extends ConsumerWidget {
     bool isOwnerOrAdmin,
     GroupRole? myRole,
   ) {
-    // Active member with actions
+    // Active member with member-management actions
     if (isActive && isOwnerOrAdmin && linkedMember!.role != 'owner') {
       return PopupMenuButton<String>(
-        onSelected: (v) =>
-            _onMemberAction(context, ref, v, linkedMember),
+        onSelected: (v) {
+          if (v == 'edit') {
+            _showEditParticipant(context, ref, participant);
+          } else if (v == 'delete') {
+            _showDeleteParticipant(context, ref, participant);
+          } else {
+            _onMemberAction(context, ref, v, linkedMember);
+          }
+        },
         itemBuilder: (ctx) => [
+          PopupMenuItem(
+            value: 'edit',
+            child: Text('edit_expense'.tr()),
+          ),
           if (myRole == GroupRole.owner) ...[
             PopupMenuItem(
               value: 'role',
@@ -576,7 +587,110 @@ class _PeopleTab extends ConsumerWidget {
         ],
       );
     }
+
+    // Standalone participant (no userId) or local-only mode — allow edit/delete
+    if (!isActive && !isLeft && isOwnerOrAdmin) {
+      return PopupMenuButton<String>(
+        onSelected: (v) {
+          if (v == 'edit') {
+            _showEditParticipant(context, ref, participant);
+          } else if (v == 'delete') {
+            _showDeleteParticipant(context, ref, participant);
+          }
+        },
+        itemBuilder: (ctx) => [
+          PopupMenuItem(
+            value: 'edit',
+            child: Text('edit_expense'.tr()),
+          ),
+          PopupMenuItem(
+            value: 'delete',
+            child: Text('delete_group'.tr()),
+          ),
+        ],
+      );
+    }
+
     return null;
+  }
+
+  Future<void> _showEditParticipant(
+    BuildContext context,
+    WidgetRef ref,
+    Participant participant,
+  ) async {
+    final nameController = TextEditingController(text: participant.name);
+    try {
+      final newName = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('participant_name'.tr()),
+          content: TextField(
+            controller: nameController,
+            decoration: InputDecoration(
+              labelText: 'participant_name'.tr(),
+            ),
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text('cancel'.tr()),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.of(ctx).pop(nameController.text.trim()),
+              child: Text('done'.tr()),
+            ),
+          ],
+        ),
+      );
+      if (newName != null && newName.isNotEmpty && context.mounted) {
+        await ref
+            .read(participantRepositoryProvider)
+            .update(participant.copyWith(name: newName));
+        ref.invalidate(participantsByGroupProvider(groupId));
+      }
+    } finally {
+      nameController.dispose();
+    }
+  }
+
+  Future<void> _showDeleteParticipant(
+    BuildContext context,
+    WidgetRef ref,
+    Participant participant,
+  ) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('delete_group'.tr()),
+        content: Text(participant.name),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('cancel'.tr()),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('done'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && context.mounted) {
+      try {
+        await ref.read(participantRepositoryProvider).delete(participant.id);
+        ref.invalidate(participantsByGroupProvider(groupId));
+      } catch (e, st) {
+        Log.warning('Delete participant failed', error: e, stackTrace: st);
+        if (context.mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('$e')));
+        }
+      }
+    }
   }
 
   Future<void> _onMemberAction(
