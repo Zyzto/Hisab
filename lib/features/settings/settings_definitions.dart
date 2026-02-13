@@ -1,40 +1,44 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 
-final generalSection = const SettingSection(
-  key: 'general',
-  titleKey: 'general',
-  icon: Icons.settings,
-  order: 0,
+final accountSection = const SettingSection(
+  key: 'account',
+  titleKey: 'account',
+  icon: Icons.person,
+  order: -1,
   initiallyExpanded: true,
 );
 
+/// Merged from old General + Appearance sections.
 final appearanceSection = const SettingSection(
   key: 'appearance',
   titleKey: 'appearance',
   icon: Icons.palette,
-  order: 1,
+  order: 0,
+  initiallyExpanded: true,
 );
 
-final dataSection = const SettingSection(
-  key: 'data',
-  titleKey: 'data',
+/// Merged from old Data + Backup sections.
+final dataBackupSection = const SettingSection(
+  key: 'data_backup',
+  titleKey: 'data_backup',
   icon: Icons.storage,
-  order: 2,
+  order: 1,
 );
 
 final receiptAiSection = const SettingSection(
   key: 'receipt_ai',
   titleKey: 'receipt_ai_section',
   icon: Icons.receipt_long,
-  order: 3,
+  order: 2,
 );
 
-final loggingSection = const SettingSection(
-  key: 'logging',
-  titleKey: 'logging',
-  icon: Icons.description,
-  order: 4,
+/// Renamed from old Logging section.
+final privacySection = const SettingSection(
+  key: 'privacy',
+  titleKey: 'privacy',
+  icon: Icons.shield_outlined,
+  order: 3,
 );
 
 /// When true, send anonymous usage data to telemetry endpoint. No-op if endpoint is empty.
@@ -43,29 +47,22 @@ final telemetryEnabledSettingDef = const BoolSetting(
   defaultValue: true,
   titleKey: 'telemetry_enabled',
   icon: Icons.analytics,
-  section: 'logging',
+  section: 'privacy',
   order: 0,
-);
-
-final backupSection = const SettingSection(
-  key: 'backup',
-  titleKey: 'backup',
-  icon: Icons.backup,
-  order: 6,
 );
 
 final advancedSection = const SettingSection(
   key: 'advanced',
   titleKey: 'advanced',
   icon: Icons.build,
-  order: 5,
+  order: 4,
 );
 
 final aboutSection = const SettingSection(
   key: 'about',
   titleKey: 'about',
   icon: Icons.info,
-  order: 7,
+  order: 5,
 );
 
 final themeModeSettingDef = const EnumSetting(
@@ -80,7 +77,7 @@ final themeModeSettingDef = const EnumSetting(
     'amoled': 'amoled',
   },
   icon: Icons.dark_mode,
-  section: 'general',
+  section: 'appearance',
   order: 0,
 );
 
@@ -89,7 +86,7 @@ final themeColorSettingDef = const ColorSetting(
   defaultValue: 0xFF2E7D32,
   titleKey: 'select_theme_color',
   icon: Icons.palette,
-  section: 'general',
+  section: 'appearance',
   order: 1,
 );
 
@@ -100,7 +97,7 @@ final languageSettingDef = const EnumSetting(
   options: ['en', 'ar'],
   optionLabels: {'en': 'English', 'ar': 'العربية'},
   icon: Icons.language,
-  section: 'general',
+  section: 'appearance',
   order: 2,
 );
 
@@ -117,7 +114,7 @@ final fontSizeScaleSettingDef = const EnumSetting(
   },
   icon: Icons.text_fields,
   section: 'appearance',
-  order: 0,
+  order: 3,
 );
 
 /// When true, user has completed first-launch onboarding.
@@ -126,39 +123,39 @@ final onboardingCompletedSettingDef = const BoolSetting(
   defaultValue: false,
   titleKey: 'onboarding_completed',
   icon: Icons.check_circle_outline,
-  section: 'general',
+  section: 'appearance',
   order: -1, // Internal, not shown in settings UI
 );
 
-/// When true, user selected Online and tapped Complete; Auth0 redirect in progress (web).
-/// Cleared when app loads after redirect and onboarding is completed.
+/// When true, user selected Online and tapped Complete; OAuth redirect in progress (web).
+/// Cleared by main.dart when the app reloads after redirect.
 final onboardingOnlinePendingSettingDef = const BoolSetting(
   'onboarding_online_pending',
   defaultValue: false,
   titleKey: 'onboarding_online_pending',
   icon: Icons.pending,
-  section: 'general',
+  section: 'appearance',
   order: -2, // Internal, not shown in settings UI
 );
 
-/// When true, user switched to online in settings; Auth0 redirect in progress (web).
-/// Cleared when app loads after redirect and localOnly is set to false.
+/// When true, user switched to online in settings; OAuth redirect in progress (web).
+/// Cleared by main.dart when the app reloads after redirect.
 final settingsOnlinePendingSettingDef = const BoolSetting(
   'settings_online_pending',
   defaultValue: false,
   titleKey: 'settings_online_pending',
   icon: Icons.pending,
-  section: 'general',
+  section: 'appearance',
   order: -3, // Internal, not shown in settings UI
 );
 
-/// When true, app uses only local storage (Drift). When false, uses Convex.
+/// When true, app uses only local storage (PowerSync SQLite). When false, syncs with Supabase.
 final localOnlySettingDef = const BoolSetting(
   'local_only',
   defaultValue: true,
   titleKey: 'local_only',
   icon: Icons.storage,
-  section: 'data',
+  section: 'data_backup',
   order: 0,
 );
 
@@ -219,12 +216,11 @@ final openaiApiKeySettingDef = const StringSetting(
 );
 
 final allSections = [
-  generalSection,
+  accountSection,
   appearanceSection,
-  dataSection,
+  dataBackupSection,
   receiptAiSection,
-  loggingSection,
-  backupSection,
+  privacySection,
   advancedSection,
   aboutSection,
 ];

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../providers/groups_provider.dart';
+import '../providers/group_member_provider.dart';
 import '../widgets/segmented_tab_bar.dart';
+import '../widgets/invite_link_sheet.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -11,6 +14,7 @@ import '../../../core/widgets/async_value_builder.dart';
 import '../../expenses/widgets/expense_list_tile.dart';
 import '../../expenses/category_icons.dart';
 import '../../balance/widgets/balance_list.dart';
+import '../../settings/providers/settings_framework_providers.dart';
 import '../../../domain/domain.dart';
 
 class GroupDetailPage extends ConsumerWidget {
@@ -62,7 +66,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _tabIndexNotifier = ValueNotifier<int>(0);
   }
 
@@ -78,6 +82,8 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
     ref.invalidate(expensesByGroupProvider(widget.group.id));
     ref.invalidate(participantsByGroupProvider(widget.group.id));
     ref.invalidate(tagsByGroupProvider(widget.group.id));
+    ref.invalidate(membersByGroupProvider(widget.group.id));
+    ref.invalidate(myRoleInGroupProvider(widget.group.id));
   }
 
   Widget _buildAppBarTitle(BuildContext context) {
@@ -113,10 +119,21 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
     );
   }
 
-  Widget? _buildFAB(BuildContext context, int index) {
+  Widget? _buildFAB(
+    BuildContext context,
+    int index,
+    GroupRole? myRole,
+    bool localOnly,
+  ) {
     final theme = Theme.of(context);
+    final isOwnerOrAdmin =
+        localOnly || myRole == GroupRole.owner || myRole == GroupRole.admin;
+    final canAddExpense = isOwnerOrAdmin || widget.group.allowMemberAddExpense;
+    final canAddParticipant =
+        isOwnerOrAdmin || widget.group.allowMemberAddParticipant;
+
     if (index == 0) {
-      if (widget.group.isSettlementFrozen) return null;
+      if (widget.group.isSettlementFrozen || !canAddExpense) return null;
       return _FABWithLabel(
         icon: Icons.add,
         label: 'add_expense'.tr(),
@@ -125,6 +142,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
       );
     }
     if (index == 2) {
+      if (!canAddParticipant) return null;
       return _FABWithLabel(
         icon: Icons.person_add,
         label: 'add_participant'.tr(),
@@ -146,6 +164,12 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
 
   @override
   Widget build(BuildContext context) {
+    final localOnly = ref.watch(effectiveLocalOnlyProvider);
+    final myRoleAsync = localOnly
+        ? const AsyncValue.data(null)
+        : ref.watch(myRoleInGroupProvider(widget.group.id));
+    final myRole = myRoleAsync.value;
+
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
@@ -161,6 +185,14 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
         ),
         title: _buildAppBarTitle(context),
         actions: [
+          if (!localOnly &&
+              (myRole == GroupRole.owner || myRole == GroupRole.admin))
+            IconButton(
+              icon: const Icon(Icons.person_add),
+              tooltip: 'invite_people'.tr(),
+              onPressed: () =>
+                  createAndShowInviteSheet(context, ref, widget.group.id),
+            ),
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () =>
@@ -173,7 +205,12 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
         children: [
           SegmentedTabBar(
             controller: _tabController,
-            labels: ['expenses'.tr(), 'balance'.tr(), 'participants'.tr()],
+            labels: [
+              'expenses'.tr(),
+              'balance'.tr(),
+              'participants'.tr(),
+              'members'.tr(),
+            ],
             currentIndexNotifier: _tabIndexNotifier,
           ),
           Expanded(
@@ -183,6 +220,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
                 _ExpensesTab(groupId: widget.group.id, group: widget.group),
                 _BalanceTab(groupId: widget.group.id),
                 _ParticipantsTab(groupId: widget.group.id),
+                _MembersTab(groupId: widget.group.id, group: widget.group),
               ],
             ),
           ),
@@ -191,7 +229,8 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
       floatingActionButton: ValueListenableBuilder<int>(
         valueListenable: _tabIndexNotifier,
         builder: (context, index, _) =>
-            _buildFAB(context, index) ?? const SizedBox.shrink(),
+            _buildFAB(context, index, myRole, localOnly) ??
+            const SizedBox.shrink(),
       ),
     );
   }
@@ -394,6 +433,359 @@ class _ParticipantsTab extends ConsumerWidget {
         );
       },
     );
+  }
+}
+
+class _MembersTab extends ConsumerWidget {
+  final String groupId;
+  final Group group;
+
+  const _MembersTab({required this.groupId, required this.group});
+
+  String _roleLabel(String role) {
+    switch (role) {
+      case 'owner':
+        return 'group_owner'.tr();
+      case 'admin':
+        return 'group_admin'.tr();
+      default:
+        return 'group_member'.tr();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final localOnly = ref.watch(effectiveLocalOnlyProvider);
+    if (localOnly) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            'invite_requires_online'.tr(),
+            style: Theme.of(context).textTheme.bodyLarge,
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
+    final membersAsync = ref.watch(membersByGroupProvider(groupId));
+    final participantsAsync = ref.watch(participantsByGroupProvider(groupId));
+    final myRoleAsync = ref.watch(myRoleInGroupProvider(groupId));
+    final myMemberAsync = ref.watch(myMemberInGroupProvider(groupId));
+
+    return membersAsync.when(
+      data: (members) {
+        return participantsAsync.when(
+          data: (participants) {
+            final participantMap = {for (final p in participants) p.id: p.name};
+            final myMember = myMemberAsync.value;
+            final myRole = myRoleAsync.value;
+            final isOwnerOrAdmin =
+                myRole == GroupRole.owner || myRole == GroupRole.admin;
+
+            return Column(
+              children: [
+                Expanded(
+                  child: members.isEmpty
+                      ? Center(
+                          child: Text(
+                            'add_participants_first'.tr(),
+                            style: Theme.of(context).textTheme.bodyLarge,
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 8,
+                            horizontal: 16,
+                          ),
+                          itemCount: members.length,
+                          itemBuilder: (context, index) {
+                            final m = members[index];
+                            final participantName = m.participantId != null
+                                ? participantMap[m.participantId]
+                                : null;
+                            return ListTile(
+                              key: ValueKey(m.id),
+                              leading: CircleAvatar(
+                                child: Text(
+                                  (participantName ?? m.userId)
+                                      .substring(0, 1)
+                                      .toUpperCase(),
+                                ),
+                              ),
+                              title: Text(
+                                participantName ??
+                                    '${m.userId.substring(0, 8)}...',
+                              ),
+                              subtitle: Text(_roleLabel(m.role)),
+                              trailing: (isOwnerOrAdmin && m.role != 'owner')
+                                  ? PopupMenuButton<String>(
+                                      onSelected: (v) => _onMemberAction(
+                                        context,
+                                        ref,
+                                        v,
+                                        m,
+                                        participants,
+                                      ),
+                                      itemBuilder: (ctx) => [
+                                        if (myRole == GroupRole.owner) ...[
+                                          PopupMenuItem(
+                                            value: 'assign',
+                                            child: Text(
+                                              'assign_participant'.tr(),
+                                            ),
+                                          ),
+                                          PopupMenuItem(
+                                            value: 'role',
+                                            child: Text('change_role'.tr()),
+                                          ),
+                                          PopupMenuItem(
+                                            value: 'transfer',
+                                            child: Text(
+                                              'transfer_ownership'.tr(),
+                                            ),
+                                          ),
+                                        ],
+                                        PopupMenuItem(
+                                          value: 'kick',
+                                          child: Text('kick_member'.tr()),
+                                        ),
+                                      ],
+                                    )
+                                  : null,
+                            );
+                          },
+                        ),
+                ),
+                if (myMember != null)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _showLeaveGroup(context, ref),
+                        icon: const Icon(Icons.exit_to_app),
+                        label: Text('leave_group'.tr()),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text('Error: $e')),
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('Error: $e')),
+    );
+  }
+
+  Future<void> _onMemberAction(
+    BuildContext context,
+    WidgetRef ref,
+    String action,
+    GroupMember member,
+    List<Participant> participants,
+  ) async {
+    switch (action) {
+      case 'assign':
+        await _showAssignParticipant(context, ref, member, participants);
+        break;
+      case 'role':
+        await _showChangeRole(context, ref, member);
+        break;
+      case 'transfer':
+        await _showTransferOwnership(context, ref, member.id);
+        break;
+      case 'kick':
+        await _showKickMember(context, ref, member);
+        break;
+    }
+  }
+
+  Future<void> _showAssignParticipant(
+    BuildContext context,
+    WidgetRef ref,
+    GroupMember member,
+    List<Participant> participants,
+  ) async {
+    final chosen = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('assign_participant'.tr()),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: participants.length,
+            itemBuilder: (_, i) {
+              final p = participants[i];
+              return ListTile(
+                title: Text(p.name),
+                onTap: () => Navigator.pop(ctx, p.id),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    if (chosen != null && context.mounted) {
+      try {
+        await ref
+            .read(groupMemberRepositoryProvider)
+            .assignParticipant(groupId, member.id, chosen);
+        ref.invalidate(membersByGroupProvider(groupId));
+      } catch (e, st) {
+        Log.warning('Assign participant failed', error: e, stackTrace: st);
+        if (context.mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('$e')));
+        }
+      }
+    }
+  }
+
+  Future<void> _showChangeRole(
+    BuildContext context,
+    WidgetRef ref,
+    GroupMember member,
+  ) async {
+    final role = await showDialog<GroupRole>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('change_role'.tr()),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text('group_admin'.tr()),
+              onTap: () => Navigator.pop(ctx, GroupRole.admin),
+            ),
+            ListTile(
+              title: Text('group_member'.tr()),
+              onTap: () => Navigator.pop(ctx, GroupRole.member),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (role != null && context.mounted) {
+      try {
+        await ref
+            .read(groupMemberRepositoryProvider)
+            .updateRole(groupId, member.id, role);
+        ref.invalidate(membersByGroupProvider(groupId));
+      } catch (e, st) {
+        Log.warning('Change role failed', error: e, stackTrace: st);
+        if (context.mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('$e')));
+        }
+      }
+    }
+  }
+
+  Future<void> _showTransferOwnership(
+    BuildContext context,
+    WidgetRef ref,
+    String memberId,
+  ) async {
+    try {
+      await ref
+          .read(groupMemberRepositoryProvider)
+          .transferOwnership(groupId, memberId);
+      ref.invalidate(futureGroupProvider(groupId));
+      ref.invalidate(membersByGroupProvider(groupId));
+      ref.invalidate(myRoleInGroupProvider(groupId));
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('ownership_transferred'.tr())));
+      }
+    } catch (e, st) {
+      Log.warning('Transfer failed', error: e, stackTrace: st);
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    }
+  }
+
+  Future<void> _showKickMember(
+    BuildContext context,
+    WidgetRef ref,
+    GroupMember member,
+  ) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('kick_member'.tr()),
+        content: Text('kick_member_confirm'.tr()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('cancel'.tr()),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('kick_member'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && context.mounted) {
+      try {
+        await ref
+            .read(groupMemberRepositoryProvider)
+            .kickMember(groupId, member.id);
+        ref.invalidate(membersByGroupProvider(groupId));
+      } catch (e, st) {
+        Log.warning('Kick failed', error: e, stackTrace: st);
+        if (context.mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('$e')));
+        }
+      }
+    }
+  }
+
+  Future<void> _showLeaveGroup(BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('leave_group'.tr()),
+        content: Text('leave_group_confirm'.tr()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('cancel'.tr()),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('leave_group'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && context.mounted) {
+      try {
+        await ref.read(groupMemberRepositoryProvider).leave(groupId);
+        if (context.mounted) context.go(RoutePaths.home);
+      } catch (e, st) {
+        Log.warning('Leave failed', error: e, stackTrace: st);
+        if (context.mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('$e')));
+        }
+      }
+    }
   }
 }
 

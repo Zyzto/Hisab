@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "default": "your-project-id",
+    "dev": "hisab-c8eb1"
+  },
+  "targets": {},
+  "etags": {}
+}

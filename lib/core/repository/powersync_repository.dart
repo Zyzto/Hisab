@@ -1,0 +1,1085 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_logging_service/flutter_logging_service.dart';
+import 'package:powersync/powersync.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
+
+import '../../domain/domain.dart';
+import 'group_repository.dart';
+import 'participant_repository.dart';
+import 'expense_repository.dart';
+import 'tag_repository.dart';
+import 'group_member_repository.dart';
+import 'group_invite_repository.dart';
+
+const _uuid = Uuid();
+
+/// On web, PowerSync/sqlite3_web can emit raw JS objects (LegacyJavaScriptObject)
+/// in update streams instead of Dart UpdateNotification, causing type errors.
+/// Use polling instead of watch() to avoid the broken stream.
+const _webPollPeriod = Duration(milliseconds: 800);
+
+Stream<T> _pollStream<T>(Future<T> Function() fetch) async* {
+  yield await fetch();
+  await for (final _ in Stream.periodic(_webPollPeriod)) {
+    yield await fetch();
+  }
+}
+
+// =============================================================================
+// Row parsing helpers
+// =============================================================================
+
+DateTime _parseDateTime(dynamic v) {
+  if (v == null) return DateTime.now();
+  if (v is DateTime) return v;
+  return DateTime.tryParse(v.toString()) ?? DateTime.now();
+}
+
+DateTime? _parseDateTimeNullable(dynamic v) {
+  if (v == null) return null;
+  if (v is DateTime) return v;
+  return DateTime.tryParse(v.toString());
+}
+
+bool _parseBool(dynamic v) {
+  if (v == null) return false;
+  if (v is bool) return v;
+  if (v is int) return v == 1;
+  return v.toString() == 'true' || v.toString() == '1';
+}
+
+SettlementMethod _parseSettlementMethod(dynamic v) {
+  if (v == null) return SettlementMethod.greedy;
+  switch (v.toString()) {
+    case 'pairwise':
+      return SettlementMethod.pairwise;
+    case 'consolidated':
+      return SettlementMethod.consolidated;
+    case 'treasurer':
+      return SettlementMethod.treasurer;
+    default:
+      return SettlementMethod.greedy;
+  }
+}
+
+SplitType _parseSplitType(dynamic v) {
+  switch (v?.toString()) {
+    case 'parts':
+      return SplitType.parts;
+    case 'amounts':
+      return SplitType.amounts;
+    default:
+      return SplitType.equal;
+  }
+}
+
+TransactionType _parseTransactionType(dynamic v) {
+  switch (v?.toString()) {
+    case 'income':
+      return TransactionType.income;
+    case 'transfer':
+      return TransactionType.transfer;
+    default:
+      return TransactionType.expense;
+  }
+}
+
+Map<String, int> _parseSplitShares(dynamic v) {
+  if (v == null || v.toString().isEmpty) return {};
+  try {
+    final decoded = jsonDecode(v.toString());
+    if (decoded is Map) {
+      return decoded.map((k, v) => MapEntry(k.toString(), (v as num).toInt()));
+    }
+  } catch (_) {}
+  return {};
+}
+
+List<ReceiptLineItem>? _parseLineItems(dynamic v) {
+  if (v == null || v.toString().isEmpty) return null;
+  try {
+    final decoded = jsonDecode(v.toString());
+    if (decoded is List) {
+      return decoded
+          .map((e) => ReceiptLineItem.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+  } catch (_) {}
+  return null;
+}
+
+Group _groupFromRow(Map<String, dynamic> row) => Group(
+  id: row['id'] as String,
+  name: row['name'] as String? ?? '',
+  currencyCode: row['currency_code'] as String? ?? 'USD',
+  createdAt: _parseDateTime(row['created_at']),
+  updatedAt: _parseDateTime(row['updated_at']),
+  settlementMethod: _parseSettlementMethod(row['settlement_method']),
+  treasurerParticipantId: row['treasurer_participant_id'] as String?,
+  settlementFreezeAt: _parseDateTimeNullable(row['settlement_freeze_at']),
+  settlementSnapshotJson: row['settlement_snapshot_json'] as String?,
+  ownerId: row['owner_id'] as String?,
+  allowMemberAddExpense: _parseBool(row['allow_member_add_expense']),
+  allowMemberAddParticipant: _parseBool(row['allow_member_add_participant']),
+  allowMemberChangeSettings: _parseBool(row['allow_member_change_settings']),
+  requireParticipantAssignment: _parseBool(
+    row['require_participant_assignment'],
+  ),
+);
+
+Participant _participantFromRow(Map<String, dynamic> row) => Participant(
+  id: row['id'] as String,
+  groupId: row['group_id'] as String,
+  name: row['name'] as String? ?? '',
+  order: (row['sort_order'] as num?)?.toInt() ?? 0,
+  createdAt: _parseDateTime(row['created_at']),
+  updatedAt: _parseDateTime(row['updated_at']),
+);
+
+Expense _expenseFromRow(Map<String, dynamic> row) => Expense(
+  id: row['id'] as String,
+  groupId: row['group_id'] as String,
+  payerParticipantId: row['payer_participant_id'] as String,
+  amountCents: (row['amount_cents'] as num).toInt(),
+  currencyCode: row['currency_code'] as String? ?? 'USD',
+  title: row['title'] as String? ?? '',
+  description: row['description'] as String?,
+  date: _parseDateTime(row['date']),
+  splitType: _parseSplitType(row['split_type']),
+  splitShares: _parseSplitShares(row['split_shares_json']),
+  createdAt: _parseDateTime(row['created_at']),
+  updatedAt: _parseDateTime(row['updated_at']),
+  transactionType: _parseTransactionType(row['type']),
+  toParticipantId: row['to_participant_id'] as String?,
+  tag: row['tag'] as String?,
+  lineItems: _parseLineItems(row['line_items_json']),
+  receiptImagePath: row['receipt_image_path'] as String?,
+);
+
+ExpenseTag _tagFromRow(Map<String, dynamic> row) => ExpenseTag(
+  id: row['id'] as String,
+  groupId: row['group_id'] as String,
+  label: row['label'] as String? ?? '',
+  iconName: row['icon_name'] as String? ?? 'label',
+  createdAt: _parseDateTime(row['created_at']),
+  updatedAt: _parseDateTime(row['updated_at']),
+);
+
+GroupMember _memberFromRow(Map<String, dynamic> row) => GroupMember(
+  id: row['id'] as String,
+  groupId: row['group_id'] as String,
+  userId: row['user_id'] as String,
+  role: row['role'] as String? ?? 'member',
+  participantId: row['participant_id'] as String?,
+  joinedAt: _parseDateTime(row['joined_at']),
+);
+
+GroupInvite _inviteFromRow(Map<String, dynamic> row) => GroupInvite(
+  id: row['id'] as String,
+  groupId: row['group_id'] as String,
+  token: row['token'] as String,
+  inviteeEmail: row['invitee_email'] as String?,
+  role: row['role'] as String? ?? 'member',
+  createdAt: _parseDateTime(row['created_at']),
+  expiresAt: _parseDateTime(row['expires_at']),
+);
+
+String _nowIso() => DateTime.now().toUtc().toIso8601String();
+
+/// Enqueue an offline write for later push.
+Future<void> _enqueue(
+  PowerSyncDatabase db, {
+  required String tableName,
+  required String operation,
+  required String rowId,
+  Map<String, dynamic>? data,
+}) async {
+  final id = _uuid.v4();
+  await db.execute(
+    'INSERT INTO pending_writes (id, table_name, operation, row_id, data_json, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    [
+      id,
+      tableName,
+      operation,
+      rowId,
+      data != null ? jsonEncode(data) : null,
+      _nowIso(),
+    ],
+  );
+  Log.debug('Queued pending write: $operation on $tableName/$rowId');
+}
+
+// =============================================================================
+// PowerSync Group Repository
+// =============================================================================
+
+class PowerSyncGroupRepository implements IGroupRepository {
+  final PowerSyncDatabase _db;
+  final SupabaseClient? _client;
+  final bool _isOnline;
+  final bool _isLocalOnly;
+
+  PowerSyncGroupRepository(
+    this._db, {
+    SupabaseClient? client,
+    bool isOnline = false,
+    bool isLocalOnly = true,
+  }) : _client = client,
+       _isOnline = isOnline,
+       _isLocalOnly = isLocalOnly;
+
+  @override
+  Future<List<Group>> getAll() async {
+    final rows = await _db.getAll(
+      'SELECT * FROM groups ORDER BY updated_at DESC',
+    );
+    return rows.map(_groupFromRow).toList();
+  }
+
+  @override
+  Stream<List<Group>> watchAll() {
+    if (kIsWeb) {
+      return _pollStream(() async {
+        final rows = await _db.getAll(
+            'SELECT * FROM groups ORDER BY updated_at DESC');
+        return rows.map(_groupFromRow).toList();
+      });
+    }
+    return _db
+        .watch('SELECT * FROM groups ORDER BY updated_at DESC')
+        .map((rows) => rows.map(_groupFromRow).toList());
+  }
+
+  @override
+  Future<Group?> getById(String id) async {
+    final rows = await _db.getAll('SELECT * FROM groups WHERE id = ?', [id]);
+    if (rows.isEmpty) return null;
+    return _groupFromRow(rows.first);
+  }
+
+  @override
+  Future<String> create(String name, String currencyCode) async {
+    final id = _uuid.v4();
+    final now = _nowIso();
+    String? ownerId;
+    try {
+      ownerId = Supabase.instance.client.auth.currentUser?.id;
+    } catch (_) {}
+
+    final groupData = <String, dynamic>{
+      'id': id,
+      'name': name,
+      'currency_code': currencyCode,
+      'owner_id': ownerId,
+      'created_at': now,
+      'updated_at': now,
+    };
+
+    if (!_isLocalOnly && _isOnline && _client != null) {
+      // Online: write to Supabase first
+      await _client.from('groups').insert(groupData);
+      // Also create owner membership in Supabase
+      if (ownerId != null) {
+        final memberId = _uuid.v4();
+        await _client.from('group_members').insert({
+          'id': memberId,
+          'group_id': id,
+          'user_id': ownerId,
+          'role': 'owner',
+          'joined_at': now,
+        });
+      }
+    }
+
+    // Always write to local DB
+    await _db.execute(
+      'INSERT INTO groups (id, name, currency_code, owner_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [id, name, currencyCode, ownerId, now, now],
+    );
+    if (ownerId != null) {
+      final memberId = _uuid.v4();
+      await _db.execute(
+        'INSERT INTO group_members (id, group_id, user_id, role, joined_at) VALUES (?, ?, ?, ?, ?)',
+        [memberId, id, ownerId, 'owner', now],
+      );
+    }
+
+    Log.debug('Group created: $id');
+    return id;
+  }
+
+  @override
+  Future<void> update(Group group) async {
+    final now = _nowIso();
+    final data = <String, dynamic>{
+      'id': group.id,
+      'name': group.name,
+      'currency_code': group.currencyCode,
+      'settlement_method': group.settlementMethod.name,
+      'treasurer_participant_id': group.treasurerParticipantId,
+      'settlement_freeze_at': group.settlementFreezeAt
+          ?.toUtc()
+          .toIso8601String(),
+      'settlement_snapshot_json': group.settlementSnapshotJson,
+      'allow_member_add_expense': group.allowMemberAddExpense,
+      'allow_member_add_participant': group.allowMemberAddParticipant,
+      'allow_member_change_settings': group.allowMemberChangeSettings,
+      'require_participant_assignment': group.requireParticipantAssignment,
+      'updated_at': now,
+    };
+
+    if (!_isLocalOnly && _isOnline && _client != null) {
+      await _client.from('groups').update(data).eq('id', group.id);
+    }
+
+    await _db.execute(
+      '''UPDATE groups SET
+        name = ?, currency_code = ?, settlement_method = ?,
+        treasurer_participant_id = ?, settlement_freeze_at = ?,
+        settlement_snapshot_json = ?, allow_member_add_expense = ?,
+        allow_member_add_participant = ?, allow_member_change_settings = ?,
+        require_participant_assignment = ?, updated_at = ?
+      WHERE id = ?''',
+      [
+        group.name,
+        group.currencyCode,
+        group.settlementMethod.name,
+        group.treasurerParticipantId,
+        group.settlementFreezeAt?.toUtc().toIso8601String(),
+        group.settlementSnapshotJson,
+        group.allowMemberAddExpense ? 1 : 0,
+        group.allowMemberAddParticipant ? 1 : 0,
+        group.allowMemberChangeSettings ? 1 : 0,
+        group.requireParticipantAssignment ? 1 : 0,
+        now,
+        group.id,
+      ],
+    );
+  }
+
+  @override
+  Future<void> delete(String id) async {
+    if (!_isLocalOnly && _isOnline && _client != null) {
+      await _client.from('groups').delete().eq('id', id);
+    }
+    await _db.execute('DELETE FROM groups WHERE id = ?', [id]);
+  }
+
+  @override
+  Future<void> freezeSettlement(
+    String groupId,
+    SettlementSnapshot snapshot,
+  ) async {
+    final now = _nowIso();
+    final snapshotJson = snapshot.toJsonString();
+
+    if (!_isLocalOnly && _isOnline && _client != null) {
+      await _client
+          .from('groups')
+          .update({
+            'settlement_freeze_at': now,
+            'settlement_snapshot_json': snapshotJson,
+            'updated_at': now,
+          })
+          .eq('id', groupId);
+    }
+
+    await _db.execute(
+      'UPDATE groups SET settlement_freeze_at = ?, settlement_snapshot_json = ?, updated_at = ? WHERE id = ?',
+      [now, snapshotJson, now, groupId],
+    );
+  }
+
+  @override
+  Future<void> unfreezeSettlement(String groupId) async {
+    final now = _nowIso();
+
+    if (!_isLocalOnly && _isOnline && _client != null) {
+      await _client
+          .from('groups')
+          .update({
+            'settlement_freeze_at': null,
+            'settlement_snapshot_json': null,
+            'updated_at': now,
+          })
+          .eq('id', groupId);
+    }
+
+    await _db.execute(
+      'UPDATE groups SET settlement_freeze_at = NULL, settlement_snapshot_json = NULL, updated_at = ? WHERE id = ?',
+      [now, groupId],
+    );
+  }
+}
+
+// =============================================================================
+// PowerSync Participant Repository
+// =============================================================================
+
+class PowerSyncParticipantRepository implements IParticipantRepository {
+  final PowerSyncDatabase _db;
+  final SupabaseClient? _client;
+  final bool _isOnline;
+  final bool _isLocalOnly;
+
+  PowerSyncParticipantRepository(
+    this._db, {
+    SupabaseClient? client,
+    bool isOnline = false,
+    bool isLocalOnly = true,
+  }) : _client = client,
+       _isOnline = isOnline,
+       _isLocalOnly = isLocalOnly;
+
+  @override
+  Future<List<Participant>> getByGroupId(String groupId) async {
+    final rows = await _db.getAll(
+      'SELECT * FROM participants WHERE group_id = ? ORDER BY sort_order ASC',
+      [groupId],
+    );
+    return rows.map(_participantFromRow).toList();
+  }
+
+  @override
+  Stream<List<Participant>> watchByGroupId(String groupId) {
+    if (kIsWeb) {
+      return _pollStream(() => getByGroupId(groupId));
+    }
+    return _db
+        .watch(
+          'SELECT * FROM participants WHERE group_id = ? ORDER BY sort_order ASC',
+          parameters: [groupId],
+        )
+        .map((rows) => rows.map(_participantFromRow).toList());
+  }
+
+  @override
+  Future<Participant?> getById(String id) async {
+    final rows = await _db.getAll('SELECT * FROM participants WHERE id = ?', [
+      id,
+    ]);
+    if (rows.isEmpty) return null;
+    return _participantFromRow(rows.first);
+  }
+
+  @override
+  Future<String> create(String groupId, String name, int order) async {
+    final id = _uuid.v4();
+    final now = _nowIso();
+    final data = <String, dynamic>{
+      'id': id,
+      'group_id': groupId,
+      'name': name,
+      'sort_order': order,
+      'created_at': now,
+      'updated_at': now,
+    };
+
+    if (!_isLocalOnly && _isOnline && _client != null) {
+      await _client.from('participants').insert(data);
+    }
+
+    await _db.execute(
+      'INSERT INTO participants (id, group_id, name, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [id, groupId, name, order, now, now],
+    );
+    return id;
+  }
+
+  @override
+  Future<void> update(Participant participant) async {
+    final now = _nowIso();
+
+    if (!_isLocalOnly && _isOnline && _client != null) {
+      await _client
+          .from('participants')
+          .update({
+            'name': participant.name,
+            'sort_order': participant.order,
+            'updated_at': now,
+          })
+          .eq('id', participant.id);
+    }
+
+    await _db.execute(
+      'UPDATE participants SET name = ?, sort_order = ?, updated_at = ? WHERE id = ?',
+      [participant.name, participant.order, now, participant.id],
+    );
+  }
+
+  @override
+  Future<void> delete(String id) async {
+    if (!_isLocalOnly && _isOnline && _client != null) {
+      await _client.from('participants').delete().eq('id', id);
+    }
+    await _db.execute('DELETE FROM participants WHERE id = ?', [id]);
+  }
+}
+
+// =============================================================================
+// PowerSync Expense Repository
+// =============================================================================
+
+class PowerSyncExpenseRepository implements IExpenseRepository {
+  final PowerSyncDatabase _db;
+  final SupabaseClient? _client;
+  final bool _isOnline;
+  final bool _isLocalOnly;
+
+  PowerSyncExpenseRepository(
+    this._db, {
+    SupabaseClient? client,
+    bool isOnline = false,
+    bool isLocalOnly = true,
+  }) : _client = client,
+       _isOnline = isOnline,
+       _isLocalOnly = isLocalOnly;
+
+  @override
+  Future<List<Expense>> getByGroupId(String groupId) async {
+    final rows = await _db.getAll(
+      'SELECT * FROM expenses WHERE group_id = ? ORDER BY date DESC',
+      [groupId],
+    );
+    return rows.map(_expenseFromRow).toList();
+  }
+
+  @override
+  Stream<List<Expense>> watchByGroupId(String groupId) {
+    if (kIsWeb) {
+      return _pollStream(() => getByGroupId(groupId));
+    }
+    return _db
+        .watch(
+          'SELECT * FROM expenses WHERE group_id = ? ORDER BY date DESC',
+          parameters: [groupId],
+        )
+        .map((rows) => rows.map(_expenseFromRow).toList());
+  }
+
+  @override
+  Future<Expense?> getById(String id) async {
+    final rows = await _db.getAll('SELECT * FROM expenses WHERE id = ?', [id]);
+    if (rows.isEmpty) return null;
+    return _expenseFromRow(rows.first);
+  }
+
+  @override
+  Future<String> create(Expense expense) async {
+    final id = _uuid.v4();
+    final now = _nowIso();
+    final splitSharesJson = jsonEncode(expense.splitShares);
+    final lineItemsJson = expense.lineItems != null
+        ? jsonEncode(expense.lineItems!.map((e) => e.toJson()).toList())
+        : null;
+
+    final data = <String, dynamic>{
+      'id': id,
+      'group_id': expense.groupId,
+      'payer_participant_id': expense.payerParticipantId,
+      'amount_cents': expense.amountCents,
+      'currency_code': expense.currencyCode,
+      'title': expense.title,
+      'description': expense.description,
+      'date': expense.date.toUtc().toIso8601String(),
+      'split_type': expense.splitType.name,
+      'split_shares_json': splitSharesJson,
+      'type': expense.transactionType.name,
+      'to_participant_id': expense.toParticipantId,
+      'tag': expense.tag,
+      'line_items_json': lineItemsJson,
+      'receipt_image_path': expense.receiptImagePath,
+      'created_at': now,
+      'updated_at': now,
+    };
+
+    if (!_isLocalOnly && _isOnline && _client != null) {
+      // Online: write to Supabase first
+      await _client.from('expenses').insert(data);
+    } else if (!_isLocalOnly && !_isOnline) {
+      // Online mode but temporarily offline: queue for later push
+      await _enqueue(
+        _db,
+        tableName: 'expenses',
+        operation: 'insert',
+        rowId: id,
+        data: data,
+      );
+    }
+
+    // Always write to local DB
+    await _db.execute(
+      '''INSERT INTO expenses (id, group_id, payer_participant_id, amount_cents,
+        currency_code, title, description, date, split_type, split_shares_json,
+        type, to_participant_id, tag, line_items_json, receipt_image_path,
+        created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+      [
+        id,
+        expense.groupId,
+        expense.payerParticipantId,
+        expense.amountCents,
+        expense.currencyCode,
+        expense.title,
+        expense.description,
+        expense.date.toUtc().toIso8601String(),
+        expense.splitType.name,
+        splitSharesJson,
+        expense.transactionType.name,
+        expense.toParticipantId,
+        expense.tag,
+        lineItemsJson,
+        expense.receiptImagePath,
+        now,
+        now,
+      ],
+    );
+    return id;
+  }
+
+  @override
+  Future<void> update(Expense expense) async {
+    final now = _nowIso();
+    final splitSharesJson = jsonEncode(expense.splitShares);
+    final lineItemsJson = expense.lineItems != null
+        ? jsonEncode(expense.lineItems!.map((e) => e.toJson()).toList())
+        : null;
+
+    if (!_isLocalOnly && _isOnline && _client != null) {
+      await _client
+          .from('expenses')
+          .update({
+            'title': expense.title,
+            'amount_cents': expense.amountCents,
+            'payer_participant_id': expense.payerParticipantId,
+            'description': expense.description,
+            'date': expense.date.toUtc().toIso8601String(),
+            'split_type': expense.splitType.name,
+            'split_shares_json': splitSharesJson,
+            'type': expense.transactionType.name,
+            'to_participant_id': expense.toParticipantId,
+            'tag': expense.tag,
+            'line_items_json': lineItemsJson,
+            'receipt_image_path': expense.receiptImagePath,
+            'updated_at': now,
+          })
+          .eq('id', expense.id);
+    }
+
+    await _db.execute(
+      '''UPDATE expenses SET
+        title = ?, amount_cents = ?, payer_participant_id = ?,
+        description = ?, date = ?, split_type = ?, split_shares_json = ?,
+        type = ?, to_participant_id = ?, tag = ?,
+        line_items_json = ?, receipt_image_path = ?, updated_at = ?
+      WHERE id = ?''',
+      [
+        expense.title,
+        expense.amountCents,
+        expense.payerParticipantId,
+        expense.description,
+        expense.date.toUtc().toIso8601String(),
+        expense.splitType.name,
+        splitSharesJson,
+        expense.transactionType.name,
+        expense.toParticipantId,
+        expense.tag,
+        lineItemsJson,
+        expense.receiptImagePath,
+        now,
+        expense.id,
+      ],
+    );
+  }
+
+  @override
+  Future<void> delete(String id) async {
+    if (!_isLocalOnly && _isOnline && _client != null) {
+      await _client.from('expenses').delete().eq('id', id);
+    }
+    await _db.execute('DELETE FROM expenses WHERE id = ?', [id]);
+  }
+}
+
+// =============================================================================
+// PowerSync Tag Repository
+// =============================================================================
+
+class PowerSyncTagRepository implements ITagRepository {
+  final PowerSyncDatabase _db;
+  final SupabaseClient? _client;
+  final bool _isOnline;
+  final bool _isLocalOnly;
+
+  PowerSyncTagRepository(
+    this._db, {
+    SupabaseClient? client,
+    bool isOnline = false,
+    bool isLocalOnly = true,
+  }) : _client = client,
+       _isOnline = isOnline,
+       _isLocalOnly = isLocalOnly;
+
+  @override
+  Future<List<ExpenseTag>> getByGroupId(String groupId) async {
+    final rows = await _db.getAll(
+      'SELECT * FROM expense_tags WHERE group_id = ? ORDER BY label ASC',
+      [groupId],
+    );
+    return rows.map(_tagFromRow).toList();
+  }
+
+  @override
+  Stream<List<ExpenseTag>> watchByGroupId(String groupId) {
+    if (kIsWeb) {
+      return _pollStream(() => getByGroupId(groupId));
+    }
+    return _db
+        .watch(
+          'SELECT * FROM expense_tags WHERE group_id = ? ORDER BY label ASC',
+          parameters: [groupId],
+        )
+        .map((rows) => rows.map(_tagFromRow).toList());
+  }
+
+  @override
+  Future<ExpenseTag?> getById(String id) async {
+    final rows = await _db.getAll('SELECT * FROM expense_tags WHERE id = ?', [
+      id,
+    ]);
+    if (rows.isEmpty) return null;
+    return _tagFromRow(rows.first);
+  }
+
+  @override
+  Future<String> create(String groupId, String label, String iconName) async {
+    final id = _uuid.v4();
+    final now = _nowIso();
+    final data = <String, dynamic>{
+      'id': id,
+      'group_id': groupId,
+      'label': label,
+      'icon_name': iconName,
+      'created_at': now,
+      'updated_at': now,
+    };
+
+    if (!_isLocalOnly && _isOnline && _client != null) {
+      await _client.from('expense_tags').insert(data);
+    }
+
+    await _db.execute(
+      'INSERT INTO expense_tags (id, group_id, label, icon_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [id, groupId, label, iconName, now, now],
+    );
+    return id;
+  }
+
+  @override
+  Future<void> update(ExpenseTag tag) async {
+    final now = _nowIso();
+
+    if (!_isLocalOnly && _isOnline && _client != null) {
+      await _client
+          .from('expense_tags')
+          .update({
+            'label': tag.label,
+            'icon_name': tag.iconName,
+            'updated_at': now,
+          })
+          .eq('id', tag.id);
+    }
+
+    await _db.execute(
+      'UPDATE expense_tags SET label = ?, icon_name = ?, updated_at = ? WHERE id = ?',
+      [tag.label, tag.iconName, now, tag.id],
+    );
+  }
+
+  @override
+  Future<void> delete(String id) async {
+    if (!_isLocalOnly && _isOnline && _client != null) {
+      await _client.from('expense_tags').delete().eq('id', id);
+    }
+    await _db.execute('DELETE FROM expense_tags WHERE id = ?', [id]);
+  }
+}
+
+// =============================================================================
+// PowerSync GroupMember Repository
+// =============================================================================
+
+class PowerSyncGroupMemberRepository implements IGroupMemberRepository {
+  final PowerSyncDatabase _db;
+  final bool isLocalOnly;
+  PowerSyncGroupMemberRepository(this._db, {this.isLocalOnly = false});
+
+  String? get _currentUserId {
+    try {
+      return Supabase.instance.client.auth.currentUser?.id;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  SupabaseClient? get _supabase {
+    if (isLocalOnly) return null;
+    try {
+      return Supabase.instance.client;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<GroupRole?> getMyRole(String groupId) async {
+    final userId = _currentUserId;
+    if (userId == null) return null;
+    final rows = await _db.getAll(
+      'SELECT role FROM group_members WHERE group_id = ? AND user_id = ?',
+      [groupId, userId],
+    );
+    if (rows.isEmpty) return null;
+    return GroupRole.fromString(rows.first['role'] as String?);
+  }
+
+  @override
+  Future<GroupMember?> getMyMember(String groupId) async {
+    final userId = _currentUserId;
+    if (userId == null) return null;
+    final rows = await _db.getAll(
+      'SELECT * FROM group_members WHERE group_id = ? AND user_id = ?',
+      [groupId, userId],
+    );
+    if (rows.isEmpty) return null;
+    return _memberFromRow(rows.first);
+  }
+
+  @override
+  Future<List<GroupMember>> listByGroup(String groupId) async {
+    final rows = await _db.getAll(
+      'SELECT * FROM group_members WHERE group_id = ? ORDER BY joined_at ASC',
+      [groupId],
+    );
+    return rows.map(_memberFromRow).toList();
+  }
+
+  @override
+  Stream<List<GroupMember>> watchByGroup(String groupId) {
+    if (kIsWeb) {
+      return _pollStream(() => listByGroup(groupId));
+    }
+    return _db
+        .watch(
+          'SELECT * FROM group_members WHERE group_id = ? ORDER BY joined_at ASC',
+          parameters: [groupId],
+        )
+        .map((rows) => rows.map(_memberFromRow).toList());
+  }
+
+  @override
+  Future<void> kickMember(String groupId, String memberId) async {
+    final client = _supabase;
+    if (client != null) {
+      await client.rpc(
+        'kick_member',
+        params: {'p_group_id': groupId, 'p_member_id': memberId},
+      );
+      Log.info('Member kicked via RPC');
+    } else {
+      throw UnsupportedError('kickMember requires online mode');
+    }
+  }
+
+  @override
+  Future<void> leave(String groupId) async {
+    final client = _supabase;
+    if (client != null) {
+      await client.rpc('leave_group', params: {'p_group_id': groupId});
+      Log.info('Left group via RPC');
+    } else {
+      throw UnsupportedError('leave requires online mode');
+    }
+  }
+
+  @override
+  Future<void> updateRole(
+    String groupId,
+    String memberId,
+    GroupRole role,
+  ) async {
+    final client = _supabase;
+    if (client != null) {
+      await client.rpc(
+        'update_member_role',
+        params: {
+          'p_group_id': groupId,
+          'p_member_id': memberId,
+          'p_role': role.name,
+        },
+      );
+      Log.info('Member role updated via RPC');
+    } else {
+      throw UnsupportedError('updateRole requires online mode');
+    }
+  }
+
+  @override
+  Future<void> transferOwnership(
+    String groupId,
+    String newOwnerMemberId,
+  ) async {
+    final client = _supabase;
+    if (client != null) {
+      await client.rpc(
+        'transfer_ownership',
+        params: {
+          'p_group_id': groupId,
+          'p_new_owner_member_id': newOwnerMemberId,
+        },
+      );
+      Log.info('Ownership transferred via RPC');
+    } else {
+      throw UnsupportedError('transferOwnership requires online mode');
+    }
+  }
+
+  @override
+  Future<void> assignParticipant(
+    String groupId,
+    String memberId,
+    String participantId,
+  ) async {
+    final client = _supabase;
+    if (client != null) {
+      await client.rpc(
+        'assign_participant',
+        params: {
+          'p_group_id': groupId,
+          'p_member_id': memberId,
+          'p_participant_id': participantId,
+        },
+      );
+      Log.info('Participant assigned via RPC');
+    } else {
+      throw UnsupportedError('assignParticipant requires online mode');
+    }
+  }
+}
+
+// =============================================================================
+// PowerSync GroupInvite Repository
+// =============================================================================
+
+class PowerSyncGroupInviteRepository implements IGroupInviteRepository {
+  final PowerSyncDatabase _db;
+  final SupabaseClient? supabaseClient;
+  PowerSyncGroupInviteRepository(this._db, {this.supabaseClient});
+
+  @override
+  Future<({GroupInvite invite, Group group})?> getByToken(String token) async {
+    final client = supabaseClient;
+    if (client == null) {
+      throw UnsupportedError('getByToken requires online mode');
+    }
+    final result = await client.rpc(
+      'get_invite_by_token',
+      params: {'p_token': token},
+    );
+    if (result == null || (result is List && result.isEmpty)) return null;
+    final row = result is List ? result.first : result;
+
+    final invite = GroupInvite(
+      id: row['invite_id'] as String,
+      groupId: row['group_id'] as String,
+      token: row['token'] as String,
+      inviteeEmail: row['invitee_email'] as String?,
+      role: row['role'] as String? ?? 'member',
+      createdAt: _parseDateTime(row['created_at']),
+      expiresAt: _parseDateTime(row['expires_at']),
+    );
+    final group = Group(
+      id: row['group_id'] as String,
+      name: row['group_name'] as String? ?? '',
+      currencyCode: row['group_currency_code'] as String? ?? 'USD',
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+    return (invite: invite, group: group);
+  }
+
+  @override
+  Future<({String id, String token})> createInvite(
+    String groupId, {
+    String? inviteeEmail,
+    String? role,
+  }) async {
+    final client = supabaseClient;
+    if (client == null) {
+      throw UnsupportedError('createInvite requires online mode');
+    }
+    final result = await client.rpc(
+      'create_invite',
+      params: {
+        'p_group_id': groupId,
+        'p_invitee_email': inviteeEmail,
+        'p_role': role ?? 'member',
+      },
+    );
+    final row = result is List ? result.first : result;
+    return (id: row['id'] as String, token: row['token'] as String);
+  }
+
+  @override
+  Future<String> accept(
+    String token, {
+    String? participantId,
+    String? newParticipantName,
+  }) async {
+    final client = supabaseClient;
+    if (client == null) {
+      throw UnsupportedError('accept requires online mode');
+    }
+    final result = await client.rpc(
+      'accept_invite',
+      params: {
+        'p_token': token,
+        'p_participant_id': participantId,
+        'p_new_participant_name': newParticipantName,
+      },
+    );
+    Log.info('Invite accepted');
+    return result as String;
+  }
+
+  @override
+  Future<List<GroupInvite>> listByGroup(String groupId) async {
+    final rows = await _db.getAll(
+      'SELECT * FROM group_invites WHERE group_id = ?',
+      [groupId],
+    );
+    return rows.map(_inviteFromRow).toList();
+  }
+
+  @override
+  Stream<List<GroupInvite>> watchByGroup(String groupId) {
+    if (kIsWeb) {
+      return _pollStream(() => listByGroup(groupId));
+    }
+    return _db
+        .watch(
+          'SELECT * FROM group_invites WHERE group_id = ?',
+          parameters: [groupId],
+        )
+        .map((rows) => rows.map(_inviteFromRow).toList());
+  }
+
+  @override
+  Future<void> revoke(String inviteId) async {
+    await _db.execute('DELETE FROM group_invites WHERE id = ?', [inviteId]);
+  }
+}

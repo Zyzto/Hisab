@@ -5,6 +5,7 @@ import 'package:easy_localization/easy_localization.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../providers/balance_provider.dart';
+import 'record_settlement_sheet.dart';
 
 class BalanceList extends ConsumerWidget {
   final String groupId;
@@ -139,7 +140,7 @@ class BalanceList extends ConsumerWidget {
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
               child: ListTile(
-                title: Text('$from → $to'),
+                title: Text('$from \u2192 $to'),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -165,6 +166,35 @@ class BalanceList extends ConsumerWidget {
                     ],
                   ],
                 ),
+                trailing: !hasFrozen
+                    ? IconButton(
+                        icon: Icon(
+                          Icons.payments_outlined,
+                          color: theme.colorScheme.primary,
+                        ),
+                        tooltip: 'record_settlement'.tr(),
+                        onPressed: () => showRecordSettlementSheet(
+                          context,
+                          ref,
+                          groupId: groupId,
+                          currencyCode: group.currencyCode,
+                          settlement: s,
+                          fromName: from,
+                          toName: to,
+                        ),
+                      )
+                    : null,
+                onTap: hasFrozen
+                    ? null
+                    : () => showRecordSettlementSheet(
+                        context,
+                        ref,
+                        groupId: groupId,
+                        currencyCode: group.currencyCode,
+                        settlement: s,
+                        fromName: from,
+                        toName: to,
+                      ),
               ),
             );
           },

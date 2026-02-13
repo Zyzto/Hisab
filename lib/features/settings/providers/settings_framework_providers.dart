@@ -2,7 +2,9 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import '../settings_definitions.dart';
-import '../../onboarding/providers/onboarding_providers.dart';
+import '../../../core/auth/auth_providers.dart';
+import '../../../core/auth/auth_user_profile.dart';
+import '../../../core/constants/supabase_config.dart';
 
 part 'settings_framework_providers.g.dart';
 
@@ -62,8 +64,7 @@ bool localOnly(Ref ref) {
 @riverpod
 bool effectiveLocalOnly(Ref ref) {
   final local = ref.watch(localOnlyProvider);
-  final onlineAvailable = ref.watch(auth0ConfigAvailableProvider);
-  return local || !onlineAvailable;
+  return local || !supabaseConfigAvailable;
 }
 
 @riverpod
@@ -208,6 +209,16 @@ String fontSizeScale(Ref ref) {
     );
     return 'normal';
   }
+}
+
+@riverpod
+Future<AuthUserProfile?> authUserProfile(Ref ref) async {
+  final localOnly = ref.watch(effectiveLocalOnlyProvider);
+  if (localOnly) return null;
+  // Watch auth state changes so the profile updates reactively when the
+  // user signs in, signs out, or the session is restored after a page reload.
+  ref.watch(authStateChangesProvider);
+  return ref.watch(authServiceProvider).getUserProfile();
 }
 
 @riverpod

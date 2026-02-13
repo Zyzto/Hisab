@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,19 +7,23 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/auth/auth_service.dart';
+import '../../../core/auth/auth_providers.dart';
+import '../../../core/auth/sign_in_sheet.dart';
 import '../../../core/constants/app_config.dart';
+import '../../../core/constants/supabase_config.dart';
+import '../../../core/database/database_providers.dart';
 import '../../../core/navigation/route_paths.dart';
-import '../../onboarding/providers/onboarding_providers.dart';
+import '../../../core/repository/repository_providers.dart';
+import '../../../core/services/migration_service.dart';
+import '../../../core/services/connectivity_service.dart';
 import '../settings_definitions.dart';
 import '../providers/settings_framework_providers.dart';
 import '../backup_helper.dart';
 import '../widgets/logs_viewer_dialog.dart';
-import '../../../core/database/providers/dao_providers.dart';
-import '../../../core/repository/local_repository.dart';
 import '../../../domain/domain.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
@@ -67,7 +70,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       appBar: AppBar(title: Text('settings'.tr())),
       body: ListView(
         children: [
-          _buildSection(context, ref, settings, generalSection, [
+          _buildAccountSection(context, ref, settings),
+          // Appearance: merged General + old Appearance
+          _buildSection(context, ref, settings, appearanceSection, [
             _languageTile(context, ref, settings),
             EnumSettingsTile.fromSetting(
               setting: themeModeSettingDef,
@@ -86,8 +91,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   .read(settings.provider(themeColorSettingDef).notifier)
                   .set(v),
             ),
-          ]),
-          _buildSection(context, ref, settings, appearanceSection, [
             EnumSettingsTile.fromSetting(
               setting: fontSizeScaleSettingDef,
               title: 'font_size'.tr(),
@@ -98,8 +101,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   .set(v),
             ),
           ]),
-          _buildSection(context, ref, settings, dataSection, [
+          // Data & Backup: merged Data + old Backup
+          _buildSection(context, ref, settings, dataBackupSection, [
+            if (!ref.watch(effectiveLocalOnlyProvider))
+              _buildDataSyncInfoTile(context, ref),
             _buildLocalOnlyTile(context, ref, settings),
+            ActionSettingsTile(
+              leading: const Icon(Icons.upload_file),
+              title: Text('export_data'.tr()),
+              onTap: () => _exportData(context, ref),
+            ),
+            ActionSettingsTile(
+              leading: const Icon(Icons.download),
+              title: Text('import_data'.tr()),
+              onTap: () => _importData(context, ref),
+            ),
           ]),
           _buildSection(context, ref, settings, receiptAiSection, [
             SwitchSettingsTile.fromSetting(
@@ -162,7 +178,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
             ),
           ]),
-          _buildSection(context, ref, settings, loggingSection, [
+          // Privacy: renamed from Logging
+          _buildSection(context, ref, settings, privacySection, [
             SwitchSettingsTile.fromSetting(
               setting: telemetryEnabledSettingDef,
               title: 'telemetry_enabled'.tr(),
@@ -175,18 +192,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               leading: const Icon(Icons.description),
               title: Text('view_logs'.tr()),
               onTap: () => _showLogsDialog(context),
-            ),
-          ]),
-          _buildSection(context, ref, settings, backupSection, [
-            ActionSettingsTile(
-              leading: const Icon(Icons.upload_file),
-              title: Text('export_data'.tr()),
-              onTap: () => _exportData(context, ref),
-            ),
-            ActionSettingsTile(
-              leading: const Icon(Icons.download),
-              title: Text('import_data'.tr()),
-              onTap: () => _importData(context, ref),
             ),
           ]),
           _buildSection(context, ref, settings, advancedSection, [
@@ -213,6 +218,303 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ],
       ),
     );
+  }
+
+  Widget _buildAccountSection(
+    BuildContext context,
+    WidgetRef ref,
+    SettingsProviders settings,
+  ) {
+    final onlineAvailable = supabaseConfigAvailable;
+    final localOnly = ref.watch(effectiveLocalOnlyProvider);
+
+    return _buildSection(context, ref, settings, accountSection, [
+      if (!onlineAvailable)
+        ListTile(
+          leading: CircleAvatar(
+            backgroundColor:
+                Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: Icon(
+              Icons.cloud_off,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          title: Text('account'.tr()),
+          subtitle: Text('onboarding_online_unavailable'.tr()),
+        )
+      else if (localOnly)
+        ..._buildLocalModeTiles(context, ref, settings)
+      else
+        ..._buildOnlineAccountTiles(context, ref, settings),
+    ]);
+  }
+
+  List<Widget> _buildLocalModeTiles(
+    BuildContext context,
+    WidgetRef ref,
+    SettingsProviders settings,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return [
+      ListTile(
+        leading: CircleAvatar(
+          backgroundColor: colorScheme.primaryContainer,
+          child:
+              Icon(Icons.smartphone, color: colorScheme.onPrimaryContainer),
+        ),
+        title: Text(
+          'local_only'.tr(),
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        subtitle: Text('account_local_mode_description'.tr()),
+      ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: FilledButton.icon(
+          onPressed: () =>
+              _handleLocalOnlyChanged(context, ref, settings, false),
+          icon: const Icon(Icons.cloud_upload_outlined),
+          label: Text('switch_to_online'.tr()),
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(48),
+          ),
+        ),
+      ),
+    ];
+  }
+
+  List<Widget> _buildOnlineAccountTiles(
+    BuildContext context,
+    WidgetRef ref,
+    SettingsProviders settings,
+  ) {
+    final profileAsync = ref.watch(authUserProfileProvider);
+    final user = ref.watch(currentUserProvider);
+    final syncStatus = ref.watch(syncStatusProvider);
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return profileAsync.when(
+      data: (profile) {
+        if (profile == null) {
+          return [
+            ListTile(
+              leading: CircleAvatar(
+                backgroundColor: colorScheme.errorContainer,
+                child: Icon(
+                  Icons.person_off,
+                  color: colorScheme.onErrorContainer,
+                ),
+              ),
+              title: Text('account'.tr()),
+              subtitle: Text('account_not_signed_in'.tr()),
+              trailing: FilledButton(
+                onPressed: () =>
+                    _handleLocalOnlyChanged(context, ref, settings, false),
+                child: Text('sign_in'.tr()),
+              ),
+            ),
+          ];
+        }
+
+        final initials = _getInitials(profile.name, profile.email);
+        final provider = _getProviderLabel(user);
+
+        return [
+          // User info card
+          ListTile(
+            leading: CircleAvatar(
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
+              child: Text(
+                initials,
+                style: textTheme.titleSmall?.copyWith(
+                  color: colorScheme.onPrimary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            title: Text(
+              profile.name ?? profile.email ?? profile.sub,
+              style: textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            subtitle: profile.email != null ? Text(profile.email!) : null,
+          ),
+          // Sync status & provider
+          _buildAccountSyncTile(context, syncStatus, provider),
+          // Sign out
+          ActionSettingsTile(
+            leading: const Icon(Icons.logout),
+            title: Text('sign_out'.tr()),
+            onTap: () => _handleSignOut(context, ref, settings),
+          ),
+        ];
+      },
+      loading: () => [
+        ListTile(
+          leading: CircleAvatar(
+            backgroundColor: colorScheme.surfaceContainerHighest,
+            child: const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+          title: const Text('…'),
+        ),
+      ],
+      error: (_, _) => [
+        ListTile(
+          leading: CircleAvatar(
+            backgroundColor: colorScheme.errorContainer,
+            child: Icon(
+              Icons.error_outline,
+              color: colorScheme.onErrorContainer,
+            ),
+          ),
+          title: Text('account'.tr()),
+          subtitle: Text('account_not_signed_in'.tr()),
+          trailing: FilledButton(
+            onPressed: () =>
+                _handleLocalOnlyChanged(context, ref, settings, false),
+            child: Text('sign_in'.tr()),
+          ),
+        ),
+      ],
+    );
+  }
+
+  static Widget _buildAccountSyncTile(
+    BuildContext context,
+    SyncStatus status,
+    String provider,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final (icon, color, label) = switch (status) {
+      SyncStatus.connected => (
+        Icons.cloud_done_outlined,
+        colorScheme.primary,
+        'sync_connected'.tr(),
+      ),
+      SyncStatus.syncing => (
+        Icons.sync,
+        colorScheme.tertiary,
+        'sync_syncing'.tr(),
+      ),
+      SyncStatus.offline => (
+        Icons.cloud_off_outlined,
+        colorScheme.error,
+        'sync_offline'.tr(),
+      ),
+      SyncStatus.localOnly => (
+        Icons.storage,
+        colorScheme.onSurfaceVariant,
+        'local_only'.tr(),
+      ),
+    };
+
+    return ListTile(
+      leading: Icon(icon, color: color),
+      title: Text(label),
+      subtitle: provider.isNotEmpty
+          ? Text(
+              'account_signed_in_via'
+                  .tr(namedArgs: {'provider': provider}),
+            )
+          : null,
+      trailing: Container(
+        width: 10,
+        height: 10,
+        decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+      ),
+    );
+  }
+
+  static String _getInitials(String? name, String? email) {
+    if (name != null && name.isNotEmpty) {
+      final parts = name.trim().split(' ');
+      if (parts.length >= 2) {
+        return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+      }
+      return name[0].toUpperCase();
+    }
+    if (email != null && email.isNotEmpty) {
+      return email[0].toUpperCase();
+    }
+    return '?';
+  }
+
+  static String _getProviderLabel(User? user) {
+    if (user == null) return '';
+    final provider = user.appMetadata['provider'] as String?;
+    return switch (provider) {
+      'google' => 'Google',
+      'github' => 'GitHub',
+      'email' => 'account_provider_email'.tr(),
+      _ => provider ?? '',
+    };
+  }
+
+  Widget _buildDataSyncInfoTile(BuildContext context, WidgetRef ref) {
+    final syncStatus = ref.watch(syncStatusProvider);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    final (icon, color, title, subtitle) = switch (syncStatus) {
+      SyncStatus.connected => (
+        Icons.cloud_done_outlined,
+        colorScheme.primary,
+        'sync_connected'.tr(),
+        'sync_data_auto'.tr(),
+      ),
+      SyncStatus.syncing => (
+        Icons.sync,
+        colorScheme.tertiary,
+        'sync_syncing'.tr(),
+        'sync_data_uploading'.tr(),
+      ),
+      SyncStatus.offline => (
+        Icons.cloud_off_outlined,
+        colorScheme.error,
+        'sync_offline'.tr(),
+        'sync_data_offline'.tr(),
+      ),
+      SyncStatus.localOnly => (
+        Icons.storage,
+        colorScheme.onSurfaceVariant,
+        'local_only'.tr(),
+        '',
+      ),
+    };
+
+    return ListTile(
+      leading: Icon(icon, color: color),
+      title: Text(title),
+      subtitle: subtitle.isNotEmpty ? Text(subtitle) : null,
+      trailing: Container(
+        width: 10,
+        height: 10,
+        decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+      ),
+    );
+  }
+
+  static Future<void> _handleSignOut(
+    BuildContext context,
+    WidgetRef ref,
+    SettingsProviders settings,
+  ) async {
+    ref.read(settings.provider(localOnlySettingDef).notifier).set(true);
+    try {
+      await ref.read(authServiceProvider).signOut();
+    } catch (e, st) {
+      Log.warning('Sign-out failed', error: e, stackTrace: st);
+    }
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('sign_out'.tr())));
   }
 
   Widget _buildSection(
@@ -297,12 +599,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final langCode = settings.controller.get(languageSettingDef);
     await context.setLocale(Locale(langCode));
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('reset_all_settings_done'.tr())),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('reset_all_settings_done'.tr())));
   }
 
-  static Future<void> _deleteAllData(BuildContext context, WidgetRef ref) async {
+  static Future<void> _deleteAllData(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -325,8 +630,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
     if (confirmed == true && context.mounted) {
       try {
-        final groupDao = ref.read(groupDaoProvider);
-        await groupDao.deleteAllGroups();
+        final db = ref.read(powerSyncDatabaseProvider);
+        await db.execute('DELETE FROM expenses');
+        await db.execute('DELETE FROM expense_tags');
+        await db.execute('DELETE FROM participants');
+        await db.execute('DELETE FROM group_members');
+        await db.execute('DELETE FROM group_invites');
+        await db.execute('DELETE FROM groups');
+        await db.execute('DELETE FROM pending_writes');
+        Log.info('All data deleted');
         if (context.mounted) {
           final settings = ref.read(hisabSettingsProvidersProvider);
           if (settings != null) {
@@ -334,9 +646,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 .read(settings.provider(onboardingCompletedSettingDef).notifier)
                 .set(false);
           }
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('delete_all_data_done'.tr())),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('delete_all_data_done'.tr())));
           context.go(RoutePaths.onboarding);
         }
       } catch (e, st) {
@@ -359,54 +671,83 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     // Switching to local: user decided; set immediately.
     if (v == true) {
       ref.read(settings.provider(localOnlySettingDef).notifier).set(true);
-      ref.read(settings.provider(settingsOnlinePendingSettingDef).notifier).set(false);
+      ref
+          .read(settings.provider(settingsOnlinePendingSettingDef).notifier)
+          .set(false);
       return;
     }
 
-    // Switching to online: show dialog, user decides.
-    final onlineAvailable = ref.read(auth0ConfigAvailableProvider);
-    if (!onlineAvailable) return;
+    // Switching to online: need auth.
+    if (!supabaseConfigAvailable) return;
 
-    final confirmed = await showDialog<bool>(
+    // Check if already signed in.
+    final authService = ref.read(authServiceProvider);
+    if (authService.isAuthenticated) {
+      ref.read(settings.provider(localOnlySettingDef).notifier).set(false);
+      return;
+    }
+
+    // Show sign-in sheet
+    if (!context.mounted) return;
+    final result = await showSignInSheet(context, ref);
+    switch (result) {
+      case SignInResult.success:
+        if (!context.mounted) return;
+        // Migrate local data to Supabase before switching
+        await _runMigration(context, ref, settings);
+      case SignInResult.pendingRedirect:
+        // OAuth redirect on web — set pending flag, page will reload
+        ref
+            .read(settings.provider(settingsOnlinePendingSettingDef).notifier)
+            .set(true);
+        Log.info('Settings OAuth redirect pending (web)');
+      case SignInResult.cancelled:
+        // User cancelled, keep localOnly as-is
+        break;
+    }
+  }
+
+  static Future<void> _runMigration(
+    BuildContext context,
+    WidgetRef ref,
+    SettingsProviders settings,
+  ) async {
+    final db = ref.read(powerSyncDatabaseProvider);
+    final migrationService = MigrationService(db, Supabase.instance.client);
+
+    // Check if there is data to migrate
+    final hasData = await migrationService.hasLocalData();
+    if (!hasData) {
+      // No data — just switch to online
+      ref.read(settings.provider(localOnlySettingDef).notifier).set(false);
+      Log.info('Switched to online mode (no data to migrate)');
+      return;
+    }
+
+    if (!context.mounted) return;
+
+    // Show migration progress dialog
+    final migrationResult = await showDialog<MigrationResult>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('sign_in'.tr()),
-        content: Text('onboarding_online_requires_sign_in'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('sign_in'.tr()),
-          ),
-        ],
-      ),
+      barrierDismissible: false,
+      builder: (ctx) =>
+          _MigrationProgressDialog(migrationService: migrationService),
     );
 
-    if (confirmed != true || !context.mounted) return;
-
-    // User chose Sign in. Check if already signed in.
-    final signedIn = await auth0HasValidCredentials();
-    if (signedIn) {
-      ref.read(settings.provider(localOnlySettingDef).notifier).set(false);
-      return;
-    }
-
-    if (kIsWeb) {
-      ref.read(settings.provider(settingsOnlinePendingSettingDef).notifier).set(true);
-      await auth0SignIn();
-      return;
-    }
-
-    final token = await auth0SignIn();
-    if (token != null && context.mounted) {
-      ref.read(settings.provider(localOnlySettingDef).notifier).set(false);
-    } else if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('onboarding_online_requires_sign_in'.tr())),
-      );
+    if (!context.mounted) return;
+    switch (migrationResult) {
+      case MigrationResult.success:
+      case MigrationResult.noData:
+        ref.read(settings.provider(localOnlySettingDef).notifier).set(false);
+        Log.info('Switched to online mode after migration');
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('migration_success'.tr())));
+      case MigrationResult.failed:
+      case null:
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('migration_failed'.tr())));
     }
   }
 
@@ -415,7 +756,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     WidgetRef ref,
     SettingsProviders settings,
   ) {
-    final onlineAvailable = ref.watch(auth0ConfigAvailableProvider);
+    final onlineAvailable = supabaseConfigAvailable;
     final value = ref.watch(settings.provider(localOnlySettingDef));
     String subtitle = 'local_only_description'.tr();
     if (!onlineAvailable) {
@@ -695,15 +1036,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   static Future<void> _exportData(BuildContext context, WidgetRef ref) async {
     try {
-      final groupDao = ref.read(groupDaoProvider);
-      final participantDao = ref.read(participantDaoProvider);
-      final expenseDao = ref.read(expenseDaoProvider);
-      final expenseTagDao = ref.read(expenseTagDaoProvider);
-      final data = await exportLocalDataToJson(
-        groupDao: groupDao,
-        participantDao: participantDao,
-        expenseDao: expenseDao,
-        expenseTagDao: expenseTagDao,
+      final data = await exportDataToJson(
+        groupRepo: ref.read(groupRepositoryProvider),
+        participantRepo: ref.read(participantRepositoryProvider),
+        expenseRepo: ref.read(expenseRepositoryProvider),
+        tagRepo: ref.read(tagRepositoryProvider),
       );
       final jsonString = const JsonEncoder.withIndent('  ').convert(data);
       final result = await FilePicker.platform.saveFile(
@@ -779,14 +1116,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         }
         return;
       }
-      final groupDao = ref.read(groupDaoProvider);
-      final participantDao = ref.read(participantDaoProvider);
-      final expenseDao = ref.read(expenseDaoProvider);
-      final expenseTagDao = ref.read(expenseTagDaoProvider);
-      final groupRepo = LocalGroupRepository(groupDao);
-      final participantRepo = LocalParticipantRepository(participantDao);
-      final expenseRepo = LocalExpenseRepository(expenseDao);
-      final tagRepo = LocalTagRepository(expenseTagDao);
+      final groupRepo = ref.read(groupRepositoryProvider);
+      final participantRepo = ref.read(participantRepositoryProvider);
+      final expenseRepo = ref.read(expenseRepositoryProvider);
+      final tagRepo = ref.read(tagRepositoryProvider);
       final idMap = <String, String>{};
       for (final g in backup.groups) {
         final newId = await groupRepo.create(g.name, g.currencyCode);
@@ -878,6 +1211,64 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             onPressed: () => Navigator.pop(ctx),
             child: Text('done'.tr()),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// Migration Progress Dialog
+// =============================================================================
+
+class _MigrationProgressDialog extends StatefulWidget {
+  final MigrationService migrationService;
+  const _MigrationProgressDialog({required this.migrationService});
+
+  @override
+  State<_MigrationProgressDialog> createState() =>
+      _MigrationProgressDialogState();
+}
+
+class _MigrationProgressDialogState extends State<_MigrationProgressDialog> {
+  int _completed = 0;
+  int _total = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _runMigration();
+  }
+
+  Future<void> _runMigration() async {
+    final result = await widget.migrationService.migrateLocalToOnline(
+      onProgress: (completed, total) {
+        if (mounted) {
+          setState(() {
+            _completed = completed;
+            _total = total;
+          });
+        }
+      },
+    );
+    if (mounted) {
+      Navigator.of(context).pop(result);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = _total > 0 ? _completed / _total : 0.0;
+    return AlertDialog(
+      title: Text('migration_title'.tr()),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('migration_uploading'.tr()),
+          const SizedBox(height: 16),
+          LinearProgressIndicator(value: progress),
+          const SizedBox(height: 8),
+          Text('$_completed / $_total'),
         ],
       ),
     );

@@ -3,22 +3,8 @@
 ///
 ///   cp lib/core/constants/app_secrets_example.dart lib/core/constants/app_secrets.dart
 ///
-/// Debug builds use dev values; release builds use prod values.
+/// Supabase config is now provided via `--dart-define` (see supabase_config.dart).
+/// This file only holds the report issue URL.
 library;
 
-// === Dev (debug builds) ===
-const String auth0DomainDev = '';
-const String auth0ClientIdDev = '';
-const String convexDeploymentUrlDev = '';
-const String telemetryEndpointUrlDev = '';
-
-// === Prod (release builds) ===
-const String auth0DomainProd = '';
-const String auth0ClientIdProd = '';
-const String convexDeploymentUrlProd = '';
-const String telemetryEndpointUrlProd = '';
-
-// === Shared ===
-/// Custom scheme for Android redirect. Must match android/secrets.properties auth0Scheme.
-const String auth0Scheme = 'com.shenepoy.hisab';
-const String reportIssueUrl = 'https://github.com/Zyzto/Hisab/issues/new';
+const String reportIssueUrl = 'https://github.com/YOUR_ORG/Hisab/issues/new';

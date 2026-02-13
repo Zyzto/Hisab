@@ -191,7 +191,7 @@ final class EffectiveLocalOnlyProvider
 }
 
 String _$effectiveLocalOnlyHash() =>
-    r'2845740a9b1f275e00d0ac3a6000f3d8b0721967';
+    r'094d91f85897f4bcffe7e2dd68d0a1d3eacb390d';
 
 @ProviderFor(receiptOcrEnabled)
 final receiptOcrEnabledProvider = ReceiptOcrEnabledProvider._();
@@ -559,6 +559,45 @@ final class FontSizeScaleProvider
 }
 
 String _$fontSizeScaleHash() => r'8a20204a46a361746e07cba5a1f0c6c1b3187e6f';
+
+@ProviderFor(authUserProfile)
+final authUserProfileProvider = AuthUserProfileProvider._();
+
+final class AuthUserProfileProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<AuthUserProfile?>,
+          AuthUserProfile?,
+          FutureOr<AuthUserProfile?>
+        >
+    with $FutureModifier<AuthUserProfile?>, $FutureProvider<AuthUserProfile?> {
+  AuthUserProfileProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'authUserProfileProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$authUserProfileHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<AuthUserProfile?> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<AuthUserProfile?> create(Ref ref) {
+    return authUserProfile(ref);
+  }
+}
+
+String _$authUserProfileHash() => r'62c592fd7f30df515f6cdb134ae7adc1f8ca29e2';
 
 @ProviderFor(telemetryEnabled)
 final telemetryEnabledProvider = TelemetryEnabledProvider._();

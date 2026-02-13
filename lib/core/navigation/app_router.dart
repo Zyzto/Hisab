@@ -9,6 +9,7 @@ import '../../features/settings/providers/settings_framework_providers.dart';
 import '../../features/groups/pages/group_create_page.dart';
 import '../../features/groups/pages/group_detail_page.dart';
 import '../../features/groups/pages/group_settings_page.dart';
+import '../../features/groups/pages/invite_accept_page.dart';
 import '../../features/expenses/pages/expense_form_page.dart';
 import '../../features/expenses/pages/expense_detail_page.dart';
 import 'main_scaffold.dart';
@@ -58,6 +59,13 @@ GoRouter router(Ref ref) {
           );
         },
         routes: [...getHomeRoutes(), ...getSettingsRoutes()],
+      ),
+      GoRoute(
+        path: '/invite/:token',
+        builder: (context, state) {
+          final token = state.pathParameters['token'] ?? '';
+          return InviteAcceptPage(token: token);
+        },
       ),
       GoRoute(
         path: '/groups/create',

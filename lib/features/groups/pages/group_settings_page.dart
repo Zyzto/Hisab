@@ -4,9 +4,14 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../providers/groups_provider.dart';
+import '../providers/group_member_provider.dart';
+import '../widgets/invite_link_sheet.dart';
+import '../../../core/navigation/route_paths.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/services/settle_up_service.dart';
+import '../../../core/telemetry/telemetry_service.dart';
 import '../../../domain/domain.dart';
+import '../../settings/providers/settings_framework_providers.dart';
 
 class GroupSettingsPage extends ConsumerStatefulWidget {
   final String groupId;
@@ -27,6 +32,10 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
       participantsByGroupProvider(widget.groupId),
     );
     final expensesAsync = ref.watch(expensesByGroupProvider(widget.groupId));
+    final localOnly = ref.watch(effectiveLocalOnlyProvider);
+    final myRoleAsync = localOnly
+        ? const AsyncValue.data(null)
+        : ref.watch(myRoleInGroupProvider(widget.groupId));
 
     return groupAsync.when(
       data: (group) {
@@ -73,6 +82,10 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                 expensesAsync,
                 ref,
               ),
+              if (!localOnly) ...[
+                const SizedBox(height: 24),
+                _buildOnlineSection(context, group, myRoleAsync, ref),
+              ],
             ],
           ),
         );
@@ -353,6 +366,286 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
       ref.invalidate(futureGroupProvider(widget.groupId));
     } catch (e, st) {
       Log.warning('Settlement unfreeze failed', error: e, stackTrace: st);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Widget _buildOnlineSection(
+    BuildContext context,
+    Group group,
+    AsyncValue<GroupRole?> myRoleAsync,
+    WidgetRef ref,
+  ) {
+    final theme = Theme.of(context);
+    return myRoleAsync.when(
+      data: (myRole) {
+        final isOwnerOrAdmin =
+            myRole == GroupRole.owner || myRole == GroupRole.admin;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (isOwnerOrAdmin && group.ownerId != null) ...[
+              Text(
+                'group_permissions'.tr(),
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              SwitchListTile(
+                title: Text('allow_add_expense'.tr()),
+                value: group.allowMemberAddExpense,
+                onChanged: _saving
+                    ? null
+                    : (v) => _onPermissionChanged(
+                        ref,
+                        group,
+                        allowMemberAddExpense: v,
+                      ),
+              ),
+              SwitchListTile(
+                title: Text('allow_add_participant'.tr()),
+                value: group.allowMemberAddParticipant,
+                onChanged: _saving
+                    ? null
+                    : (v) => _onPermissionChanged(
+                        ref,
+                        group,
+                        allowMemberAddParticipant: v,
+                      ),
+              ),
+              SwitchListTile(
+                title: Text('allow_change_settings'.tr()),
+                value: group.allowMemberChangeSettings,
+                onChanged: _saving
+                    ? null
+                    : (v) => _onPermissionChanged(
+                        ref,
+                        group,
+                        allowMemberChangeSettings: v,
+                      ),
+              ),
+              SwitchListTile(
+                title: Text('require_participant_assignment'.tr()),
+                subtitle: Text('require_participant_assignment_desc'.tr()),
+                value: group.requireParticipantAssignment,
+                onChanged: _saving
+                    ? null
+                    : (v) => _onPermissionChanged(
+                        ref,
+                        group,
+                        requireParticipantAssignment: v,
+                      ),
+              ),
+              const SizedBox(height: 24),
+            ],
+            if (isOwnerOrAdmin) ...[
+              Text(
+                'invite_people'.tr(),
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              FilledButton.icon(
+                onPressed: () =>
+                    createAndShowInviteSheet(context, ref, widget.groupId),
+                icon: const Icon(Icons.add_link),
+                label: Text('invite_people'.tr()),
+              ),
+              const SizedBox(height: 24),
+            ],
+            if (myRole == GroupRole.owner) ...[
+              OutlinedButton.icon(
+                onPressed: _saving
+                    ? null
+                    : () => _showTransferOwnership(context, ref),
+                icon: const Icon(Icons.swap_horiz),
+                label: Text('transfer_ownership'.tr()),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _saving
+                    ? null
+                    : () => _showDeleteGroup(context, ref),
+                icon: const Icon(Icons.delete_outline),
+                label: Text('delete_group'.tr()),
+              ),
+              const SizedBox(height: 24),
+            ],
+            OutlinedButton.icon(
+              onPressed: _saving ? null : () => _showLeaveGroup(context, ref),
+              icon: const Icon(Icons.exit_to_app),
+              label: Text('leave_group'.tr()),
+            ),
+          ],
+        );
+      },
+      loading: () => const CircularProgressIndicator(),
+      error: (_, _) => const SizedBox.shrink(),
+    );
+  }
+
+  Future<void> _onPermissionChanged(
+    WidgetRef ref,
+    Group group, {
+    bool? allowMemberAddExpense,
+    bool? allowMemberAddParticipant,
+    bool? allowMemberChangeSettings,
+    bool? requireParticipantAssignment,
+  }) async {
+    setState(() => _saving = true);
+    try {
+      await ref
+          .read(groupRepositoryProvider)
+          .update(
+            group.copyWith(
+              allowMemberAddExpense:
+                  allowMemberAddExpense ?? group.allowMemberAddExpense,
+              allowMemberAddParticipant:
+                  allowMemberAddParticipant ?? group.allowMemberAddParticipant,
+              allowMemberChangeSettings:
+                  allowMemberChangeSettings ?? group.allowMemberChangeSettings,
+              requireParticipantAssignment:
+                  requireParticipantAssignment ??
+                  group.requireParticipantAssignment,
+              updatedAt: DateTime.now(),
+            ),
+          );
+      ref.invalidate(futureGroupProvider(widget.groupId));
+    } catch (e, st) {
+      Log.warning('Permission change failed', error: e, stackTrace: st);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _showTransferOwnership(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final members = await ref
+        .read(groupMemberRepositoryProvider)
+        .listByGroup(widget.groupId);
+    if (!context.mounted) return;
+    final others = members.where((m) => m.role != 'owner').toList();
+    if (others.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('no_other_members'.tr())));
+      return;
+    }
+    final chosen = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => ListView(
+        shrinkWrap: true,
+        children: others
+            .map(
+              (m) => ListTile(
+                title: Text('${m.userId.substring(0, 8)}... (${m.role})'),
+                onTap: () => Navigator.pop(ctx, m.id),
+              ),
+            )
+            .toList(),
+      ),
+    );
+    if (chosen == null || !context.mounted) return;
+    setState(() => _saving = true);
+    try {
+      await ref
+          .read(groupMemberRepositoryProvider)
+          .transferOwnership(widget.groupId, chosen);
+      TelemetryService.sendEvent('ownership_transferred', {
+        'groupId': widget.groupId,
+      }, enabled: ref.read(telemetryEnabledProvider));
+      ref.invalidate(futureGroupProvider(widget.groupId));
+      ref.invalidate(myRoleInGroupProvider(widget.groupId));
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('ownership_transferred'.tr())));
+      }
+    } catch (e, st) {
+      Log.warning('Transfer failed', error: e, stackTrace: st);
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _showDeleteGroup(BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('delete_group'.tr()),
+        content: Text('delete_group_confirm'.tr()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('cancel'.tr()),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('delete_group'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    setState(() => _saving = true);
+    try {
+      await ref.read(groupRepositoryProvider).delete(widget.groupId);
+      if (context.mounted) context.go(RoutePaths.home);
+    } catch (e, st) {
+      Log.warning('Delete group failed', error: e, stackTrace: st);
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _showLeaveGroup(BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('leave_group'.tr()),
+        content: Text('leave_group_confirm'.tr()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('cancel'.tr()),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('leave_group'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    setState(() => _saving = true);
+    try {
+      await ref.read(groupMemberRepositoryProvider).leave(widget.groupId);
+      TelemetryService.sendEvent('member_left', {
+        'groupId': widget.groupId,
+      }, enabled: ref.read(telemetryEnabledProvider));
+      if (context.mounted) context.go(RoutePaths.home);
+    } catch (e, st) {
+      Log.warning('Leave failed', error: e, stackTrace: st);
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }

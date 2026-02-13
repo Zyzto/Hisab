@@ -1,11 +1,10 @@
 import 'dart:convert';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
-import '../../../core/database/daos/expense_dao.dart';
-import '../../../core/database/daos/expense_tag_dao.dart';
-import '../../../core/database/daos/group_dao.dart';
-import '../../../core/database/daos/participant_dao.dart';
-import '../../../core/repository/local_repository.dart';
-import '../../../domain/domain.dart';
+import '../../core/repository/group_repository.dart';
+import '../../core/repository/participant_repository.dart';
+import '../../core/repository/expense_repository.dart';
+import '../../core/repository/tag_repository.dart';
+import '../../domain/domain.dart';
 
 /// Result of backup export or import.
 class BackupResult {
@@ -17,18 +16,13 @@ class BackupResult {
 }
 
 /// Export all local data to a JSON-serializable map.
-/// Uses DAOs directly so we always export from Drift regardless of localOnly setting.
-Future<Map<String, dynamic>> exportLocalDataToJson({
-  required GroupDao groupDao,
-  required ParticipantDao participantDao,
-  required ExpenseDao expenseDao,
-  required ExpenseTagDao expenseTagDao,
+/// Uses repository interfaces (backed by PowerSync).
+Future<Map<String, dynamic>> exportDataToJson({
+  required IGroupRepository groupRepo,
+  required IParticipantRepository participantRepo,
+  required IExpenseRepository expenseRepo,
+  required ITagRepository tagRepo,
 }) async {
-  final groupRepo = LocalGroupRepository(groupDao);
-  final participantRepo = LocalParticipantRepository(participantDao);
-  final expenseRepo = LocalExpenseRepository(expenseDao);
-  final tagRepo = LocalTagRepository(expenseTagDao);
-
   final groups = await groupRepo.getAll();
   final participants = <Participant>[];
   final expenses = <Expense>[];

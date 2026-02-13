@@ -8,30 +8,32 @@ part of 'onboarding_providers.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// When true, online mode is available (Auth0 and Convex both configured).
+/// Whether online mode is available (Supabase configured via --dart-define).
 
-@ProviderFor(auth0ConfigAvailable)
-final auth0ConfigAvailableProvider = Auth0ConfigAvailableProvider._();
+@ProviderFor(supabaseConfigAvailableOnboarding)
+final supabaseConfigAvailableOnboardingProvider =
+    SupabaseConfigAvailableOnboardingProvider._();
 
-/// When true, online mode is available (Auth0 and Convex both configured).
+/// Whether online mode is available (Supabase configured via --dart-define).
 
-final class Auth0ConfigAvailableProvider
+final class SupabaseConfigAvailableOnboardingProvider
     extends $FunctionalProvider<bool, bool, bool>
     with $Provider<bool> {
-  /// When true, online mode is available (Auth0 and Convex both configured).
-  Auth0ConfigAvailableProvider._()
+  /// Whether online mode is available (Supabase configured via --dart-define).
+  SupabaseConfigAvailableOnboardingProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'auth0ConfigAvailableProvider',
+        name: r'supabaseConfigAvailableOnboardingProvider',
         isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$auth0ConfigAvailableHash();
+  String debugGetCreateSourceHash() =>
+      _$supabaseConfigAvailableOnboardingHash();
 
   @$internal
   @override
@@ -40,7 +42,7 @@ final class Auth0ConfigAvailableProvider
 
   @override
   bool create(Ref ref) {
-    return auth0ConfigAvailable(ref);
+    return supabaseConfigAvailableOnboarding(ref);
   }
 
   /// {@macro riverpod.override_with_value}
@@ -52,5 +54,5 @@ final class Auth0ConfigAvailableProvider
   }
 }
 
-String _$auth0ConfigAvailableHash() =>
-    r'382e3a90d8cf95e13843c5827b1ccee3f055df0b';
+String _$supabaseConfigAvailableOnboardingHash() =>
+    r'a30394b5fc0d0cae3a84849c30aff802400fa94d';

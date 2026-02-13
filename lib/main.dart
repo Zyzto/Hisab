@@ -4,22 +4,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
-import 'package:convex_flutter/convex_flutter.dart';
-import 'core/auth/auth_service.dart';
-import 'core/constants/convex_config.dart';
+import 'package:path/path.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:powersync/powersync.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'core/constants/supabase_config.dart';
+import 'core/database/database_providers.dart';
+import 'core/database/powersync_schema.dart' as ps;
 import 'features/settings/providers/settings_framework_providers.dart';
 import 'features/settings/settings_definitions.dart';
 import 'app.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Suppress convex_flutter WebConvexClient verbose logs (Ping/Pong, RAW MESSAGE, etc.)
-  final oldDebugPrint = debugPrint;
-  debugPrint = (String? message, {int? wrapWidth}) {
-    if (message != null && message.contains('[WebConvexClient]')) return;
-    oldDebugPrint(message, wrapWidth: wrapWidth);
-  };
 
   // Log framework and async errors before logging service is ready
   FlutterError.onError = (FlutterErrorDetails details) {
@@ -32,6 +30,19 @@ void main() async {
     );
   };
   PlatformDispatcher.instance.onError = (error, stack) {
+    // Known web issue: PowerSync/sqlite3_web can emit LegacyJavaScriptObject
+    // in internal streams where Dart expects UpdateNotification. We use
+    // polling instead of watch() on web, but the SDK may still create
+    // internal listeners. Suppress this specific error from surfacing.
+    if (kIsWeb &&
+        error is TypeError &&
+        error.toString().contains('LegacyJavaScriptObject') &&
+        error.toString().contains('UpdateNotification')) {
+      Log.debug(
+        'Suppressed known web stream type error (PowerSync/sqlite3_web): $error',
+      );
+      return true;
+    }
     LoggingService.severe(
       'Uncaught async error: $error',
       component: 'CrashHandler',
@@ -41,15 +52,14 @@ void main() async {
     return true;
   };
 
-  if (!kIsWeb) {
-    await LoggingService.init(
-      const LoggingConfig(
-        appName: 'Hisab',
-        logFileName: 'hisab.log',
-        crashLogFileName: 'hisab_crashes.log',
-      ),
-    );
-  }
+  await LoggingService.init(
+    const LoggingConfig(
+      appName: 'Hisab',
+      logFileName: 'hisab.log',
+      crashLogFileName: 'hisab_crashes.log',
+    ),
+  );
+  Log.debug('Logging initialized');
 
   await EasyLocalization.ensureInitialized();
   // Reduce console noise from easy_localization [DEBUG] / [INFO] messages
@@ -59,52 +69,95 @@ void main() async {
   final settingsProviders = await initializeHisabSettings();
   if (settingsProviders != null) {
     Log.debug('Settings framework initialized');
-
-    // Initialize Convex only when online is configured (Auth0 + Convex both set)
-    if (auth0ConfigAvailable && convexDeploymentUrl.isNotEmpty) {
-      try {
-        await ConvexClient.initialize(
-          // ignore: prefer_const_constructors - deploymentUrl is a variable
-          ConvexConfig(deploymentUrl: convexDeploymentUrl, clientId: 'hisab-1.0'),
-        );
-        Log.debug('Convex client initialized');
-      } catch (e, stackTrace) {
-        Log.error(
-          'Convex client initialization failed',
-          error: e,
-          stackTrace: stackTrace,
-        );
-      }
-    }
-
-    // Web: process Auth0 redirect callback only when we might need it
-    final onboardingPending = settingsProviders.controller.get(onboardingOnlinePendingSettingDef);
-    final settingsPending = settingsProviders.controller.get(settingsOnlinePendingSettingDef);
-    final localOnly = settingsProviders.controller.get(localOnlySettingDef);
-    final needAuth0OnLoad = kIsWeb &&
-        auth0ConfigAvailable &&
-        (onboardingPending == true || settingsPending == true || localOnly == false);
-
-    if (needAuth0OnLoad) {
-      final credentials = await auth0OnLoad();
-      if (credentials != null) {
-        if (onboardingPending == true) {
-          settingsProviders.controller.set(onboardingCompletedSettingDef, true);
-          settingsProviders.controller.set(onboardingOnlinePendingSettingDef, false);
-          Log.info('Onboarding completed after Auth0 redirect');
-        }
-        if (settingsPending == true) {
-          settingsProviders.controller.set(localOnlySettingDef, false);
-          settingsProviders.controller.set(settingsOnlinePendingSettingDef, false);
-          Log.info('Settings: switched to online after Auth0 redirect');
-        }
-      }
-    }
   } else {
     Log.warning('Settings framework init returned null, using defaults');
   }
 
-  // Use saved language from settings; we persist via our settings, not EasyLocalization
+  // --------------------------------------------------------------------------
+  // Local SQLite database (always initialized — works offline)
+  // --------------------------------------------------------------------------
+  final dbPath = kIsWeb
+      ? 'hisab.db'
+      : join((await getApplicationDocumentsDirectory()).path, 'hisab.db');
+  final db = PowerSyncDatabase(schema: ps.schema, path: dbPath);
+  await db.initialize();
+  Log.info('PowerSync database initialized (local SQLite)');
+
+  // --------------------------------------------------------------------------
+  // Supabase (ONLY if configured via --dart-define)
+  // --------------------------------------------------------------------------
+  if (supabaseConfigAvailable) {
+    await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
+    Log.info('Supabase client initialized');
+
+    if (settingsProviders != null) {
+      final session = Supabase.instance.client.auth.currentSession;
+
+      // Handle pending OAuth redirects (web only — page reloaded after redirect)
+      final onboardingPending = settingsProviders.controller.get(
+        onboardingOnlinePendingSettingDef,
+      );
+      final settingsPending = settingsProviders.controller.get(
+        settingsOnlinePendingSettingDef,
+      );
+
+      if (onboardingPending && session != null) {
+        // OAuth completed after onboarding redirect
+        settingsProviders.controller.set(
+          onboardingOnlinePendingSettingDef,
+          false,
+        );
+        settingsProviders.controller.set(localOnlySettingDef, false);
+        settingsProviders.controller.set(onboardingCompletedSettingDef, true);
+        Log.info('Completed pending onboarding OAuth redirect');
+      } else if (onboardingPending && session == null) {
+        // OAuth was started but failed/cancelled
+        settingsProviders.controller.set(
+          onboardingOnlinePendingSettingDef,
+          false,
+        );
+        Log.info('Cleared failed onboarding OAuth redirect');
+      }
+
+      if (settingsPending && session != null) {
+        // OAuth completed after settings redirect
+        settingsProviders.controller.set(
+          settingsOnlinePendingSettingDef,
+          false,
+        );
+        settingsProviders.controller.set(localOnlySettingDef, false);
+        Log.info('Completed pending settings OAuth redirect');
+      } else if (settingsPending && session == null) {
+        // OAuth was started but failed/cancelled
+        settingsProviders.controller.set(
+          settingsOnlinePendingSettingDef,
+          false,
+        );
+        Log.info('Cleared failed settings OAuth redirect');
+      }
+
+      // If previously online but no session on startup, do NOT force
+      // local-only. On web, the session may recover asynchronously after
+      // a token refresh. Forcing local-only permanently overwrites the
+      // user's preference and requires them to manually switch back.
+      // Instead, keep the online preference — the DataSyncService already
+      // handles "online but not authenticated" by pausing sync, and the
+      // account UI shows a re-authenticate prompt.
+      final localOnly = settingsProviders.controller.get(localOnlySettingDef);
+      if (!localOnly && session == null) {
+        Log.info(
+          'Online mode active but no session yet — '
+          'user can re-authenticate from settings',
+        );
+      }
+    }
+  } else {
+    Log.info('Supabase not configured — running in local-only mode');
+  }
+
+  // --------------------------------------------------------------------------
+  // Run app
+  // --------------------------------------------------------------------------
   final startLocale = settingsProviders != null
       ? Locale(settingsProviders.controller.get(languageSettingDef))
       : const Locale('en');
@@ -118,6 +171,7 @@ void main() async {
       saveLocale: false,
       child: ProviderScope(
         overrides: [
+          powerSyncDatabaseProvider.overrideWithValue(db),
           if (settingsProviders != null) ...[
             settingsControllerProvider.overrideWithValue(
               settingsProviders.controller,

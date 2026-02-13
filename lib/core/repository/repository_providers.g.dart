@@ -53,7 +53,7 @@ final class GroupRepositoryProvider
   }
 }
 
-String _$groupRepositoryHash() => r'f650776cc69524f79df964d0eb33955af109d09d';
+String _$groupRepositoryHash() => r'80ef1d952d4028a529ac365f605e237455ba83db';
 
 @ProviderFor(participantRepository)
 final participantRepositoryProvider = ParticipantRepositoryProvider._();
@@ -101,7 +101,7 @@ final class ParticipantRepositoryProvider
 }
 
 String _$participantRepositoryHash() =>
-    r'f0ed386a6db8fa4b2f5ed412b57de39956927f82';
+    r'a4c893329f2e472f561ab95bc00201753da3ef90';
 
 @ProviderFor(expenseRepository)
 final expenseRepositoryProvider = ExpenseRepositoryProvider._();
@@ -148,7 +148,7 @@ final class ExpenseRepositoryProvider
   }
 }
 
-String _$expenseRepositoryHash() => r'9663e8f59a506434555e5747e92fe2f339cb48c4';
+String _$expenseRepositoryHash() => r'2876dbf340ae37464f0e149af17dc093ef28b6ac';
 
 @ProviderFor(tagRepository)
 final tagRepositoryProvider = TagRepositoryProvider._();
@@ -189,4 +189,100 @@ final class TagRepositoryProvider
   }
 }
 
-String _$tagRepositoryHash() => r'3f7cac86008992fc667f0523f07baef084a2e8f7';
+String _$tagRepositoryHash() => r'9a1c1d6f9c7d73342aef32685763998a1ae69b86';
+
+@ProviderFor(groupMemberRepository)
+final groupMemberRepositoryProvider = GroupMemberRepositoryProvider._();
+
+final class GroupMemberRepositoryProvider
+    extends
+        $FunctionalProvider<
+          IGroupMemberRepository,
+          IGroupMemberRepository,
+          IGroupMemberRepository
+        >
+    with $Provider<IGroupMemberRepository> {
+  GroupMemberRepositoryProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'groupMemberRepositoryProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$groupMemberRepositoryHash();
+
+  @$internal
+  @override
+  $ProviderElement<IGroupMemberRepository> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  IGroupMemberRepository create(Ref ref) {
+    return groupMemberRepository(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(IGroupMemberRepository value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<IGroupMemberRepository>(value),
+    );
+  }
+}
+
+String _$groupMemberRepositoryHash() =>
+    r'9087c5d7cb49bd87ed249198c8a33243f6937777';
+
+@ProviderFor(groupInviteRepository)
+final groupInviteRepositoryProvider = GroupInviteRepositoryProvider._();
+
+final class GroupInviteRepositoryProvider
+    extends
+        $FunctionalProvider<
+          IGroupInviteRepository,
+          IGroupInviteRepository,
+          IGroupInviteRepository
+        >
+    with $Provider<IGroupInviteRepository> {
+  GroupInviteRepositoryProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'groupInviteRepositoryProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$groupInviteRepositoryHash();
+
+  @$internal
+  @override
+  $ProviderElement<IGroupInviteRepository> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  IGroupInviteRepository create(Ref ref) {
+    return groupInviteRepository(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(IGroupInviteRepository value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<IGroupInviteRepository>(value),
+    );
+  }
+}
+
+String _$groupInviteRepositoryHash() =>
+    r'6e819df75291c288ca90445c45b5ff105acd603d';

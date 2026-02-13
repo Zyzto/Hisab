@@ -6,6 +6,7 @@ import 'package:easy_localization/easy_localization.dart';
 import '../../features/home/pages/home_page.dart';
 import '../../features/settings/pages/settings_page.dart';
 import '../widgets/floating_nav_bar.dart';
+import '../widgets/sync_status_icon.dart';
 import 'route_paths.dart';
 
 class MainScaffold extends ConsumerStatefulWidget {
@@ -58,6 +59,12 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
           Padding(
             padding: EdgeInsets.only(bottom: showNavBar ? 100 : 0),
             child: _buildMainContent(),
+          ),
+          // Sync status icon — top right, only visible in Online mode
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 8,
+            right: 16,
+            child: const SyncStatusIcon(),
           ),
           if (showNavBar)
             Positioned(

@@ -18,6 +18,7 @@ migrate_working_dir/
 *.iws
 .idea/
 #.vscode/  # Uncomment to ignore; launch configs are often shared
+.cursor/
 
 # Flutter / Dart
 **/doc/api/
@@ -36,20 +37,19 @@ app.*.symbols
 app.*.map.json
 
 # Android (build artifacts; android/.gitignore has local.properties, key.properties)
+android/secrets.properties
 /android/app/debug
 /android/app/profile
 /android/app/release
 
 # Secrets (copy from *_example files)
 lib/core/constants/app_secrets.dart
-android/secrets.properties
+dart_defines_online.json
 
-# Environment (Convex deployment URL override, API keys)
+# Environment
 .env
 .env.*
 !.env.example
 
-# Convex / Node
+# Node (if any tooling is used)
 node_modules/
-convex/_generated/
-convex/.tmp/

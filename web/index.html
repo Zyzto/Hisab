@@ -31,52 +31,8 @@
 
   <title>hisab</title>
   <link rel="manifest" href="manifest.json">
-  <!-- Auth0 Flutter SDK web dependency -->
-  <script src="https://cdn.auth0.com/js/auth0-spa-js/2.0/auth0-spa-js.production.js" defer></script>
 </head>
 <body>
-  <script>
-    // Register service worker that fixes .wasm MIME type (application/wasm).
-    // Required for Drift/sqlite3.wasm and any other .wasm. Do a FULL PAGE RELOAD (F5)
-    // once so this worker registers; hot restart does not reload the page.
-    (function () {
-      var script = document.createElement('script');
-      script.src = 'flutter_bootstrap.js';
-      script.async = true;
-      function loadApp() {
-        document.body.appendChild(script);
-      }
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('wasm_mime_sw.js', { scope: './' })
-          .then(function (reg) {
-            // Load only when this page is controlled by the SW (so .wasm fetches are intercepted).
-            if (navigator.serviceWorker.controller) {
-              loadApp();
-              return;
-            }
-            var done = false;
-            function loadOnce() {
-              if (done) return;
-              done = true;
-              navigator.serviceWorker.removeEventListener('controllerchange', onController);
-              loadApp();
-            }
-            function onController() {
-              if (navigator.serviceWorker.controller) loadOnce();
-            }
-            navigator.serviceWorker.addEventListener('controllerchange', onController);
-            reg.installing && reg.installing.addEventListener('statechange', function () {
-              if (reg.installing.state === 'activated' && navigator.serviceWorker.controller) loadOnce();
-            });
-            reg.waiting && reg.waiting.state === 'activated' && navigator.serviceWorker.controller && loadOnce();
-            // Fallback: load after 5s so app still starts if SW never controls (e.g. private mode).
-            setTimeout(loadOnce, 5000);
-          })
-          .catch(function () { loadApp(); });
-      } else {
-        loadApp();
-      }
-    })();
-  </script>
+  <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

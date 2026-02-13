@@ -1,0 +1,1056 @@
+# Supabase Backend Setup Guide
+
+This guide walks you through setting up the Supabase backend for Hisab from scratch. Follow these steps if you are self-hosting or contributing to the project and need your own Supabase instance.
+
+> **Offline mode**: Hisab works fully offline without any Supabase configuration. Online features (sync, auth, invites, telemetry) are only available when Supabase is configured.
+
+---
+
+## Table of Contents
+
+1. [Prerequisites](#1-prerequisites)
+2. [Create a Supabase Project](#2-create-a-supabase-project)
+3. [Apply Database Migrations](#3-apply-database-migrations)
+   - [Migration 1: Tables, Indexes, and Triggers](#migration-1-tables-indexes-and-triggers)
+   - [Migration 2: Row Level Security (RLS) Policies](#migration-2-row-level-security-rls-policies)
+   - [Migration 3: RPC Functions](#migration-3-rpc-functions)
+   - [Migration 4: Security Hardening](#migration-4-security-hardening)
+4. [Configure Authentication](#4-configure-authentication)
+5. [Deploy Edge Functions](#5-deploy-edge-functions)
+6. [Configure the Flutter App](#6-configure-the-flutter-app)
+7. [Verify the Setup](#7-verify-the-setup)
+8. [Architecture Overview](#8-architecture-overview)
+9. [Troubleshooting](#9-troubleshooting)
+
+---
+
+## 1. Prerequisites
+
+- A [Supabase](https://supabase.com/) account (free tier works)
+- [Supabase CLI](https://supabase.com/docs/guides/cli) installed (optional, for Edge Functions)
+- Flutter SDK installed
+- A Google Cloud project (for Google OAuth, optional)
+- A GitHub OAuth app (for GitHub OAuth, optional)
+
+---
+
+## 2. Create a Supabase Project
+
+1. Go to [supabase.com/dashboard](https://supabase.com/dashboard) and create a new project.
+2. Choose a name (e.g., "Hisab"), region, and set a database password.
+3. Once created, note the following from **Settings > API**:
+   - **Project URL** (e.g., `https://xxxxxxxxxxxxx.supabase.co`)
+   - **anon (public) key** (starts with `eyJ...`)
+4. These values are used in `--dart-define` when running the Flutter app.
+
+---
+
+## 3. Apply Database Migrations
+
+Go to the **SQL Editor** in your Supabase dashboard and run each migration in order. You can also use the Supabase CLI or MCP tools.
+
+### Migration 1: Tables, Indexes, and Triggers
+
+This creates the core schema: 7 tables, indexes, and an `updated_at` trigger.
+
+```sql
+-- =============================================
+-- Hisab Database Schema: Tables, Indexes, Triggers
+-- =============================================
+
+-- updated_at trigger function
+CREATE OR REPLACE FUNCTION public.handle_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- groups table
+CREATE TABLE public.groups (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL CHECK (length(name) >= 1 AND length(name) <= 200),
+  currency_code TEXT NOT NULL CHECK (length(currency_code) = 3),
+  owner_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  settlement_method TEXT DEFAULT 'greedy',
+  treasurer_participant_id UUID,
+  settlement_freeze_at TIMESTAMPTZ,
+  settlement_snapshot_json TEXT,
+  allow_member_add_expense BOOLEAN DEFAULT true NOT NULL,
+  allow_member_add_participant BOOLEAN DEFAULT true NOT NULL,
+  allow_member_change_settings BOOLEAN DEFAULT true NOT NULL,
+  require_participant_assignment BOOLEAN DEFAULT false NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
+-- participants table
+CREATE TABLE public.participants (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id UUID NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
+  name TEXT NOT NULL CHECK (length(name) >= 1 AND length(name) <= 100),
+  sort_order INT DEFAULT 0 NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
+-- Add FK for treasurer_participant_id (after participants exists)
+ALTER TABLE public.groups
+  ADD CONSTRAINT fk_groups_treasurer_participant
+  FOREIGN KEY (treasurer_participant_id) REFERENCES public.participants(id) ON DELETE SET NULL;
+
+-- group_members table
+CREATE TABLE public.group_members (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id UUID NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'member')),
+  participant_id UUID REFERENCES public.participants(id) ON DELETE SET NULL,
+  joined_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+  UNIQUE(group_id, user_id)
+);
+
+-- expenses table
+CREATE TABLE public.expenses (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id UUID NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
+  payer_participant_id UUID NOT NULL REFERENCES public.participants(id) ON DELETE CASCADE,
+  amount_cents INT NOT NULL,
+  currency_code TEXT NOT NULL CHECK (length(currency_code) = 3),
+  title TEXT NOT NULL CHECK (length(title) >= 1 AND length(title) <= 500),
+  description TEXT,
+  date TIMESTAMPTZ NOT NULL,
+  split_type TEXT NOT NULL CHECK (split_type IN ('equal', 'parts', 'amounts')),
+  split_shares_json TEXT,
+  type TEXT DEFAULT 'expense' NOT NULL CHECK (type IN ('expense', 'income', 'transfer')),
+  to_participant_id UUID REFERENCES public.participants(id) ON DELETE SET NULL,
+  tag TEXT,
+  line_items_json TEXT,
+  receipt_image_path TEXT,
+  created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
+-- expense_tags table
+CREATE TABLE public.expense_tags (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id UUID NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
+  label TEXT NOT NULL CHECK (length(label) >= 1 AND length(label) <= 100),
+  icon_name TEXT NOT NULL CHECK (length(icon_name) >= 1 AND length(icon_name) <= 80),
+  created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
+-- group_invites table
+CREATE TABLE public.group_invites (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id UUID NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
+  token TEXT NOT NULL UNIQUE,
+  invitee_email TEXT,
+  role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'admin', 'member')),
+  created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL
+);
+
+-- telemetry table (anonymous usage analytics)
+CREATE TABLE public.telemetry (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event TEXT NOT NULL,
+  timestamp TIMESTAMPTZ DEFAULT now(),
+  data JSONB
+);
+
+-- Indexes
+CREATE INDEX idx_group_members_group_id ON public.group_members(group_id);
+CREATE INDEX idx_group_members_user_id ON public.group_members(user_id);
+CREATE INDEX idx_group_invites_group_id ON public.group_invites(group_id);
+CREATE INDEX idx_participants_group_id ON public.participants(group_id);
+CREATE INDEX idx_expenses_group_id ON public.expenses(group_id);
+CREATE INDEX idx_expense_tags_group_id ON public.expense_tags(group_id);
+
+-- Updated-at triggers
+CREATE TRIGGER set_groups_updated_at
+  BEFORE UPDATE ON public.groups
+  FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+CREATE TRIGGER set_participants_updated_at
+  BEFORE UPDATE ON public.participants
+  FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+CREATE TRIGGER set_expenses_updated_at
+  BEFORE UPDATE ON public.expenses
+  FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+CREATE TRIGGER set_expense_tags_updated_at
+  BEFORE UPDATE ON public.expense_tags
+  FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+```
+
+### Migration 2: Row Level Security (RLS) Policies
+
+This enables RLS on all tables and creates granular access policies based on group membership and roles.
+
+```sql
+-- =============================================
+-- Helper Functions
+-- =============================================
+
+-- Get user's role in a group
+CREATE OR REPLACE FUNCTION public.get_user_role(p_group_id UUID)
+RETURNS TEXT AS $$
+  SELECT role FROM public.group_members
+  WHERE group_id = p_group_id AND user_id = auth.uid()
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
+-- Check if user is member of group
+CREATE OR REPLACE FUNCTION public.is_group_member(p_group_id UUID)
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS(
+    SELECT 1 FROM public.group_members
+    WHERE group_id = p_group_id AND user_id = auth.uid()
+  )
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
+-- =============================================
+-- Enable RLS on all tables
+-- =============================================
+ALTER TABLE public.groups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.group_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.participants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.expense_tags ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.group_invites ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.telemetry ENABLE ROW LEVEL SECURITY;
+
+-- =============================================
+-- Groups Policies
+-- =============================================
+CREATE POLICY "groups_select_members" ON public.groups
+  FOR SELECT USING (public.is_group_member(id));
+
+-- Allow creator to SELECT their own group (owner_id = auth.uid()) so that
+-- group_members_insert can succeed when adding the first owner row.
+CREATE POLICY "groups_select_owner" ON public.groups
+  FOR SELECT USING (owner_id = auth.uid());
+
+CREATE POLICY "groups_insert_authenticated" ON public.groups
+  FOR INSERT WITH CHECK (auth.uid() IS NOT NULL AND owner_id = auth.uid());
+
+CREATE POLICY "groups_update_owner_admin" ON public.groups
+  FOR UPDATE USING (public.get_user_role(id) IN ('owner', 'admin'));
+
+CREATE POLICY "groups_delete_owner" ON public.groups
+  FOR DELETE USING (public.get_user_role(id) = 'owner');
+
+-- =============================================
+-- Group Members Policies
+-- =============================================
+CREATE POLICY "group_members_select" ON public.group_members
+  FOR SELECT USING (public.is_group_member(group_id));
+
+CREATE POLICY "group_members_insert" ON public.group_members
+  FOR INSERT WITH CHECK (
+    public.get_user_role(group_id) IN ('owner', 'admin')
+    OR (
+      user_id = auth.uid()
+      AND role = 'owner'
+      AND (SELECT g.owner_id FROM public.groups g WHERE g.id = group_id) = auth.uid()
+    )
+  );
+
+CREATE POLICY "group_members_update" ON public.group_members
+  FOR UPDATE USING (public.get_user_role(group_id) IN ('owner', 'admin'));
+
+CREATE POLICY "group_members_delete" ON public.group_members
+  FOR DELETE USING (
+    public.get_user_role(group_id) IN ('owner', 'admin')
+    OR user_id = auth.uid()
+  );
+
+-- =============================================
+-- Participants Policies
+-- =============================================
+CREATE POLICY "participants_select" ON public.participants
+  FOR SELECT USING (public.is_group_member(group_id));
+
+CREATE POLICY "participants_insert" ON public.participants
+  FOR INSERT WITH CHECK (
+    public.get_user_role(group_id) IN ('owner', 'admin')
+    OR (
+      public.get_user_role(group_id) = 'member'
+      AND (SELECT g.allow_member_add_participant FROM public.groups g WHERE g.id = group_id) = true
+    )
+  );
+
+CREATE POLICY "participants_update" ON public.participants
+  FOR UPDATE USING (
+    public.get_user_role(group_id) IN ('owner', 'admin')
+    OR (
+      public.get_user_role(group_id) = 'member'
+      AND (SELECT g.allow_member_change_settings FROM public.groups g WHERE g.id = group_id) = true
+    )
+  );
+
+CREATE POLICY "participants_delete" ON public.participants
+  FOR DELETE USING (
+    public.get_user_role(group_id) IN ('owner', 'admin')
+    OR (
+      public.get_user_role(group_id) = 'member'
+      AND (
+        (SELECT g.allow_member_add_participant FROM public.groups g WHERE g.id = group_id) = true
+        OR (SELECT g.allow_member_change_settings FROM public.groups g WHERE g.id = group_id) = true
+      )
+    )
+  );
+
+-- =============================================
+-- Expenses Policies
+-- =============================================
+CREATE POLICY "expenses_select" ON public.expenses
+  FOR SELECT USING (public.is_group_member(group_id));
+
+CREATE POLICY "expenses_insert" ON public.expenses
+  FOR INSERT WITH CHECK (
+    public.get_user_role(group_id) IN ('owner', 'admin')
+    OR (
+      public.get_user_role(group_id) = 'member'
+      AND (SELECT g.allow_member_add_expense FROM public.groups g WHERE g.id = group_id) = true
+    )
+  );
+
+CREATE POLICY "expenses_update" ON public.expenses
+  FOR UPDATE USING (
+    public.get_user_role(group_id) IN ('owner', 'admin')
+    OR (
+      public.get_user_role(group_id) = 'member'
+      AND (SELECT g.allow_member_add_expense FROM public.groups g WHERE g.id = group_id) = true
+    )
+  );
+
+CREATE POLICY "expenses_delete" ON public.expenses
+  FOR DELETE USING (
+    public.get_user_role(group_id) IN ('owner', 'admin')
+    OR (
+      public.get_user_role(group_id) = 'member'
+      AND (SELECT g.allow_member_add_expense FROM public.groups g WHERE g.id = group_id) = true
+    )
+  );
+
+-- =============================================
+-- Expense Tags Policies
+-- =============================================
+CREATE POLICY "expense_tags_select" ON public.expense_tags
+  FOR SELECT USING (public.is_group_member(group_id));
+
+CREATE POLICY "expense_tags_insert" ON public.expense_tags
+  FOR INSERT WITH CHECK (
+    public.get_user_role(group_id) IN ('owner', 'admin')
+    OR (
+      public.get_user_role(group_id) = 'member'
+      AND (SELECT g.allow_member_change_settings FROM public.groups g WHERE g.id = group_id) = true
+    )
+  );
+
+CREATE POLICY "expense_tags_update" ON public.expense_tags
+  FOR UPDATE USING (
+    public.get_user_role(group_id) IN ('owner', 'admin')
+    OR (
+      public.get_user_role(group_id) = 'member'
+      AND (SELECT g.allow_member_change_settings FROM public.groups g WHERE g.id = group_id) = true
+    )
+  );
+
+CREATE POLICY "expense_tags_delete" ON public.expense_tags
+  FOR DELETE USING (
+    public.get_user_role(group_id) IN ('owner', 'admin')
+    OR (
+      public.get_user_role(group_id) = 'member'
+      AND (SELECT g.allow_member_change_settings FROM public.groups g WHERE g.id = group_id) = true
+    )
+  );
+
+-- =============================================
+-- Group Invites Policies
+-- =============================================
+CREATE POLICY "group_invites_select_members" ON public.group_invites
+  FOR SELECT USING (public.is_group_member(group_id));
+
+CREATE POLICY "group_invites_insert" ON public.group_invites
+  FOR INSERT WITH CHECK (public.get_user_role(group_id) IN ('owner', 'admin'));
+
+CREATE POLICY "group_invites_delete" ON public.group_invites
+  FOR DELETE USING (public.get_user_role(group_id) IN ('owner', 'admin'));
+
+-- =============================================
+-- Telemetry Policies (insert-only, any user including anonymous)
+-- =============================================
+CREATE POLICY "telemetry_insert" ON public.telemetry
+  FOR INSERT WITH CHECK (true);
+```
+
+### Migration 3: RPC Functions
+
+These server-side functions handle complex multi-table operations that need to bypass RLS (they run as `SECURITY DEFINER`).
+
+```sql
+-- =============================================
+-- RPC Functions for multi-table operations
+-- =============================================
+
+-- get_invite_by_token: lookup invite + group info (bypasses RLS for token-based access)
+CREATE OR REPLACE FUNCTION public.get_invite_by_token(p_token TEXT)
+RETURNS TABLE(
+  invite_id UUID,
+  group_id UUID,
+  token TEXT,
+  invitee_email TEXT,
+  role TEXT,
+  created_at TIMESTAMPTZ,
+  expires_at TIMESTAMPTZ,
+  group_name TEXT,
+  group_currency_code TEXT
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    gi.id AS invite_id,
+    gi.group_id,
+    gi.token,
+    gi.invitee_email,
+    gi.role,
+    gi.created_at,
+    gi.expires_at,
+    g.name AS group_name,
+    g.currency_code AS group_currency_code
+  FROM public.group_invites gi
+  JOIN public.groups g ON g.id = gi.group_id
+  WHERE gi.token = p_token
+    AND gi.expires_at > now();
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- accept_invite: validates token, creates membership, optionally creates participant, deletes invite
+CREATE OR REPLACE FUNCTION public.accept_invite(
+  p_token TEXT,
+  p_participant_id UUID DEFAULT NULL,
+  p_new_participant_name TEXT DEFAULT NULL
+)
+RETURNS UUID AS $$
+DECLARE
+  v_invite RECORD;
+  v_user_id UUID;
+  v_group_id UUID;
+  v_new_participant_id UUID;
+BEGIN
+  v_user_id := auth.uid();
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  SELECT * INTO v_invite FROM public.group_invites
+  WHERE group_invites.token = p_token AND expires_at > now();
+
+  IF v_invite IS NULL THEN
+    RAISE EXCEPTION 'Invalid or expired invite';
+  END IF;
+
+  v_group_id := v_invite.group_id;
+
+  IF EXISTS (SELECT 1 FROM public.group_members WHERE group_id = v_group_id AND user_id = v_user_id) THEN
+    RAISE EXCEPTION 'Already a member of this group';
+  END IF;
+
+  IF p_new_participant_name IS NOT NULL AND p_new_participant_name != '' THEN
+    INSERT INTO public.participants (group_id, name, sort_order)
+    VALUES (v_group_id, p_new_participant_name,
+      (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM public.participants WHERE group_id = v_group_id))
+    RETURNING id INTO v_new_participant_id;
+    p_participant_id := v_new_participant_id;
+  END IF;
+
+  INSERT INTO public.group_members (group_id, user_id, role, participant_id)
+  VALUES (v_group_id, v_user_id, v_invite.role, p_participant_id);
+
+  DELETE FROM public.group_invites WHERE id = v_invite.id;
+
+  RETURN v_group_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- transfer_ownership: swaps owner/admin roles atomically
+CREATE OR REPLACE FUNCTION public.transfer_ownership(
+  p_group_id UUID,
+  p_new_owner_member_id UUID
+)
+RETURNS VOID AS $$
+DECLARE
+  v_user_id UUID;
+  v_current_member RECORD;
+  v_new_owner_member RECORD;
+BEGIN
+  v_user_id := auth.uid();
+
+  SELECT * INTO v_current_member FROM public.group_members
+  WHERE group_id = p_group_id AND user_id = v_user_id AND role = 'owner';
+
+  IF v_current_member IS NULL THEN
+    RAISE EXCEPTION 'Only the owner can transfer ownership';
+  END IF;
+
+  SELECT * INTO v_new_owner_member FROM public.group_members
+  WHERE id = p_new_owner_member_id AND group_id = p_group_id;
+
+  IF v_new_owner_member IS NULL THEN
+    RAISE EXCEPTION 'Member not found in this group';
+  END IF;
+
+  UPDATE public.group_members SET role = 'admin' WHERE id = v_current_member.id;
+  UPDATE public.group_members SET role = 'owner' WHERE id = v_new_owner_member.id;
+  UPDATE public.groups SET owner_id = v_new_owner_member.user_id WHERE id = p_group_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- leave_group: handles ownership transfer on leave, deletes membership
+CREATE OR REPLACE FUNCTION public.leave_group(p_group_id UUID)
+RETURNS VOID AS $$
+DECLARE
+  v_user_id UUID;
+  v_member RECORD;
+  v_oldest_member RECORD;
+BEGIN
+  v_user_id := auth.uid();
+
+  SELECT * INTO v_member FROM public.group_members
+  WHERE group_id = p_group_id AND user_id = v_user_id;
+
+  IF v_member IS NULL THEN
+    RAISE EXCEPTION 'Not a member of this group';
+  END IF;
+
+  IF v_member.role = 'owner' THEN
+    SELECT * INTO v_oldest_member FROM public.group_members
+    WHERE group_id = p_group_id AND user_id != v_user_id
+    ORDER BY joined_at ASC
+    LIMIT 1;
+
+    IF v_oldest_member IS NOT NULL THEN
+      UPDATE public.group_members SET role = 'owner' WHERE id = v_oldest_member.id;
+      UPDATE public.groups SET owner_id = v_oldest_member.user_id WHERE id = p_group_id;
+    ELSE
+      UPDATE public.groups SET owner_id = NULL WHERE id = p_group_id;
+    END IF;
+  END IF;
+
+  DELETE FROM public.group_members WHERE id = v_member.id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- kick_member: validates role, removes membership
+CREATE OR REPLACE FUNCTION public.kick_member(
+  p_group_id UUID,
+  p_member_id UUID
+)
+RETURNS VOID AS $$
+DECLARE
+  v_user_id UUID;
+  v_kicker_role TEXT;
+  v_target RECORD;
+BEGIN
+  v_user_id := auth.uid();
+
+  SELECT role INTO v_kicker_role FROM public.group_members
+  WHERE group_id = p_group_id AND user_id = v_user_id;
+
+  IF v_kicker_role NOT IN ('owner', 'admin') THEN
+    RAISE EXCEPTION 'Only owner or admin can kick members';
+  END IF;
+
+  SELECT * INTO v_target FROM public.group_members
+  WHERE id = p_member_id AND group_id = p_group_id;
+
+  IF v_target IS NULL THEN
+    RAISE EXCEPTION 'Member not found in this group';
+  END IF;
+
+  IF v_target.role = 'owner' THEN
+    RAISE EXCEPTION 'Cannot kick the owner';
+  END IF;
+
+  DELETE FROM public.group_members WHERE id = p_member_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- update_member_role: owner changes a member's role
+CREATE OR REPLACE FUNCTION public.update_member_role(
+  p_group_id UUID,
+  p_member_id UUID,
+  p_role TEXT
+)
+RETURNS VOID AS $$
+DECLARE
+  v_user_id UUID;
+  v_user_role TEXT;
+  v_target RECORD;
+BEGIN
+  v_user_id := auth.uid();
+
+  IF p_role NOT IN ('admin', 'member') THEN
+    RAISE EXCEPTION 'Invalid role. Must be admin or member';
+  END IF;
+
+  SELECT role INTO v_user_role FROM public.group_members
+  WHERE group_id = p_group_id AND user_id = v_user_id;
+
+  IF v_user_role != 'owner' THEN
+    RAISE EXCEPTION 'Only the owner can change roles';
+  END IF;
+
+  SELECT * INTO v_target FROM public.group_members
+  WHERE id = p_member_id AND group_id = p_group_id;
+
+  IF v_target IS NULL THEN
+    RAISE EXCEPTION 'Member not found';
+  END IF;
+
+  IF v_target.role = 'owner' THEN
+    RAISE EXCEPTION 'Cannot change owner role directly. Use transfer_ownership instead';
+  END IF;
+
+  UPDATE public.group_members SET role = p_role WHERE id = p_member_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- assign_participant: owner/admin assigns a participant to a member
+CREATE OR REPLACE FUNCTION public.assign_participant(
+  p_group_id UUID,
+  p_member_id UUID,
+  p_participant_id UUID
+)
+RETURNS VOID AS $$
+DECLARE
+  v_user_id UUID;
+  v_user_role TEXT;
+  v_participant RECORD;
+BEGIN
+  v_user_id := auth.uid();
+
+  SELECT role INTO v_user_role FROM public.group_members
+  WHERE group_id = p_group_id AND user_id = v_user_id;
+
+  IF v_user_role NOT IN ('owner', 'admin') THEN
+    RAISE EXCEPTION 'Only owner or admin can assign participants';
+  END IF;
+
+  SELECT * INTO v_participant FROM public.participants
+  WHERE id = p_participant_id AND group_id = p_group_id;
+
+  IF v_participant IS NULL THEN
+    RAISE EXCEPTION 'Participant not found in this group';
+  END IF;
+
+  UPDATE public.group_members SET participant_id = p_participant_id
+  WHERE id = p_member_id AND group_id = p_group_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- create_invite: generates token, creates invite
+CREATE OR REPLACE FUNCTION public.create_invite(
+  p_group_id UUID,
+  p_invitee_email TEXT DEFAULT NULL,
+  p_role TEXT DEFAULT 'member'
+)
+RETURNS TABLE(id UUID, token TEXT) AS $$
+DECLARE
+  v_user_id UUID;
+  v_user_role TEXT;
+  v_token TEXT;
+  v_invite_id UUID;
+BEGIN
+  v_user_id := auth.uid();
+
+  SELECT gm.role INTO v_user_role FROM public.group_members gm
+  WHERE gm.group_id = p_group_id AND gm.user_id = v_user_id;
+
+  IF v_user_role NOT IN ('owner', 'admin') THEN
+    RAISE EXCEPTION 'Only owner or admin can create invites';
+  END IF;
+
+  v_token := pg_catalog.encode(extensions.gen_random_bytes(18), 'base64');
+  v_token := replace(replace(replace(v_token, '+', ''), '/', ''), '=', '');
+  v_token := substr(v_token, 1, 24);
+
+  INSERT INTO public.group_invites (group_id, token, invitee_email, role, expires_at)
+  VALUES (p_group_id, v_token, p_invitee_email, p_role, now() + interval '7 days')
+  RETURNING group_invites.id INTO v_invite_id;
+
+  RETURN QUERY SELECT v_invite_id, v_token;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
+### Migration 4: Security Hardening
+
+This fixes the `search_path` on all functions to prevent search path manipulation attacks.
+
+```sql
+-- Fix search_path on all functions for security
+
+ALTER FUNCTION public.handle_updated_at() SET search_path = '';
+
+ALTER FUNCTION public.get_user_role(UUID) SET search_path = '';
+ALTER FUNCTION public.is_group_member(UUID) SET search_path = '';
+
+ALTER FUNCTION public.get_invite_by_token(TEXT) SET search_path = '';
+ALTER FUNCTION public.accept_invite(TEXT, UUID, TEXT) SET search_path = '';
+ALTER FUNCTION public.transfer_ownership(UUID, UUID) SET search_path = '';
+ALTER FUNCTION public.leave_group(UUID) SET search_path = '';
+ALTER FUNCTION public.kick_member(UUID, UUID) SET search_path = '';
+ALTER FUNCTION public.update_member_role(UUID, UUID, TEXT) SET search_path = '';
+ALTER FUNCTION public.assign_participant(UUID, UUID, UUID) SET search_path = '';
+ALTER FUNCTION public.create_invite(UUID, TEXT, TEXT) SET search_path = '';
+```
+
+---
+
+## 4. Configure Authentication
+
+### Email/Password Authentication
+
+Email auth is enabled by default in Supabase. No additional configuration needed.
+
+### Magic Link Authentication
+
+Magic links use the same email provider. Configure your SMTP settings in **Authentication > Email Templates** for production use (Supabase's built-in email has rate limits).
+
+### Google OAuth (Optional)
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/) and create OAuth 2.0 credentials.
+2. Set the authorized redirect URI to:
+   ```
+   https://<your-project-ref>.supabase.co/auth/v1/callback
+   ```
+3. In Supabase dashboard, go to **Authentication > Providers > Google**.
+4. Enable it and paste your Client ID and Client Secret.
+
+### GitHub OAuth (Optional)
+
+1. Go to [GitHub Developer Settings](https://github.com/settings/developers) and create a new OAuth App.
+2. Set the authorization callback URL to:
+   ```
+   https://<your-project-ref>.supabase.co/auth/v1/callback
+   ```
+3. In Supabase dashboard, go to **Authentication > Providers > GitHub**.
+4. Enable it and paste your Client ID and Client Secret.
+
+### Deep Link / Redirect Configuration
+
+For mobile apps, configure the redirect URLs in **Authentication > URL Configuration**:
+
+- **Site URL**: Your production app URL (e.g. `https://your-app-domain.com`). If this is left as `http://localhost:...`, **email verification and magic links** in auth emails will point to localhost. For production, set this to your real domain.
+- **Redirect URLs** (add all that you use):
+  - Your production URL if using `SITE_URL` in the app (e.g. `https://yourdomain.com`)
+  - `io.supabase.hisab://callback` (for native mobile apps)
+  - `http://localhost:*` (for local development)
+
+To control the redirect from the app (e.g. when Site URL is wrong), pass `--dart-define=SITE_URL=https://yourdomain.com` when building. The app will send this as `emailRedirectTo` for sign-up, magic link, and resend confirmation. The URL must be in the **Redirect URLs** list above.
+
+---
+
+## 5. Deploy Edge Functions
+
+Hisab uses two Supabase Edge Functions. Deploy them using the Supabase CLI or dashboard.
+
+### invite-redirect
+
+Handles invite link redirects -- sends mobile users to the app deep link and desktop users to the web app.
+
+**File**: `supabase/functions/invite-redirect/index.ts`
+
+```typescript
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
+
+const APP_SCHEME = "io.supabase.hisab";
+const WEB_URL = Deno.env.get("SITE_URL") ?? "https://hisab.app";
+
+Deno.serve(async (req: Request) => {
+  const url = new URL(req.url);
+  const token = url.searchParams.get("token");
+
+  if (!token) {
+    return new Response(JSON.stringify({ error: "Missing token parameter" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // Validate invite exists (optional, for better error messages)
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, serviceKey);
+
+    const { data, error } = await supabase.rpc("get_invite_by_token", {
+      p_token: token,
+    });
+
+    if (error || !data || data.length === 0) {
+      return new Response(
+        `<html><body><h2>Invalid or expired invite link</h2><p>This invite may have expired or already been used.</p></body></html>`,
+        {
+          status: 404,
+          headers: { "Content-Type": "text/html" },
+        }
+      );
+    }
+  } catch (_) {
+    // If validation fails, still redirect -- app will handle the error
+  }
+
+  // Redirect to app deep link
+  const appLink = `${APP_SCHEME}://invite?token=${encodeURIComponent(token)}`;
+  const webLink = `${WEB_URL}/invite?token=${encodeURIComponent(token)}`;
+
+  // User-Agent detection: mobile gets deep link, desktop gets web
+  const ua = req.headers.get("user-agent") ?? "";
+  const isMobile = /android|iphone|ipad|mobile/i.test(ua);
+  const redirectTo = isMobile ? appLink : webLink;
+
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: redirectTo,
+      "Cache-Control": "no-cache",
+    },
+  });
+});
+```
+
+**Deploy with CLI**:
+```bash
+supabase functions deploy invite-redirect --no-verify-jwt
+```
+
+> **Note**: `--no-verify-jwt` is required because invite links are accessed by unauthenticated users clicking a shared URL.
+
+### telemetry
+
+Accepts anonymous usage telemetry events.
+
+**File**: `supabase/functions/telemetry/index.ts`
+
+```typescript
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
+
+Deno.serve(async (req: Request) => {
+  // Only accept POST
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  try {
+    const body = await req.json();
+    const { event, timestamp, data } = body;
+
+    if (!event) {
+      return new Response(JSON.stringify({ error: "Missing 'event' field" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, serviceKey);
+
+    const { error } = await supabase.from("telemetry").insert({
+      event,
+      timestamp: timestamp ?? new Date().toISOString(),
+      data: data ?? null,
+    });
+
+    if (error) {
+      console.error("Telemetry insert error:", error);
+      return new Response(JSON.stringify({ error: "Insert failed" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        Connection: "keep-alive",
+      },
+    });
+  } catch (e) {
+    console.error("Telemetry error:", e);
+    return new Response(JSON.stringify({ error: "Internal error" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+});
+```
+
+**Deploy with CLI**:
+```bash
+supabase functions deploy telemetry --no-verify-jwt
+```
+
+> **Note**: `--no-verify-jwt` allows anonymous telemetry without requiring authentication.
+
+---
+
+## 6. Configure the Flutter App
+
+The app uses `--dart-define` parameters for build-time configuration. No hardcoded secrets are needed in the codebase.
+
+### Required Parameters
+
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `SUPABASE_URL` | Your Supabase project URL | `https://xxxxx.supabase.co` |
+| `SUPABASE_ANON_KEY` | Your Supabase anon/public key | `eyJhbGci...` |
+| `INVITE_BASE_URL` | Optional. Custom domain for invite links (no extra hosting). See [Custom Domains](https://supabase.com/docs/guides/platform/custom-domains). | `https://invite.yourdomain.com` |
+| `SITE_URL` | Optional. Redirect URL for auth emails (magic link, sign-up confirmation). Stops verification links from using localhost. Must be in Supabase Redirect URLs. | `https://yourdomain.com` |
+
+### Running the App
+
+```bash
+flutter run \
+  --dart-define=SUPABASE_URL=https://xxxxx.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=eyJhbGci...
+```
+
+### Running Without Supabase (Offline Only)
+
+Simply run without any `--dart-define` parameters:
+
+```bash
+flutter run
+```
+
+The app will operate in **local-only mode** -- all data stays on-device, and authentication, sync, invites, and telemetry features are disabled.
+
+### VS Code / Cursor Launch Configuration
+
+Add to `.vscode/launch.json`:
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Hisab (Online)",
+      "request": "launch",
+      "type": "dart",
+      "args": [
+        "--dart-define=SUPABASE_URL=https://xxxxx.supabase.co",
+        "--dart-define=SUPABASE_ANON_KEY=eyJhbGci..."
+      ]
+    },
+    {
+      "name": "Hisab (Offline Only)",
+      "request": "launch",
+      "type": "dart"
+    }
+  ]
+}
+```
+
+---
+
+## 7. Verify the Setup
+
+After completing all steps:
+
+1. **Database**: Go to Supabase Table Editor and verify all 7 tables exist (`groups`, `group_members`, `participants`, `expenses`, `expense_tags`, `group_invites`, `telemetry`).
+
+2. **RLS**: Go to **Authentication > Policies** and verify each table has its RLS policies enabled.
+
+3. **Functions**: Go to **Database > Functions** and verify all RPC functions exist:
+   - `handle_updated_at`
+   - `get_user_role`, `is_group_member`
+   - `get_invite_by_token`, `accept_invite`, `transfer_ownership`, `leave_group`, `kick_member`, `update_member_role`, `assign_participant`, `create_invite`
+
+4. **Edge Functions**: Go to **Edge Functions** and verify `invite-redirect` and `telemetry` are deployed and active.
+
+5. **Auth**: Try signing up with email/password in the app. Check the Supabase **Authentication > Users** page to confirm the user was created.
+
+6. **Sync**: After signing in, create a group in the app. Check the Supabase Table Editor to verify the group appears in the `groups` table with the correct `owner_id`.
+
+---
+
+## 8. Architecture Overview
+
+```
++------------------+     +------------------+
+|   Flutter App    |     |    Supabase      |
+|                  |     |                  |
+| Local SQLite     |     | Postgres DB      |
+| (PowerSync pkg)  |     | (+ RLS policies) |
+|                  |     |                  |
+| DataSyncService  |<--->| REST API         |
+| (fetch/push)     |     |                  |
+|                  |     |                  |
+| Supabase Client  |<--->| Auth             |
+| (auth + RPC)     |     | Edge Functions   |
++------------------+     +------------------+
+```
+
+### Data Flow
+
+- **Reads**: All reads come from local SQLite (instant, works offline).
+- **Writes (online)**: Writes go to Supabase first, then update local SQLite cache.
+- **Writes (temporarily offline)**: Expense creation queued in `pending_writes` table; pushed when connectivity returns.
+- **Sync**: `DataSyncService` performs full fetches from Supabase, pushes pending writes, and periodic refreshes (every 5 min).
+- **Complex operations**: RPC functions (invites, ownership transfer, etc.) are called directly on Supabase when online. These are unavailable in offline/local-only mode.
+- **Auth**: Supabase Auth handles all authentication.
+
+### Permission Model
+
+| Role | Capabilities |
+|------|-------------|
+| **Owner** | Full control: CRUD all data, manage members, change settings, delete group, transfer ownership |
+| **Admin** | Manage members, create invites, CRUD expenses/participants/tags, change group settings |
+| **Member** | Conditional: add expenses (if `allow_member_add_expense`), add participants (if `allow_member_add_participant`), change settings (if `allow_member_change_settings`) |
+
+---
+
+## 9. Troubleshooting
+
+### "App works offline but nothing syncs"
+
+- Verify both `--dart-define` parameters are set correctly.
+- Check that the Supabase project is active in the dashboard.
+- Ensure the user is authenticated (signed in).
+
+### "RLS policy violation" errors
+
+- Check that the user is authenticated (`auth.uid()` is not null).
+- Verify the user has the correct role for the operation.
+- For new group creation, ensure `owner_id` matches `auth.uid()`.
+
+### "Function not found" errors
+
+- Ensure all 4 migrations were applied in order.
+- Check that the function exists in **Database > Functions**.
+- Verify the function signature matches (parameter types matter).
+
+### Edge Function errors
+
+- Check **Edge Functions > Logs** in the Supabase dashboard.
+- Verify `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` environment variables are automatically available (they are by default in Supabase Edge Functions).
+
+### OAuth redirect issues
+
+- Verify the redirect URL is added to **Authentication > URL Configuration > Redirect URLs**.
+- For mobile, ensure the app scheme (`io.supabase.hisab`) is registered in your Android/iOS configuration.
+- For web, ensure the site URL matches your deployment URL.

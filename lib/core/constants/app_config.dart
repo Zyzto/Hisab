@@ -1,9 +1,10 @@
 // Report issue URL and telemetry endpoint. Empty = disabled.
-// Debug builds use dev telemetry URL; release uses prod.
-import 'package:flutter/foundation.dart';
-
-import 'app_secrets.dart';
+// Telemetry uses Supabase Edge Function when configured.
+import 'supabase_config.dart';
 
 export 'app_secrets.dart' show reportIssueUrl;
+
+/// Telemetry endpoint URL. Uses Supabase Edge Function when configured,
+/// otherwise empty (telemetry disabled).
 String get telemetryEndpointUrl =>
-    kDebugMode ? telemetryEndpointUrlDev : telemetryEndpointUrlProd;
+    supabaseConfigAvailable ? '$supabaseUrl/functions/v1/telemetry' : '';
