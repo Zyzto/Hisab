@@ -8,6 +8,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth_providers.dart';
+import 'predefined_avatars.dart';
 
 /// Result from the sign-in sheet.
 enum SignInResult {
@@ -56,17 +57,20 @@ class _SignInSheet extends StatefulWidget {
 class _SignInSheetState extends State<_SignInSheet> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _nameController = TextEditingController();
   bool _isSignUp = false;
   bool _loading = false;
   String? _error;
   bool _magicLinkSent = false;
   bool _emailNotConfirmed = false;
   bool _confirmationResent = false;
+  String _selectedAvatarId = defaultAvatarId;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
@@ -86,7 +90,13 @@ class _SignInSheetState extends State<_SignInSheet> {
     try {
       final authService = widget.ref.read(authServiceProvider);
       if (_isSignUp) {
-        final response = await authService.signUpWithEmail(email, password);
+        final name = _nameController.text.trim();
+        final response = await authService.signUpWithEmail(
+          email,
+          password,
+          name: name.isEmpty ? null : name,
+          avatarId: _selectedAvatarId,
+        );
         // If email confirmation is required, the user won't have a session yet.
         if (response.session == null) {
           Log.info('Sign-up succeeded — email confirmation required');
@@ -361,6 +371,63 @@ class _SignInSheetState extends State<_SignInSheet> {
             ),
             const SizedBox(height: 24),
 
+            // Sign-up only: name and avatar
+            if (_isSignUp) ...[
+              TextField(
+                controller: _nameController,
+                decoration: InputDecoration(
+                  labelText: 'auth_name'.tr(),
+                  hintText: 'auth_name_hint'.tr(),
+                  prefixIcon: const Icon(Icons.badge_outlined),
+                  border: const OutlineInputBorder(),
+                ),
+                textInputAction: TextInputAction.next,
+                enabled: !_loading,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'auth_avatar'.tr(),
+                style: textTheme.labelLarge?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: predefinedAvatars.map((e) {
+                  final selected = _selectedAvatarId == e.key;
+                  return GestureDetector(
+                    onTap: _loading
+                        ? null
+                        : () => setState(() => _selectedAvatarId = e.key),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? colorScheme.primaryContainer
+                            : colorScheme.surfaceContainerHighest,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: selected
+                              ? colorScheme.primary
+                              : colorScheme.outline.withValues(alpha: 0.3),
+                          width: selected ? 2.5 : 1,
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        e.value,
+                        style: const TextStyle(fontSize: 22),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 20),
+            ],
+
             // Magic link sent confirmation
             if (_magicLinkSent) ...[
               Container(
@@ -603,6 +670,9 @@ class _SignInSheetState extends State<_SignInSheet> {
                       : () => setState(() {
                           _isSignUp = !_isSignUp;
                           _error = null;
+                          if (_isSignUp) {
+                            _selectedAvatarId = defaultAvatarId;
+                          }
                         }),
                   child: Text(_isSignUp ? 'sign_in'.tr() : 'auth_sign_up'.tr()),
                 ),
