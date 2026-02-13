@@ -6,9 +6,15 @@ abstract class IGroupInviteRepository {
     String groupId, {
     String? inviteeEmail,
     String? role,
+    String? label,
+    int? maxUses,
+    Duration? expiresIn,
   });
   Future<String> accept(String token);
   Future<List<GroupInvite>> listByGroup(String groupId);
   Stream<List<GroupInvite>> watchByGroup(String groupId);
   Future<void> revoke(String inviteId);
+  Future<void> toggleActive(String inviteId, bool active);
+  Future<List<InviteUsage>> listUsages(String inviteId);
+  Stream<List<InviteUsage>> watchUsages(String inviteId);
 }

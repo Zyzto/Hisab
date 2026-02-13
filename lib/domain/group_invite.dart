@@ -6,7 +6,12 @@ class GroupInvite {
   final String? inviteeEmail;
   final String role;
   final DateTime createdAt;
-  final DateTime expiresAt;
+  final DateTime? expiresAt;
+  final String? createdBy;
+  final String? label;
+  final int? maxUses;
+  final int useCount;
+  final bool isActive;
 
   const GroupInvite({
     required this.id,
@@ -15,10 +20,32 @@ class GroupInvite {
     this.inviteeEmail,
     required this.role,
     required this.createdAt,
-    required this.expiresAt,
+    this.expiresAt,
+    this.createdBy,
+    this.label,
+    this.maxUses,
+    this.useCount = 0,
+    this.isActive = true,
   });
 
-  bool get isExpired => DateTime.now().isAfter(expiresAt);
+  /// Whether the invite has passed its expiry date.
+  bool get isExpired =>
+      expiresAt != null && DateTime.now().isAfter(expiresAt!);
+
+  /// Whether the invite has reached its max usage limit.
+  bool get isMaxedOut =>
+      maxUses != null && useCount >= maxUses!;
+
+  /// Whether the invite can currently be used to join.
+  bool get isUsable => isActive && !isExpired && !isMaxedOut;
+
+  /// A status category for display purposes.
+  InviteStatus get status {
+    if (!isActive) return InviteStatus.revoked;
+    if (isExpired) return InviteStatus.expired;
+    if (isMaxedOut) return InviteStatus.maxedOut;
+    return InviteStatus.active;
+  }
 
   GroupInvite copyWith({
     String? id,
@@ -28,6 +55,11 @@ class GroupInvite {
     String? role,
     DateTime? createdAt,
     DateTime? expiresAt,
+    String? createdBy,
+    String? label,
+    int? maxUses,
+    int? useCount,
+    bool? isActive,
   }) {
     return GroupInvite(
       id: id ?? this.id,
@@ -37,6 +69,14 @@ class GroupInvite {
       role: role ?? this.role,
       createdAt: createdAt ?? this.createdAt,
       expiresAt: expiresAt ?? this.expiresAt,
+      createdBy: createdBy ?? this.createdBy,
+      label: label ?? this.label,
+      maxUses: maxUses ?? this.maxUses,
+      useCount: useCount ?? this.useCount,
+      isActive: isActive ?? this.isActive,
     );
   }
 }
+
+/// Enumeration of invite statuses for display.
+enum InviteStatus { active, expired, maxedOut, revoked }

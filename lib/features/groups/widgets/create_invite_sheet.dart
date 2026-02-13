@@ -1,0 +1,354 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_logging_service/flutter_logging_service.dart';
+import 'package:pretty_qr_code/pretty_qr_code.dart';
+import '../../../core/constants/supabase_config.dart';
+import '../../../core/repository/repository_providers.dart';
+import '../../../core/telemetry/telemetry_service.dart';
+import '../../../core/theme/theme_config.dart';
+import '../../settings/providers/settings_framework_providers.dart';
+
+/// Expiry option for invite creation.
+class _ExpiryOption {
+  final String labelKey;
+  final Duration? duration; // null = never
+  const _ExpiryOption(this.labelKey, this.duration);
+}
+
+const _expiryOptions = [
+  _ExpiryOption('invite_expiry_1h', Duration(hours: 1)),
+  _ExpiryOption('invite_expiry_1d', Duration(days: 1)),
+  _ExpiryOption('invite_expiry_7d', Duration(days: 7)),
+  _ExpiryOption('invite_expiry_30d', Duration(days: 30)),
+  _ExpiryOption('invite_expiry_never', null),
+];
+
+/// Max uses option for invite creation.
+class _MaxUsesOption {
+  final String label;
+  final int? value; // null = unlimited
+  const _MaxUsesOption(this.label, this.value);
+}
+
+const _maxUsesOptions = [
+  _MaxUsesOption('1', 1),
+  _MaxUsesOption('5', 5),
+  _MaxUsesOption('10', 10),
+  _MaxUsesOption('25', 25),
+  _MaxUsesOption('50', 50),
+  _MaxUsesOption('∞', null),
+];
+
+/// Shows a bottom sheet to create an invite with advanced options.
+/// Returns the created token if successful, or null.
+Future<String?> showCreateInviteSheet(
+  BuildContext context,
+  WidgetRef ref,
+  String groupId,
+) async {
+  return showModalBottomSheet<String>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    builder: (ctx) => _CreateInviteSheet(groupId: groupId),
+  );
+}
+
+class _CreateInviteSheet extends ConsumerStatefulWidget {
+  final String groupId;
+  const _CreateInviteSheet({required this.groupId});
+
+  @override
+  ConsumerState<_CreateInviteSheet> createState() => _CreateInviteSheetState();
+}
+
+class _CreateInviteSheetState extends ConsumerState<_CreateInviteSheet> {
+  final _labelController = TextEditingController();
+  String _role = 'member';
+  int _expiryIndex = 2; // default: 7 days
+  int _maxUsesIndex = 5; // default: unlimited
+  bool _creating = false;
+  String? _createdToken;
+
+  @override
+  void dispose() {
+    _labelController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _create() async {
+    setState(() => _creating = true);
+    try {
+      final expiry = _expiryOptions[_expiryIndex];
+      final maxUses = _maxUsesOptions[_maxUsesIndex];
+      final result = await ref
+          .read(groupInviteRepositoryProvider)
+          .createInvite(
+            widget.groupId,
+            role: _role,
+            label: _labelController.text.trim().isEmpty
+                ? null
+                : _labelController.text.trim(),
+            maxUses: maxUses.value,
+            expiresIn: expiry.duration,
+          );
+      TelemetryService.sendEvent(
+        'invite_created',
+        {'groupId': widget.groupId},
+        enabled: ref.read(telemetryEnabledProvider),
+      );
+      setState(() {
+        _createdToken = result.token;
+        _creating = false;
+      });
+    } catch (e, st) {
+      Log.warning('Create invite failed', error: e, stackTrace: st);
+      setState(() => _creating = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('$e')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    if (_createdToken != null) {
+      return _InviteResultView(token: _createdToken!);
+    }
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: ThemeConfig.spacingL,
+        right: ThemeConfig.spacingL,
+        top: ThemeConfig.spacingL,
+        bottom: MediaQuery.of(context).viewInsets.bottom + ThemeConfig.spacingL,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Handle
+          Center(
+            child: Container(
+              width: 32,
+              height: 4,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: ThemeConfig.spacingM),
+          Text(
+            'create_invite'.tr(),
+            style: theme.textTheme.titleLarge,
+          ),
+          const SizedBox(height: ThemeConfig.spacingM),
+
+          // Label
+          TextField(
+            controller: _labelController,
+            decoration: InputDecoration(
+              labelText: 'invite_label'.tr(),
+              hintText: 'invite_label_hint'.tr(),
+              prefixIcon: const Icon(Icons.label_outline),
+              border: const OutlineInputBorder(),
+            ),
+            textCapitalization: TextCapitalization.sentences,
+          ),
+          const SizedBox(height: ThemeConfig.spacingM),
+
+          // Role
+          Text('invite_role'.tr(), style: theme.textTheme.titleSmall),
+          const SizedBox(height: ThemeConfig.spacingS),
+          SegmentedButton<String>(
+            segments: [
+              ButtonSegment(
+                value: 'member',
+                label: Text('group_member'.tr()),
+                icon: const Icon(Icons.person_outline, size: 18),
+              ),
+              ButtonSegment(
+                value: 'admin',
+                label: Text('group_admin'.tr()),
+                icon: const Icon(Icons.admin_panel_settings_outlined, size: 18),
+              ),
+            ],
+            selected: {_role},
+            onSelectionChanged: (v) => setState(() => _role = v.first),
+          ),
+          const SizedBox(height: ThemeConfig.spacingM),
+
+          // Expiry
+          Text('invite_expiry'.tr(), style: theme.textTheme.titleSmall),
+          const SizedBox(height: ThemeConfig.spacingS),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: List.generate(_expiryOptions.length, (i) {
+              final opt = _expiryOptions[i];
+              return ChoiceChip(
+                label: Text(opt.labelKey.tr()),
+                selected: _expiryIndex == i,
+                onSelected: (_) => setState(() => _expiryIndex = i),
+              );
+            }),
+          ),
+          const SizedBox(height: ThemeConfig.spacingM),
+
+          // Max uses
+          Text('invite_max_uses'.tr(), style: theme.textTheme.titleSmall),
+          const SizedBox(height: ThemeConfig.spacingS),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: List.generate(_maxUsesOptions.length, (i) {
+              final opt = _maxUsesOptions[i];
+              return ChoiceChip(
+                label: Text(opt.value?.toString() ?? 'invite_unlimited'.tr()),
+                selected: _maxUsesIndex == i,
+                onSelected: (_) => setState(() => _maxUsesIndex = i),
+              );
+            }),
+          ),
+          const SizedBox(height: ThemeConfig.spacingL),
+
+          // Create button
+          FilledButton.icon(
+            onPressed: _creating ? null : _create,
+            icon: _creating
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.add_link),
+            label: Text('create_invite'.tr()),
+          ),
+          const SizedBox(height: ThemeConfig.spacingS),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shows the QR code and copy link after successful creation.
+class _InviteResultView extends StatelessWidget {
+  final String token;
+  const _InviteResultView({required this.token});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final base = inviteLinkBaseUrl.endsWith('/')
+        ? inviteLinkBaseUrl.substring(0, inviteLinkBaseUrl.length - 1)
+        : inviteLinkBaseUrl;
+    final url = supabaseConfigAvailable
+        ? '$base/functions/v1/invite-redirect?token=$token'
+        : '';
+
+    if (url.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(24),
+        child: Center(
+          child: Text(
+            'invite_requires_online'.tr(),
+            style: theme.textTheme.bodyLarge,
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle
+          Center(
+            child: Container(
+              width: 32,
+              height: 4,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Icon(
+            Icons.check_circle_outline,
+            color: theme.colorScheme.primary,
+            size: 48,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'invite_created_success'.tr(),
+            style: theme.textTheme.titleMedium,
+          ),
+          const SizedBox(height: 20),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final qrSize = (constraints.maxWidth - 64).clamp(0.0, 250.0);
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: SizedBox(
+                  width: qrSize,
+                  height: qrSize,
+                  child: PrettyQrView.data(
+                    data: url,
+                    errorCorrectLevel: QrErrorCorrectLevel.M,
+                    decoration: const PrettyQrDecoration(
+                      shape: PrettyQrSmoothSymbol(color: Colors.black),
+                      background: Colors.white,
+                      quietZone: PrettyQrQuietZone.zero,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+          Text(
+            url,
+            style: theme.textTheme.bodySmall,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              FilledButton.tonalIcon(
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: url));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('invite_link_copied'.tr())),
+                  );
+                },
+                icon: const Icon(Icons.copy),
+                label: Text('copy_link'.tr()),
+              ),
+              const SizedBox(width: 12),
+              OutlinedButton(
+                onPressed: () => Navigator.of(context).pop(token),
+                child: Text('done'.tr()),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}

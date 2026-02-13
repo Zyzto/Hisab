@@ -8,7 +8,8 @@ import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../providers/groups_provider.dart';
 import '../providers/group_member_provider.dart';
-import '../widgets/invite_link_sheet.dart';
+import '../providers/group_invite_provider.dart';
+import '../widgets/create_invite_sheet.dart';
 import '../utils/group_icon_utils.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/navigation/route_paths.dart';
@@ -174,18 +175,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: ThemeConfig.spacingL),
-                        _buildSection(
-                          context,
-                          title: 'invite_people'.tr(),
-                          children: [
-                            FilledButton.icon(
-                              onPressed: () => createAndShowInviteSheet(
-                                  context, ref, widget.groupId),
-                              icon: const Icon(Icons.add_link),
-                              label: Text('invite_people'.tr()),
-                            ),
-                          ],
-                        ),
+                        _buildInviteSection(context, ref),
                       ],
                     );
                   },
@@ -332,17 +322,25 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     required String title,
     required List<Widget> children,
     Color? titleColor,
+    Widget? trailing,
   }) {
     final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: titleColor,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: titleColor,
+                ),
+              ),
+            ),
+            ?trailing,
+          ],
         ),
         const SizedBox(height: ThemeConfig.spacingS),
         const Divider(height: 1),
@@ -673,6 +671,101 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Danger Zone
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Invite section – inline preview + manage button
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  Widget _buildInviteSection(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final invitesAsync = ref.watch(invitesByGroupProvider(widget.groupId));
+
+    return _buildSection(
+      context,
+      title: 'invite_links'.tr(),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.add, size: 20),
+            tooltip: 'create_invite'.tr(),
+            onPressed: () =>
+                showCreateInviteSheet(context, ref, widget.groupId),
+            visualDensity: VisualDensity.compact,
+            constraints: const BoxConstraints(),
+            padding: EdgeInsets.zero,
+          ),
+        ],
+      ),
+      children: [
+        invitesAsync.when(
+          data: (invites) {
+            if (invites.isEmpty) {
+              return Padding(
+                padding:
+                    const EdgeInsets.symmetric(vertical: ThemeConfig.spacingS),
+                child: Text(
+                  'invite_empty'.tr(),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              );
+            }
+
+            // Show up to 3 most recent active invites
+            final sorted = List.of(invites)
+              ..sort((a, b) {
+                final aActive = a.status == InviteStatus.active ? 0 : 1;
+                final bActive = b.status == InviteStatus.active ? 0 : 1;
+                if (aActive != bActive) return aActive.compareTo(bActive);
+                return b.createdAt.compareTo(a.createdAt);
+              });
+            final preview = sorted.take(3).toList();
+
+            return Column(
+              children: [
+                ...preview.map((invite) => _InvitePreviewTile(invite: invite)),
+                if (invites.length > 3)
+                  Padding(
+                    padding: const EdgeInsets.only(top: ThemeConfig.spacingXS),
+                    child: Text(
+                      'invite_and_more'
+                          .tr(args: ['${invites.length - 3}']),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+          loading: () => const Padding(
+            padding: EdgeInsets.all(8.0),
+            child: Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          ),
+          error: (_, _) => const SizedBox.shrink(),
+        ),
+        const SizedBox(height: ThemeConfig.spacingS),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => context.push(
+              RoutePaths.groupInvites(widget.groupId),
+            ),
+            icon: const Icon(Icons.open_in_new, size: 16),
+            label: Text('invite_manage_all'.tr()),
+          ),
+        ),
+      ],
+    );
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
 
   Widget _buildDangerZone(
@@ -1313,6 +1406,87 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Compact invite preview tile for the settings page
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _InvitePreviewTile extends StatelessWidget {
+  final GroupInvite invite;
+  const _InvitePreviewTile({required this.invite});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final displayLabel = invite.label?.isNotEmpty == true
+        ? invite.label!
+        : 'invite_untitled'.tr();
+
+    Color statusColor;
+    String statusText;
+    switch (invite.status) {
+      case InviteStatus.active:
+        statusColor = Colors.green;
+        statusText = 'invite_status_active'.tr();
+        break;
+      case InviteStatus.expired:
+        statusColor = theme.colorScheme.onSurfaceVariant;
+        statusText = 'invite_status_expired'.tr();
+        break;
+      case InviteStatus.maxedOut:
+        statusColor = Colors.orange;
+        statusText = 'invite_status_maxed'.tr();
+        break;
+      case InviteStatus.revoked:
+        statusColor = theme.colorScheme.error;
+        statusText = 'invite_status_revoked'.tr();
+        break;
+    }
+
+    final usageText = invite.maxUses != null
+        ? '${invite.useCount}/${invite.maxUses}'
+        : '${invite.useCount}';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          Icon(Icons.link, size: 16, color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              displayLabel,
+              style: theme.textTheme.bodyMedium,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+            decoration: BoxDecoration(
+              color: statusColor.withAlpha(25),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              statusText,
+              style: theme.textTheme.labelSmall?.copyWith(color: statusColor),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Icon(Icons.people_outline,
+              size: 14, color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(width: 2),
+          Text(
+            usageText,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

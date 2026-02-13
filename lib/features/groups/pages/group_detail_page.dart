@@ -6,7 +6,7 @@ import 'package:easy_localization/easy_localization.dart';
 import '../providers/groups_provider.dart';
 import '../providers/group_member_provider.dart';
 import '../widgets/segmented_tab_bar.dart';
-import '../widgets/invite_link_sheet.dart';
+import '../widgets/create_invite_sheet.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -201,7 +201,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
               icon: const Icon(Icons.person_add),
               tooltip: 'invite_people'.tr(),
               onPressed: () =>
-                  createAndShowInviteSheet(context, ref, widget.group.id),
+                  showCreateInviteSheet(context, ref, widget.group.id),
             ),
           IconButton(
             icon: const Icon(Icons.settings),
