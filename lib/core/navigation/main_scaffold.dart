@@ -8,6 +8,7 @@ import '../../features/home/pages/home_page.dart';
 import '../../features/settings/pages/settings_page.dart';
 import '../widgets/connection_banner.dart';
 import '../widgets/floating_nav_bar.dart';
+import '../widgets/pwa_install_banner.dart';
 import 'route_paths.dart';
 
 class MainScaffold extends ConsumerStatefulWidget {
@@ -73,6 +74,14 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
             right: 0,
             child: ConnectionBanner(),
           ),
+          // PWA install banner — only on home tab for mobile web users
+          if (showNavBar && _currentIndex == 0)
+            const Positioned(
+              left: 16,
+              right: 16,
+              bottom: 120,
+              child: PwaInstallBanner(),
+            ),
           if (showNavBar)
             Positioned(
               left: 0,

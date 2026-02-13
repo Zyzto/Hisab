@@ -412,5 +412,7 @@
   "invite_revoke_title": "Revoke Invite",
   "invite_revoke_confirm": "This invite link will stop working. Continue?",
   "invite_usage_history": "Usage History",
-  "invite_no_usages": "No one has used this invite yet"
+  "invite_no_usages": "No one has used this invite yet",
+  "install_app": "Install App",
+  "install_app_description": "Install Hisab for a better experience"
 }
