@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 /// Full-screen view not available on web (no file access). Shows a message.
@@ -5,14 +6,12 @@ void showReceiptImageFullScreen(BuildContext context, String imagePath) {
   showDialog(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: const Text('Receipt'),
-      content: const Text(
-        'Receipt image attached. Full preview is available in the mobile app.',
-      ),
+      title: Text('receipt'.tr()),
+      content: Text('receipt_preview_web'.tr()),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('OK'),
+          child: Text('ok'.tr()),
         ),
       ],
     ),
@@ -39,7 +38,7 @@ Widget buildReceiptImageView(
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'Receipt image attached',
+                'receipt_attached'.tr(),
                 style: TextStyle(color: Colors.grey.shade700),
               ),
             ),

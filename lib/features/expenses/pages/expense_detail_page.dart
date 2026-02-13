@@ -94,14 +94,14 @@ class ExpenseDetailPage extends ConsumerWidget {
                           }
                         },
                         itemBuilder: (context) => [
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: 'edit',
-                            child: Text('Edit'),
+                            child: Text('edit'.tr()),
                           ),
                           PopupMenuItem(
                             value: 'delete',
                             child: Text(
-                              'Delete',
+                              'delete'.tr(),
                               style: TextStyle(color: theme.colorScheme.error),
                             ),
                           ),
@@ -238,21 +238,21 @@ class ExpenseDetailPage extends ConsumerWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete expense?'),
+        title: Text('delete_expense_confirm'.tr()),
         content: Text(
           '${expense.title} – ${CurrencyFormatter.formatCents(expense.amountCents, expense.currencyCode)}',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text('cancel'.tr()),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(ctx).colorScheme.error,
             ),
-            child: const Text('Delete'),
+            child: Text('delete'.tr()),
           ),
         ],
       ),

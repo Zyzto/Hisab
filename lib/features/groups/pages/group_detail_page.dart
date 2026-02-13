@@ -7,6 +7,7 @@ import '../providers/groups_provider.dart';
 import '../providers/group_member_provider.dart';
 import '../widgets/segmented_tab_bar.dart';
 import '../widgets/invite_link_sheet.dart';
+import '../../../core/database/database_providers.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -841,6 +842,10 @@ class _PeopleTab extends ConsumerWidget {
     if (ok == true && context.mounted) {
       try {
         await ref.read(groupMemberRepositoryProvider).leave(groupId);
+        // Trigger immediate sync so the groups list reflects the change
+        ref
+            .read(dataSyncServiceProvider.notifier)
+            .syncNow();
         if (context.mounted) context.go(RoutePaths.home);
       } catch (e, st) {
         Log.warning('Leave failed', error: e, stackTrace: st);
@@ -982,7 +987,7 @@ Future<void> _showAddParticipant(
           controller: nameController,
           decoration: InputDecoration(
             labelText: 'participants'.tr(),
-            hintText: 'Name',
+            hintText: 'participant_name'.tr(),
           ),
           autofocus: true,
         ),

@@ -520,6 +520,39 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                             ],
                           ),
                         ),
+                        const SizedBox(height: ThemeConfig.spacingS),
+                        Container(
+                          padding: const EdgeInsets.all(ThemeConfig.spacingM),
+                          decoration: BoxDecoration(
+                            color: colorScheme.errorContainer.withValues(
+                              alpha: 0.4,
+                            ),
+                            borderRadius: BorderRadius.circular(
+                              ThemeConfig.radiusM,
+                            ),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.warning_amber_rounded,
+                                size: 20,
+                                color: colorScheme.onErrorContainer,
+                              ),
+                              const SizedBox(width: ThemeConfig.spacingM),
+                              Expanded(
+                                child: Text(
+                                  'onboarding_online_disclaimer'.tr(),
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
+                                        color: colorScheme.onErrorContainer,
+                                        height: 1.4,
+                                      ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ] else ...[
                       Container(
@@ -576,6 +609,31 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                         ),
                       ),
                     ],
+                    const SizedBox(height: ThemeConfig.spacingL),
+                    GestureDetector(
+                      onTap: () =>
+                          context.push(RoutePaths.privacyPolicy),
+                      child: Text.rich(
+                        TextSpan(
+                          text: 'onboarding_privacy_agree_prefix'.tr(),
+                          children: [
+                            TextSpan(
+                              text: 'privacy_policy'.tr(),
+                              style: TextStyle(
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.w600,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ],
+                        ),
+                        style:
+                            Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
                   ],
                 ),
               ),

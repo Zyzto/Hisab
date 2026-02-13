@@ -7,6 +7,7 @@ import 'package:easy_localization/easy_localization.dart';
 import '../providers/groups_provider.dart';
 import '../providers/group_member_provider.dart';
 import '../widgets/invite_link_sheet.dart';
+import '../../../core/database/database_providers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/services/settle_up_service.dart';
@@ -737,6 +738,10 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
       TelemetryService.sendEvent('member_left', {
         'groupId': widget.groupId,
       }, enabled: ref.read(telemetryEnabledProvider));
+      // Trigger immediate sync so the groups list reflects the change
+      ref
+          .read(dataSyncServiceProvider.notifier)
+          .syncNow();
       if (context.mounted) context.go(RoutePaths.home);
     } catch (e, st) {
       Log.warning('Leave failed', error: e, stackTrace: st);
