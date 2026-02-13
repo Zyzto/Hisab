@@ -52,6 +52,21 @@ bool _parseBool(dynamic v) {
   return v.toString() == 'true' || v.toString() == '1';
 }
 
+/// Convert an unsigned ARGB32 color int to a signed 32-bit int for Postgres.
+int? _colorToSigned(int? color) {
+  if (color == null) return null;
+  // If the value exceeds signed 32-bit max, convert to signed representation.
+  if (color > 0x7FFFFFFF) return color - 0x100000000;
+  return color;
+}
+
+/// Convert a signed 32-bit int from Postgres back to an unsigned ARGB32 color.
+int? _colorToUnsigned(int? color) {
+  if (color == null) return null;
+  if (color < 0) return color + 0x100000000;
+  return color;
+}
+
 SettlementMethod _parseSettlementMethod(dynamic v) {
   if (v == null) return SettlementMethod.greedy;
   switch (v.toString()) {
@@ -125,6 +140,8 @@ Group _groupFromRow(Map<String, dynamic> row) => Group(
   ownerId: row['owner_id'] as String?,
   allowMemberAddExpense: _parseBool(row['allow_member_add_expense']),
   allowMemberChangeSettings: _parseBool(row['allow_member_change_settings']),
+  icon: row['icon'] as String?,
+  color: _colorToUnsigned((row['color'] as num?)?.toInt()),
 );
 
 Participant _participantFromRow(Map<String, dynamic> row) => Participant(
@@ -133,6 +150,7 @@ Participant _participantFromRow(Map<String, dynamic> row) => Participant(
   name: row['name'] as String? ?? '',
   order: (row['sort_order'] as num?)?.toInt() ?? 0,
   userId: row['user_id'] as String?,
+  avatarId: row['avatar_id'] as String?,
   createdAt: _parseDateTime(row['created_at']),
   updatedAt: _parseDateTime(row['updated_at']),
 );
@@ -261,11 +279,12 @@ class PowerSyncGroupRepository implements IGroupRepository {
   }
 
   @override
-  Future<String> create(String name, String currencyCode) async {
+  Future<String> create(String name, String currencyCode, {String? icon, int? color, List<String> initialParticipants = const []}) async {
     final id = _uuid.v4();
     final now = _nowIso();
     String? ownerId;
     String? ownerDisplayName;
+    String? ownerAvatarId;
     try {
       final user = Supabase.instance.client.auth.currentUser;
       ownerId = user?.id;
@@ -274,6 +293,7 @@ class PowerSyncGroupRepository implements IGroupRepository {
           user?.userMetadata?['full_name'] as String? ??
           user?.email ??
           'Owner';
+      ownerAvatarId = user?.userMetadata?['avatar_id'] as String?;
     } catch (_) {}
 
     final groupData = <String, dynamic>{
@@ -281,6 +301,8 @@ class PowerSyncGroupRepository implements IGroupRepository {
       'name': name,
       'currency_code': currencyCode,
       'owner_id': ownerId,
+      'icon': icon,
+      'color': _colorToSigned(color),
       'created_at': now,
       'updated_at': now,
     };
@@ -312,6 +334,7 @@ class PowerSyncGroupRepository implements IGroupRepository {
         'name': participantName,
         'sort_order': 0,
         'user_id': ownerId,
+        'avatar_id': ownerAvatarId,
         'created_at': now,
         'updated_at': now,
       });
@@ -322,23 +345,47 @@ class PowerSyncGroupRepository implements IGroupRepository {
             .update({'participant_id': participantId})
             .eq('id', memberId);
       }
+      // Create additional participants from the wizard
+      for (int i = 0; i < initialParticipants.length; i++) {
+        final pName = initialParticipants[i].trim();
+        if (pName.isEmpty) continue;
+        final pId = _uuid.v4();
+        await _client.from('participants').insert({
+          'id': pId,
+          'group_id': id,
+          'name': pName,
+          'sort_order': i + 1,
+          'created_at': now,
+          'updated_at': now,
+        });
+      }
     }
 
     // Always write to local DB
     await _db.execute(
-      'INSERT INTO groups (id, name, currency_code, owner_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [id, name, currencyCode, ownerId, now, now],
+      'INSERT INTO groups (id, name, currency_code, owner_id, icon, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, name, currencyCode, ownerId, icon, color, now, now],
     );
     // Local participant for owner
     await _db.execute(
-      'INSERT INTO participants (id, group_id, name, sort_order, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [participantId, id, participantName, 0, ownerId, now, now],
+      'INSERT INTO participants (id, group_id, name, sort_order, user_id, avatar_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [participantId, id, participantName, 0, ownerId, ownerAvatarId, now, now],
     );
     if (ownerId != null) {
       final memberId = _uuid.v4();
       await _db.execute(
         'INSERT INTO group_members (id, group_id, user_id, role, participant_id, joined_at) VALUES (?, ?, ?, ?, ?, ?)',
         [memberId, id, ownerId, 'owner', participantId, now],
+      );
+    }
+    // Create additional participants from the wizard in local DB
+    for (int i = 0; i < initialParticipants.length; i++) {
+      final pName = initialParticipants[i].trim();
+      if (pName.isEmpty) continue;
+      final pId = _uuid.v4();
+      await _db.execute(
+        'INSERT INTO participants (id, group_id, name, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [pId, id, pName, i + 1, now, now],
       );
     }
 
@@ -361,6 +408,8 @@ class PowerSyncGroupRepository implements IGroupRepository {
       'settlement_snapshot_json': group.settlementSnapshotJson,
       'allow_member_add_expense': group.allowMemberAddExpense,
       'allow_member_change_settings': group.allowMemberChangeSettings,
+      'icon': group.icon,
+      'color': _colorToSigned(group.color),
       'updated_at': now,
     };
 
@@ -373,7 +422,7 @@ class PowerSyncGroupRepository implements IGroupRepository {
         name = ?, currency_code = ?, settlement_method = ?,
         treasurer_participant_id = ?, settlement_freeze_at = ?,
         settlement_snapshot_json = ?, allow_member_add_expense = ?,
-        allow_member_change_settings = ?, updated_at = ?
+        allow_member_change_settings = ?, icon = ?, color = ?, updated_at = ?
       WHERE id = ?''',
       [
         group.name,
@@ -384,6 +433,8 @@ class PowerSyncGroupRepository implements IGroupRepository {
         group.settlementSnapshotJson,
         group.allowMemberAddExpense ? 1 : 0,
         group.allowMemberChangeSettings ? 1 : 0,
+        group.icon,
+        _colorToSigned(group.color),
         now,
         group.id,
       ],
@@ -496,7 +547,7 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
   }
 
   @override
-  Future<String> create(String groupId, String name, int order, {String? userId}) async {
+  Future<String> create(String groupId, String name, int order, {String? userId, String? avatarId}) async {
     final id = _uuid.v4();
     final now = _nowIso();
     final data = <String, dynamic>{
@@ -505,6 +556,7 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
       'name': name,
       'sort_order': order,
       'user_id': userId,
+      'avatar_id': avatarId,
       'created_at': now,
       'updated_at': now,
     };
@@ -514,8 +566,8 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
     }
 
     await _db.execute(
-      'INSERT INTO participants (id, group_id, name, sort_order, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [id, groupId, name, order, userId, now, now],
+      'INSERT INTO participants (id, group_id, name, sort_order, user_id, avatar_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, groupId, name, order, userId, avatarId, now, now],
     );
     return id;
   }
@@ -530,15 +582,45 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
           .update({
             'name': participant.name,
             'sort_order': participant.order,
+            'avatar_id': participant.avatarId,
             'updated_at': now,
           })
           .eq('id', participant.id);
     }
 
     await _db.execute(
-      'UPDATE participants SET name = ?, sort_order = ?, updated_at = ? WHERE id = ?',
-      [participant.name, participant.order, now, participant.id],
+      'UPDATE participants SET name = ?, sort_order = ?, avatar_id = ?, updated_at = ? WHERE id = ?',
+      [participant.name, participant.order, participant.avatarId, now, participant.id],
     );
+  }
+
+  @override
+  Future<void> updateProfileByUserId(String userId, String newName, {String? avatarId}) async {
+    final now = _nowIso();
+    final updates = <String, dynamic>{
+      'name': newName,
+      'updated_at': now,
+    };
+    if (avatarId != null) updates['avatar_id'] = avatarId;
+
+    if (!_isLocalOnly && _isOnline && _client != null) {
+      await _client
+          .from('participants')
+          .update(updates)
+          .eq('user_id', userId);
+    }
+
+    if (avatarId != null) {
+      await _db.execute(
+        'UPDATE participants SET name = ?, avatar_id = ?, updated_at = ? WHERE user_id = ?',
+        [newName, avatarId, now, userId],
+      );
+    } else {
+      await _db.execute(
+        'UPDATE participants SET name = ?, updated_at = ? WHERE user_id = ?',
+        [newName, now, userId],
+      );
+    }
   }
 
   @override

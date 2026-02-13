@@ -4,7 +4,7 @@ abstract class IGroupRepository {
   Future<List<Group>> getAll();
   Stream<List<Group>> watchAll();
   Future<Group?> getById(String id);
-  Future<String> create(String name, String currencyCode);
+  Future<String> create(String name, String currencyCode, {String? icon, int? color, List<String> initialParticipants = const []});
   Future<void> update(Group group);
   Future<void> delete(String id);
   Future<void> freezeSettlement(String groupId, SettlementSnapshot snapshot);
