@@ -412,5 +412,7 @@
   "invite_revoke_title": "إلغاء الدعوة",
   "invite_revoke_confirm": "سيتوقف رابط الدعوة عن العمل. هل تريد المتابعة؟",
   "invite_usage_history": "سجل الاستخدام",
-  "invite_no_usages": "لم يستخدم أحد هذه الدعوة بعد"
+  "invite_no_usages": "لم يستخدم أحد هذه الدعوة بعد",
+  "install_app": "تثبيت التطبيق",
+  "install_app_description": "ثبّت حساب للحصول على تجربة أفضل"
 }
