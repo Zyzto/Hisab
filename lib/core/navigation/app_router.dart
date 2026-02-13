@@ -13,6 +13,7 @@ import '../../features/groups/pages/group_settings_page.dart';
 import '../../features/groups/pages/invite_accept_page.dart';
 import '../../features/expenses/pages/expense_form_page.dart';
 import '../../features/expenses/pages/expense_detail_page.dart';
+import '../../features/settings/widgets/privacy_policy_page.dart';
 import 'main_scaffold.dart';
 
 part 'app_router.g.dart';
@@ -36,6 +37,8 @@ GoRouter router(Ref ref) {
     initialLocation: RoutePaths.home,
     redirect: (context, state) {
       final onOnboarding = state.matchedLocation == RoutePaths.onboarding;
+      final onPrivacyPolicy =
+          state.matchedLocation == RoutePaths.privacyPolicy;
       // Pending invite from deep link: send to invite page and clear
       final settings = ref.read(hisabSettingsProvidersProvider);
       if (settings != null) {
@@ -49,7 +52,7 @@ GoRouter router(Ref ref) {
           return RoutePaths.inviteAccept(pendingToken);
         }
       }
-      if (!onboardingCompleted && !onOnboarding) {
+      if (!onboardingCompleted && !onOnboarding && !onPrivacyPolicy) {
         return RoutePaths.onboarding;
       }
       if (onboardingCompleted && onOnboarding) {
@@ -59,6 +62,10 @@ GoRouter router(Ref ref) {
     },
     routes: [
       ...getOnboardingRoutes(),
+      GoRoute(
+        path: RoutePaths.privacyPolicy,
+        builder: (context, state) => const PrivacyPolicyPage(),
+      ),
       ShellRoute(
         builder: (context, state, child) {
           final location = state.uri.path;

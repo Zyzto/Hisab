@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:currency_picker/currency_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,6 +21,7 @@ import '../../../core/navigation/route_paths.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/services/migration_service.dart';
 import '../../../core/services/connectivity_service.dart';
+import '../../../core/utils/currency_helpers.dart';
 import '../settings_definitions.dart';
 import '../providers/settings_framework_providers.dart';
 import '../backup_helper.dart';
@@ -115,6 +117,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   .read(settings.provider(fontSizeScaleSettingDef).notifier)
                   .set(v),
             ),
+            _favoriteCurrenciesTile(context, ref, settings),
           ]),
           // Data & Backup: merged Data + old Backup
           _buildSection(context, ref, settings, dataBackupSection, [
@@ -339,8 +342,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
         final initials = _getInitials(profile.name, profile.email);
         final provider = _getProviderLabel(user);
-        final hasAvatarId =
-            profile.avatarId != null && profile.avatarId!.isNotEmpty;
+        final emoji = avatarEmoji(profile.avatarId);
 
         return [
           // User info card (tappable to edit profile)
@@ -348,9 +350,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             leading: CircleAvatar(
               backgroundColor: colorScheme.primaryContainer,
               foregroundColor: colorScheme.onPrimaryContainer,
-              child: hasAvatarId
+              child: emoji != null
                   ? Text(
-                      avatarEmoji(profile.avatarId),
+                      emoji,
                       style: const TextStyle(fontSize: 24),
                     )
                   : Text(
@@ -848,6 +850,80 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
+  Widget _favoriteCurrenciesTile(
+    BuildContext context,
+    WidgetRef ref,
+    SettingsProviders settings,
+  ) {
+    final stored = ref.watch(settings.provider(favoriteCurrenciesSettingDef));
+    final effective = CurrencyHelpers.getEffectiveFavorites(stored);
+    final isCustom = stored.trim().isNotEmpty;
+
+    // Build short labels: "🇸🇦 SAR, 🇯🇵 JPY, ..."
+    final labels = effective.map((code) {
+      final c = CurrencyHelpers.fromCode(code);
+      return c != null ? CurrencyHelpers.shortLabel(c) : code;
+    }).join(', ');
+
+    return ListTile(
+      leading: const Icon(Icons.star_outline),
+      title: Text('favorite_currencies'.tr()),
+      subtitle: Text(
+        isCustom ? labels : '${'default'.tr()}: $labels',
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+      trailing: isCustom
+          ? IconButton(
+              icon: const Icon(Icons.restore),
+              tooltip: 'reset_to_default'.tr(),
+              onPressed: () {
+                ref
+                    .read(
+                      settings
+                          .provider(favoriteCurrenciesSettingDef)
+                          .notifier,
+                    )
+                    .set('');
+              },
+            )
+          : null,
+      onTap: () => _showFavoriteCurrenciesEditor(context, ref, settings),
+    );
+  }
+
+  void _showFavoriteCurrenciesEditor(
+    BuildContext context,
+    WidgetRef ref,
+    SettingsProviders settings,
+  ) {
+    final stored =
+        ref.read(settings.provider(favoriteCurrenciesSettingDef));
+    final current =
+        List<String>.from(CurrencyHelpers.getEffectiveFavorites(stored));
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.75,
+      ),
+      builder: (ctx) => _FavoriteCurrenciesSheet(
+        initial: current,
+        onSave: (updated) {
+          final encoded = CurrencyHelpers.encodeFavorites(updated);
+          ref
+              .read(
+                settings
+                    .provider(favoriteCurrenciesSettingDef)
+                    .notifier,
+              )
+              .set(encoded);
+        },
+      ),
+    );
+  }
+
   Widget _buildAboutSection(
     BuildContext context,
     WidgetRef ref,
@@ -1317,6 +1393,173 @@ class _MigrationProgressDialogState extends State<_MigrationProgressDialog> {
           LinearProgressIndicator(value: progress),
           const SizedBox(height: 8),
           Text('$_completed / $_total'),
+        ],
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// Favorite Currencies Editor Sheet
+// =============================================================================
+
+class _FavoriteCurrenciesSheet extends StatefulWidget {
+  final List<String> initial;
+  final ValueChanged<List<String>> onSave;
+
+  const _FavoriteCurrenciesSheet({
+    required this.initial,
+    required this.onSave,
+  });
+
+  @override
+  State<_FavoriteCurrenciesSheet> createState() =>
+      _FavoriteCurrenciesSheetState();
+}
+
+class _FavoriteCurrenciesSheetState extends State<_FavoriteCurrenciesSheet> {
+  late List<String> _codes;
+
+  @override
+  void initState() {
+    super.initState();
+    _codes = List<String>.from(widget.initial);
+  }
+
+  void _addCurrency() {
+    CurrencyHelpers.showPicker(
+      context: context,
+      onSelect: (currency) {
+        if (!_codes.contains(currency.code)) {
+          setState(() => _codes.add(currency.code));
+        }
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag handle
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 4),
+              width: 32,
+              height: 4,
+              decoration: BoxDecoration(
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'favorite_currencies'.tr(),
+                    style: textTheme.titleMedium,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  tooltip: 'add_currency'.tr(),
+                  onPressed: _addCurrency,
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              'favorite_currencies_hint'.tr(),
+              style: textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // List
+          if (_codes.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'favorite_currencies_empty'.tr(),
+                style: textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            )
+          else
+            Flexible(
+              child: ReorderableListView.builder(
+                shrinkWrap: true,
+                itemCount: _codes.length,
+                onReorder: (oldIndex, newIndex) {
+                  setState(() {
+                    if (newIndex > oldIndex) newIndex--;
+                    final item = _codes.removeAt(oldIndex);
+                    _codes.insert(newIndex, item);
+                  });
+                },
+                itemBuilder: (context, index) {
+                  final code = _codes[index];
+                  final currency = CurrencyHelpers.fromCode(code);
+                  final flag = currency != null
+                      ? CurrencyUtils.currencyToEmoji(currency)
+                      : '';
+                  final name = currency?.name ?? code;
+
+                  return ListTile(
+                    key: ValueKey(code),
+                    leading: Text(flag, style: const TextStyle(fontSize: 24)),
+                    title: Text('$code - $name'),
+                    trailing: IconButton(
+                      icon: Icon(
+                        Icons.remove_circle_outline,
+                        color: colorScheme.error,
+                      ),
+                      onPressed: () {
+                        setState(() => _codes.removeAt(index));
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+          const SizedBox(height: 8),
+          // Actions
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text('cancel'.tr()),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () {
+                      widget.onSave(_codes);
+                      Navigator.pop(context);
+                    },
+                    child: Text('done'.tr()),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
