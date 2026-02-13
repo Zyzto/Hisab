@@ -36,3 +36,8 @@ String get inviteLinkBaseUrl =>
 /// and magic links will redirect here instead of the Supabase default (e.g. localhost).
 /// Must be listed in Supabase Dashboard → Authentication → URL Configuration → Redirect URLs.
 const authRedirectUrl = String.fromEnvironment('SITE_URL', defaultValue: '');
+
+/// VAPID key for Firebase Cloud Messaging on web.
+/// Generated in Firebase Console → Project Settings → Cloud Messaging → Web Push certificates.
+/// Required for `FirebaseMessaging.instance.getToken(vapidKey: ...)` on web.
+const fcmVapidKey = String.fromEnvironment('FCM_VAPID_KEY', defaultValue: '');

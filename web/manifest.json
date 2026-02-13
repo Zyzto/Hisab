@@ -1,13 +1,14 @@
 {
-    "name": "hisab",
-    "short_name": "hisab",
+    "name": "Hisab",
+    "short_name": "Hisab",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Group expense splitting and settle-up app.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
+    "gcm_sender_id": "103953800507",
     "icons": [
         {
             "src": "icons/Icon-192.png",
