@@ -271,6 +271,7 @@ class PowerSyncGroupRepository implements IGroupRepository {
       ownerId = user?.id;
       ownerDisplayName =
           user?.userMetadata?['display_name'] as String? ??
+          user?.userMetadata?['full_name'] as String? ??
           user?.email ??
           'Owner';
     } catch (_) {}
@@ -291,7 +292,20 @@ class PowerSyncGroupRepository implements IGroupRepository {
     if (!_isLocalOnly && _isOnline && _client != null) {
       // Online: write to Supabase first
       await _client.from('groups').insert(groupData);
-      // Create participant for owner
+      // Create owner membership first (without participant_id) so that
+      // get_user_role() returns 'owner' for subsequent RLS checks.
+      String? memberId;
+      if (ownerId != null) {
+        memberId = _uuid.v4();
+        await _client.from('group_members').insert({
+          'id': memberId,
+          'group_id': id,
+          'user_id': ownerId,
+          'role': 'owner',
+          'joined_at': now,
+        });
+      }
+      // Create participant for owner (RLS now passes via get_user_role)
       await _client.from('participants').insert({
         'id': participantId,
         'group_id': id,
@@ -301,17 +315,12 @@ class PowerSyncGroupRepository implements IGroupRepository {
         'created_at': now,
         'updated_at': now,
       });
-      // Create owner membership linked to participant
-      if (ownerId != null) {
-        final memberId = _uuid.v4();
-        await _client.from('group_members').insert({
-          'id': memberId,
-          'group_id': id,
-          'user_id': ownerId,
-          'role': 'owner',
-          'participant_id': participantId,
-          'joined_at': now,
-        });
+      // Link participant to the membership record
+      if (memberId != null) {
+        await _client
+            .from('group_members')
+            .update({'participant_id': participantId})
+            .eq('id', memberId);
       }
     }
 

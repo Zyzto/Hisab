@@ -195,6 +195,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ]),
           // Privacy: renamed from Logging
           _buildSection(context, ref, settings, privacySection, [
+            NavigationSettingsTile(
+              leading: const Icon(Icons.privacy_tip_outlined),
+              title: Text('privacy_policy'.tr()),
+              onTap: () => context.push(RoutePaths.privacyPolicy),
+            ),
             SwitchSettingsTile.fromSetting(
               setting: telemetryEnabledSettingDef,
               title: 'telemetry_enabled'.tr(),

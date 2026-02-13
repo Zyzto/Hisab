@@ -19,7 +19,7 @@ class BalanceList extends ConsumerWidget {
     return balanceAsync.when(
       data: (result) {
         if (result == null) {
-          return const Center(child: Text('Group Not Found'));
+          return Center(child: Text('group_not_found'.tr()));
         }
         final group = result.group;
         final participants = result.participants;
