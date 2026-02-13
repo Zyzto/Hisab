@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:currency_picker/currency_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,11 +9,13 @@ import 'package:easy_localization/easy_localization.dart';
 import '../providers/groups_provider.dart';
 import '../providers/group_member_provider.dart';
 import '../widgets/invite_link_sheet.dart';
+import '../utils/group_icon_utils.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/services/settle_up_service.dart';
 import '../../../core/telemetry/telemetry_service.dart';
+import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/currency_helpers.dart';
 import '../../../domain/domain.dart';
 import '../../settings/providers/settings_framework_providers.dart';
@@ -58,7 +62,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
         }
         return Scaffold(
           appBar: AppBar(
-            title: Text('settlement_settings'.tr()),
+            title: Text('group_settings'.tr()),
             leading: IconButton(
               icon: const Icon(Icons.arrow_back),
               onPressed: () {
@@ -71,26 +75,128 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
             ),
           ),
           body: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(
+              horizontal: ThemeConfig.spacingM,
+              vertical: ThemeConfig.spacingS,
+            ),
             children: [
-              _buildCurrencySection(context, group, expensesAsync, ref),
-              const SizedBox(height: 24),
-              _buildSettlementMethodSection(context, group, ref),
-              const SizedBox(height: 24),
-              if (group.settlementMethod == SettlementMethod.treasurer)
-                _buildTreasurerSection(context, group, participantsAsync, ref),
-              const SizedBox(height: 24),
-              _buildFreezeSection(
+              // ── Group Profile Header ──
+              _buildProfileHeader(context, group),
+              const SizedBox(height: ThemeConfig.spacingL),
+
+              // ── Currency Section ──
+              _buildSection(
                 context,
-                group,
-                participantsAsync,
-                expensesAsync,
-                ref,
+                title: 'group_currency'.tr(),
+                children: [
+                  _buildCurrencyRow(context, group, expensesAsync, ref),
+                ],
               ),
-              if (!localOnly) ...[
-                const SizedBox(height: 24),
-                _buildOnlineSection(context, group, myRoleAsync, ref),
-              ],
+              const SizedBox(height: ThemeConfig.spacingL),
+
+              // ── Settlement Section ──
+              _buildSection(
+                context,
+                title: 'settlement_method'.tr(),
+                children: [
+                  _buildSettlementMethodContent(context, group, ref),
+                  if (group.settlementMethod == SettlementMethod.treasurer)
+                    _buildTreasurerContent(
+                        context, group, participantsAsync, ref),
+                  _buildFreezeContent(
+                    context,
+                    group,
+                    participantsAsync,
+                    expensesAsync,
+                    ref,
+                  ),
+                ],
+              ),
+
+              // ── Permissions Section (online only) ──
+              if (!localOnly)
+                myRoleAsync.when(
+                  data: (myRole) {
+                    final isOwnerOrAdmin = myRole == GroupRole.owner ||
+                        myRole == GroupRole.admin;
+                    if (!isOwnerOrAdmin || group.ownerId == null) {
+                      return const SizedBox.shrink();
+                    }
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: ThemeConfig.spacingL),
+                        _buildSection(
+                          context,
+                          title: 'group_permissions'.tr(),
+                          children: [
+                            SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text('allow_add_expense'.tr()),
+                              value: group.allowMemberAddExpense,
+                              onChanged: _saving
+                                  ? null
+                                  : (v) => _onPermissionChanged(
+                                        ref,
+                                        group,
+                                        allowMemberAddExpense: v,
+                                      ),
+                            ),
+                            SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text('allow_change_settings'.tr()),
+                              value: group.allowMemberChangeSettings,
+                              onChanged: _saving
+                                  ? null
+                                  : (v) => _onPermissionChanged(
+                                        ref,
+                                        group,
+                                        allowMemberChangeSettings: v,
+                                      ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    );
+                  },
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, _) => const SizedBox.shrink(),
+                ),
+
+              // ── Invite Section (online only, owner/admin) ──
+              if (!localOnly)
+                myRoleAsync.when(
+                  data: (myRole) {
+                    final isOwnerOrAdmin = myRole == GroupRole.owner ||
+                        myRole == GroupRole.admin;
+                    if (!isOwnerOrAdmin) return const SizedBox.shrink();
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: ThemeConfig.spacingL),
+                        _buildSection(
+                          context,
+                          title: 'invite_people'.tr(),
+                          children: [
+                            FilledButton.icon(
+                              onPressed: () => createAndShowInviteSheet(
+                                  context, ref, widget.groupId),
+                              icon: const Icon(Icons.add_link),
+                              label: Text('invite_people'.tr()),
+                            ),
+                          ],
+                        ),
+                      ],
+                    );
+                  },
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, _) => const SizedBox.shrink(),
+                ),
+
+              // ── Danger Zone ──
+              const SizedBox(height: ThemeConfig.spacingXL),
+              _buildDangerZone(context, group, localOnly, myRoleAsync, ref),
+              const SizedBox(height: ThemeConfig.spacingXL),
             ],
           ),
         );
@@ -98,13 +204,159 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => Scaffold(
-        appBar: AppBar(title: Text('settlement_settings'.tr())),
+        appBar: AppBar(title: Text('group_settings'.tr())),
         body: Center(child: Text('Error: $e')),
       ),
     );
   }
 
-  Widget _buildCurrencySection(
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Profile Header
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  Widget _buildProfileHeader(BuildContext context, Group group) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final avatarColor =
+        group.color != null ? Color(group.color!) : colorScheme.primary;
+    final iconData = groupIconFromKey(group.icon);
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(ThemeConfig.radiusXL),
+        side: BorderSide(
+          color: colorScheme.outline.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: ThemeConfig.spacingM,
+          vertical: ThemeConfig.spacingM,
+        ),
+        child: Row(
+          children: [
+            // Avatar – tap to change icon/color
+            GestureDetector(
+              onTap: () => _showIconColorPicker(context, group),
+              child: Stack(
+                alignment: AlignmentDirectional.bottomEnd,
+                children: [
+                  CircleAvatar(
+                    radius: 30,
+                    backgroundColor: avatarColor,
+                    child: iconData != null
+                        ? Icon(iconData, size: 30, color: Colors.white)
+                        : Text(
+                            group.name.isNotEmpty
+                                ? group.name[0].toUpperCase()
+                                : '?',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surface,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: colorScheme.outline.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.edit,
+                      size: 12,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: ThemeConfig.spacingM),
+            // Name + date
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Name – tap to edit
+                  GestureDetector(
+                    onTap: () => _showEditNameDialog(context, group),
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            group.name,
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: ThemeConfig.spacingXS),
+                        Icon(
+                          Icons.edit_outlined,
+                          size: 16,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: ThemeConfig.spacingXS),
+                  // Created date
+                  Text(
+                    'created_on'.tr(namedArgs: {
+                      'date': DateFormat.yMMMd().format(group.createdAt),
+                    }),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Section Builder
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  Widget _buildSection(
+    BuildContext context, {
+    required String title,
+    required List<Widget> children,
+    Color? titleColor,
+  }) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: titleColor,
+          ),
+        ),
+        const SizedBox(height: ThemeConfig.spacingS),
+        const Divider(height: 1),
+        const SizedBox(height: ThemeConfig.spacingM),
+        ...children,
+      ],
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Currency
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  Widget _buildCurrencyRow(
     BuildContext context,
     Group group,
     AsyncValue<List<Expense>> expensesAsync,
@@ -113,58 +365,44 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     final theme = Theme.of(context);
     final currency = CurrencyHelpers.fromCode(group.currencyCode);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'group_currency'.tr(),
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+    return InkWell(
+      onTap: _saving ? null : () => _onCurrencyTap(group, expensesAsync, ref),
+      borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          border: Border.all(color: theme.colorScheme.outline),
+          borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
         ),
-        const SizedBox(height: 8),
-        InkWell(
-          onTap: _saving
-              ? null
-              : () => _onCurrencyTap(group, expensesAsync, ref),
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              border: Border.all(color: theme.colorScheme.outline),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                if (currency != null) ...[
-                  Text(
-                    CurrencyUtils.currencyToEmoji(currency),
-                    style: const TextStyle(fontSize: 24),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      CurrencyHelpers.displayLabel(currency),
-                      style: theme.textTheme.bodyLarge,
-                    ),
-                  ),
-                ] else ...[
-                  Expanded(
-                    child: Text(
-                      group.currencyCode,
-                      style: theme.textTheme.bodyLarge,
-                    ),
-                  ),
-                ],
-                Icon(
-                  Icons.arrow_drop_down,
-                  color: theme.colorScheme.onSurfaceVariant,
+        child: Row(
+          children: [
+            if (currency != null) ...[
+              Text(
+                CurrencyUtils.currencyToEmoji(currency),
+                style: const TextStyle(fontSize: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  CurrencyHelpers.displayLabel(currency),
+                  style: theme.textTheme.bodyLarge,
                 ),
-              ],
+              ),
+            ] else ...[
+              Expanded(
+                child: Text(
+                  group.currencyCode,
+                  style: theme.textTheme.bodyLarge,
+                ),
+              ),
+            ],
+            Icon(
+              Icons.arrow_drop_down,
+              color: theme.colorScheme.onSurfaceVariant,
             ),
-          ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
@@ -173,13 +411,11 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     AsyncValue<List<Expense>> expensesAsync,
     WidgetRef ref,
   ) async {
-    showCurrencyPicker(
+    final stored = ref.read(favoriteCurrenciesProvider);
+    final favorites = CurrencyHelpers.getEffectiveFavorites(stored);
+    CurrencyHelpers.showPicker(
       context: context,
-      favorite: CurrencyHelpers.favoriteCurrencies,
-      showFlag: true,
-      showSearchField: true,
-      showCurrencyName: true,
-      showCurrencyCode: true,
+      favorite: favorites,
       onSelect: (Currency currency) async {
         if (currency.code == group.currencyCode) return;
 
@@ -229,44 +465,132 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     );
   }
 
-  Widget _buildSettlementMethodSection(
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Settlement Method
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  Widget _buildSettlementMethodContent(
     BuildContext context,
     Group group,
     WidgetRef ref,
   ) {
     final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'settlement_method'.tr(),
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+    final colorScheme = theme.colorScheme;
+
+    return InkWell(
+      onTap: _saving
+          ? null
+          : () => _showSettlementMethodPicker(context, group, ref),
+      borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          border: Border.all(color: colorScheme.outline),
+          borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
         ),
-        const SizedBox(height: 8),
-        RadioGroup<SettlementMethod>(
-          groupValue: group.settlementMethod,
-          onChanged: (v) {
-            if (!_saving && v != null) _onMethodChanged(ref, group, v);
-          },
-          child: Column(
-            children: SettlementMethod.values
-                .map(
-                  (method) => RadioListTile<SettlementMethod>(
-                    value: method,
-                    title: Text(_methodLabel(method)),
-                    subtitle: Text(_methodDescription(method)),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _methodLabel(group.settlementMethod),
+                    style: theme.textTheme.titleMedium,
                   ),
-                )
-                .toList(),
-          ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _methodDescription(group.settlementMethod),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_drop_down,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
-  Widget _buildTreasurerSection(
+  Future<void> _showSettlementMethodPicker(
+    BuildContext context,
+    Group group,
+    WidgetRef ref,
+  ) async {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    final chosen = await showModalBottomSheet<SettlementMethod>(
+      context: context,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: ThemeConfig.spacingM),
+                child: Text(
+                  'settlement_method'.tr(),
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              ...SettlementMethod.values.map((method) {
+                final isSelected = method == group.settlementMethod;
+                return ListTile(
+                  selected: isSelected,
+                  selectedTileColor:
+                      colorScheme.primaryContainer.withValues(alpha: 0.3),
+                  leading: Icon(
+                    isSelected
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                    color: isSelected
+                        ? colorScheme.primary
+                        : colorScheme.onSurfaceVariant,
+                  ),
+                  title: Text(
+                    _methodLabel(method),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: isSelected ? FontWeight.w600 : null,
+                      color: isSelected ? colorScheme.primary : null,
+                    ),
+                  ),
+                  subtitle: Text(
+                    _methodDescription(method),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  onTap: () => Navigator.pop(ctx, method),
+                );
+              }),
+              const SizedBox(height: ThemeConfig.spacingM),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (chosen != null && chosen != group.settlementMethod) {
+      _onMethodChanged(ref, group, chosen);
+    }
+  }
+
+  Widget _buildTreasurerContent(
     BuildContext context,
     Group group,
     AsyncValue<List<Participant>> participantsAsync,
@@ -278,20 +602,21 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const SizedBox(height: ThemeConfig.spacingS),
             Text(
               'select_treasurer'.tr(),
-              style: theme.textTheme.titleMedium?.copyWith(
+              style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: ThemeConfig.spacingS),
             DropdownButtonFormField<String>(
               initialValue:
                   group.treasurerParticipantId ??
                   (participants.isNotEmpty ? participants.first.id : null),
               decoration: InputDecoration(
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(ThemeConfig.radiusXL),
                 ),
               ),
               items: participants
@@ -311,79 +636,423 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     );
   }
 
-  Widget _buildFreezeSection(
+  Widget _buildFreezeContent(
     BuildContext context,
     Group group,
     AsyncValue<List<Participant>> participantsAsync,
     AsyncValue<List<Expense>> expensesAsync,
     WidgetRef ref,
   ) {
-    final theme = Theme.of(context);
     final isFrozen = group.isSettlementFrozen;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'settlement_freeze'.tr(),
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 8),
-        if (isFrozen) ...[
-          Card(
-            color: theme.colorScheme.surfaceContainerHighest,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'settlement_frozen_since'.tr().replaceAll(
-                      '{date}',
-                      group.settlementFreezeAt != null
-                          ? DateFormat.yMMMd().format(group.settlementFreezeAt!)
-                          : '',
-                    ),
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'settlement_frozen_hint'.tr(),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          FilledButton.icon(
-            onPressed: _saving ? null : () => _onUnfreeze(ref),
-            icon: const Icon(Icons.play_circle_outline),
-            label: Text('unfreeze_settlement'.tr()),
-          ),
-        ] else ...[
-          Text(
-            'settlement_freeze_description'.tr(),
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: _saving
+    final subtitle = isFrozen
+        ? 'settlement_frozen_since'.tr().replaceAll(
+              '{date}',
+              group.settlementFreezeAt != null
+                  ? DateFormat.yMMMd().format(group.settlementFreezeAt!)
+                  : '',
+            )
+        : 'settlement_freeze_description'.tr();
+
+    return SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text('settlement_freeze'.tr()),
+      subtitle: Text(subtitle),
+      value: isFrozen,
+      onChanged: _saving
+          ? null
+          : (v) {
+              if (v) {
+                _onFreeze(ref, group, participantsAsync, expensesAsync);
+              } else {
+                _onUnfreeze(ref);
+              }
+            },
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Danger Zone
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  Widget _buildDangerZone(
+    BuildContext context,
+    Group group,
+    bool localOnly,
+    AsyncValue<GroupRole?> myRoleAsync,
+    WidgetRef ref,
+  ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final errorColor = colorScheme.error;
+
+    // For local-only mode, show just delete. For online, show based on role.
+    final List<Widget> actions = [];
+
+    if (localOnly) {
+      actions.add(_dangerButton(
+        icon: Icons.delete_outline,
+        label: 'delete_group'.tr(),
+        color: errorColor,
+        onTap: _saving ? null : () => _showDeleteGroup(context, ref),
+      ));
+    } else {
+      myRoleAsync.whenData((myRole) {
+        if (myRole == GroupRole.owner) {
+          actions.add(_dangerButton(
+            icon: Icons.swap_horiz,
+            label: 'transfer_ownership'.tr(),
+            color: errorColor,
+            onTap: _saving
                 ? null
-                : () => _onFreeze(ref, group, participantsAsync, expensesAsync),
-            icon: const Icon(Icons.pause_circle_outline),
-            label: Text('freeze_settlement'.tr()),
-          ),
-        ],
+                : () => _showTransferOwnership(context, ref),
+          ));
+          actions.add(_dangerButton(
+            icon: Icons.delete_outline,
+            label: 'delete_group'.tr(),
+            color: errorColor,
+            onTap: _saving ? null : () => _showDeleteGroup(context, ref),
+          ));
+        }
+        if (myRole != null) {
+          actions.add(_dangerButton(
+            icon: Icons.exit_to_app,
+            label: 'leave_group'.tr(),
+            color: errorColor,
+            onTap: _saving ? null : () => _showLeaveGroup(context, ref),
+          ));
+        }
+      });
+    }
+
+    if (actions.isEmpty) return const SizedBox.shrink();
+
+    return _buildSection(
+      context,
+      title: 'danger_zone'.tr(),
+      titleColor: errorColor,
+      children: [
+        Row(
+          children: actions
+              .map((btn) => Expanded(child: btn))
+              .expand((w) sync* {
+                yield w;
+                yield const SizedBox(width: ThemeConfig.spacingS);
+              })
+              .toList()
+            ..removeLast(),
+        ),
       ],
     );
   }
+
+  Widget _dangerButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    VoidCallback? onTap,
+  }) {
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 14, color: color),
+      label: Text(
+        label,
+        style: TextStyle(color: color, fontSize: 12),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      style: OutlinedButton.styleFrom(
+        side: BorderSide(color: color.withValues(alpha: 0.4)),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        visualDensity: VisualDensity.compact,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Edit Name Dialog
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  Future<void> _showEditNameDialog(BuildContext context, Group group) async {
+    final controller = TextEditingController(text: group.name);
+
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('edit_group_name'.tr()),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: 'group_name'.tr(),
+            border: const OutlineInputBorder(),
+          ),
+          textInputAction: TextInputAction.done,
+          onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('cancel'.tr()),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: Text('done'.tr()),
+          ),
+        ],
+      ),
+    );
+
+    if (newName == null || newName.isEmpty || newName == group.name) {
+      if (newName != null && newName.isEmpty && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('group_name_empty'.tr())),
+        );
+      }
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      await ref.read(groupRepositoryProvider).update(
+            group.copyWith(name: newName, updatedAt: DateTime.now()),
+          );
+      ref.invalidate(futureGroupProvider(widget.groupId));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('group_name_updated'.tr())),
+        );
+      }
+    } catch (e, st) {
+      Log.warning('Name change failed', error: e, stackTrace: st);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Icon / Color Picker Bottom Sheet
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  Future<void> _showIconColorPicker(BuildContext context, Group group) async {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    String? selectedIcon = group.icon;
+    Color selectedColor = group.color != null
+        ? Color(group.color!)
+        : groupColors.first;
+
+    final result = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.75,
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(
+              ThemeConfig.spacingM,
+              0,
+              ThemeConfig.spacingM,
+              ThemeConfig.spacingM,
+            ),
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                Text(
+                  'change_icon_color'.tr(),
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: ThemeConfig.spacingL),
+
+                // Icon grid
+                Text(
+                  'wizard_icon_label'.tr(),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: ThemeConfig.spacingM),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 4,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 1,
+                  ),
+                  itemCount: groupIcons.length,
+                  itemBuilder: (context, index) {
+                    final opt = groupIcons[index];
+                    final isSelected = selectedIcon == opt.key;
+                    return Material(
+                      color: isSelected
+                          ? selectedColor.withValues(alpha: 0.15)
+                          : colorScheme.surfaceContainerHighest,
+                      borderRadius:
+                          BorderRadius.circular(ThemeConfig.radiusL),
+                      child: InkWell(
+                        borderRadius:
+                            BorderRadius.circular(ThemeConfig.radiusL),
+                        onTap: () =>
+                            setSheetState(() => selectedIcon = opt.key),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          decoration: BoxDecoration(
+                            borderRadius:
+                                BorderRadius.circular(ThemeConfig.radiusL),
+                            border: Border.all(
+                              color: isSelected
+                                  ? selectedColor
+                                  : colorScheme.outline
+                                      .withValues(alpha: 0.2),
+                              width: isSelected ? 2 : 1,
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                opt.icon,
+                                size: 28,
+                                color: isSelected
+                                    ? selectedColor
+                                    : colorScheme.onSurfaceVariant,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                opt.labelKey.tr(),
+                                style:
+                                    theme.textTheme.labelSmall?.copyWith(
+                                  color: isSelected
+                                      ? selectedColor
+                                      : colorScheme.onSurfaceVariant,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: ThemeConfig.spacingXL),
+
+                // Color palette
+                Text(
+                  'wizard_color_label'.tr(),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: ThemeConfig.spacingM),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: groupColors.map((color) {
+                    final isSelected = selectedColor == color;
+                    return GestureDetector(
+                      onTap: () =>
+                          setSheetState(() => selectedColor = color),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isSelected
+                                ? colorScheme.onSurface
+                                : Colors.transparent,
+                            width: 3,
+                          ),
+                          boxShadow: isSelected
+                              ? [
+                                  BoxShadow(
+                                    color: color.withValues(alpha: 0.4),
+                                    blurRadius: 8,
+                                    spreadRadius: 1,
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: isSelected
+                            ? const Icon(Icons.check,
+                                color: Colors.white, size: 22)
+                            : null,
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: ThemeConfig.spacingXL),
+
+                // Confirm button
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, {
+                    'icon': selectedIcon,
+                    'color': selectedColor.toARGB32(),
+                  }),
+                  child: Text('done'.tr()),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    if (result == null || !mounted) return;
+
+    final newIcon = result['icon'] as String?;
+    final newColor = result['color'] as int?;
+
+    // Only save if something changed
+    if (newIcon == group.icon && newColor == group.color) return;
+
+    setState(() => _saving = true);
+    try {
+      await ref.read(groupRepositoryProvider).update(
+            group.copyWith(
+              icon: newIcon,
+              color: newColor,
+              updatedAt: DateTime.now(),
+            ),
+          );
+      ref.invalidate(futureGroupProvider(widget.groupId));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('group_icon_color_updated'.tr())),
+        );
+      }
+    } catch (e, st) {
+      Log.warning('Icon/color change failed', error: e, stackTrace: st);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Helpers (unchanged logic from previous version)
+  // ═══════════════════════════════════════════════════════════════════════════
 
   String _methodLabel(SettlementMethod m) {
     switch (m) {
@@ -501,99 +1170,6 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     }
   }
 
-  Widget _buildOnlineSection(
-    BuildContext context,
-    Group group,
-    AsyncValue<GroupRole?> myRoleAsync,
-    WidgetRef ref,
-  ) {
-    final theme = Theme.of(context);
-    return myRoleAsync.when(
-      data: (myRole) {
-        final isOwnerOrAdmin =
-            myRole == GroupRole.owner || myRole == GroupRole.admin;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (isOwnerOrAdmin && group.ownerId != null) ...[
-              Text(
-                'group_permissions'.tr(),
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
-              SwitchListTile(
-                title: Text('allow_add_expense'.tr()),
-                value: group.allowMemberAddExpense,
-                onChanged: _saving
-                    ? null
-                    : (v) => _onPermissionChanged(
-                        ref,
-                        group,
-                        allowMemberAddExpense: v,
-                      ),
-              ),
-              SwitchListTile(
-                title: Text('allow_change_settings'.tr()),
-                value: group.allowMemberChangeSettings,
-                onChanged: _saving
-                    ? null
-                    : (v) => _onPermissionChanged(
-                        ref,
-                        group,
-                        allowMemberChangeSettings: v,
-                      ),
-              ),
-              const SizedBox(height: 24),
-            ],
-            if (isOwnerOrAdmin) ...[
-              Text(
-                'invite_people'.tr(),
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
-              FilledButton.icon(
-                onPressed: () =>
-                    createAndShowInviteSheet(context, ref, widget.groupId),
-                icon: const Icon(Icons.add_link),
-                label: Text('invite_people'.tr()),
-              ),
-              const SizedBox(height: 24),
-            ],
-            if (myRole == GroupRole.owner) ...[
-              OutlinedButton.icon(
-                onPressed: _saving
-                    ? null
-                    : () => _showTransferOwnership(context, ref),
-                icon: const Icon(Icons.swap_horiz),
-                label: Text('transfer_ownership'.tr()),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: _saving
-                    ? null
-                    : () => _showDeleteGroup(context, ref),
-                icon: const Icon(Icons.delete_outline),
-                label: Text('delete_group'.tr()),
-              ),
-              const SizedBox(height: 24),
-            ],
-            OutlinedButton.icon(
-              onPressed: _saving ? null : () => _showLeaveGroup(context, ref),
-              icon: const Icon(Icons.exit_to_app),
-              label: Text('leave_group'.tr()),
-            ),
-          ],
-        );
-      },
-      loading: () => const CircularProgressIndicator(),
-      error: (_, _) => const SizedBox.shrink(),
-    );
-  }
-
   Future<void> _onPermissionChanged(
     WidgetRef ref,
     Group group, {
@@ -681,19 +1257,11 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
   Future<void> _showDeleteGroup(BuildContext context, WidgetRef ref) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('delete_group'.tr()),
-        content: Text('delete_group_confirm'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('delete_group'.tr()),
-          ),
-        ],
+      builder: (ctx) => _TimedConfirmDialog(
+        title: 'delete_group'.tr(),
+        content: 'delete_group_confirm'.tr(),
+        confirmLabel: 'delete_group'.tr(),
+        seconds: 10,
       ),
     );
     if (ok != true || !context.mounted) return;
@@ -716,19 +1284,11 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
   Future<void> _showLeaveGroup(BuildContext context, WidgetRef ref) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('leave_group'.tr()),
-        content: Text('leave_group_confirm'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('leave_group'.tr()),
-          ),
-        ],
+      builder: (ctx) => _TimedConfirmDialog(
+        title: 'leave_group'.tr(),
+        content: 'leave_group_confirm'.tr(),
+        confirmLabel: 'leave_group'.tr(),
+        seconds: 10,
       ),
     );
     if (ok != true || !context.mounted) return;
@@ -753,5 +1313,79 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Timed confirmation dialog -- confirm button is disabled for [seconds] seconds
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _TimedConfirmDialog extends StatefulWidget {
+  final String title;
+  final String content;
+  final String confirmLabel;
+  final int seconds;
+
+  const _TimedConfirmDialog({
+    required this.title,
+    required this.content,
+    required this.confirmLabel,
+    required this.seconds,
+  });
+
+  @override
+  State<_TimedConfirmDialog> createState() => _TimedConfirmDialogState();
+}
+
+class _TimedConfirmDialogState extends State<_TimedConfirmDialog> {
+  late int _remaining;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _remaining = widget.seconds;
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_remaining <= 1) {
+        _timer?.cancel();
+        _timer = null;
+      }
+      if (mounted) setState(() => _remaining--);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final enabled = _remaining <= 0;
+
+    return AlertDialog(
+      title: Text(widget.title),
+      content: Text(widget.content),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: Text('cancel'.tr()),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: colorScheme.error,
+            disabledBackgroundColor: colorScheme.error.withValues(alpha: 0.3),
+          ),
+          onPressed: enabled ? () => Navigator.pop(context, true) : null,
+          child: Text(
+            enabled
+                ? widget.confirmLabel
+                : '${widget.confirmLabel} (${_remaining}s)',
+          ),
+        ),
+      ],
+    );
   }
 }
