@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../features/home/pages/home_page.dart';
 import '../../features/settings/pages/settings_page.dart';
 import '../widgets/connection_banner.dart';
@@ -72,6 +73,31 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
             right: 0,
             child: ConnectionBanner(),
           ),
+          if (showNavBar)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 85,
+              child: FutureBuilder<PackageInfo>(
+                future: PackageInfo.fromPlatform(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) return const SizedBox.shrink();
+                  return Text(
+                    'v${snapshot.data!.version}',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.15),
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.5,
+                    ),
+                  );
+                },
+              ),
+            ),
           if (showNavBar)
             Positioned(
               left: 0,
