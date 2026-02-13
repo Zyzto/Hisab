@@ -1,0 +1,180 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      deploy_play_store:
+        description: "Deploy AAB to Google Play internal track"
+        type: boolean
+        default: true
+      deploy_web:
+        description: "Deploy web build to Firebase Hosting"
+        type: boolean
+        default: true
+
+# Cancel previous runs on the same ref so we don't waste minutes.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: "3.32.2" # keep in sync with your local SDK
+  JAVA_VERSION: "17"
+
+jobs:
+  # ──────────────────────────────────────────────
+  # 1. Build Android APK + AAB
+  # ──────────────────────────────────────────────
+  build-android:
+    name: Build Android
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      # Decode the release keystore from a base64 secret.
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release-keystore.jks
+
+      # Write key.properties so build.gradle.kts picks it up.
+      - name: Create key.properties
+        run: |
+          cat > android/key.properties <<EOF
+          storeFile=${{ github.workspace }}/android/app/release-keystore.jks
+          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          EOF
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Build APK
+        run: |
+          flutter build apk --release \
+            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
+            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+
+      - name: Build App Bundle
+        run: |
+          flutter build appbundle --release \
+            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
+            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+
+  # ──────────────────────────────────────────────
+  # 2. Create GitHub Release (tag pushes only)
+  # ──────────────────────────────────────────────
+  github-release:
+    name: GitHub Release
+    needs: build-android
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download APK
+        uses: actions/download-artifact@v4
+        with:
+          name: release-apk
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: app-release.apk
+
+  # ──────────────────────────────────────────────
+  # 3. Deploy AAB to Google Play (internal track)
+  # ──────────────────────────────────────────────
+  deploy-play-store:
+    name: Deploy to Google Play
+    needs: build-android
+    if: >-
+      (startsWith(github.ref, 'refs/tags/v')) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_play_store == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download AAB
+        uses: actions/download-artifact@v4
+        with:
+          name: release-aab
+
+      - name: Upload to Play Store (internal)
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON }}
+          packageName: com.shenepoy.hisab
+          releaseFiles: app-release.aab
+          track: internal
+          status: completed
+
+  # ──────────────────────────────────────────────
+  # 4. Build & deploy web to Firebase Hosting
+  # ──────────────────────────────────────────────
+  deploy-web:
+    name: Deploy Web
+    if: >-
+      (startsWith(github.ref, 'refs/tags/v')) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_web == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      # PowerSync needs a WASM binary for web SQLite.
+      - name: Set up PowerSync web (sqlite3.wasm)
+        run: dart run powersync:setup_web
+
+      - name: Build web
+        run: |
+          flutter build web \
+            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
+            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
+            --dart-define=SITE_URL=${{ secrets.SITE_URL }}
+
+      - name: Deploy to Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          channelId: live
+          projectId: hisab-c8eb1
