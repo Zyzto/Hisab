@@ -75,6 +75,12 @@ dependencies:
   app_links: ^6.3.2
   currency_picker: ^2.0.21
 
+  # Push notifications
+  firebase_core: ^3.12.1
+  firebase_messaging: ^15.2.4
+  flutter_local_notifications: ^18.0.1
+  pwa_install: ^0.0.6
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
