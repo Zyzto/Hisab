@@ -54,6 +54,8 @@ Map<String, dynamic> _groupToMap(Group g) => {
   'treasurerParticipantId': g.treasurerParticipantId,
   'settlementFreezeAt': g.settlementFreezeAt?.millisecondsSinceEpoch,
   'settlementSnapshotJson': g.settlementSnapshotJson,
+  'icon': g.icon,
+  'color': g.color,
 };
 
 Map<String, dynamic> _participantToMap(Participant p) => {
@@ -164,6 +166,8 @@ Group _mapToGroup(Map<String, dynamic> m) {
         ? DateTime.fromMillisecondsSinceEpoch(m['settlementFreezeAt'] as int)
         : null,
     settlementSnapshotJson: m['settlementSnapshotJson'] as String?,
+    icon: m['icon'] as String?,
+    color: (m['color'] as num?)?.toInt(),
   );
 }
 

@@ -15,6 +15,8 @@ class Group {
   final String? ownerId;
   final bool allowMemberAddExpense;
   final bool allowMemberChangeSettings;
+  final String? icon;
+  final int? color;
 
   const Group({
     required this.id,
@@ -29,6 +31,8 @@ class Group {
     this.ownerId,
     this.allowMemberAddExpense = true,
     this.allowMemberChangeSettings = true,
+    this.icon,
+    this.color,
   });
 
   bool get isSettlementFrozen => settlementFreezeAt != null;
@@ -46,6 +50,8 @@ class Group {
     String? ownerId,
     bool? allowMemberAddExpense,
     bool? allowMemberChangeSettings,
+    String? icon,
+    int? color,
   }) {
     return Group(
       id: id ?? this.id,
@@ -64,6 +70,8 @@ class Group {
           allowMemberAddExpense ?? this.allowMemberAddExpense,
       allowMemberChangeSettings:
           allowMemberChangeSettings ?? this.allowMemberChangeSettings,
+      icon: icon ?? this.icon,
+      color: color ?? this.color,
     );
   }
 
@@ -81,5 +89,7 @@ class Group {
     ownerId: ownerId,
     allowMemberAddExpense: allowMemberAddExpense,
     allowMemberChangeSettings: allowMemberChangeSettings,
+    icon: icon,
+    color: color,
   );
 }
