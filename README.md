@@ -95,6 +95,78 @@ Full configuration reference: [CONFIGURATION.md](CONFIGURATION.md).
 
 All secrets are provided at build time via `--dart-define` — nothing is committed to the repository. The only gitignored secrets file is `lib/core/constants/app_secrets.dart` which contains fallback placeholders.
 
+## CI/CD (GitHub Actions)
+
+The project includes a release workflow (`.github/workflows/release.yml`) that builds Android APK/AAB, deploys to Google Play, and deploys the web app to Firebase Hosting. It triggers on version tags (`v*`) or manual dispatch.
+
+### Required GitHub Secrets
+
+Go to **repo Settings** → **Secrets and variables** → **Actions** and add each secret.
+
+#### Supabase
+
+| Secret | How to get it |
+|--------|--------------|
+| `SUPABASE_URL` | Supabase Dashboard → **Settings** → **API** → Project URL |
+| `SUPABASE_ANON_KEY` | Supabase Dashboard → **Settings** → **API** → `anon` `public` key |
+| `SITE_URL` | Your web app URL, e.g. `https://hisab-c8eb1.web.app` |
+
+#### Firebase Hosting
+
+| Secret | How to get it |
+|--------|--------------|
+| `FIREBASE_SERVICE_ACCOUNT` | Firebase Console → **Project Settings** → **Service accounts** → **Generate new private key** → paste the entire JSON |
+
+#### Android Signing
+
+Generate a keystore (one-time setup):
+
+```bash
+keytool -genkey -v \
+  -keystore ~/hisab-release.jks \
+  -keyalg RSA -keysize 2048 \
+  -validity 10000 \
+  -alias hisab
+```
+
+You will be prompted for a **store password** and a **key password** (press Enter at the key password prompt to reuse the store password).
+
+Then base64-encode it:
+
+```bash
+base64 -w 0 ~/hisab-release.jks
+```
+
+Copy the keystore into the project for local signed builds (already gitignored):
+
+```bash
+cp ~/hisab-release.jks android/app/release-keystore.jks
+```
+
+| Secret | Value |
+|--------|-------|
+| `KEYSTORE_BASE64` | Output of `base64 -w 0 ~/hisab-release.jks` (entire string, no newlines) |
+| `KEYSTORE_PASSWORD` | The store password you chose during `keytool` |
+| `KEY_ALIAS` | `hisab` |
+| `KEY_PASSWORD` | The key password (same as store password if you pressed Enter) |
+
+#### Google Play (optional)
+
+| Secret | How to get it |
+|--------|--------------|
+| `PLAY_STORE_SERVICE_ACCOUNT_JSON` | Google Play Console → **Setup** → **API access** → create/link a service account → download JSON key |
+
+### Local key.properties (for local release builds)
+
+Create `android/key.properties` (gitignored):
+
+```properties
+storeFile=/absolute/path/to/android/app/release-keystore.jks
+storePassword=your_store_password
+keyAlias=hisab
+keyPassword=your_key_password
+```
+
 ## License
 
 This project is licensed under **Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)**.
