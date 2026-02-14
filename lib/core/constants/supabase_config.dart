@@ -37,6 +37,10 @@ String get inviteLinkBaseUrl =>
 /// Must be listed in Supabase Dashboard → Authentication → URL Configuration → Redirect URLs.
 const authRedirectUrl = String.fromEnvironment('SITE_URL', defaultValue: '');
 
+/// Deep link used for OAuth redirect on native (Android/iOS) so the app reopens after sign-in.
+/// Must be listed in Supabase Dashboard → Authentication → URL Configuration → Redirect URLs.
+const authOAuthCallbackDeepLink = 'io.supabase.hisab://callback';
+
 /// VAPID key for Firebase Cloud Messaging on web.
 /// Generated in Firebase Console → Project Settings → Cloud Messaging → Web Push certificates.
 /// Required for `FirebaseMessaging.instance.getToken(vapidKey: ...)` on web.
