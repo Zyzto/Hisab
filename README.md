@@ -46,7 +46,7 @@ The app is deployed as a **Progressive Web App (PWA)**. It works locally and off
 
 **Option 1: Obtainium (Recommended) - Automatic Updates**
 
-<a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/Zyzto/Adati">
+<a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/Zyzto/Hisab">
 <img src="https://raw.githubusercontent.com/ImranR98/Obtainium/refs/heads/main/assets/graphics/badge_obtainium.png" alt="Get it on Obtainium" height="60"/>
 </a>
 
