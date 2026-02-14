@@ -29,6 +29,19 @@ When in Online mode and temporarily offline, you can still add expenses (queued 
 
 ## Install
 
+### 🌐 Web / PWA
+
+The app is deployed as a **Progressive Web App (PWA)**. It works locally and offline.
+<h3>
+  <a href="https://hisab.shenepoy.com">
+    👉 Visit Hisab Web App
+  </a>
+</h3>
+
+- **Install:** Add to Home Screen via Chrome, Edge, or Safari.
+- **Offline:** Works perfectly without an internet connection.
+
+#
 ### Android
 
 **Option 1: Obtainium (Recommended) - Automatic Updates**
