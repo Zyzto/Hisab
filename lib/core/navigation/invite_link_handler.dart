@@ -4,6 +4,8 @@ import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'app_router.dart';
+import 'route_paths.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
 import '../../features/settings/settings_definitions.dart';
 
@@ -62,7 +64,17 @@ class _InviteLinkHandlerState extends ConsumerState<InviteLinkHandler> {
     // Initial link (cold start from invite link)
     final initialUri = await appLinks.getInitialLink();
     final initialToken = extractInviteTokenFromUri(initialUri);
-    if (initialToken != null) notifier.set(initialToken);
+    if (initialToken != null) {
+      notifier.set(initialToken);
+      final onboardingCompleted = ref.read(onboardingCompletedProvider);
+      if (onboardingCompleted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          ref.read(routerProvider).go(RoutePaths.inviteAccept(initialToken));
+          notifier.set('');
+        });
+      }
+    }
 
     // Link stream (app opened from background with invite link)
     _linkSubscription = appLinks.uriLinkStream.listen((Uri uri) {
