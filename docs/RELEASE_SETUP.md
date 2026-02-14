@@ -248,17 +248,17 @@ Once all secrets are in place:
 
 ### pubspec_overrides.yaml
 
-The main `pubspec.yaml` uses `git:` dependencies for `flutter_logging_service` and `flutter_settings_framework` (so CI can resolve them). For local development, `pubspec_overrides.yaml` redirects them back to your local `../siglat` and `../edadat` paths.
+The main `pubspec.yaml` may use `git:` dependencies for some packages (so CI can resolve them). For local development, you can add a `pubspec_overrides.yaml` to redirect those dependencies to local paths (e.g. sibling packages you are developing).
 
-This file is automatically gitignored by `dart pub`. If you delete it by accident, recreate it:
+This file is automatically gitignored by `dart pub`. If you use it and delete it by accident, recreate it with your local paths:
 
 ```yaml
 dependency_overrides:
-  flutter_logging_service:
-    path: ../siglat
-  flutter_settings_framework:
-    path: ../edadat
+  some_package:
+    path: ../your-local-package
 ```
+
+Replace `some_package` and `../your-local-package` with the actual package name and path.
 
 ### Local signing (optional)
 
