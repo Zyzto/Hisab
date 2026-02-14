@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -8,6 +9,14 @@ import 'auth_user_profile.dart';
 /// handles web/native differences internally.
 class AuthService {
   SupabaseClient get _client => Supabase.instance.client;
+
+  /// Redirect URL for OAuth: on web use [authRedirectUrl] (SITE_URL); on native use deep link so the app reopens.
+  String? get _oauthRedirectUrl {
+    if (kIsWeb) {
+      return authRedirectUrl.trim().isNotEmpty ? authRedirectUrl.trim() : null;
+    }
+    return authOAuthCallbackDeepLink;
+  }
 
   // ---------------------------------------------------------------------------
   // Sign-in methods
@@ -111,7 +120,11 @@ class AuthService {
   Future<bool> signInWithGoogle() async {
     Log.debug('Signing in with Google OAuth');
     try {
-      final ok = await _client.auth.signInWithOAuth(OAuthProvider.google);
+      final redirectTo = _oauthRedirectUrl;
+      final ok = await _client.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: redirectTo,
+      );
       return ok;
     } catch (e, st) {
       Log.error('Google sign-in failed', error: e, stackTrace: st);
@@ -122,7 +135,11 @@ class AuthService {
   Future<bool> signInWithGithub() async {
     Log.debug('Signing in with GitHub OAuth');
     try {
-      final ok = await _client.auth.signInWithOAuth(OAuthProvider.github);
+      final redirectTo = _oauthRedirectUrl;
+      final ok = await _client.auth.signInWithOAuth(
+        OAuthProvider.github,
+        redirectTo: redirectTo,
+      );
       return ok;
     } catch (e, st) {
       Log.error('GitHub sign-in failed', error: e, stackTrace: st);
