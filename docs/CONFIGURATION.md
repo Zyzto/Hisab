@@ -54,7 +54,7 @@ Find these values in:
 
 ## Invite links with a custom domain
 
-Invite links normally use your Supabase project URL (e.g. `https://xxxxx.supabase.co/functions/v1/invite-redirect?token=...`). To show your own domain (e.g. `https://invite.yourdomain.com/functions/v1/invite-redirect?token=...`) **without running your own server**, use Supabase’s **Custom Domain** and the app’s optional `INVITE_BASE_URL`:
+Invite links normally use your Supabase project URL (e.g. `https://xxxxx.supabase.co/functions/v1/invite-redirect?token=...`). To show your own domain (e.g. `https://invite.yourdomain.com/functions/v1/invite-redirect?token=...`) **without running your own server**, use Supabase's **Custom Domain** and the app's optional `INVITE_BASE_URL`:
 
 1. **Supabase (paid plan)**  
    In the [Supabase Dashboard](https://supabase.com/dashboard): **Project → Settings → Custom Domains** (or [Add-ons](https://supabase.com/docs/guides/platform/custom-domains)). Add a subdomain (e.g. `invite.yourdomain.com`), add the CNAME and TXT records at your DNS provider, then verify and activate. Your Edge Functions (including `invite-redirect`) are then available at that domain.
@@ -178,7 +178,7 @@ The icon is hidden entirely in Local-Only mode.
 
 ## Firebase Hosting (web)
 
-Firebase Hosting serves **static files** only. It does not run your app or provide environment variables at runtime. Any “secrets” (Supabase URL, anon key, etc.) must be **injected at build time** via `--dart-define`; the resulting JavaScript will contain those values. The Supabase **anon key** is intended for client use and is protected by Row Level Security (RLS); do not put the service-role key in the client.
+Firebase Hosting serves **static files** only. It does not run your app or provide environment variables at runtime. Any "secrets" (Supabase URL, anon key, etc.) must be **injected at build time** via `--dart-define`; the resulting JavaScript will contain those values. The Supabase **anon key** is intended for client use and is protected by Row Level Security (RLS); do not put the service-role key in the client.
 
 ### 1. Build the web app with your config
 
@@ -210,12 +210,12 @@ Your `firebase.json` already points `hosting.public` to `build/web`, so the buil
   Use GitHub Actions (or similar) and store `SUPABASE_URL` and `SUPABASE_ANON_KEY` as **repository secrets**. In the workflow, run the same `flutter build web --dart-define=...` using `${{ secrets.SUPABASE_URL }}` (and the anon key), then run `firebase deploy --only hosting` using a Firebase token (e.g. `FIREBASE_TOKEN` from `firebase login:ci`). The build and deploy happen in CI; you never type secrets locally.
 
 - **Option B – Local script**  
-  Put the build command in a script that reads from env vars (e.g. `SUPABASE_URL`, `SUPABASE_ANON_KEY`) and passes them to `--dart-define`. Source the vars from a file that is gitignored (e.g. `.env.production`) so you don’t commit them. Never commit that file or the script’s contents with real keys.
+  Put the build command in a script that reads from env vars (e.g. `SUPABASE_URL`, `SUPABASE_ANON_KEY`) and passes them to `--dart-define`. Source the vars from a file that is gitignored (e.g. `.env.production`) so you don't commit them. Never commit that file or the script's contents with real keys.
 
 - **Option C – One-off**  
   Run the `flutter build web --dart-define=...` command once locally and then deploy. Keys will be in your shell history unless your shell is configured not to persist it.
 
-After the first deploy, get your live URL from the Firebase console (e.g. `https://YOUR_PROJECT.web.app`) and add it to Supabase redirect URLs if you didn’t use `SITE_URL` in the initial build.
+After the first deploy, get your live URL from the Firebase console (e.g. `https://YOUR_PROJECT.web.app`) and add it to Supabase redirect URLs if you didn't use `SITE_URL` in the initial build.
 
 ---
 
