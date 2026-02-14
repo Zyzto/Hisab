@@ -77,11 +77,21 @@ class NotificationService extends _$NotificationService {
   /// Call after Firebase.initializeApp() and after the user is authenticated.
   /// Idempotent — safe to call multiple times.
   ///
+  /// Returns `true` when notifications were successfully initialized (or were
+  /// already initialized). Returns `false` when initialization could not
+  /// proceed (Firebase unavailable, permission denied, etc.).
+  ///
   /// [context] is optional — when provided, a non-blocking dialog is shown
   /// if the user denies notification permission, explaining how to re-enable
   /// it from system settings.
-  Future<void> initialize([BuildContext? context]) async {
-    if (!supabaseConfigAvailable || !firebaseInitialized || _initialized || _initializing) return;
+  Future<bool> initialize([BuildContext? context]) async {
+    if (_initialized) return true;
+    if (!supabaseConfigAvailable || !firebaseInitialized || _initializing) {
+      if (!firebaseInitialized) {
+        Log.warning('NotificationService: Firebase not initialized, cannot enable notifications');
+      }
+      return false;
+    }
     _initializing = true;
 
     try {
@@ -100,7 +110,7 @@ class NotificationService extends _$NotificationService {
         if (context != null && context.mounted) {
           PermissionService.showNotificationDeniedInfo(context);
         }
-        return;
+        return false;
       }
 
       Log.info(
@@ -134,6 +144,7 @@ class NotificationService extends _$NotificationService {
       }
 
       _initialized = true;
+      return true;
     } finally {
       _initializing = false;
     }
