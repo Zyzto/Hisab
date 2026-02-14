@@ -32,6 +32,11 @@ class PrivacyPolicyPage extends StatelessWidget {
           ),
           _buildSection(
             context,
+            title: 'privacy_policy_permissions_title'.tr(),
+            body: 'privacy_policy_permissions_body'.tr(),
+          ),
+          _buildSection(
+            context,
             title: 'privacy_policy_data_collection_title'.tr(),
             body: 'privacy_policy_data_collection_body'.tr(),
           ),
