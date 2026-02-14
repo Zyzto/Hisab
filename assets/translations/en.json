@@ -422,5 +422,6 @@
   "permission_photos_message": "Photo library access is needed to pick receipt images. Please enable it in Settings.",
   "permission_notification_message": "Notifications are disabled. Enable them in Settings to get updates when group members add expenses.",
   "permission_open_settings": "Open Settings",
-  "permission_cancel": "Not Now"
+  "permission_cancel": "Not Now",
+  "notifications_unavailable": "Push notifications are not available. Please check that Google services are configured correctly."
 }

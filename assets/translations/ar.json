@@ -422,5 +422,6 @@
   "permission_photos_message": "يحتاج التطبيق إلى الوصول إلى مكتبة الصور لاختيار صور الإيصالات. يرجى تفعيله من الإعدادات.",
   "permission_notification_message": "الإشعارات معطّلة. فعّلها من الإعدادات لتلقي التحديثات عند إضافة أعضاء المجموعة للمصروفات.",
   "permission_open_settings": "فتح الإعدادات",
-  "permission_cancel": "ليس الآن"
+  "permission_cancel": "ليس الآن",
+  "notifications_unavailable": "الإشعارات غير متاحة. يرجى التحقق من أن خدمات Google مُعدَّة بشكل صحيح."
 }
