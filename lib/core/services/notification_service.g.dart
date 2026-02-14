@@ -34,7 +34,7 @@ final class NotificationServiceProvider
 }
 
 String _$notificationServiceHash() =>
-    r'7e7288d2604e70f803a21a229b00bc3368a64928';
+    r'dcada43736c4c961d4d2454fb4f824f0cdb97a23';
 
 abstract class _$NotificationService extends $AsyncNotifier<void> {
   FutureOr<void> build();
