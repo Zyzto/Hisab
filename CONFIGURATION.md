@@ -195,11 +195,14 @@ Optional: if you use a custom domain for Hosting, use that for `SITE_URL` and ad
 
 ### 2. Deploy
 
+Include the static privacy policy page so `https://YOUR_PROJECT.web.app/privacy` is available (e.g. for Play Console):
+
 ```bash
+cp -r web/privacy build/web/
 firebase deploy --only hosting
 ```
 
-Your `firebase.json` already points `hosting.public` to `build/web`, so the built output is deployed as-is.
+Your `firebase.json` already points `hosting.public` to `build/web`, so the built output (including `privacy/index.html`) is deployed as-is.
 
 ### 3. Keeping secrets out of your shell history
 

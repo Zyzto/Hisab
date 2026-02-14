@@ -180,6 +180,9 @@ jobs:
             --dart-define=SITE_URL=${{ secrets.SITE_URL }} \
             --dart-define=FCM_VAPID_KEY=${{ secrets.FCM_VAPID_KEY }}
 
+      - name: Copy privacy policy page for Firebase Hosting
+        run: cp -r web/privacy build/web/
+
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
