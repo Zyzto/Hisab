@@ -131,6 +131,9 @@ The app supports English (`en`) and Arabic (`ar`) with full RTL support. Locale 
 - **`supabase_config.dart`**: Reads `SUPABASE_URL`, `SUPABASE_ANON_KEY` from `--dart-define`.
 - **`app_config.dart`**: Derives telemetry endpoint from Supabase URL.
 - **Supabase Dashboard**: Auth providers (email, Google, GitHub), redirect URLs.
+- **Firebase (Android)**: Place `google-services.json` in `android/app/`. The Google Services Gradle plugin (`com.google.gms.google-services`) in `settings.gradle.kts` and `app/build.gradle.kts` processes it into resource values at build time.
+- **Firebase (iOS)**: Place `GoogleService-Info.plist` in `ios/Runner/`.
+- **Firebase (Web)**: Firebase config is in `web/index.html`; VAPID key via `--dart-define=FCM_VAPID_KEY`.
 
 See [SUPABASE_SETUP.md](SUPABASE_SETUP.md) for full backend setup and [CONFIGURATION.md](CONFIGURATION.md) for quick reference.
 
@@ -205,7 +208,8 @@ Firebase Cloud Messaging → push to User B's devices
 |-----------|------|------|
 | `NotificationService` | `lib/core/services/notification_service.dart` | Riverpod `keepAlive` provider — FCM init, permission request, token management, foreground/background/tap handling |
 | Background handler | `lib/core/services/notification_service.dart` (top-level) | `firebaseMessagingBackgroundHandler` — required by FCM for background messages on mobile |
-| Firebase init | `lib/main.dart` | `Firebase.initializeApp()` + background handler registration |
+| Firebase init | `lib/main.dart` | `Firebase.initializeApp()` + background handler registration; sets `firebaseInitialized` flag |
+| Gradle plugin | `android/settings.gradle.kts`, `android/app/build.gradle.kts` | `com.google.gms.google-services` — processes `google-services.json` into resources for Firebase SDKs |
 | Auth integration | `lib/app.dart` | `ref.listen(isAuthenticatedProvider)` — registers token on sign-in, unregisters on sign-out |
 | Service worker | `web/firebase-messaging-sw.js` | Handles background push on web/PWA; shows notifications and handles click-to-navigate |
 | Firebase SDK | `web/index.html` | Firebase compat scripts + app initialization for web |
@@ -224,17 +228,19 @@ Firebase Cloud Messaging → push to User B's devices
 
 ### Lifecycle
 
-1. **App start**: Firebase initialized in `main.dart`
+1. **App start**: Firebase initialized in `main.dart`; sets `firebaseInitialized = true` on success
 2. **Auth sign-in**: `app.dart` detects auth change → checks `notificationsEnabledProvider` → if enabled, calls `NotificationService.initialize(context)` → requests permission → registers FCM token in `device_tokens` (shows denial dialog via `PermissionService` if denied)
 3. **Token refresh**: FCM fires `onTokenRefresh` → token updated in `device_tokens`
 4. **Auth sign-out**: `app.dart` detects auth change → calls `unregisterToken()` → deletes token from `device_tokens`
 5. **Notification tap**: Extracts `group_id` from data payload → navigates to group detail via GoRouter
 
+`initialize()` returns `Future<bool>` — `true` on success, `false` when Firebase is unavailable, permission is denied, or Supabase is not configured. Callers (e.g. the settings toggle) use this to revert UI state and show a snackbar on failure.
+
 ### User Setting
 
 A **Push Notifications** toggle lives in Settings > Privacy (only visible in online mode). Controlled by `notificationsEnabledSettingDef` (`notifications_enabled` key in SharedPreferences, default `true`).
 
-- **Toggle ON**: calls `NotificationService.initialize(context)` — requests permission (if not yet granted) and registers the FCM token.
+- **Toggle ON**: calls `NotificationService.initialize(context)` — requests permission (if not yet granted) and registers the FCM token. If `initialize()` returns `false` (Firebase unavailable, permission denied), the toggle **reverts to OFF** and a snackbar displays `notifications_unavailable`.
 - **Toggle OFF**: calls `NotificationService.unregisterToken()` — removes the FCM token from Supabase `device_tokens`, stopping all push delivery.
 - **Init gate**: `app.dart` checks `notificationsEnabledProvider` before calling `initialize()` on sign-in and on first build.
 
@@ -262,7 +268,7 @@ User taps feature (e.g. camera)
 | `PermissionService` | `lib/core/services/permission_service.dart` | Static methods for camera, photos, and notification permission — check, request, and show denial dialog |
 | Expense form pre-check | `lib/features/expenses/pages/expense_form_page.dart` | Calls `requestCameraPermission` / `requestPhotosPermission` before opening `ImagePicker` |
 | Notification denial | `lib/core/services/notification_service.dart` | Calls `PermissionService.showNotificationDeniedInfo()` when FCM permission is denied |
-| Translations | `assets/translations/{en,ar}.json` | Keys: `permission_denied_title`, `permission_camera_message`, `permission_photos_message`, `permission_notification_message`, `permission_open_settings`, `permission_cancel` |
+| Translations | `assets/translations/{en,ar}.json` | Keys: `permission_denied_title`, `permission_camera_message`, `permission_photos_message`, `permission_notification_message`, `permission_open_settings`, `permission_cancel`, `notifications_unavailable` |
 
 ### Permissions Used
 
@@ -270,7 +276,7 @@ User taps feature (e.g. camera)
 |------------|---------|----------------|
 | Camera | Receipt scanning (ImagePicker) | iOS: `NSCameraUsageDescription` in Info.plist |
 | Photos | Receipt image from gallery | iOS: `NSPhotoLibraryUsageDescription` in Info.plist |
-| Notification | Push notifications (FCM) | Android 13+: `POST_NOTIFICATIONS`; iOS: system prompt via Firebase |
+| Notification | Push notifications (FCM) | Android 13+: `POST_NOTIFICATIONS` in manifest; iOS: system prompt via Firebase |
 
 ### UX Design
 
