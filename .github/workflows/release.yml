@@ -65,6 +65,10 @@ jobs:
             "$STORE_FILE" "$STORE_PASSWORD" "$KEY_ALIAS_VAL" "$KEY_PASSWORD_VAL" \
             > android/key.properties
 
+      # Restore google-services.json from a base64 secret (gitignored for security).
+      - name: Decode google-services.json
+        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 --decode > android/app/google-services.json
+
       - name: Flutter pub get
         run: flutter pub get
 
