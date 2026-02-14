@@ -225,7 +225,65 @@ Firebase Cloud Messaging → push to User B's devices
 ### Lifecycle
 
 1. **App start**: Firebase initialized in `main.dart`
-2. **Auth sign-in**: `app.dart` detects auth change → calls `NotificationService.initialize()` → requests permission → registers FCM token in `device_tokens`
+2. **Auth sign-in**: `app.dart` detects auth change → checks `notificationsEnabledProvider` → if enabled, calls `NotificationService.initialize(context)` → requests permission → registers FCM token in `device_tokens` (shows denial dialog via `PermissionService` if denied)
 3. **Token refresh**: FCM fires `onTokenRefresh` → token updated in `device_tokens`
 4. **Auth sign-out**: `app.dart` detects auth change → calls `unregisterToken()` → deletes token from `device_tokens`
 5. **Notification tap**: Extracts `group_id` from data payload → navigates to group detail via GoRouter
+
+### User Setting
+
+A **Push Notifications** toggle lives in Settings > Privacy (only visible in online mode). Controlled by `notificationsEnabledSettingDef` (`notifications_enabled` key in SharedPreferences, default `true`).
+
+- **Toggle ON**: calls `NotificationService.initialize(context)` — requests permission (if not yet granted) and registers the FCM token.
+- **Toggle OFF**: calls `NotificationService.unregisterToken()` — removes the FCM token from Supabase `device_tokens`, stopping all push delivery.
+- **Init gate**: `app.dart` checks `notificationsEnabledProvider` before calling `initialize()` on sign-in and on first build.
+
+---
+
+## Permission Handling
+
+Runtime permissions are managed through `permission_handler` and a centralized `PermissionService` utility class. Permissions are requested lazily — only when the feature is first used — and never block app usage.
+
+### Flow
+
+```
+User taps feature (e.g. camera)
+  → PermissionService.requestCameraPermission(context)
+  → check status
+    → granted? proceed
+    → denied? request() → granted? proceed
+    → permanentlyDenied? show dialog with "Open Settings" → return false
+```
+
+### Components
+
+| Component | File | Role |
+|-----------|------|------|
+| `PermissionService` | `lib/core/services/permission_service.dart` | Static methods for camera, photos, and notification permission — check, request, and show denial dialog |
+| Expense form pre-check | `lib/features/expenses/pages/expense_form_page.dart` | Calls `requestCameraPermission` / `requestPhotosPermission` before opening `ImagePicker` |
+| Notification denial | `lib/core/services/notification_service.dart` | Calls `PermissionService.showNotificationDeniedInfo()` when FCM permission is denied |
+| Translations | `assets/translations/{en,ar}.json` | Keys: `permission_denied_title`, `permission_camera_message`, `permission_photos_message`, `permission_notification_message`, `permission_open_settings`, `permission_cancel` |
+
+### Permissions Used
+
+| Permission | Feature | Platform notes |
+|------------|---------|----------------|
+| Camera | Receipt scanning (ImagePicker) | iOS: `NSCameraUsageDescription` in Info.plist |
+| Photos | Receipt image from gallery | iOS: `NSPhotoLibraryUsageDescription` in Info.plist |
+| Notification | Push notifications (FCM) | Android 13+: `POST_NOTIFICATIONS`; iOS: system prompt via Firebase |
+
+### UX Design
+
+- **Non-blocking**: The denial dialog is informational — it explains why the permission is needed and offers "Open Settings", but the user can dismiss it and continue using the app normally.
+- **Lazy**: Permissions are only requested when the user actively taps a feature that needs them (camera button, gallery button, notification init on sign-in).
+- **Web excluded**: On web, `PermissionService` methods return `true` immediately — the browser handles permission prompts natively.
+
+### iOS Podfile Note
+
+When building for iOS, `permission_handler` requires enabling specific permission pods in the Podfile `post_install` block. Only these should be enabled:
+
+- `PERMISSION_CAMERA`
+- `PERMISSION_PHOTOS`
+- `PERMISSION_NOTIFICATIONS`
+
+See [permission_handler iOS setup](https://pub.dev/packages/permission_handler#setup) for details.
