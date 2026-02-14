@@ -7,11 +7,11 @@ Use this when filling the **App content** and related declaration forms for Hisa
 ## 1. Privacy policy
 
 - **What to do:** Add a **privacy policy URL** (required for apps that use sensitive permissions such as Camera).
-- **URL:** Use a **public** URL where your policy is hosted, e.g.:
+- **URL:** Use a **public** URL where your policy is hosted:
+  - **Firebase Hosting (recommended):** `https://hisab-c8eb1.web.app/privacy` — the static page is built from `web/privacy/index.html` and deployed with the web app (see release workflow; local deploy: after `flutter build web`, run `cp -r web/privacy build/web/` then `firebase deploy --only hosting`).
   - GitHub Pages: `https://<your-org-or-username>.github.io/Hisab/privacy` (if you add a `privacy` page there)
-  - Firebase Hosting: `https://<your-project>.web.app/privacy` (if you add a `/privacy` page to your web build)
   - Your own domain: `https://yourdomain.com/privacy`
-- **Content:** The policy text should match what’s in the app (Settings → Privacy Policy), including the **App Permissions** section (Camera, Photos, Notifications). You can copy from the in-app strings or from `assets/translations/en.json` keys `privacy_policy_*`.
+- **Content:** The policy text in `web/privacy/index.html` matches the in-app policy (Settings → Privacy Policy) and `assets/translations/en.json` keys `privacy_policy_*`, including the **App Permissions** section (Camera, Photos, Notifications). When updating the policy, change both the app strings and `web/privacy/index.html`.
 
 ---
 
