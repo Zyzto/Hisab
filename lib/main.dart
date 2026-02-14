@@ -14,6 +14,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/constants/supabase_config.dart';
 import 'core/database/database_providers.dart';
+import 'core/image_picker_init.dart';
 import 'core/database/powersync_schema.dart' as ps;
 import 'core/services/notification_service.dart';
 import 'features/settings/providers/settings_framework_providers.dart';
@@ -85,6 +86,9 @@ void main() async {
   // Reduce console noise from easy_localization [DEBUG] / [INFO] messages
   EasyLocalization.logger.enableBuildModes = [];
   Log.debug('Easy Localization initialized');
+
+  // Use Android Photo Picker for gallery (no READ_MEDIA_IMAGES required).
+  initImagePicker();
 
   final settingsProviders = await initializeHisabSettings();
   if (settingsProviders != null) {

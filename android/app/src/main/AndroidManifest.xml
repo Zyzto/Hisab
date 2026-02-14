@@ -1,9 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Camera: receipt scanning via image_picker -->
     <uses-permission android:name="android.permission.CAMERA" />
-    <!-- Photo library: pick receipt images (Android 13+) -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <!-- Photo library: pick receipt images (Android 12 and below) -->
+    <!-- Gallery: we use the Android Photo Picker (no READ_MEDIA_IMAGES).
+         Photo library on Android 12 and below: fallback for older devices. -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
     <!-- Push notifications: required on Android 13+ (API 33) -->
