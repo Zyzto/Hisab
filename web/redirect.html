@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Hisab - Redirecting...</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,system-ui,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;text-align:center;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:#fafafa;color:#333}
+.card{max-width:360px;width:100%;padding:40px 24px;background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+h3{font-size:1.25rem;margin-bottom:8px}
+p{color:#666;margin-bottom:20px;font-size:.95rem}
+.spinner{width:32px;height:32px;border:3px solid #e0e0e0;border-top-color:#007AFF;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 20px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.btn{display:inline-block;background:#007AFF;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-size:.95rem;transition:background .2s}
+.btn:hover{background:#0062cc}
+.error-icon{font-size:48px;margin-bottom:12px}
+</style>
+</head>
+<body>
+<div class="card" id="content">
+  <div class="spinner" id="spinner"></div>
+  <h3 id="heading">Opening Hisab...</h3>
+  <p id="message">If nothing happens, tap the button below.</p>
+  <a id="fallback" href="#" class="btn">Open in Browser</a>
+</div>
+
+<script>
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  var token = params.get("token");
+  var error = params.get("error");
+
+  var heading = document.getElementById("heading");
+  var message = document.getElementById("message");
+  var fallback = document.getElementById("fallback");
+  var spinner = document.getElementById("spinner");
+
+  // Error state
+  if (error || !token) {
+    spinner.style.display = "none";
+    heading.textContent = "Error";
+    message.textContent = error === "expired"
+      ? "This invite link is invalid or expired."
+      : "Missing or invalid invite link.";
+    fallback.style.display = "none";
+    return;
+  }
+
+  var encodedToken = encodeURIComponent(token);
+  var webUrl = window.location.origin + "/invite?token=" + encodedToken;
+
+  // Set fallback button
+  fallback.href = webUrl;
+
+  // Detect platform
+  var ua = navigator.userAgent || "";
+  var isAndroid = /android/i.test(ua);
+  var isIOS = /iphone|ipad|ipod/i.test(ua);
+  var isMobile = isAndroid || isIOS || /mobile/i.test(ua);
+
+  // Desktop: go straight to web app
+  if (!isMobile) {
+    window.location.replace(webUrl);
+    return;
+  }
+
+  var done = false;
+  function goWeb() {
+    if (!done) {
+      done = true;
+      window.location.replace(webUrl);
+    }
+  }
+
+  // Cancel web fallback if app opens (page goes hidden)
+  document.addEventListener("visibilitychange", function() {
+    if (document.hidden) done = true;
+  });
+
+  // Try to open the app
+  if (isAndroid) {
+    // Android: intent:// with browser_fallback_url
+    var intentUrl = "intent://invite?token=" + encodedToken
+      + "#Intent"
+      + ";scheme=io.supabase.hisab"
+      + ";package=com.shenepoy.hisab"
+      + ";S.browser_fallback_url=" + encodeURIComponent(webUrl)
+      + ";end";
+    window.location.href = intentUrl;
+  } else {
+    // iOS / other: custom scheme
+    window.location.href = "io.supabase.hisab://invite?token=" + encodedToken;
+  }
+
+  // Fallback timer
+  setTimeout(goWeb, 2500);
+})();
+</script>
+</body>
+</html>
