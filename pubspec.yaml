@@ -1,7 +1,7 @@
 name: hisab
 description: "Group expense splitting and settle-up app."
 publish_to: 'none'
-version: 0.3.1+1
+version: 0.3.1+2
 
 environment:
   sdk: ^3.10.0
@@ -42,6 +42,8 @@ dependencies:
 
   # Receipt: camera + OCR
   image_picker: ^1.0.7
+  image_picker_android: ^0.8.13
+  image_picker_platform_interface: ^2.9.0
   google_mlkit_text_recognition: ^0.15.1
 
   # Receipt AI (LangChain.dart – Gemini + OpenAI vision)
@@ -83,6 +85,9 @@ dependencies:
 
   # Permissions
   permission_handler: ^11.3.1
+
+  # Screenshot detection (Android/iOS; no-op on web)
+  screenshot_callback_fix: ^0.1.4
 
 dev_dependencies:
   flutter_test:
