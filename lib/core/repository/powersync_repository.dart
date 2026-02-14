@@ -1189,7 +1189,11 @@ class PowerSyncGroupInviteRepository implements IGroupInviteRepository {
     }
     final result = await client.rpc(
       'accept_invite',
-      params: {'p_token': token},
+      params: {
+        'p_token': token,
+        'p_participant_id': null,
+        'p_new_participant_name': null,
+      },
     );
     Log.info('Invite accepted');
     return result as String;
