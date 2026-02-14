@@ -57,6 +57,7 @@ class NotificationService extends _$NotificationService {
 
   String? _currentToken;
   bool _initialized = false;
+  bool _initializing = false;
 
   @override
   Future<void> build() async {
@@ -67,6 +68,7 @@ class NotificationService extends _$NotificationService {
       _foregroundSub?.cancel();
       _tokenRefreshSub?.cancel();
       _initialized = false;
+      _initializing = false;
     });
   }
 
@@ -79,61 +81,68 @@ class NotificationService extends _$NotificationService {
   /// if the user denies notification permission, explaining how to re-enable
   /// it from system settings.
   Future<void> initialize([BuildContext? context]) async {
-    if (!supabaseConfigAvailable || !firebaseInitialized || _initialized) return;
+    if (!supabaseConfigAvailable || !firebaseInitialized || _initialized || _initializing) return;
+    _initializing = true;
 
-    final messaging = FirebaseMessaging.instance;
+    try {
+      final messaging = FirebaseMessaging.instance;
 
-    // Request permission (shows system dialog on iOS / Android 13+ / web)
-    final settings = await messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-      provisional: false,
-    );
+      // Request permission (shows system dialog on iOS / Android 13+ / web)
+      final settings = await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+        provisional: false,
+      );
 
-    if (settings.authorizationStatus == AuthorizationStatus.denied) {
-      Log.warning('NotificationService: permission denied');
-      if (context != null && context.mounted) {
-        PermissionService.showNotificationDeniedInfo(context);
+      if (settings.authorizationStatus == AuthorizationStatus.denied) {
+        Log.warning('NotificationService: permission denied');
+        if (context != null && context.mounted) {
+          PermissionService.showNotificationDeniedInfo(context);
+        }
+        return;
       }
-      return;
-    }
 
-    Log.info(
-      'NotificationService: permission ${settings.authorizationStatus}',
-    );
+      Log.info(
+        'NotificationService: permission ${settings.authorizationStatus}',
+      );
 
-    // Set up foreground notification display (mobile only)
-    if (!kIsWeb) {
-      await _setupLocalNotifications();
-    }
+      // Set up foreground notification display (mobile only)
+      if (!kIsWeb) {
+        await _setupLocalNotifications();
+      }
 
-    // Get initial FCM token
-    await _registerToken();
-
-    // Listen for token refresh
-    _tokenRefreshSub = messaging.onTokenRefresh.listen((_) async {
+      // Get initial FCM token
       await _registerToken();
-    });
 
-    // Handle foreground messages
-    _foregroundSub = FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+      // Listen for token refresh
+      _tokenRefreshSub = messaging.onTokenRefresh.listen((_) async {
+        await _registerToken();
+      });
 
-    // Handle notification taps when app is in background / terminated
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
+      // Handle foreground messages
+      _foregroundSub =
+          FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
 
-    // Check if app was opened from a terminated-state notification
-    final initialMessage = await messaging.getInitialMessage();
-    if (initialMessage != null) {
-      _handleNotificationTap(initialMessage);
+      // Handle notification taps when app is in background / terminated
+      FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
+
+      // Check if app was opened from a terminated-state notification
+      final initialMessage = await messaging.getInitialMessage();
+      if (initialMessage != null) {
+        _handleNotificationTap(initialMessage);
+      }
+
+      _initialized = true;
+    } finally {
+      _initializing = false;
     }
-
-    _initialized = true;
   }
 
   /// Remove the device token from Supabase (call on sign-out).
   Future<void> unregisterToken() async {
     _initialized = false;
+    _initializing = false;
     _foregroundSub?.cancel();
     _foregroundSub = null;
     _tokenRefreshSub?.cancel();
