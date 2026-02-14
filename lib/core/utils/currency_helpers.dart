@@ -72,7 +72,9 @@ class CurrencyHelpers {
       constraints: BoxConstraints(maxHeight: maxHeight),
       builder: (_) => CurrencyListView(
         onSelect: (currency) {
-          Navigator.pop(context);
+          // CurrencyListView already calls Navigator.pop internally after
+          // onSelect, so we must NOT pop here to avoid a double-pop that
+          // would dismiss the parent page route.
           onSelect(currency);
         },
         favorite: favorite,
