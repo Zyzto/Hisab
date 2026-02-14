@@ -54,7 +54,7 @@ class PermissionService {
   /// Show the "notifications are disabled" dialog without requesting again.
   /// Useful when the Firebase permission check already ran and was denied.
   static void showNotificationDeniedInfo(BuildContext context) {
-    if (kIsWeb) return;
+    if (kIsWeb || !context.mounted) return;
     _showPermissionDeniedDialog(
       context,
       'permission_notification_message'.tr(),
@@ -93,6 +93,7 @@ class PermissionService {
     BuildContext context,
     String message,
   ) {
+    if (!context.mounted) return;
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(

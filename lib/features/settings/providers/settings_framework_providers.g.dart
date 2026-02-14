@@ -722,4 +722,4 @@ final class NotificationsEnabledProvider
 }
 
 String _$notificationsEnabledHash() =>
-    r'b4e8c1a2f3d5e6a7b8c9d0e1f2a3b4c5d6e7f8a9';
+    r'd2accaf7ba61744fc47169cb415cc979e6fecdb7';

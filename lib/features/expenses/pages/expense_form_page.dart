@@ -1339,12 +1339,16 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         ),
       ),
     );
-    if (source == null || !mounted) return;
+    if (source == null) return;
+    if (!mounted) return;
 
     // Pre-check permission before opening the picker.
-    final hasPermission = source == ImageSource.camera
-        ? await PermissionService.requestCameraPermission(context)
-        : await PermissionService.requestPhotosPermission(context);
+    final bool hasPermission;
+    if (source == ImageSource.camera) {
+      hasPermission = await PermissionService.requestCameraPermission(context);
+    } else {
+      hasPermission = await PermissionService.requestPhotosPermission(context);
+    }
     if (!hasPermission || !mounted) return;
 
     const double maxDimension = 1920;
