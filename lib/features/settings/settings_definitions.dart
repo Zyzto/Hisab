@@ -184,7 +184,7 @@ final localOnlySettingDef = const BoolSetting(
 /// When true, run OCR on receipt images (and optionally AI). When false, only attach the picture.
 final receiptOcrEnabledSettingDef = const BoolSetting(
   'receipt_ocr_enabled',
-  defaultValue: true,
+  defaultValue: false,
   titleKey: 'receipt_ocr_enabled',
   icon: Icons.document_scanner,
   section: 'receipt_ai',

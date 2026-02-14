@@ -61,11 +61,13 @@ Declare what the app **collects** and **shares**. Below matches current behavior
 | **App activity** (e.g. events) | Yes, if user enables | Anonymous telemetry (Settings → Privacy) | No | Yes (toggle off) |
 | **Device or other IDs** (FCM token) | Yes (online, if notifications on) | Push notifications | With Firebase / FCM only for delivery | Yes (user can disable notifications) |
 
-- **Camera / Photos:** Used only for receipt scanning and picking images; no ongoing collection of photo library. Declare as needed by the form (e.g. “Photos” or “User content” if the form asks).
+- **Camera / Photos:** Used only for receipt scanning and picking images; no ongoing collection of photo library. On Android, the app uses the **Android Photo Picker** for gallery access (no `READ_MEDIA_IMAGES`); receipt images are selected on demand when the user taps "Scan receipt" → Gallery. Declare as needed by the form (e.g. “Photos” or “User content” if the form asks).
 - **Data is not sold or shared for ads.** Data is **not** used for advertising purposes.
 - **Data encryption:** Data in transit is encrypted (HTTPS). Data at rest on servers is not end-to-end encrypted (state this if the form asks).
 
 Fill the Data safety form step-by-step; the above table maps to the questions you’ll get.
+
+**Photo and video permissions (if the form asks):** The app uses the **Android Photo Picker** for infrequent receipt attachment. When the user taps to attach a receipt and chooses "Gallery", the system photo picker is shown; no `READ_MEDIA_IMAGES` permission is used. You can state: "We use the Android Photo Picker for one-time selection of a receipt image when the user taps to attach a receipt to an expense. We do not use READ_MEDIA_IMAGES."
 
 ---
 
