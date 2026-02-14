@@ -56,7 +56,7 @@ The app is deployed as a **Progressive Web App (PWA)**. It works locally and off
 - **Manual Setup**: Install [Obtainium](https://github.com/ImranR98/Obtainium) from [F-Droid](https://f-droid.org/packages/com.imranr98.obtainium/) or [GitHub Releases](https://github.com/ImranR98/Obtainium/releases), then:
   - Open Obtainium and tap the "+" button
   - Select "GitHub Releases" as the source
-  - Enter repository: `Zyzto/Adati`
+  - Enter repository: `Zyzto/Hisab`
 - Obtainium will automatically track new releases and notify you of updates
 
 **Option 2: Google Play Store** **WIP**
@@ -64,7 +64,7 @@ The app is deployed as a **Progressive Web App (PWA)**. It works locally and off
 - Automatic updates through Play Store
 
 **Option 3: Direct Install (APK)**
-- Download `adati-VERSION-android.apk` from [GitHub Releases](https://github.com/Zyzto/Hisab/releases/latest)
+- Download the APK (e.g. `app-release.apk`) from [GitHub Releases](https://github.com/Zyzto/Hisab/releases/latest)
 - Enable "Install from unknown sources" in your Android settings
 - Tap the downloaded APK file to install
 
@@ -112,7 +112,7 @@ dart run powersync:setup_web
 
 ## Supabase (optional)
 
-For **online mode**, set up Supabase. See **[SUPABASE_SETUP.md](SUPABASE_SETUP.md)** for the full step-by-step guide covering:
+For **online mode**, set up Supabase. See **[SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md)** for the full step-by-step guide covering:
 
 - Creating the Supabase project and applying database migrations
 - Configuring authentication providers (email, Google, GitHub)
@@ -130,7 +130,7 @@ If no `--dart-define` values are provided, the app runs in **local-only mode** â
 | **OAuth redirect fails** | Check Supabase Auth redirect URLs match your app |
 | **Migration fails** | Ensure stable internet; migration is idempotent |
 
-Full configuration reference: [CONFIGURATION.md](CONFIGURATION.md).
+Full configuration reference: [CONFIGURATION.md](docs/CONFIGURATION.md).
 
 ### Keeping secrets out of git
 

@@ -63,3 +63,6 @@ dart_defines_online.json
 
 # Node (if any tooling is used)
 node_modules/
+
+# Private / personal notes (not for other developers or users)
+docs/_private/
