@@ -8,6 +8,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/receipt/receipt_image_view.dart';
 import '../../../core/receipt/receipt_scan_service.dart';
+import '../../../core/services/permission_service.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/services/exchange_rate_service.dart';
 import '../../../core/telemetry/telemetry_service.dart';
@@ -1339,6 +1340,13 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       ),
     );
     if (source == null || !mounted) return;
+
+    // Pre-check permission before opening the picker.
+    final hasPermission = source == ImageSource.camera
+        ? await PermissionService.requestCameraPermission(context)
+        : await PermissionService.requestPhotosPermission(context);
+    if (!hasPermission || !mounted) return;
+
     const double maxDimension = 1920;
     final XFile? file = await ImagePicker().pickImage(
       source: source,

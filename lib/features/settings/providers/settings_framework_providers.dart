@@ -252,3 +252,19 @@ bool telemetryEnabled(Ref ref) {
     return true;
   }
 }
+
+@riverpod
+bool notificationsEnabled(Ref ref) {
+  try {
+    final settings = ref.watch(hisabSettingsProvidersProvider);
+    if (settings == null) return true;
+    return ref.watch(settings.provider(notificationsEnabledSettingDef));
+  } catch (e, stackTrace) {
+    Log.warning(
+      'notificationsEnabled read failed, defaulting to true',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return true;
+  }
+}

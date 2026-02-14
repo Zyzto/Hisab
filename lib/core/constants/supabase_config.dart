@@ -45,3 +45,7 @@ const authOAuthCallbackDeepLink = 'io.supabase.hisab://callback';
 /// Generated in Firebase Console → Project Settings → Cloud Messaging → Web Push certificates.
 /// Required for `FirebaseMessaging.instance.getToken(vapidKey: ...)` on web.
 const fcmVapidKey = String.fromEnvironment('FCM_VAPID_KEY', defaultValue: '');
+
+/// Set to true after `Firebase.initializeApp()` succeeds in main.dart.
+/// Guards all Firebase-dependent code (notifications) at runtime.
+bool firebaseInitialized = false;

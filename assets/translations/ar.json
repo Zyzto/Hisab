@@ -414,5 +414,13 @@
   "invite_usage_history": "سجل الاستخدام",
   "invite_no_usages": "لم يستخدم أحد هذه الدعوة بعد",
   "install_app": "تثبيت التطبيق",
-  "install_app_description": "ثبّت حساب للحصول على تجربة أفضل"
+  "install_app_description": "ثبّت حساب للحصول على تجربة أفضل",
+  "notifications_enabled": "الإشعارات",
+  "notifications_enabled_description": "تلقي التحديثات عند إضافة أعضاء المجموعة للمصروفات",
+  "permission_denied_title": "مطلوب إذن",
+  "permission_camera_message": "يحتاج التطبيق إلى الوصول إلى الكاميرا لمسح الإيصالات. يرجى تفعيله من الإعدادات.",
+  "permission_photos_message": "يحتاج التطبيق إلى الوصول إلى مكتبة الصور لاختيار صور الإيصالات. يرجى تفعيله من الإعدادات.",
+  "permission_notification_message": "الإشعارات معطّلة. فعّلها من الإعدادات لتلقي التحديثات عند إضافة أعضاء المجموعة للمصروفات.",
+  "permission_open_settings": "فتح الإعدادات",
+  "permission_cancel": "ليس الآن"
 }
