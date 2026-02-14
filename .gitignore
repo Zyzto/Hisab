@@ -41,9 +41,16 @@ app.*.map.json
 
 # Android (build artifacts; android/.gitignore has local.properties, key.properties)
 android/secrets.properties
+android/app/google-services.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# iOS (Firebase config)
+ios/Runner/GoogleService-Info.plist
+
+# Firebase Hosting cache
+.firebase/
 
 # Secrets (copy from *_example files)
 lib/core/constants/app_secrets.dart

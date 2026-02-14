@@ -72,13 +72,15 @@ jobs:
         run: |
           flutter build apk --release \
             --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
-            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
+            --dart-define=FCM_VAPID_KEY=${{ secrets.FCM_VAPID_KEY }}
 
       - name: Build App Bundle
         run: |
           flutter build appbundle --release \
             --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
-            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
+            --dart-define=FCM_VAPID_KEY=${{ secrets.FCM_VAPID_KEY }}
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -171,7 +173,8 @@ jobs:
           flutter build web \
             --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
             --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
-            --dart-define=SITE_URL=${{ secrets.SITE_URL }}
+            --dart-define=SITE_URL=${{ secrets.SITE_URL }} \
+            --dart-define=FCM_VAPID_KEY=${{ secrets.FCM_VAPID_KEY }}
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
