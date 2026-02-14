@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -11,6 +12,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants/supabase_config.dart';
 import '../navigation/app_router.dart';
 import '../navigation/route_paths.dart';
+import 'permission_service.dart';
 
 part 'notification_service.g.dart';
 
@@ -58,8 +60,8 @@ class NotificationService extends _$NotificationService {
 
   @override
   Future<void> build() async {
-    // Only initialise when Supabase is configured (online mode)
-    if (!supabaseConfigAvailable) return;
+    // Only initialise when Supabase + Firebase are both available
+    if (!supabaseConfigAvailable || !firebaseInitialized) return;
 
     ref.onDispose(() {
       _foregroundSub?.cancel();
@@ -72,8 +74,12 @@ class NotificationService extends _$NotificationService {
 
   /// Call after Firebase.initializeApp() and after the user is authenticated.
   /// Idempotent — safe to call multiple times.
-  Future<void> initialize() async {
-    if (!supabaseConfigAvailable || _initialized) return;
+  ///
+  /// [context] is optional — when provided, a non-blocking dialog is shown
+  /// if the user denies notification permission, explaining how to re-enable
+  /// it from system settings.
+  Future<void> initialize([BuildContext? context]) async {
+    if (!supabaseConfigAvailable || !firebaseInitialized || _initialized) return;
 
     final messaging = FirebaseMessaging.instance;
 
@@ -87,6 +93,9 @@ class NotificationService extends _$NotificationService {
 
     if (settings.authorizationStatus == AuthorizationStatus.denied) {
       Log.warning('NotificationService: permission denied');
+      if (context != null && context.mounted) {
+        PermissionService.showNotificationDeniedInfo(context);
+      }
       return;
     }
 

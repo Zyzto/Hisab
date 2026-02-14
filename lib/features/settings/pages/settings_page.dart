@@ -21,6 +21,7 @@ import '../../../core/navigation/route_paths.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/services/migration_service.dart';
 import '../../../core/services/connectivity_service.dart';
+import '../../../core/services/notification_service.dart';
 import '../../../core/utils/currency_helpers.dart';
 import '../settings_definitions.dart';
 import '../providers/settings_framework_providers.dart';
@@ -211,6 +212,30 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   .read(settings.provider(telemetryEnabledSettingDef).notifier)
                   .set(v),
             ),
+            if (!ref.watch(effectiveLocalOnlyProvider))
+              SwitchSettingsTile.fromSetting(
+                setting: notificationsEnabledSettingDef,
+                title: 'notifications_enabled'.tr(),
+                subtitle: 'notifications_enabled_description'.tr(),
+                value: ref.watch(
+                    settings.provider(notificationsEnabledSettingDef)),
+                onChanged: (v) {
+                  ref
+                      .read(settings
+                          .provider(notificationsEnabledSettingDef)
+                          .notifier)
+                      .set(v);
+                  if (v) {
+                    ref
+                        .read(notificationServiceProvider.notifier)
+                        .initialize(context);
+                  } else {
+                    ref
+                        .read(notificationServiceProvider.notifier)
+                        .unregisterToken();
+                  }
+                },
+              ),
             ActionSettingsTile(
               leading: const Icon(Icons.description),
               title: Text('view_logs'.tr()),

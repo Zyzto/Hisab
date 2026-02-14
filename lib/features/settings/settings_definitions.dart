@@ -51,6 +51,17 @@ final telemetryEnabledSettingDef = const BoolSetting(
   order: 0,
 );
 
+/// When true, push notifications are active (FCM token registered).
+/// When false, the token is unregistered and no push notifications are received.
+final notificationsEnabledSettingDef = const BoolSetting(
+  'notifications_enabled',
+  defaultValue: true,
+  titleKey: 'notifications_enabled',
+  icon: Icons.notifications_outlined,
+  section: 'privacy',
+  order: 1,
+);
+
 final advancedSection = const SettingSection(
   key: 'advanced',
   titleKey: 'advanced',
@@ -265,6 +276,7 @@ final allSettings = <SettingDefinition>[
   geminiApiKeySettingDef,
   openaiApiKeySettingDef,
   telemetryEnabledSettingDef,
+  notificationsEnabledSettingDef,
 ];
 
 SettingsRegistry createHisabSettingsRegistry() {

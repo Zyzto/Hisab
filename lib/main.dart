@@ -54,6 +54,15 @@ void main() async {
       );
       return true;
     }
+    // Firebase not initialized: native plugins may fire async events even
+    // after Firebase.initializeApp() failed. The root failure is already
+    // logged as a warning; suppress the cascading [core/no-app] noise.
+    if (error.toString().contains('[core/no-app]')) {
+      Log.debug(
+        'Suppressed Firebase [core/no-app] (Firebase not initialized)',
+      );
+      return true;
+    }
     LoggingService.severe(
       'Uncaught async error: $error',
       component: 'CrashHandler',
@@ -172,6 +181,7 @@ void main() async {
   if (supabaseConfigAvailable) {
     try {
       await Firebase.initializeApp();
+      firebaseInitialized = true;
       FirebaseMessaging.onBackgroundMessage(
         firebaseMessagingBackgroundHandler,
       );

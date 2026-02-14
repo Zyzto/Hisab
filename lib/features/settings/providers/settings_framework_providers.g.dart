@@ -681,3 +681,45 @@ final class TelemetryEnabledProvider
 }
 
 String _$telemetryEnabledHash() => r'a6a0a33d9a26855661d54d6f71e68d5ec7cab33c';
+
+@ProviderFor(notificationsEnabled)
+final notificationsEnabledProvider = NotificationsEnabledProvider._();
+
+final class NotificationsEnabledProvider
+    extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  NotificationsEnabledProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'notificationsEnabledProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$notificationsEnabledHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return notificationsEnabled(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$notificationsEnabledHash() =>
+    r'b4e8c1a2f3d5e6a7b8c9d0e1f2a3b4c5d6e7f8a9';

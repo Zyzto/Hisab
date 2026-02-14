@@ -5,6 +5,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'core/auth/auth_providers.dart';
 import 'core/database/database_providers.dart';
 import 'core/services/notification_service.dart';
+import 'features/settings/providers/settings_framework_providers.dart';
 import 'core/theme/app_scroll_behavior.dart';
 import 'core/theme/theme_providers.dart';
 import 'core/navigation/app_router.dart';
@@ -22,19 +23,24 @@ class App extends ConsumerWidget {
     // Watch DataSyncService to reactively fetch/push data
     ref.watch(dataSyncServiceProvider);
 
-    // Initialize push notifications when user authenticates.
+    // Initialize push notifications when user authenticates and setting is enabled.
     // listen handles sign-in/sign-out transitions; watch handles initial state.
+    // Context is passed so the notification service can show a non-blocking
+    // dialog when the user denies notification permission.
     ref.listen(isAuthenticatedProvider, (prev, isAuth) {
       if (isAuth && prev != true) {
-        ref.read(notificationServiceProvider.notifier).initialize();
+        if (ref.read(notificationsEnabledProvider)) {
+          ref.read(notificationServiceProvider.notifier).initialize(context);
+        }
       } else if (!isAuth && prev == true) {
         ref.read(notificationServiceProvider.notifier).unregisterToken();
       }
     });
     // Handle already-authenticated on first build (initialize() is idempotent).
-    if (ref.read(isAuthenticatedProvider)) {
+    if (ref.read(isAuthenticatedProvider) &&
+        ref.read(notificationsEnabledProvider)) {
       Future.microtask(
-        () => ref.read(notificationServiceProvider.notifier).initialize(),
+        () => ref.read(notificationServiceProvider.notifier).initialize(context),
       );
     }
 

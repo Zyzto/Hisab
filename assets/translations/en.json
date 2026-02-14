@@ -414,5 +414,13 @@
   "invite_usage_history": "Usage History",
   "invite_no_usages": "No one has used this invite yet",
   "install_app": "Install App",
-  "install_app_description": "Install Hisab for a better experience"
+  "install_app_description": "Install Hisab for a better experience",
+  "notifications_enabled": "Push Notifications",
+  "notifications_enabled_description": "Receive updates when group members add expenses",
+  "permission_denied_title": "Permission Required",
+  "permission_camera_message": "Camera access is needed to scan receipts. Please enable it in Settings.",
+  "permission_photos_message": "Photo library access is needed to pick receipt images. Please enable it in Settings.",
+  "permission_notification_message": "Notifications are disabled. Enable them in Settings to get updates when group members add expenses.",
+  "permission_open_settings": "Open Settings",
+  "permission_cancel": "Not Now"
 }
