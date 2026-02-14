@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/receipt/receipt_image_view.dart';
+import '../../../core/platform_utils.dart';
 import '../../../core/receipt/receipt_scan_service.dart';
 import '../../../core/services/permission_service.dart';
 import '../../../core/repository/repository_providers.dart';
@@ -1343,9 +1344,12 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     if (!mounted) return;
 
     // Pre-check permission before opening the picker.
+    // On Android we use the Photo Picker for gallery (no READ_MEDIA_IMAGES).
     final bool hasPermission;
     if (source == ImageSource.camera) {
       hasPermission = await PermissionService.requestCameraPermission(context);
+    } else if (isAndroid) {
+      hasPermission = true; // Photo Picker does not require storage permission
     } else {
       hasPermission = await PermissionService.requestPhotosPermission(context);
     }

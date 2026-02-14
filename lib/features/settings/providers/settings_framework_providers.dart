@@ -71,15 +71,15 @@ bool effectiveLocalOnly(Ref ref) {
 bool receiptOcrEnabled(Ref ref) {
   try {
     final settings = ref.watch(hisabSettingsProvidersProvider);
-    if (settings == null) return true;
+    if (settings == null) return false;
     return ref.watch(settings.provider(receiptOcrEnabledSettingDef));
   } catch (e, stackTrace) {
     Log.warning(
-      'receiptOcrEnabled read failed, defaulting to true',
+      'receiptOcrEnabled read failed, defaulting to false',
       error: e,
       stackTrace: stackTrace,
     );
-    return true;
+    return false;
   }
 }
 
