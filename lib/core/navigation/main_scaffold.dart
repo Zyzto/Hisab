@@ -6,6 +6,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../features/home/pages/home_page.dart';
 import '../../features/settings/pages/settings_page.dart';
+import '../../features/settings/widgets/screenshot_feedback_trigger.dart';
 import '../widgets/connection_banner.dart';
 import '../widgets/floating_nav_bar.dart';
 import '../widgets/pwa_install_banner.dart';
@@ -61,8 +62,9 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     final showNavBar = _shouldShowNavBar();
 
     return Scaffold(
-      body: Stack(
-        children: [
+      body: ScreenshotFeedbackTrigger(
+        child: Stack(
+          children: [
           Padding(
             padding: EdgeInsets.only(bottom: showNavBar ? 100 : 0),
             child: _buildMainContent(),
@@ -139,7 +141,8 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
                 ],
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }

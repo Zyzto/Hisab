@@ -268,3 +268,21 @@ bool notificationsEnabled(Ref ref) {
     return true;
   }
 }
+
+@riverpod
+bool promptFeedbackOnScreenshot(Ref ref) {
+  try {
+    final settings = ref.watch(hisabSettingsProvidersProvider);
+    if (settings == null) return true;
+    return ref.watch(
+      settings.provider(promptFeedbackOnScreenshotSettingDef),
+    );
+  } catch (e, stackTrace) {
+    Log.warning(
+      'promptFeedbackOnScreenshot read failed, defaulting to true',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return true;
+  }
+}
