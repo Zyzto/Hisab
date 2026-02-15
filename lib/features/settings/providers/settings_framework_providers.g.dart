@@ -232,7 +232,7 @@ final class ReceiptOcrEnabledProvider
   }
 }
 
-String _$receiptOcrEnabledHash() => r'a9af4c8b97e97de65b8f8aa3ff83095818700982';
+String _$receiptOcrEnabledHash() => r'b291e2faf65f16d2cd20dd81333d0353c017ba0e';
 
 @ProviderFor(receiptAiEnabled)
 final receiptAiEnabledProvider = ReceiptAiEnabledProvider._();
@@ -723,3 +723,46 @@ final class NotificationsEnabledProvider
 
 String _$notificationsEnabledHash() =>
     r'd2accaf7ba61744fc47169cb415cc979e6fecdb7';
+
+@ProviderFor(promptFeedbackOnScreenshot)
+final promptFeedbackOnScreenshotProvider =
+    PromptFeedbackOnScreenshotProvider._();
+
+final class PromptFeedbackOnScreenshotProvider
+    extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  PromptFeedbackOnScreenshotProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'promptFeedbackOnScreenshotProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$promptFeedbackOnScreenshotHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return promptFeedbackOnScreenshot(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$promptFeedbackOnScreenshotHash() =>
+    r'263ec662f3b5366efad618ba7c7d0e2ac218fe09';

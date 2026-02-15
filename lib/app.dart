@@ -59,9 +59,13 @@ class App extends ConsumerWidget {
         locale: context.locale,
         builder: (context, child) {
           final isRtl = context.locale.languageCode == 'ar';
-          return Directionality(
-            textDirection: isRtl ? ui.TextDirection.rtl : ui.TextDirection.ltr,
-            child: child ?? const SizedBox.shrink(),
+          return GestureDetector(
+            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+            behavior: HitTestBehavior.deferToChild,
+            child: Directionality(
+              textDirection: isRtl ? ui.TextDirection.rtl : ui.TextDirection.ltr,
+              child: child ?? const SizedBox.shrink(),
+            ),
           );
         },
         theme: themes.light,

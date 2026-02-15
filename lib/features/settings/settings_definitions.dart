@@ -76,6 +76,16 @@ final aboutSection = const SettingSection(
   order: 5,
 );
 
+/// When true, after taking a screenshot the app prompts to send feedback.
+final promptFeedbackOnScreenshotSettingDef = const BoolSetting(
+  'prompt_feedback_on_screenshot',
+  defaultValue: true,
+  titleKey: 'prompt_feedback_on_screenshot',
+  icon: Icons.screenshot_monitor_outlined,
+  section: 'about',
+  order: 0,
+);
+
 final themeModeSettingDef = const EnumSetting(
   'theme_mode',
   defaultValue: 'system',
@@ -277,6 +287,7 @@ final allSettings = <SettingDefinition>[
   openaiApiKeySettingDef,
   telemetryEnabledSettingDef,
   notificationsEnabledSettingDef,
+  promptFeedbackOnScreenshotSettingDef,
 ];
 
 SettingsRegistry createHisabSettingsRegistry() {
