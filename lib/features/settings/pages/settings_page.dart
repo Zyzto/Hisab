@@ -26,6 +26,7 @@ import '../../../core/utils/currency_helpers.dart';
 import '../settings_definitions.dart';
 import '../providers/settings_framework_providers.dart';
 import '../backup_helper.dart';
+import '../widgets/feedback_sheet.dart';
 import '../widgets/logs_viewer_dialog.dart';
 import '../widgets/edit_profile_sheet.dart';
 import '../../../core/auth/predefined_avatars.dart';
@@ -985,6 +986,26 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               value: Text(version),
             );
           },
+        ),
+        SwitchSettingsTile.fromSetting(
+          setting: promptFeedbackOnScreenshotSettingDef,
+          title: 'prompt_feedback_on_screenshot'.tr(),
+          subtitle: 'prompt_feedback_on_screenshot_description'.tr(),
+          value: ref.watch(
+            settings.provider(promptFeedbackOnScreenshotSettingDef),
+          ),
+          onChanged: (v) => ref
+              .read(
+                settings
+                    .provider(promptFeedbackOnScreenshotSettingDef)
+                    .notifier,
+              )
+              .set(v),
+        ),
+        NavigationSettingsTile(
+          leading: const Icon(Icons.feedback_outlined),
+          title: Text('send_feedback'.tr()),
+          onTap: () => FeedbackSheet.show(context, fromScreenshot: false),
         ),
         NavigationSettingsTile(
           leading: const Icon(Icons.info_outline),
