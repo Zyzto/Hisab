@@ -23,13 +23,31 @@ class _ScreenshotFeedbackTriggerState
     extends ConsumerState<ScreenshotFeedbackTrigger> {
   ScreenCaptureEvent? _detector;
   bool _listenerAdded = false;
+  DateTime? _lastShownAt;
+  bool _feedbackSheetOpen = false;
+
+  static const _debounceDuration = Duration(seconds: 4);
 
   void _onScreenshot(String filePath) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (ref.read(promptFeedbackOnScreenshotProvider)) {
-        FeedbackSheet.show(context, fromScreenshot: true);
+      if (!ref.read(promptFeedbackOnScreenshotProvider)) return;
+      if (_feedbackSheetOpen) return;
+      final now = DateTime.now();
+      if (_lastShownAt != null &&
+          now.difference(_lastShownAt!) < _debounceDuration) {
+        return;
       }
+      _lastShownAt = now;
+      _feedbackSheetOpen = true;
+      final path = filePath.trim().isEmpty ? null : filePath.trim();
+      FeedbackSheet.show(
+        context,
+        fromScreenshot: true,
+        screenshotPath: path,
+      ).whenComplete(() {
+        if (mounted) setState(() => _feedbackSheetOpen = false);
+      });
     });
   }
 
