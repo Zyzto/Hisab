@@ -54,6 +54,7 @@ class NotificationService extends _$NotificationService {
 
   StreamSubscription<RemoteMessage>? _foregroundSub;
   StreamSubscription<String>? _tokenRefreshSub;
+  StreamSubscription<RemoteMessage>? _openedAppSub;
 
   String? _currentToken;
   bool _initialized = false;
@@ -67,6 +68,7 @@ class NotificationService extends _$NotificationService {
     ref.onDispose(() {
       _foregroundSub?.cancel();
       _tokenRefreshSub?.cancel();
+      _openedAppSub?.cancel();
       _initialized = false;
       _initializing = false;
     });
@@ -95,6 +97,12 @@ class NotificationService extends _$NotificationService {
     _initializing = true;
 
     try {
+      final client = Supabase.instance.client;
+      if (client.auth.currentUser == null) {
+        Log.warning('NotificationService: initialize called without authenticated user');
+        return false;
+      }
+
       final messaging = FirebaseMessaging.instance;
 
       // Request permission (shows system dialog on iOS / Android 13+ / web)
@@ -126,16 +134,21 @@ class NotificationService extends _$NotificationService {
       await _registerToken();
 
       // Listen for token refresh
+      _tokenRefreshSub?.cancel();
       _tokenRefreshSub = messaging.onTokenRefresh.listen((_) async {
         await _registerToken();
       });
 
       // Handle foreground messages
+      _foregroundSub?.cancel();
       _foregroundSub =
           FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
 
       // Handle notification taps when app is in background / terminated
-      FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
+      _openedAppSub?.cancel();
+      _openedAppSub = FirebaseMessaging.onMessageOpenedApp.listen(
+        _handleNotificationTap,
+      );
 
       // Check if app was opened from a terminated-state notification
       final initialMessage = await messaging.getInitialMessage();
@@ -158,6 +171,8 @@ class NotificationService extends _$NotificationService {
     _foregroundSub = null;
     _tokenRefreshSub?.cancel();
     _tokenRefreshSub = null;
+    _openedAppSub?.cancel();
+    _openedAppSub = null;
 
     if (_currentToken == null) return;
 
@@ -233,7 +248,10 @@ class NotificationService extends _$NotificationService {
       // Upsert into device_tokens
       final client = Supabase.instance.client;
       final userId = client.auth.currentUser?.id;
-      if (userId == null) return;
+      if (userId == null) {
+        Log.warning('NotificationService: skip token upsert, no authenticated user');
+        return;
+      }
 
       await client.from('device_tokens').upsert(
         {
@@ -268,8 +286,9 @@ class NotificationService extends _$NotificationService {
     }
 
     // Show a local notification on mobile
+    final notificationId = _notificationIdForMessage(message);
     _localNotifications.show(
-      notification.hashCode,
+      notificationId,
       notification.title,
       notification.body,
       NotificationDetails(
@@ -289,6 +308,17 @@ class NotificationService extends _$NotificationService {
       ),
       payload: message.data['group_id'],
     );
+  }
+
+  int _notificationIdForMessage(RemoteMessage message) {
+    final messageId = message.messageId;
+    if (messageId != null && messageId.isNotEmpty) return messageId.hashCode;
+
+    final sent = message.sentTime?.millisecondsSinceEpoch ?? 0;
+    final groupId = message.data['group_id']?.toString() ?? '';
+    final title = message.notification?.title ?? '';
+    final body = message.notification?.body ?? '';
+    return '$sent|$groupId|$title|$body'.hashCode;
   }
 
   void _handleNotificationTap(RemoteMessage message) {
