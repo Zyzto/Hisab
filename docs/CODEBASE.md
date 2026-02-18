@@ -23,6 +23,8 @@
 | `core/database/database_providers.dart` | `PowerSyncDatabase` provider, `DataSyncService` (fetch/push/refresh) |
 | `core/services/connectivity_service.dart` | Network connectivity detection, SyncStatus for UI |
 | `core/services/migration_service.dart` | Local→Online data migration when switching modes |
+| `core/update/app_update_helper.dart` | Android in-app update (native flow) then Play Store fallback |
+| `core/update/upgrader_messages.dart` | Update dialog strings via EasyLocalization (HisabUpgraderMessages) |
 | `core/widgets/sync_status_icon.dart` | Connection status indicator (cloud icons) |
 
 ### `lib/domain/`
@@ -123,6 +125,7 @@ The app supports English (`en`) and Arabic (`ar`) with full RTL support. Locale 
 | `lib/core/navigation/app_router.dart` | `localeRefreshNotifier` for GoRouter |
 | `lib/features/settings/pages/settings_page.dart` | Language picker tile, reset-all (delegates locale sync to `_LocaleSync`) |
 | `lib/features/onboarding/pages/onboarding_page.dart` | Language button during onboarding |
+| `lib/core/update/upgrader_messages.dart` | Update dialog strings via EasyLocalization (`context.tr` for `update_*` keys) |
 
 ---
 
@@ -150,6 +153,7 @@ See [SUPABASE_SETUP.md](SUPABASE_SETUP.md) for full backend setup and [CONFIGURA
 | Connectivity | `connectivity_plus` |
 | Localization | `easy_localization` |
 | Date/Currency | `intl` |
+| App update | `upgrader` (version check + dialog), `in_app_update` (Android native in-app update) |
 | Receipt | `image_picker`, `google_mlkit_text_recognition` |
 | AI | `langchain_google`, `langchain_openai` |
 | Other | `file_picker`, `pretty_qr_code`, `uuid` |
