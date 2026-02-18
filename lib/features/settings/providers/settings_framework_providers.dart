@@ -269,3 +269,19 @@ bool notificationsEnabled(Ref ref) {
   }
 }
 
+@riverpod
+bool expenseFormFullFeatures(Ref ref) {
+  try {
+    final settings = ref.watch(hisabSettingsProvidersProvider);
+    if (settings == null) return false;
+    return ref.watch(settings.provider(expenseFormFullFeaturesSettingDef));
+  } catch (e, stackTrace) {
+    Log.warning(
+      'expenseFormFullFeatures read failed, defaulting to false',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return false;
+  }
+}
+

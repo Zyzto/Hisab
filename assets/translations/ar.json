@@ -438,5 +438,10 @@
   "permission_notification_message": "الإشعارات مقفلة. فعّلها من الإعدادات عشان توصلك تحديثات لما يضيف أعضاء المجموعة مصاريف.",
   "permission_open_settings": "فتح الإعدادات",
   "permission_cancel": "ليس الآن",
-  "notifications_unavailable": "الإشعارات غير متاحة. يرجى التحقق من أن خدمات Google مُعدَّة بشكل صحيح."
+  "notifications_unavailable": "الإشعارات غير متاحة. يرجى التحقق من أن خدمات Google مُعدَّة بشكل صحيح.",
+  "functional_settings": "الوظائف",
+  "expense_form_full_features": "نموذج مصروف كامل (دخل وتحويل)",
+  "expense_form_full_features_description": "إظهار تبويبات المصروف / الدخل / التحويل عند إضافة مصروف",
+  "expense_form_full_features_tooltip": "لاستخدام الدخل والتحويل وخيارات أخرى، فعّلها من الإعدادات.",
+  "expense_form_full_features_tooltip_title": "خيارات إضافية"
 }
