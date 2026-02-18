@@ -8,6 +8,7 @@ import 'package:upgrader/upgrader.dart';
 import 'core/auth/auth_providers.dart';
 import 'core/database/database_providers.dart';
 import 'core/services/notification_service.dart';
+import 'core/debug/debug_menu.dart';
 import 'core/update/app_update_helper.dart';
 import 'core/update/upgrader_messages.dart';
 import 'features/settings/providers/settings_framework_providers.dart';
@@ -17,18 +18,30 @@ import 'core/theme/theme_providers.dart';
 import 'core/navigation/app_router.dart';
 import 'core/navigation/invite_link_handler.dart';
 
-class App extends ConsumerWidget {
+class App extends ConsumerStatefulWidget {
   const App({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<App> createState() => _AppState();
+}
+
+class _AppState extends ConsumerState<App> {
+  late final Upgrader _upgrader;
+
+  @override
+  void initState() {
+    super.initState();
+    _upgrader = Upgrader(
+      durationUntilAlertAgain: const Duration(days: 3),
+      messages: HisabUpgraderMessages(context: context),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
     final themes = ref.watch(appThemesProvider);
     final themeMode = ref.watch(appThemeModeProvider);
-    final upgrader = Upgrader(
-      durationUntilAlertAgain: const Duration(days: 3),
-      messages: HisabUpgraderMessages(code: context.locale.languageCode, context: context),
-    );
 
     // Watch DataSyncService to reactively fetch/push data
     ref.watch(dataSyncServiceProvider);
@@ -77,26 +90,43 @@ class App extends ConsumerWidget {
         locale: context.locale,
         builder: (context, child) {
           final isRtl = context.locale.languageCode == 'ar';
-          return UpgradeAlert(
-            navigatorKey: router.routerDelegate.navigatorKey,
-            upgrader: upgrader,
-            onUpdate: () {
-              if (!kIsWeb &&
-                  defaultTargetPlatform == TargetPlatform.android) {
-                handleAndroidUpdateThenStore(upgrader);
-                return false;
-              }
-              return true;
-            },
-            child: GestureDetector(
-              onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-              behavior: HitTestBehavior.deferToChild,
-              child: Directionality(
-                textDirection:
-                    isRtl ? ui.TextDirection.rtl : ui.TextDirection.ltr,
-                child: child ?? const SizedBox.shrink(),
+          final isDebug =
+              ref.watch(isDebugBuildProvider).asData?.value == true;
+          return Stack(
+            children: [
+              UpgradeAlert(
+                navigatorKey: router.routerDelegate.navigatorKey,
+                upgrader: _upgrader,
+                onUpdate: () {
+                  if (!kIsWeb &&
+                      defaultTargetPlatform == TargetPlatform.android) {
+                    handleAndroidUpdateThenStore(_upgrader);
+                    return false;
+                  }
+                  return true;
+                },
+                child: GestureDetector(
+                  onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+                  behavior: HitTestBehavior.deferToChild,
+                  child: Directionality(
+                    textDirection:
+                        isRtl ? ui.TextDirection.rtl : ui.TextDirection.ltr,
+                    child: child ?? const SizedBox.shrink(),
+                  ),
+                ),
               ),
-            ),
+              if (isDebug)
+                Positioned(
+                  bottom: 96,
+                  right: 8,
+                  child: DebugMenuFab(
+                    upgrader: _upgrader,
+                    navigatorContext:
+                        router.routerDelegate.navigatorKey.currentContext,
+                    localeContext: context,
+                  ),
+                ),
+            ],
           );
         },
         theme: themes.light,
