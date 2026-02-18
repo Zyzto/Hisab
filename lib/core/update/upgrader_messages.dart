@@ -32,7 +32,12 @@ class HisabUpgraderMessages extends UpgraderMessages {
         UpgraderMessage.prompt => _keys.prompt,
         UpgraderMessage.releaseNotes => _keys.releaseNotes,
       };
-      return ctx.tr(key);
+      try {
+        return ctx.tr(key);
+      } catch (_) {
+        // Context may not have EasyLocalization (e.g. after async or in overlay).
+        return super.message(messageKey);
+      }
     }
     return super.message(messageKey);
   }
