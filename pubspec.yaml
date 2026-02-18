@@ -1,7 +1,7 @@
 name: hisab
 description: "Group expense splitting and settle-up app."
 publish_to: 'none'
-version: 0.3.2+5
+version: 0.3.3+6
 
 environment:
   sdk: ^3.10.0
@@ -88,6 +88,7 @@ dependencies:
 
   # Interactive feedback with annotated screenshots
   feedback: ^3.2.0
+  clipboard: ^3.0.14
   web: ^1.1.0
 
 dev_dependencies:
