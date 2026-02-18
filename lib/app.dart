@@ -1,4 +1,5 @@
 import 'dart:ui' as ui;
+import 'package:feedback/feedback.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -7,6 +8,7 @@ import 'core/database/database_providers.dart';
 import 'core/services/notification_service.dart';
 import 'features/settings/providers/settings_framework_providers.dart';
 import 'core/theme/app_scroll_behavior.dart';
+import 'core/theme/theme_config.dart';
 import 'core/theme/theme_providers.dart';
 import 'core/navigation/app_router.dart';
 import 'core/navigation/invite_link_handler.dart';
@@ -48,9 +50,25 @@ class App extends ConsumerWidget {
     // Locale is read exclusively from EasyLocalization (context.locale) so that
     // locale: and localizationsDelegates always come from the same frame.
     // _LocaleSync (in main.dart) bridges languageProvider → context.setLocale.
-    return InviteLinkHandler(
-      ref: ref,
-      child: MaterialApp.router(
+    final feedbackTheme = FeedbackThemeData(
+      background: themes.light.colorScheme.surfaceContainerHighest,
+      feedbackSheetColor: themes.light.colorScheme.surface,
+      drawColors: [
+        ThemeConfig.defaultSeedColor,
+        themes.light.colorScheme.secondary,
+        themes.light.colorScheme.tertiary,
+      ],
+    );
+    return BetterFeedback(
+      theme: feedbackTheme,
+      localizationsDelegates: [
+        ...context.localizationDelegates,
+        GlobalFeedbackLocalizationsDelegate(),
+      ],
+      localeOverride: context.locale,
+      child: InviteLinkHandler(
+        ref: ref,
+        child: MaterialApp.router(
         title: 'Hisab',
         debugShowCheckedModeBanner: false,
         scrollBehavior: AppScrollBehavior(),
@@ -71,7 +89,8 @@ class App extends ConsumerWidget {
         theme: themes.light,
         darkTheme: themes.dark,
         themeMode: themeMode,
-        routerConfig: router
+        routerConfig: router,
+        ),
       ),
     );
   }

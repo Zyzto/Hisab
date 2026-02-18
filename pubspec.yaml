@@ -86,8 +86,9 @@ dependencies:
   # Permissions
   permission_handler: ^11.3.1
 
-  # Screenshot detection (Android/iOS; no-op on web)
-  screen_capture_event: ^1.2.0
+  # Interactive feedback with annotated screenshots
+  feedback: ^3.2.0
+  web: ^1.1.0
 
 dev_dependencies:
   flutter_test:

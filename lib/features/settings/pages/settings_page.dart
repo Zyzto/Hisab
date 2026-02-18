@@ -11,6 +11,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
+import 'package:feedback/feedback.dart';
 
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/auth/sign_in_sheet.dart';
@@ -26,7 +27,7 @@ import '../../../core/utils/currency_helpers.dart';
 import '../settings_definitions.dart';
 import '../providers/settings_framework_providers.dart';
 import '../backup_helper.dart';
-import '../widgets/feedback_sheet.dart';
+import '../feedback_handler.dart';
 import '../widgets/logs_viewer_dialog.dart';
 import '../widgets/edit_profile_sheet.dart';
 import '../../../core/auth/predefined_avatars.dart';
@@ -987,25 +988,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             );
           },
         ),
-        SwitchSettingsTile.fromSetting(
-          setting: promptFeedbackOnScreenshotSettingDef,
-          title: 'prompt_feedback_on_screenshot'.tr(),
-          subtitle: 'prompt_feedback_on_screenshot_description'.tr(),
-          value: ref.watch(
-            settings.provider(promptFeedbackOnScreenshotSettingDef),
-          ),
-          onChanged: (v) => ref
-              .read(
-                settings
-                    .provider(promptFeedbackOnScreenshotSettingDef)
-                    .notifier,
-              )
-              .set(v),
-        ),
         NavigationSettingsTile(
           leading: const Icon(Icons.feedback_outlined),
           title: Text('send_feedback'.tr()),
-          onTap: () => FeedbackSheet.show(context, fromScreenshot: false),
+          onTap: () {
+            if (!context.mounted) return;
+            // Reset controller so sheet can open again after being dismissed (e.g. if user navigated away without submitting).
+            BetterFeedback.of(context).hide();
+            BetterFeedback.of(context).show(
+              (UserFeedback feedback) => handleFeedback(context, feedback: feedback),
+            );
+          },
         ),
         NavigationSettingsTile(
           leading: const Icon(Icons.info_outline),
