@@ -28,6 +28,7 @@ This guide walks you through setting up the Supabase backend for Hisab from scra
 7. [Verify the Setup](#7-verify-the-setup)
 8. [Architecture Overview](#8-architecture-overview)
 9. [Troubleshooting](#9-troubleshooting)
+10. [Testing](#10-testing)
 
 ---
 
@@ -1645,3 +1646,29 @@ The "Current schema reference" table above can be re-verified with `list_tables`
 - Verify the redirect URL is added to **Authentication > URL Configuration > Redirect URLs**.
 - For mobile, ensure the app scheme (`io.supabase.hisab`) is registered in your Android/iOS configuration.
 - For web, ensure the site URL matches your deployment URL.
+
+---
+
+## 10. Testing
+
+Run the test suite with:
+
+```bash
+flutter test
+```
+
+**What is covered**
+
+- **Local database** (`test/local_database_test.dart`): PowerSync repository CRUD and streams with no Supabase (local-only mode). Requires the PowerSync native binary to run; see below.
+- **Sync** (`test/sync_test.dart`): `SyncEngine` fetch and push using a fake backend. Verifies that data from the backend is written correctly to the local DB and that pending writes are applied and removed. Requires the PowerSync native binary.
+- **Supabase repository** (`test/supabase_repository_test.dart`): Local-only repository behavior (no Supabase client). Full integration tests against a real Supabase project are not included; run those manually with `--dart-define=SUPABASE_URL=...` and `--dart-define=SUPABASE_ANON_KEY=...` if needed.
+
+**PowerSync native binary (for local DB and sync tests)**
+
+Tests that use [PowerSyncDatabase](https://pub.dev/documentation/powersync/latest/powersync/PowerSyncDatabase-class.html) need the `powersync-sqlite-core` native library. Without it, those tests are skipped and the suite still passes.
+
+1. Download the binary for your OS from [powersync-sqlite-core Releases](https://github.com/powersync-ja/powersync-sqlite-core/releases).
+2. Rename it: `libpowersync_x64.so` → `libpowersync.so` (Linux), `libpowersync_aarch64.dylib` → `libpowersync.dylib` (macOS), or `powersync_x64.dll` → `powersync.dll` (Windows).
+3. Place the renamed file in the project root directory.
+
+See [PowerSync Flutter unit testing](https://docs.powersync.com/client-sdk-references/flutter/unit-testing) for details.
