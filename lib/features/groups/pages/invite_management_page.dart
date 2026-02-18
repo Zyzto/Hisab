@@ -317,51 +317,57 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
     final url = _inviteUrl(widget.invite.token);
     showModalBottomSheet(
       context: context,
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: SizedBox(
-                width: 200,
-                height: 200,
-                child: PrettyQrView.data(
-                  data: url,
-                  errorCorrectLevel: QrErrorCorrectLevel.M,
-                  decoration: const PrettyQrDecoration(
-                    shape: PrettyQrSmoothSymbol(color: Colors.black),
-                    background: Colors.white,
-                    quietZone: PrettyQrQuietZone.zero,
+      isScrollControlled: true,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.75,
+      ),
+      builder: (ctx) => SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: SizedBox(
+                  width: 200,
+                  height: 200,
+                  child: PrettyQrView.data(
+                    data: url,
+                    errorCorrectLevel: QrErrorCorrectLevel.M,
+                    decoration: const PrettyQrDecoration(
+                      shape: PrettyQrSmoothSymbol(color: Colors.black),
+                      background: Colors.white,
+                      quietZone: PrettyQrQuietZone.zero,
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              url,
-              style: Theme.of(ctx).textTheme.bodySmall,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            FilledButton.tonalIcon(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: url));
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  SnackBar(content: Text('invite_link_copied'.tr())),
-                );
-              },
-              icon: const Icon(Icons.copy),
-              label: Text('copy_link'.tr()),
-            ),
-          ],
+              const SizedBox(height: 16),
+              Text(
+                url,
+                style: Theme.of(ctx).textTheme.bodySmall,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              FilledButton.tonalIcon(
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: url));
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(content: Text('invite_link_copied'.tr())),
+                  );
+                },
+                icon: const Icon(Icons.copy),
+                label: Text('copy_link'.tr()),
+              ),
+            ],
+          ),
         ),
       ),
     );
