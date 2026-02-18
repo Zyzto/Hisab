@@ -1,299 +1,231 @@
 # Hisab Codebase Overview
 
-**Hisab** — Group expense splitting and settle-up app. Built with Flutter, Riverpod, GoRouter, and Supabase (auth, database, edge functions). Uses local SQLite (via PowerSync package) for offline-first data storage.
+`Hisab` is a Flutter app for group expense splitting and settlement. It is offline-first: local SQLite (via the PowerSync package) is always initialized, and Supabase is optional for online auth/sync/invites/notifications.
 
----
+## Stack
 
-## Project Structure
+- Flutter + Dart
+- Riverpod (`riverpod_annotation`) for state and DI
+- GoRouter for navigation
+- Easy Localization (`en`, `ar`, RTL support)
+- PowerSync package as local SQLite engine
+- Supabase (optional): Auth, Postgres, RPCs, Edge Functions
+- Firebase Cloud Messaging for push notifications (Android/iOS/Web)
 
-### `lib/` — Flutter App
+## Repository Layout
 
 | Path | Purpose |
-|------|---------|
-| `main.dart` | Entry point — Supabase init, local SQLite init, OAuth redirect handling, ProviderScope |
-| `app.dart` | Root widget — MaterialApp.router, theming, RTL support, DataSyncService watcher |
-| `core/navigation/app_router.dart` | GoRouter — onboarding redirect, shell route, groups/expenses routes |
-| `core/navigation/main_scaffold.dart` | Main scaffold with floating nav bar and sync status icon |
-| `core/auth/auth_service.dart` | Supabase Auth — sign-in/out, OAuth, magic link |
-| `core/auth/auth_providers.dart` | Riverpod providers for auth state, session, user profile |
-| `core/auth/sign_in_sheet.dart` | Shared sign-in bottom sheet (email, magic link, Google, GitHub) |
-| `core/constants/supabase_config.dart` | `supabaseUrl`, `supabaseAnonKey`, optional `inviteLinkBaseUrl` (from `--dart-define`) |
-| `core/constants/app_config.dart` | Telemetry endpoint, report URL |
-| `core/database/powersync_schema.dart` | Local SQLite schema (mirrors Supabase tables + pending_writes queue) |
-| `core/database/database_providers.dart` | `PowerSyncDatabase` provider, `DataSyncService` (fetch/push/refresh) |
-| `core/services/connectivity_service.dart` | Network connectivity detection, SyncStatus for UI |
-| `core/services/migration_service.dart` | Local→Online data migration when switching modes |
-| `core/update/app_update_helper.dart` | Android in-app update (native flow) then Play Store fallback |
-| `core/update/upgrader_messages.dart` | Update dialog strings via EasyLocalization (HisabUpgraderMessages) |
-| `core/widgets/sync_status_icon.dart` | Connection status indicator (cloud icons) |
+|---|---|
+| `lib/` | Main Flutter application code |
+| `lib/core/` | Cross-cutting services (auth, db, sync, router, notifications, telemetry, permissions, updates) |
+| `lib/features/` | Feature modules (`home`, `groups`, `expenses`, `balance`, `settings`, `onboarding`) |
+| `lib/domain/` | Domain entities and value types |
+| `assets/translations/` | Localization JSON files |
+| `web/` | PWA shell, Firebase web messaging config, redirect pages, static privacy page |
+| `ios/Runner/Info.plist` | iOS permissions/deep-link/background notification config |
+| `supabase/functions/invite-redirect/` | Edge Function source for invite redirect |
+| `docs/` | Setup and architecture documentation |
+| `.github/workflows/release.yml` | CI/CD for Android builds/releases + web deploy |
 
-### `lib/domain/`
+## App Startup Flow
 
-Domain models: `Group`, `Participant`, `Expense`, `ExpenseTag`, `GroupMember`, `GroupInvite`, `SettlementTransaction`, `SplitType`, etc.
+`lib/main.dart` boot sequence:
 
-#### Participant–Member Auto-Link
+1. Flutter bindings, (web) PWA install callback, global error handlers, logging service, Easy Localization, image picker setup.
+2. Settings framework (`flutter_settings_framework`) and reads persisted settings.
+3. Initializes local SQLite (`PowerSyncDatabase`) unconditionally.
+4. Initializes Supabase only when `SUPABASE_URL` and `SUPABASE_ANON_KEY` are provided.
+5. Resolves pending OAuth flags from settings (onboarding/settings web redirect flows).
+6. Initializes Firebase (for FCM) when Supabase is configured.
+7. Mounts `EasyLocalization` + `ProviderScope` and injects initialized singletons.
+8. Uses `_LocaleSync` as the only bridge from settings language provider to `context.setLocale`.
 
-`Participant` and `GroupMember` remain separate tables but are automatically linked:
+## Core Architecture
 
-- **Join**: When a user creates a group or accepts an invite, a `Participant` is auto-created with `user_id` set to the auth user and `participant_id` set on the member row.
-- **Leave/Kick**: Only the `group_members` row is deleted. The `Participant` stays (with `user_id` intact) so expense history is preserved. The "People" tab shows them as "left".
-- **Rejoin**: If the same user accepts a new invite, the backend detects the existing `Participant` (by `group_id` + `user_id`) and re-links instead of creating a duplicate.
-- **Non-person participants**: Participants with `user_id = null` (e.g. "Cash", "Hotel") can still be added manually.
+### Data Layer
 
-### `lib/features/`
+- `lib/core/database/powersync_schema.dart` defines local schema:
+  - `groups`, `group_members`, `participants`, `expenses`, `expense_tags`, `group_invites`, `invite_usages`
+  - `pending_writes` queue for offline-online deferred writes
+- `lib/core/repository/powersync_repository.dart` implements repositories against local SQLite + optional Supabase.
+- Reads come from local DB; online mode writes target Supabase then local cache.
+- In online mode while temporarily offline, some writes (notably expense writes) are queued to `pending_writes`.
 
-| Feature | Contents |
-|---------|----------|
-| `home/` | Home routes |
-| `groups/` | GroupCreatePage, GroupDetailPage, GroupSettingsPage, InviteAcceptPage, invite_link_sheet |
-| `expenses/` | ExpenseFormPage, ExpenseDetailPage, split/category widgets |
-| `balance/` | Balance list, settlement rows, record settlement sheet |
-| `onboarding/` | Onboarding flow |
-| `settings/` | Settings, backup, logs, migration progress dialog |
+### Sync Layer
 
-### `lib/core/repository/`
+`lib/core/database/database_providers.dart` contains `DataSyncService`:
 
-Repository pattern: `PowerSyncGroupRepository`, `PowerSyncParticipantRepository`, `PowerSyncExpenseRepository`, etc.
+- Active only when:
+  - Supabase is configured
+  - app is not in effective local-only mode
+  - user is authenticated
+- Sync actions:
+  - pushes `pending_writes`
+  - performs full fetch from Supabase for member groups
+  - refreshes every 5 minutes while online
 
-- **Local-Only mode**: Direct SQLite reads/writes, no restrictions.
-- **Online + connected**: Write to Supabase first, then update local cache.
-- **Online + temporarily offline**: Expense creation queued in `pending_writes` table for later push.
-- **Reads**: Always from local SQLite (fast, reactive via `watch()` streams).
-- Complex multi-table operations use Supabase RPC functions when online.
+### Mode Model
 
-`repository_providers.dart` provides all repository instances with connectivity and mode flags.
+- `local_only = true`: full local operation, no network dependency
+- `local_only = false`: online mode (subject to auth/connectivity)
+- `effectiveLocalOnly` also becomes true when Supabase config is missing
 
----
+Switching local to online goes through sign-in and optional migration (`MigrationService`) before flipping mode.
 
-## Two User Modes
+## Navigation and Deep Links
 
-| Mode | Behavior |
-|------|----------|
-| **Local-Only** (toggle ON) | Everything works locally — full CRUD, settlement, no network calls |
-| **Online** (toggle OFF) | Supabase as source of truth, local SQLite as cache, DataSyncService manages sync |
+- Router: `lib/core/navigation/app_router.dart`
+  - onboarding redirect guard
+  - shell route for home/settings tabs
+  - group/invite/expense routes
+- Deep link handling: `lib/core/navigation/invite_link_handler.dart`
+  - reads initial and streamed app links
+  - persists pending invite token in settings to survive onboarding/OAuth redirects
+  - navigates to invite accept route when appropriate
 
-### Switching Modes
+## Localization and RTL
 
-- **Local → Online**: Sign in → `MigrationService` pushes local data to Supabase → switch to online
-- **Online → Local**: Disconnect and stop syncing; cached data remains available locally
+- Source of truth for language is settings key `language`.
+- `_LocaleSync` (in `main.dart`) updates Easy Localization locale when provider changes.
+- `App` (`lib/app.dart`) intentionally reads locale from `context.locale` only.
+- Router refreshes on locale changes via `localeRefreshNotifier`.
+- Supported locales: English (`en`), Arabic (`ar`).
 
-### Record Settlement
+## Authentication
 
-Tap a settlement suggestion ("A → B $50") in the balance view to record the payment. Creates a `TransactionType.transfer` expense that zeroes out the computed debt.
+`lib/core/auth/auth_service.dart` supports:
 
----
+- email/password sign-in and sign-up
+- magic link sign-in
+- Google and GitHub OAuth
+- profile metadata update (`full_name`, `avatar_id`)
+- resend confirmation
 
-## Language / Locale Architecture
+Redirect behavior:
 
-The app supports English (`en`) and Arabic (`ar`) with full RTL support. Locale state is managed through a pipeline that keeps persistence, translation, and UI in sync on the same frame.
+- Web uses `SITE_URL` if provided.
+- Native uses deep link callback `io.supabase.hisab://callback`.
 
-### State Flow
+## Notifications (FCM)
 
-| Layer | Component | Role |
-|-------|-----------|------|
-| Persistence | `languageSettingDef` (key `'language'`) in SharedPreferences via `flutter_settings_framework` | Source of truth, survives restarts |
-| Riverpod | `languageProvider` | Exposes the stored value reactively |
-| Bridge | `_LocaleSync` widget (`main.dart`) | Watches `languageProvider`, calls `context.setLocale()` via `addPostFrameCallback` when value differs from `context.locale` |
-| Translation | `EasyLocalization` (`saveLocale: false`) | Provides `context.localizationDelegates`, `context.supportedLocales`, and `context.locale`. Does NOT persist locale itself |
-| UI | `App` widget (`app.dart`) | Reads locale exclusively from `context.locale` for both `locale:` param and RTL directionality |
-| Router | `localeRefreshNotifier` (`app_router.dart`) | Listens to `languageProvider`, fires `ValueNotifier` so GoRouter re-evaluates redirects |
+Implemented in `lib/core/services/notification_service.dart`:
 
-### How a Language Switch Works
+- requests notification permission
+- registers/unregisters device token in Supabase `device_tokens`
+- handles token refresh
+- handles foreground display (mobile local notifications)
+- handles tap navigation to group details
 
-1. User picks a language (settings page or onboarding).
-2. Settings framework writes `'language'` key to SharedPreferences.
-3. `languageProvider` rebuilds (Riverpod).
-4. `_LocaleSync.build` runs, detects `context.locale != languageProvider`, schedules `context.setLocale(newLocale)` for after the current frame.
-5. `localeRefreshNotifier` fires, GoRouter re-evaluates redirects.
-6. On the next frame, `context.setLocale` runs. EasyLocalization updates its state and rebuilds its entire subtree.
-7. `App.build` runs with consistent `context.locale`, `context.localizationDelegates`, and RTL directionality — all from the same EasyLocalization state.
+Web-specific pieces:
 
-### Key Invariants
+- `web/index.html` initializes Firebase web SDK and listens for service worker click messages
+- `web/firebase-messaging-sw.js` handles background push and notification clicks
 
-- **`App` never watches `languageProvider` directly.** It reads locale only from `context.locale` (EasyLocalization). This prevents a one-frame mismatch where `locale:` and `localizationDelegates` disagree.
-- **`_LocaleSync` is the sole bridge** from Riverpod to EasyLocalization. No other widget should call `context.setLocale()` directly.
-- **`EasyLocalization` uses `saveLocale: false`** — persistence is handled entirely by the settings framework (SharedPreferences). The `startLocale` is read from settings on app startup in `main()`.
+Settings integration:
 
-### Files
+- `notifications_enabled` controls initialization/token registration.
+- Toggle only appears in online mode.
 
-| File | Locale role |
-|------|-------------|
-| `lib/main.dart` | `_LocaleSync` widget, `startLocale` initialization |
-| `lib/app.dart` | `MaterialApp.router` with `locale: context.locale`, RTL `Directionality` builder |
-| `lib/features/settings/providers/settings_framework_providers.dart` | `languageProvider` |
-| `lib/features/settings/settings_definitions.dart` | `languageSettingDef` (key, options, default) |
-| `lib/core/navigation/app_router.dart` | `localeRefreshNotifier` for GoRouter |
-| `lib/features/settings/pages/settings_page.dart` | Language picker tile, reset-all (delegates locale sync to `_LocaleSync`) |
-| `lib/features/onboarding/pages/onboarding_page.dart` | Language button during onboarding |
-| `lib/core/update/upgrader_messages.dart` | Update dialog strings via EasyLocalization (`context.tr` for `update_*` keys) |
+## Feature Modules
 
----
+- `features/home`: groups list and manual refresh trigger
+- `features/groups`: create/detail/settings, invite management, invite acceptance
+- `features/expenses`: create/edit/detail expenses, split logic UI, receipt input hooks
+- `features/balance`: settlement list and record settlement flow
+- `features/settings`:
+  - account mode and auth controls
+  - theme/language/font/favorite currencies
+  - local-only toggle + migration
+  - import/export backup JSON
+  - telemetry + notifications toggles
+  - logs viewer/clear/report flow
+  - feedback capture integration
+- `features/onboarding`: two-page onboarding with mode selection and auth gate for online mode
+
+## Settings Framework
+
+Definitions live in `lib/features/settings/settings_definitions.dart`.
+
+Major persisted keys include:
+
+- appearance: `theme_mode`, `theme_color`, `language`, `font_size_scale`, `favorite_currencies`
+- mode/lifecycle: `local_only`, `onboarding_completed`, pending OAuth flags, pending invite token
+- privacy: `telemetry_enabled`, `notifications_enabled`
+- receipt AI: OCR/AI flags, provider, and API keys
+
+## Web and PWA
+
+- PWA manifest: `web/manifest.json`
+- Install prompt integration: `pwa_install` package + `PwaInstallBanner` widget
+- Invite redirect static page: `web/redirect.html`
+  - desktop -> web invite route
+  - mobile -> attempts app deep link with timed web fallback
+- Public privacy page: `web/privacy/index.html`
+
+## Supabase Backend Contract
+
+This repo contains one Edge Function source: `supabase/functions/invite-redirect/index.ts`.
+
+The app also depends on Supabase-side schema, RLS, RPCs, and additional edge functions documented in `docs/SUPABASE_SETUP.md`, including:
+
+- tables such as `groups`, `group_members`, `participants`, `expenses`, `expense_tags`, `group_invites`, `telemetry`, `device_tokens`
+- RPCs such as `accept_invite`, `transfer_ownership`, `leave_group`, `kick_member`, `update_member_role`, `create_invite`, etc.
+- optional edge functions `telemetry` and `send-notification` (documented, not committed in this repo snapshot)
 
 ## Configuration
 
-- **`supabase_config.dart`**: Reads `SUPABASE_URL`, `SUPABASE_ANON_KEY` from `--dart-define`.
-- **`app_config.dart`**: Derives telemetry endpoint from Supabase URL.
-- **Supabase Dashboard**: Auth providers (email, Google, GitHub), redirect URLs.
-- **Firebase (Android)**: Place `google-services.json` in `android/app/`. The Google Services Gradle plugin (`com.google.gms.google-services`) in `settings.gradle.kts` and `app/build.gradle.kts` processes it into resource values at build time.
-- **Firebase (iOS)**: Place `GoogleService-Info.plist` in `ios/Runner/`.
-- **Firebase (Web)**: Firebase config is in `web/index.html`; VAPID key via `--dart-define=FCM_VAPID_KEY`.
+Build-time config is via `--dart-define` in `lib/core/constants/supabase_config.dart`:
 
-See [SUPABASE_SETUP.md](SUPABASE_SETUP.md) for full backend setup and [CONFIGURATION.md](CONFIGURATION.md) for quick reference.
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `INVITE_BASE_URL` (optional)
+- `SITE_URL` (optional auth email redirect)
+- `FCM_VAPID_KEY` (web push)
 
----
+If Supabase defines are missing, app runs local-only by design.
 
-## Key Dependencies
+## Platform Permissions
 
-| Category | Packages |
-|----------|----------|
-| State | `flutter_riverpod`, `riverpod_annotation` |
-| Navigation | `go_router` |
-| Backend | `supabase_flutter` |
-| Local Database | `powersync` (SQLite engine) |
-| Connectivity | `connectivity_plus` |
-| Localization | `easy_localization` |
-| Date/Currency | `intl` |
-| App update | `upgrader` (version check + dialog), `in_app_update` (Android native in-app update) |
-| Receipt | `image_picker`, `google_mlkit_text_recognition` |
-| AI | `langchain_google`, `langchain_openai` |
-| Other | `file_picker`, `pretty_qr_code`, `uuid` |
+Runtime permission handling is centralized in `lib/core/services/permission_service.dart`:
 
----
+- camera
+- photo library
+- notifications
 
-## Supabase Backend
+iOS declarations are present in `ios/Runner/Info.plist`, including:
 
-The backend is entirely managed through Supabase. Database schema, RLS policies, and RPC functions are applied as migrations (see [SUPABASE_SETUP.md](SUPABASE_SETUP.md)).
+- `NSCameraUsageDescription`
+- `NSPhotoLibraryUsageDescription`
+- `NSUserNotificationsUsageDescription`
+- `UIBackgroundModes: remote-notification`
+- custom URL scheme `io.supabase.hisab`
 
-| Component | Purpose |
-|-----------|---------|
-| Postgres tables | `groups`, `group_members`, `group_invites`, `participants`, `expenses`, `expense_tags`, `telemetry`, `device_tokens` |
-| RLS policies | Row-level security enforcing group membership and role-based access |
-| RPC functions | `accept_invite` (auto-creates/re-links participant), `transfer_ownership`, `leave_group`, `kick_member`, `create_invite`, etc. |
-| Edge Functions | `invite-redirect` (deep link redirect), `telemetry` (anonymous event collection), `send-notification` (FCM push) |
-| DB triggers | `notify_group_activity` on `expenses` (INSERT/UPDATE) and `group_members` (INSERT) — sends push notifications via `pg_net` |
-| Auth | Email/password, magic link, Google OAuth, GitHub OAuth |
+## CI/CD
 
-## Data Sync Architecture
+`.github/workflows/release.yml`:
 
-```
-┌─────────────────┐    ┌──────────────┐    ┌──────────────┐
-│  Flutter App     │    │  Local SQLite │    │   Supabase   │
-│  (Repositories)  │───>│  (PowerSync)  │    │   Postgres   │
-│                  │<───│              │    │              │
-└─────────────────┘    └──────┬───────┘    └──────┬───────┘
-                              │                    │
-                     ┌────────┴────────────────────┴────────┐
-                     │         DataSyncService               │
-                     │  - Full fetch on connect               │
-                     │  - Push pending_writes on reconnect    │
-                     │  - Periodic refresh (5 min)            │
-                     └────────────────────────────────────────┘
-```
+- triggers on tags `v*` or manual dispatch
+- builds Android APK + AAB
+- creates GitHub release (tag flow)
+- optional Play Store internal deploy
+- builds/deploys Flutter web to Firebase Hosting (copies privacy page to build output)
 
-## Push Notification Architecture
+## Key Dependencies (Selected)
 
-Push notifications alert group members when someone else creates/edits an expense or joins the group. Uses Firebase Cloud Messaging (FCM) on all platforms (Android, iOS, Web/PWA).
+- state: `flutter_riverpod`, `riverpod_annotation`
+- navigation: `go_router`
+- local db/sync engine: `powersync`
+- backend/auth: `supabase_flutter`
+- notifications: `firebase_core`, `firebase_messaging`, `flutter_local_notifications`
+- localization: `easy_localization`
+- settings framework: `flutter_settings_framework`
+- connectivity: `connectivity_plus`
+- permissions: `permission_handler`
+- feedback: `feedback`
+- backup/file ops: `file_picker`
 
-### Flow
+## Related Docs
 
-```
-User A writes expense → Supabase Postgres
-  ↓ AFTER trigger (notify_group_activity)
-  ↓ pg_net async HTTP POST
-send-notification Edge Function
-  ↓ queries group_members + device_tokens (excluding actor)
-  ↓ FCM HTTP v1 API
-Firebase Cloud Messaging → push to User B's devices
-```
-
-### Components
-
-| Component | File | Role |
-|-----------|------|------|
-| `NotificationService` | `lib/core/services/notification_service.dart` | Riverpod `keepAlive` provider — FCM init, permission request, token management, foreground/background/tap handling |
-| Background handler | `lib/core/services/notification_service.dart` (top-level) | `firebaseMessagingBackgroundHandler` — required by FCM for background messages on mobile |
-| Firebase init | `lib/main.dart` | `Firebase.initializeApp()` + background handler registration; sets `firebaseInitialized` flag |
-| Gradle plugin | `android/settings.gradle.kts`, `android/app/build.gradle.kts` | `com.google.gms.google-services` — processes `google-services.json` into resources for Firebase SDKs |
-| Auth integration | `lib/app.dart` | `ref.listen(isAuthenticatedProvider)` — registers token on sign-in, unregisters on sign-out |
-| Service worker | `web/firebase-messaging-sw.js` | Handles background push on web/PWA; shows notifications and handles click-to-navigate |
-| Firebase SDK | `web/index.html` | Firebase compat scripts + app initialization for web |
-| VAPID key | `lib/core/constants/supabase_config.dart` | `fcmVapidKey` from `--dart-define=FCM_VAPID_KEY` — required for web push token |
-| DB trigger | Supabase (Migration 6) | `notify_group_activity()` on `expenses` INSERT/UPDATE and `group_members` INSERT |
-| Edge function | Supabase `send-notification` | Queries recipients, builds notification, sends via FCM HTTP v1 API |
-| Device tokens | Supabase `device_tokens` table | Stores FCM tokens per user/device with platform (android/ios/web) |
-
-### Notification Events
-
-| Event | Trigger | Message |
-|-------|---------|---------|
-| New expense | `expenses` INSERT | "{actor} added '{title}' ({amount})" |
-| Edited expense | `expenses` UPDATE | "{actor} edited '{title}'" |
-| Member joined | `group_members` INSERT | "{actor} joined the group" |
-
-### Lifecycle
-
-1. **App start**: Firebase initialized in `main.dart`; sets `firebaseInitialized = true` on success
-2. **Auth sign-in**: `app.dart` detects auth change → checks `notificationsEnabledProvider` → if enabled, calls `NotificationService.initialize(context)` → requests permission → registers FCM token in `device_tokens` (shows denial dialog via `PermissionService` if denied)
-3. **Token refresh**: FCM fires `onTokenRefresh` → token updated in `device_tokens`
-4. **Auth sign-out**: `app.dart` detects auth change → calls `unregisterToken()` → deletes token from `device_tokens`
-5. **Notification tap**: Extracts `group_id` from data payload → navigates to group detail via GoRouter
-
-`initialize()` returns `Future<bool>` — `true` on success, `false` when Firebase is unavailable, permission is denied, or Supabase is not configured. Callers (e.g. the settings toggle) use this to revert UI state and show a snackbar on failure.
-
-### User Setting
-
-A **Push Notifications** toggle lives in Settings > Privacy (only visible in online mode). Controlled by `notificationsEnabledSettingDef` (`notifications_enabled` key in SharedPreferences, default `true`).
-
-- **Toggle ON**: calls `NotificationService.initialize(context)` — requests permission (if not yet granted) and registers the FCM token. If `initialize()` returns `false` (Firebase unavailable, permission denied), the toggle **reverts to OFF** and a snackbar displays `notifications_unavailable`.
-- **Toggle OFF**: calls `NotificationService.unregisterToken()` — removes the FCM token from Supabase `device_tokens`, stopping all push delivery.
-- **Init gate**: `app.dart` checks `notificationsEnabledProvider` before calling `initialize()` on sign-in and on first build.
-
----
-
-## Permission Handling
-
-Runtime permissions are managed through `permission_handler` and a centralized `PermissionService` utility class. Permissions are requested lazily — only when the feature is first used — and never block app usage.
-
-### Flow
-
-```
-User taps feature (e.g. camera)
-  → PermissionService.requestCameraPermission(context)
-  → check status
-    → granted? proceed
-    → denied? request() → granted? proceed
-    → permanentlyDenied? show dialog with "Open Settings" → return false
-```
-
-### Components
-
-| Component | File | Role |
-|-----------|------|------|
-| `PermissionService` | `lib/core/services/permission_service.dart` | Static methods for camera, photos, and notification permission — check, request, and show denial dialog |
-| Expense form pre-check | `lib/features/expenses/pages/expense_form_page.dart` | Calls `requestCameraPermission` / `requestPhotosPermission` before opening `ImagePicker` |
-| Notification denial | `lib/core/services/notification_service.dart` | Calls `PermissionService.showNotificationDeniedInfo()` when FCM permission is denied |
-| Translations | `assets/translations/{en,ar}.json` | Keys: `permission_denied_title`, `permission_camera_message`, `permission_photos_message`, `permission_notification_message`, `permission_open_settings`, `permission_cancel`, `notifications_unavailable` |
-
-### Permissions Used
-
-| Permission | Feature | Platform notes |
-|------------|---------|----------------|
-| Camera | Receipt scanning (ImagePicker) | iOS: `NSCameraUsageDescription` in Info.plist |
-| Photos | Receipt image from gallery | iOS: `NSPhotoLibraryUsageDescription` in Info.plist |
-| Notification | Push notifications (FCM) | Android 13+: `POST_NOTIFICATIONS` in manifest; iOS: system prompt via Firebase |
-
-### UX Design
-
-- **Non-blocking**: The denial dialog is informational — it explains why the permission is needed and offers "Open Settings", but the user can dismiss it and continue using the app normally.
-- **Lazy**: Permissions are only requested when the user actively taps a feature that needs them (camera button, gallery button, notification init on sign-in).
-- **Web excluded**: On web, `PermissionService` methods return `true` immediately — the browser handles permission prompts natively.
-
-### iOS Podfile Note
-
-When building for iOS, `permission_handler` requires enabling specific permission pods in the Podfile `post_install` block. Only these should be enabled:
-
-- `PERMISSION_CAMERA`
-- `PERMISSION_PHOTOS`
-- `PERMISSION_NOTIFICATIONS`
-
-See [permission_handler iOS setup](https://pub.dev/packages/permission_handler#setup) for details.
+- `docs/SUPABASE_SETUP.md` - complete backend bootstrap and SQL/RPC policy setup
+- `docs/CONFIGURATION.md` - runtime configuration quick reference
+- `docs/RELEASE_SETUP.md` and `docs/PLAY_CONSOLE_DECLARATIONS.md` - release/distribution notes
