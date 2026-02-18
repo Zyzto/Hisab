@@ -1,11 +1,15 @@
 import 'dart:ui' as ui;
 import 'package:feedback/feedback.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:upgrader/upgrader.dart';
 import 'core/auth/auth_providers.dart';
 import 'core/database/database_providers.dart';
 import 'core/services/notification_service.dart';
+import 'core/update/app_update_helper.dart';
+import 'core/update/upgrader_messages.dart';
 import 'features/settings/providers/settings_framework_providers.dart';
 import 'core/theme/app_scroll_behavior.dart';
 import 'core/theme/theme_config.dart';
@@ -21,6 +25,10 @@ class App extends ConsumerWidget {
     final router = ref.watch(routerProvider);
     final themes = ref.watch(appThemesProvider);
     final themeMode = ref.watch(appThemeModeProvider);
+    final upgrader = Upgrader(
+      durationUntilAlertAgain: const Duration(days: 3),
+      messages: HisabUpgraderMessages(code: context.locale.languageCode, context: context),
+    );
 
     // Watch DataSyncService to reactively fetch/push data
     ref.watch(dataSyncServiceProvider);
@@ -77,12 +85,25 @@ class App extends ConsumerWidget {
         locale: context.locale,
         builder: (context, child) {
           final isRtl = context.locale.languageCode == 'ar';
-          return GestureDetector(
-            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-            behavior: HitTestBehavior.deferToChild,
-            child: Directionality(
-              textDirection: isRtl ? ui.TextDirection.rtl : ui.TextDirection.ltr,
-              child: child ?? const SizedBox.shrink(),
+          return UpgradeAlert(
+            navigatorKey: router.routerDelegate.navigatorKey,
+            upgrader: upgrader,
+            onUpdate: () {
+              if (!kIsWeb &&
+                  defaultTargetPlatform == TargetPlatform.android) {
+                handleAndroidUpdateThenStore(upgrader);
+                return false;
+              }
+              return true;
+            },
+            child: GestureDetector(
+              onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+              behavior: HitTestBehavior.deferToChild,
+              child: Directionality(
+                textDirection:
+                    isRtl ? ui.TextDirection.rtl : ui.TextDirection.ltr,
+                child: child ?? const SizedBox.shrink(),
+              ),
             ),
           );
         },

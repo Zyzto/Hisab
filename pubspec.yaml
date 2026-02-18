@@ -64,6 +64,10 @@ dependencies:
   # About (version, licenses)
   package_info_plus: ^9.0.0
 
+  # App update (version check + Android in-app update)
+  upgrader: ^12.5.0
+  in_app_update: ^4.2.5
+
   # Backup (file picker for export/import)
   file_picker: ^10.3.10
   langchain_core: ^0.4.1
