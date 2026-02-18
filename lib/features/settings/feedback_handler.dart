@@ -46,7 +46,7 @@ Future<void> handleFeedback(
     }
     await setFeedbackClipboard(body, screenshotBytes);
   } catch (_) {
-    // Fallback to clipboard-only when launchUrl fails (e.g. no handler).
+    // Fallback to clipboard-only when launchUrl or copy fails (e.g. no handler).
     try {
       await setFeedbackClipboard(body, screenshotBytes);
     } catch (_) {
