@@ -123,24 +123,30 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       onPressed: () async {
         final chosen = await showModalBottomSheet<Locale>(
           context: context,
+          isScrollControlled: true,
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.75,
+          ),
           builder: (ctx) => SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    'language'.tr(),
-                    style: Theme.of(ctx).textTheme.titleMedium,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      'language'.tr(),
+                      style: Theme.of(ctx).textTheme.titleMedium,
+                    ),
                   ),
-                ),
-                ..._supportedLocales.map(
-                  (locale) => ListTile(
-                    title: Text(_localeDisplayName(locale)),
-                    onTap: () => Navigator.of(ctx).pop(locale),
+                  ..._supportedLocales.map(
+                    (locale) => ListTile(
+                      title: Text(_localeDisplayName(locale)),
+                      onTap: () => Navigator.of(ctx).pop(locale),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );

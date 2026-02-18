@@ -528,56 +528,62 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
 
     final chosen = await showModalBottomSheet<SettlementMethod>(
       context: context,
+      isScrollControlled: true,
       showDragHandle: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.75,
+      ),
       builder: (ctx) {
         return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(bottom: ThemeConfig.spacingM),
-                child: Text(
-                  'settlement_method'.tr(),
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: ThemeConfig.spacingM),
+                  child: Text(
+                    'settlement_method'.tr(),
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-              ),
-              ...SettlementMethod.values.map((method) {
-                final isSelected = method == group.settlementMethod;
-                return ListTile(
-                  selected: isSelected,
-                  selectedTileColor:
-                      colorScheme.primaryContainer.withValues(alpha: 0.3),
-                  leading: Icon(
-                    isSelected
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
-                    color: isSelected
-                        ? colorScheme.primary
-                        : colorScheme.onSurfaceVariant,
-                  ),
-                  title: Text(
-                    _methodLabel(method),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: isSelected ? FontWeight.w600 : null,
-                      color: isSelected ? colorScheme.primary : null,
+                ...SettlementMethod.values.map((method) {
+                  final isSelected = method == group.settlementMethod;
+                  return ListTile(
+                    selected: isSelected,
+                    selectedTileColor:
+                        colorScheme.primaryContainer.withValues(alpha: 0.3),
+                    leading: Icon(
+                      isSelected
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked,
+                      color: isSelected
+                          ? colorScheme.primary
+                          : colorScheme.onSurfaceVariant,
                     ),
-                  ),
-                  subtitle: Text(
-                    _methodDescription(method),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
+                    title: Text(
+                      _methodLabel(method),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: isSelected ? FontWeight.w600 : null,
+                        color: isSelected ? colorScheme.primary : null,
+                      ),
                     ),
-                  ),
-                  onTap: () => Navigator.pop(ctx, method),
-                );
-              }),
-              const SizedBox(height: ThemeConfig.spacingM),
-            ],
+                    subtitle: Text(
+                      _methodDescription(method),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    onTap: () => Navigator.pop(ctx, method),
+                  );
+                }),
+                const SizedBox(height: ThemeConfig.spacingM),
+              ],
+            ),
           ),
         );
       },
@@ -949,36 +955,37 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
       ),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) {
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(
-              ThemeConfig.spacingM,
-              0,
-              ThemeConfig.spacingM,
-              ThemeConfig.spacingM,
-            ),
-            child: ListView(
-              shrinkWrap: true,
-              children: [
-                Text(
-                  'change_icon_color'.tr(),
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
+          return SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                ThemeConfig.spacingM,
+                0,
+                ThemeConfig.spacingM,
+                ThemeConfig.spacingM,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'change_icon_color'.tr(),
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: ThemeConfig.spacingL),
+                  const SizedBox(height: ThemeConfig.spacingL),
 
-                // Icon grid
-                Text(
-                  'wizard_icon_label'.tr(),
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
+                  // Icon grid
+                  Text(
+                    'wizard_icon_label'.tr(),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const SizedBox(height: ThemeConfig.spacingM),
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
+                  const SizedBox(height: ThemeConfig.spacingM),
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
                   gridDelegate:
                       const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 4,
@@ -1106,7 +1113,8 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                   }),
                   child: Text('done'.tr()),
                 ),
-              ],
+                ],
+              ),
             ),
           );
         },
@@ -1307,16 +1315,22 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     }
     final chosen = await showModalBottomSheet<String>(
       context: context,
-      builder: (ctx) => ListView(
-        shrinkWrap: true,
-        children: others
-            .map(
-              (m) => ListTile(
-                title: Text('${m.userId.substring(0, 8)}... (${m.role})'),
-                onTap: () => Navigator.pop(ctx, m.id),
-              ),
-            )
-            .toList(),
+      isScrollControlled: true,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.75,
+      ),
+      builder: (ctx) => SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: others
+              .map(
+                (m) => ListTile(
+                  title: Text('${m.userId.substring(0, 8)}... (${m.role})'),
+                  onTap: () => Navigator.pop(ctx, m.id),
+                ),
+              )
+              .toList(),
+        ),
       ),
     );
     if (chosen == null || !context.mounted) return;
