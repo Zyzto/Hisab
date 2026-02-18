@@ -40,20 +40,52 @@
     // Firebase config — replace with your values from Firebase Console.
     // These are safe to expose (they are public identifiers, not secrets).
     const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_PROJECT_ID.firebasestorage.app",
-      messagingSenderId: "YOUR_SENDER_ID",
-      appId: "YOUR_APP_ID",
+      apiKey: "AIzaSyAHqu53pQGNME24l4XvsZZ3YvT1u--rfxk",
+      authDomain: "hisab-c8eb1.firebaseapp.com",
+      projectId: "hisab-c8eb1",
+      storageBucket: "hisab-c8eb1.firebasestorage.app",
+      messagingSenderId: "981938007704",
+      appId: "1:981938007704:web:9a607f674d6cdae0b1aaed",
     };
 
-    // Initialize Firebase (must happen before Flutter loads firebase_messaging)
-    firebase.initializeApp(firebaseConfig);
+    function hasPlaceholderFirebaseConfig(config) {
+      const values = Object.values(config);
+      return values.some((v) => typeof v === "string" && v.includes("YOUR_"));
+    }
+
+    if (hasPlaceholderFirebaseConfig(firebaseConfig)) {
+      console.warn(
+        "[hisab] Firebase web config uses placeholders; web push notifications are disabled until real values are set."
+      );
+    } else {
+      // Must happen before Flutter loads firebase_messaging.
+      firebase.initializeApp(firebaseConfig);
+    }
   </script>
 
   <!-- PWA install prompt capture (used by pwa_install package) -->
   <script>
+    function handleNotificationClickUrl(targetUrl) {
+      if (typeof targetUrl !== "string" || targetUrl.length === 0) return;
+
+      // Same-origin route navigation for Flutter web app.
+      if (window.location.pathname !== targetUrl) {
+        window.location.assign(targetUrl);
+      } else {
+        // Already on target path; emit popstate for routers listening to history.
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      }
+    }
+
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.addEventListener("message", (event) => {
+        const data = event.data || {};
+        if (data.type === "NOTIFICATION_CLICK" && typeof data.url === "string") {
+          handleNotificationClickUrl(data.url);
+        }
+      });
+    }
+
     let deferredPrompt;
     window.addEventListener('beforeinstallprompt', (e) => {
       deferredPrompt = e;
