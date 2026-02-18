@@ -124,8 +124,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ]),
           // Data & Backup: merged Data + old Backup
           _buildSection(context, ref, settings, dataBackupSection, [
-            if (!ref.watch(effectiveLocalOnlyProvider))
-              _buildDataSyncInfoTile(context, ref),
             _buildLocalOnlyTile(context, ref, settings),
             ActionSettingsTile(
               leading: const Icon(Icons.upload_file),
@@ -135,6 +133,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ActionSettingsTile(
               leading: const Icon(Icons.download),
               title: Text('import_data'.tr()),
+              subtitle: Text('import_data_subtitle'.tr()),
               onTap: () => _importData(context, ref),
             ),
           ]),
@@ -166,38 +165,44 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   .read(settings.provider(receiptAiProviderSettingDef).notifier)
                   .set(v),
             ),
-            ListTile(
-              leading: const Icon(Icons.key),
-              title: Text('gemini_api_key'.tr()),
-              subtitle: Text(
-                ref.watch(geminiApiKeyProvider).isEmpty
-                    ? 'receipt_ai_key_not_set'.tr()
-                    : 'receipt_ai_key_set'.tr(),
+            if (ref.watch(settings.provider(receiptAiProviderSettingDef)) ==
+                    'gemini' ||
+                ref.watch(geminiApiKeyProvider).isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.key),
+                title: Text('gemini_api_key'.tr()),
+                subtitle: Text(
+                  ref.watch(geminiApiKeyProvider).isEmpty
+                      ? 'receipt_ai_key_not_set'.tr()
+                      : 'receipt_ai_key_set'.tr(),
+                ),
+                onTap: () => _showApiKeyDialog(
+                  context: context,
+                  ref: ref,
+                  titleKey: 'gemini_api_key',
+                  currentValue: ref.read(geminiApiKeyProvider),
+                  settingDef: geminiApiKeySettingDef,
+                ),
               ),
-              onTap: () => _showApiKeyDialog(
-                context: context,
-                ref: ref,
-                titleKey: 'gemini_api_key',
-                currentValue: ref.read(geminiApiKeyProvider),
-                settingDef: geminiApiKeySettingDef,
+            if (ref.watch(settings.provider(receiptAiProviderSettingDef)) ==
+                    'openai' ||
+                ref.watch(openaiApiKeyProvider).isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.key),
+                title: Text('openai_api_key'.tr()),
+                subtitle: Text(
+                  ref.watch(openaiApiKeyProvider).isEmpty
+                      ? 'receipt_ai_key_not_set'.tr()
+                      : 'receipt_ai_key_set'.tr(),
+                ),
+                onTap: () => _showApiKeyDialog(
+                  context: context,
+                  ref: ref,
+                  titleKey: 'openai_api_key',
+                  currentValue: ref.read(openaiApiKeyProvider),
+                  settingDef: openaiApiKeySettingDef,
+                ),
               ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.key),
-              title: Text('openai_api_key'.tr()),
-              subtitle: Text(
-                ref.watch(openaiApiKeyProvider).isEmpty
-                    ? 'receipt_ai_key_not_set'.tr()
-                    : 'receipt_ai_key_set'.tr(),
-              ),
-              onTap: () => _showApiKeyDialog(
-                context: context,
-                ref: ref,
-                titleKey: 'openai_api_key',
-                currentValue: ref.read(openaiApiKeyProvider),
-                settingDef: openaiApiKeySettingDef,
-              ),
-            ),
           ]),
           // Privacy: renamed from Logging
           _buildSection(context, ref, settings, privacySection, [
@@ -209,6 +214,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             SwitchSettingsTile.fromSetting(
               setting: telemetryEnabledSettingDef,
               title: 'telemetry_enabled'.tr(),
+              subtitle: 'telemetry_enabled_description'.tr(),
               value: ref.watch(settings.provider(telemetryEnabledSettingDef)),
               onChanged: (v) => ref
                   .read(settings.provider(telemetryEnabledSettingDef).notifier)
@@ -249,11 +255,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   }
                 },
               ),
-            ActionSettingsTile(
-              leading: const Icon(Icons.description),
-              title: Text('view_logs'.tr()),
-              onTap: () => _showLogsDialog(context),
-            ),
           ]),
           _buildSection(context, ref, settings, advancedSection, [
             ActionSettingsTile(
@@ -261,6 +262,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               title: Text('return_to_onboarding'.tr()),
               subtitle: Text('return_to_onboarding_description'.tr()),
               onTap: () => _resetToOnboarding(context, ref, settings),
+            ),
+            ActionSettingsTile(
+              leading: const Icon(Icons.description),
+              title: Text('view_logs'.tr()),
+              onTap: () => _showLogsDialog(context),
             ),
             ActionSettingsTile(
               leading: const Icon(Icons.restore),
@@ -526,54 +532,29 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     };
   }
 
-  Widget _buildDataSyncInfoTile(BuildContext context, WidgetRef ref) {
-    final syncStatus = ref.watch(syncStatusProvider);
-    final colorScheme = Theme.of(context).colorScheme;
-
-    final (icon, color, title, subtitle) = switch (syncStatus) {
-      SyncStatus.connected => (
-        Icons.cloud_done_outlined,
-        colorScheme.primary,
-        'sync_connected'.tr(),
-        'sync_data_auto'.tr(),
-      ),
-      SyncStatus.syncing => (
-        Icons.sync,
-        colorScheme.tertiary,
-        'sync_syncing'.tr(),
-        'sync_data_uploading'.tr(),
-      ),
-      SyncStatus.offline => (
-        Icons.cloud_off_outlined,
-        colorScheme.error,
-        'sync_offline'.tr(),
-        'sync_data_offline'.tr(),
-      ),
-      SyncStatus.localOnly => (
-        Icons.storage,
-        colorScheme.onSurfaceVariant,
-        'local_only'.tr(),
-        '',
-      ),
-    };
-
-    return ListTile(
-      leading: Icon(icon, color: color),
-      title: Text(title),
-      subtitle: subtitle.isNotEmpty ? Text(subtitle) : null,
-      trailing: Container(
-        width: 10,
-        height: 10,
-        decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-      ),
-    );
-  }
-
   static Future<void> _handleSignOut(
     BuildContext context,
     WidgetRef ref,
     SettingsProviders settings,
   ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('sign_out_confirm_title'.tr()),
+        content: Text('sign_out_confirm_body'.tr()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('cancel'.tr()),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('sign_out'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
     ref.read(settings.provider(localOnlySettingDef).notifier).set(true);
     try {
       await ref.read(authServiceProvider).signOut();
@@ -583,7 +564,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (!context.mounted) return;
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text('sign_out'.tr())));
+    ).showSnackBar(SnackBar(content: Text('signed_out_message'.tr())));
   }
 
   Widget _buildSection(
