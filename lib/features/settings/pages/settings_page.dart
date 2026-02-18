@@ -71,10 +71,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       return Scaffold(
         appBar: AppBar(
           title: Text('settings'.tr()),
-          actions: const [
-            SyncStatusChip(),
-            SizedBox(width: 12),
-          ],
+          actions: const [SyncStatusChip(), SizedBox(width: 12)],
         ),
         body: Center(child: Text('settings_unavailable'.tr())),
       );
@@ -83,10 +80,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text('settings'.tr()),
-        actions: const [
-          SyncStatusChip(),
-          SizedBox(width: 12),
-        ],
+        actions: const [SyncStatusChip(), SizedBox(width: 12)],
       ),
       body: ListView(
         children: [
@@ -129,9 +123,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               title: 'expense_form_full_features'.tr(),
               subtitle: 'expense_form_full_features_description'.tr(),
               value: ref.watch(
-                  settings.provider(expenseFormFullFeaturesSettingDef)),
+                settings.provider(expenseFormFullFeaturesSettingDef),
+              ),
               onChanged: (v) => ref
-                  .read(settings.provider(expenseFormFullFeaturesSettingDef).notifier)
+                  .read(
+                    settings
+                        .provider(expenseFormFullFeaturesSettingDef)
+                        .notifier,
+                  )
                   .set(v),
             ),
           ]),
@@ -239,11 +238,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 title: 'notifications_enabled'.tr(),
                 subtitle: 'notifications_enabled_description'.tr(),
                 value: ref.watch(
-                    settings.provider(notificationsEnabledSettingDef)),
+                  settings.provider(notificationsEnabledSettingDef),
+                ),
                 onChanged: (v) async {
-                  final notifier = ref.read(settings
-                      .provider(notificationsEnabledSettingDef)
-                      .notifier);
+                  final notifier = ref.read(
+                    settings.provider(notificationsEnabledSettingDef).notifier,
+                  );
                   if (v) {
                     final ok = await ref
                         .read(notificationServiceProvider.notifier)
@@ -308,8 +308,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       if (!onlineAvailable)
         ListTile(
           leading: CircleAvatar(
-            backgroundColor:
-                Theme.of(context).colorScheme.surfaceContainerHighest,
+            backgroundColor: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest,
             child: Icon(
               Icons.cloud_off,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -335,8 +336,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ListTile(
         leading: CircleAvatar(
           backgroundColor: colorScheme.primaryContainer,
-          child:
-              Icon(Icons.smartphone, color: colorScheme.onPrimaryContainer),
+          child: Icon(Icons.smartphone, color: colorScheme.onPrimaryContainer),
         ),
         title: Text(
           'local_only'.tr(),
@@ -351,9 +351,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               _handleLocalOnlyChanged(context, ref, settings, false),
           icon: const Icon(Icons.cloud_upload_outlined),
           label: Text('switch_to_online'.tr()),
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(48),
-          ),
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
         ),
       ),
     ];
@@ -404,10 +402,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               backgroundColor: colorScheme.primaryContainer,
               foregroundColor: colorScheme.onPrimaryContainer,
               child: emoji != null
-                  ? Text(
-                      emoji,
-                      style: const TextStyle(fontSize: 24),
-                    )
+                  ? Text(emoji, style: const TextStyle(fontSize: 24))
                   : Text(
                       initials,
                       style: textTheme.titleSmall?.copyWith(
@@ -503,10 +498,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       leading: Icon(icon, color: color),
       title: Text(label),
       subtitle: provider.isNotEmpty
-          ? Text(
-              'account_signed_in_via'
-                  .tr(namedArgs: {'provider': provider}),
-            )
+          ? Text('account_signed_in_via'.tr(namedArgs: {'provider': provider}))
           : null,
       trailing: Container(
         width: 10,
@@ -846,24 +838,30 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       onTap: () async {
         final chosen = await showModalBottomSheet<Locale>(
           context: context,
+          isScrollControlled: true,
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.75,
+          ),
           builder: (ctx) => SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    'language'.tr(),
-                    style: Theme.of(ctx).textTheme.titleMedium,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      'language'.tr(),
+                      style: Theme.of(ctx).textTheme.titleMedium,
+                    ),
                   ),
-                ),
-                ..._supportedLocales.map(
-                  (locale) => ListTile(
-                    title: Text(_localeDisplayName(locale)),
-                    onTap: () => Navigator.of(ctx).pop(locale),
+                  ..._supportedLocales.map(
+                    (locale) => ListTile(
+                      title: Text(_localeDisplayName(locale)),
+                      onTap: () => Navigator.of(ctx).pop(locale),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
@@ -888,10 +886,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final isCustom = stored.trim().isNotEmpty;
 
     // Build short labels: "🇸🇦 SAR, 🇯🇵 JPY, ..."
-    final labels = effective.map((code) {
-      final c = CurrencyHelpers.fromCode(code);
-      return c != null ? CurrencyHelpers.shortLabel(c) : code;
-    }).join(', ');
+    final labels = effective
+        .map((code) {
+          final c = CurrencyHelpers.fromCode(code);
+          return c != null ? CurrencyHelpers.shortLabel(c) : code;
+        })
+        .join(', ');
 
     return ListTile(
       leading: const Icon(Icons.star_outline),
@@ -908,9 +908,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               onPressed: () {
                 ref
                     .read(
-                      settings
-                          .provider(favoriteCurrenciesSettingDef)
-                          .notifier,
+                      settings.provider(favoriteCurrenciesSettingDef).notifier,
                     )
                     .set('');
               },
@@ -925,10 +923,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     WidgetRef ref,
     SettingsProviders settings,
   ) {
-    final stored =
-        ref.read(settings.provider(favoriteCurrenciesSettingDef));
-    final current =
-        List<String>.from(CurrencyHelpers.getEffectiveFavorites(stored));
+    final stored = ref.read(settings.provider(favoriteCurrenciesSettingDef));
+    final current = List<String>.from(
+      CurrencyHelpers.getEffectiveFavorites(stored),
+    );
 
     showModalBottomSheet(
       context: context,
@@ -941,11 +939,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         onSave: (updated) {
           final encoded = CurrencyHelpers.encodeFavorites(updated);
           ref
-              .read(
-                settings
-                    .provider(favoriteCurrenciesSettingDef)
-                    .notifier,
-              )
+              .read(settings.provider(favoriteCurrenciesSettingDef).notifier)
               .set(encoded);
         },
       ),
@@ -986,7 +980,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             // Reset controller so sheet can open again after being dismissed (e.g. if user navigated away without submitting).
             BetterFeedback.of(context).hide();
             BetterFeedback.of(context).show(
-              (UserFeedback feedback) => handleFeedback(context, feedback: feedback),
+              (UserFeedback feedback) =>
+                  handleFeedback(context, feedback: feedback),
             );
           },
         ),
@@ -1352,9 +1347,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('donate'.tr())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('donate'.tr())));
       }
     }
   }
@@ -1447,10 +1442,7 @@ class _FavoriteCurrenciesSheet extends StatefulWidget {
   final List<String> initial;
   final ValueChanged<List<String>> onSave;
 
-  const _FavoriteCurrenciesSheet({
-    required this.initial,
-    required this.onSave,
-  });
+  const _FavoriteCurrenciesSheet({required this.initial, required this.onSave});
 
   @override
   State<_FavoriteCurrenciesSheet> createState() =>
@@ -1539,10 +1531,13 @@ class _FavoriteCurrenciesSheetState extends State<_FavoriteCurrenciesSheet> {
               ),
             )
           else
-            Flexible(
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.5,
+              ),
               child: ReorderableListView.builder(
-                shrinkWrap: true,
                 itemCount: _codes.length,
+                shrinkWrap: true,
                 onReorder: (oldIndex, newIndex) {
                   setState(() {
                     if (newIndex > oldIndex) newIndex--;

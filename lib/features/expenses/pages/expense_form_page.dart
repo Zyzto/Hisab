@@ -1099,20 +1099,25 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     final theme = Theme.of(context);
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.75,
+      ),
       builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'category'.tr(),
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'category'.tr(),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
               Wrap(
                 spacing: 10,
                 runSpacing: 10,
@@ -1253,6 +1258,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           ),
         ),
       ),
+    ),
     );
   }
 
@@ -1363,21 +1369,27 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     }
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
+      isScrollControlled: true,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.75,
+      ),
       builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: Text('camera'.tr()),
-              onTap: () => Navigator.pop(ctx, ImageSource.camera),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: Text('gallery'.tr()),
-              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
-            ),
-          ],
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: Text('camera'.tr()),
+                onTap: () => Navigator.pop(ctx, ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: Text('gallery'.tr()),
+                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1713,24 +1725,30 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                   if (others.isEmpty) return;
                   final chosen = await showModalBottomSheet<String>(
                     context: context,
+                    isScrollControlled: true,
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(context).size.height * 0.75,
+                    ),
                     builder: (ctx) => SafeArea(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Text(
-                              'to'.tr(),
-                              style: Theme.of(ctx).textTheme.titleMedium,
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Text(
+                                'to'.tr(),
+                                style: Theme.of(ctx).textTheme.titleMedium,
+                              ),
                             ),
-                          ),
-                          ...others.map(
-                            (p) => ListTile(
-                              title: Text(p.name),
-                              onTap: () => Navigator.of(ctx).pop(p.id),
+                            ...others.map(
+                              (p) => ListTile(
+                                title: Text(p.name),
+                                onTap: () => Navigator.of(ctx).pop(p.id),
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   );
@@ -1828,24 +1846,30 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   ) async {
     final chosen = await showModalBottomSheet<String>(
       context: context,
+      isScrollControlled: true,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.75,
+      ),
       builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                'paid_by_label'.tr(),
-                style: Theme.of(ctx).textTheme.titleMedium,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  'paid_by_label'.tr(),
+                  style: Theme.of(ctx).textTheme.titleMedium,
+                ),
               ),
-            ),
-            ...participants.map(
-              (p) => ListTile(
-                title: Text(p.name),
-                onTap: () => Navigator.of(ctx).pop(p.id),
+              ...participants.map(
+                (p) => ListTile(
+                  title: Text(p.name),
+                  onTap: () => Navigator.of(ctx).pop(p.id),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1855,30 +1879,36 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   Future<void> _showSplitTypePicker(BuildContext context) async {
     final chosen = await showModalBottomSheet<SplitType>(
       context: context,
+      isScrollControlled: true,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.75,
+      ),
       builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                'split_type'.tr(),
-                style: Theme.of(ctx).textTheme.titleMedium,
-              ),
-            ),
-            ...SplitType.values.map(
-              (e) => ListTile(
-                title: Text(
-                  e == SplitType.equal
-                      ? 'equal'.tr()
-                      : e == SplitType.parts
-                      ? 'parts'.tr()
-                      : 'amounts'.tr(),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  'split_type'.tr(),
+                  style: Theme.of(ctx).textTheme.titleMedium,
                 ),
-                onTap: () => Navigator.of(ctx).pop(e),
               ),
-            ),
-          ],
+              ...SplitType.values.map(
+                (e) => ListTile(
+                  title: Text(
+                    e == SplitType.equal
+                        ? 'equal'.tr()
+                        : e == SplitType.parts
+                        ? 'parts'.tr()
+                        : 'amounts'.tr(),
+                  ),
+                  onTap: () => Navigator.of(ctx).pop(e),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
