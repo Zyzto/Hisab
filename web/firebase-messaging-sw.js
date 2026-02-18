@@ -9,41 +9,57 @@ importScripts("https://www.gstatic.com/firebasejs/11.4.0/firebase-messaging-comp
 
 // Firebase config — must match index.html
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.firebasestorage.app",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID",
+  apiKey: "AIzaSyAHqu53pQGNME24l4XvsZZ3YvT1u--rfxk",
+  authDomain: "hisab-c8eb1.firebaseapp.com",
+  projectId: "hisab-c8eb1",
+  storageBucket: "hisab-c8eb1.firebasestorage.app",
+  messagingSenderId: "981938007704",
+  appId: "1:981938007704:web:9a607f674d6cdae0b1aaed",
 };
 
-firebase.initializeApp(firebaseConfig);
+function hasPlaceholderFirebaseConfig(config) {
+  return Object.values(config).some(
+    (v) => typeof v === "string" && v.includes("YOUR_")
+  );
+}
 
-const messaging = firebase.messaging();
+const isConfigured = !hasPlaceholderFirebaseConfig(firebaseConfig);
+
+if (isConfigured) {
+  firebase.initializeApp(firebaseConfig);
+}
+
+const messaging = isConfigured ? firebase.messaging() : null;
 
 // Handle background messages (when PWA is closed or tab is backgrounded).
 // FCM automatically shows a notification using the `notification` payload field.
 // This handler is for custom processing of the `data` payload if needed.
-messaging.onBackgroundMessage((payload) => {
-  console.log("[firebase-messaging-sw] Background message:", payload);
+if (messaging) {
+  messaging.onBackgroundMessage((payload) => {
+    console.log("[firebase-messaging-sw] Background message:", payload);
 
-  // If FCM already shows a notification (via `notification` field), skip.
-  if (payload.notification) {
-    return;
-  }
+    // If FCM already shows a notification (via `notification` field), skip.
+    if (payload.notification) {
+      return;
+    }
 
-  // Fallback: show notification from data payload
-  const data = payload.data || {};
-  const title = data.title || "Hisab";
-  const body = data.body || "You have a new notification";
+    // Fallback: show notification from data payload
+    const data = payload.data || {};
+    const title = data.title || "Hisab";
+    const body = data.body || "You have a new notification";
 
-  return self.registration.showNotification(title, {
-    body: body,
-    icon: "/icons/Icon-192.png",
-    badge: "/icons/Icon-192.png",
-    data: data,
+    return self.registration.showNotification(title, {
+      body: body,
+      icon: "/icons/Icon-192.png",
+      badge: "/icons/Icon-192.png",
+      data: data,
+    });
   });
-});
+} else {
+  console.warn(
+    "[firebase-messaging-sw] Firebase web config uses placeholders; background push notifications are disabled."
+  );
+}
 
 // Handle notification click — open or focus the app and navigate to the group
 self.addEventListener("notificationclick", (event) => {
@@ -63,6 +79,9 @@ self.addEventListener("notificationclick", (event) => {
       // If the app is already open, focus it and navigate
       for (const client of clientList) {
         if ("focus" in client) {
+          if ("navigate" in client) {
+            client.navigate(targetUrl);
+          }
           client.focus();
           client.postMessage({ type: "NOTIFICATION_CLICK", url: targetUrl });
           return;
