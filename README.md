@@ -91,7 +91,7 @@ flutter run \
   --dart-define=SUPABASE_ANON_KEY=eyJhbGci...
 ```
 
-For web: ensure `web/sqlite3.wasm` is present. Generate it with:
+For web: ensure `web/sqlite3.wasm` is present (it is generated locally and typically not committed). Generate it with:
 
 ```bash
 dart run powersync:setup_web
@@ -108,7 +108,7 @@ dart run powersync:setup_web
   - Complex operations (invite accept, ownership transfer, etc.) use Supabase RPC functions.
 - **Sync** — `DataSyncService` handles: full fetch from Supabase, push pending offline writes, periodic refresh.
 - **Auth** — Supabase Auth (email/password, magic link, Google OAuth, GitHub OAuth).
-- **Domain** — `lib/domain/`: Group, Participant, Expense (amounts in cents), SplitType, SettlementTransaction.
+- **Domain** — `lib/domain/`: Group, Participant, Expense (amounts in cents), SplitType, SettlementTransaction, and related types (e.g. GroupMember, GroupInvite, SettlementMethod, SettlementSnapshot).
 
 ## Supabase (optional)
 
@@ -116,7 +116,7 @@ For **online mode**, set up Supabase. See **[SUPABASE_SETUP.md](docs/SUPABASE_SE
 
 - Creating the Supabase project and applying database migrations
 - Configuring authentication providers (email, Google, GitHub)
-- Deploying Edge Functions (invite-redirect, telemetry)
+- Deploying Edge Functions (the repo includes `invite-redirect`; `telemetry` and `send-notification` are documented in setup docs and can be deployed from those definitions)
 - Configuring `--dart-define` parameters
 
 If no `--dart-define` values are provided, the app runs in **local-only mode** — all features work except sign-in and cross-device sync.
@@ -134,7 +134,7 @@ Full configuration reference: [CONFIGURATION.md](docs/CONFIGURATION.md).
 
 ### Keeping secrets out of git
 
-All secrets are provided at build time via `--dart-define` — nothing is committed to the repository. The only gitignored secrets file is `lib/core/constants/app_secrets.dart` which contains fallback placeholders.
+All secrets are provided at build time via `--dart-define` — nothing is committed to the repository. The only gitignored file for local secrets is `lib/core/constants/app_secrets.dart` (copy from `app_secrets_example.dart`); it holds the report-issue URL. All Supabase and Firebase values are provided via `--dart-define` only.
 
 ## CI/CD (GitHub Actions)
 
@@ -158,6 +158,12 @@ Go to **repo Settings** → **Secrets and variables** → **Actions** and add ea
 |--------|--------------|
 | `FIREBASE_SERVICE_ACCOUNT` | Firebase Console → **Project Settings** → **Service accounts** → **Generate new private key** → paste the entire JSON |
 
+#### Firebase / FCM (web push, optional for Android)
+
+| Secret | How to get it |
+|--------|--------------|
+| `FCM_VAPID_KEY` | Firebase Console → **Project Settings** → **Cloud Messaging** → **Web Push certificates** → generate or copy the key pair's public key (required for web push token) |
+
 #### Android Signing
 
 Generate a keystore (one-time setup):
@@ -167,7 +173,7 @@ keytool -genkey -v \
   -keystore ~/hisab-release.jks \
   -keyalg RSA -keysize 2048 \
   -validity 10000 \
-  -alias hisab
+  -alias hisab-release
 ```
 
 You will be prompted for a **store password** and a **key password** (press Enter at the key password prompt to reuse the store password).
@@ -188,8 +194,9 @@ cp ~/hisab-release.jks android/app/release-keystore.jks
 |--------|-------|
 | `KEYSTORE_BASE64` | Output of `base64 -w 0 ~/hisab-release.jks` (entire string, no newlines) |
 | `KEYSTORE_PASSWORD` | The store password you chose during `keytool` |
-| `KEY_ALIAS` | `hisab` |
+| `KEY_ALIAS` | `hisab-release` |
 | `KEY_PASSWORD` | The key password (same as store password if you pressed Enter) |
+| `GOOGLE_SERVICES_JSON` | Base64-encoded `android/app/google-services.json` (Firebase Console → **Project settings** → your Android app → download `google-services.json`, then `base64 -w 0 android/app/google-services.json`) |
 
 #### Google Play (optional)
 
@@ -204,7 +211,7 @@ Create `android/key.properties` (gitignored):
 ```properties
 storeFile=/absolute/path/to/android/app/release-keystore.jks
 storePassword=your_store_password
-keyAlias=hisab
+keyAlias=hisab-release
 keyPassword=your_key_password
 ```
 

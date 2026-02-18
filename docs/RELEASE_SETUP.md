@@ -198,6 +198,8 @@ Add each secret listed below:
 | `KEY_PASSWORD` | The key password from [step 2](#2-generate-an-android-release-keystore) |
 | `PLAY_STORE_SERVICE_ACCOUNT_JSON` | The full JSON contents from [step 5a](#5a-create-the-service-account-in-google-cloud) |
 | `FIREBASE_SERVICE_ACCOUNT` | The full JSON contents from [step 6b](#6b-generate-a-firebase-service-account-for-ci) |
+| `GOOGLE_SERVICES_JSON` | Base64-encoded contents of `android/app/google-services.json` (Firebase Console → Project settings → your Android app → download `google-services.json`, then `base64 -w 0 android/app/google-services.json` or equivalent) |
+| `FCM_VAPID_KEY` | Web Push certificate VAPID key from Firebase Console → Project Settings → Cloud Messaging → Web Push certificates (needed for web and optionally for Android FCM) |
 
 ---
 

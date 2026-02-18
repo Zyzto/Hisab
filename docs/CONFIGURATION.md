@@ -46,6 +46,7 @@ The app works fully offline with no configuration. Authentication, sync, invites
 | `SUPABASE_ANON_KEY` | For online mode | Your Supabase anon/public key (starts with `eyJ...`) |
 | `INVITE_BASE_URL` | Optional | Custom base URL for invite links (e.g. `https://invite.yourdomain.com`). When set, share links and QR codes use this instead of the Supabase URL. See [Invite links with a custom domain](#invite-links-with-a-custom-domain). |
 | `SITE_URL` | Optional | Redirect URL for auth emails (magic link, sign-up confirmation). When set (e.g. `https://yourdomain.com`), verification and magic links in emails point here instead of the Supabase default (e.g. localhost). Must be in Supabase **Redirect URLs**. |
+| `FCM_VAPID_KEY` | Optional | VAPID key for Firebase Cloud Messaging on web (Web Push certificates in Firebase Console). Required for web push token. |
 
 Find these values in:
 - **Supabase**: Dashboard → Settings → API
