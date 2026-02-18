@@ -723,3 +723,45 @@ final class NotificationsEnabledProvider
 
 String _$notificationsEnabledHash() =>
     r'd2accaf7ba61744fc47169cb415cc979e6fecdb7';
+
+@ProviderFor(expenseFormFullFeatures)
+final expenseFormFullFeaturesProvider = ExpenseFormFullFeaturesProvider._();
+
+final class ExpenseFormFullFeaturesProvider
+    extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  ExpenseFormFullFeaturesProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'expenseFormFullFeaturesProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$expenseFormFullFeaturesHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return expenseFormFullFeatures(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$expenseFormFullFeaturesHash() =>
+    r'9d8cf0c3ba7f994110ad662ff2a2267b84121f1b';

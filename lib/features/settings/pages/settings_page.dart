@@ -122,6 +122,19 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
             _favoriteCurrenciesTile(context, ref, settings),
           ]),
+          // Functional: behavior toggles (expense form mode, etc.)
+          _buildSection(context, ref, settings, functionalSection, [
+            SwitchSettingsTile.fromSetting(
+              setting: expenseFormFullFeaturesSettingDef,
+              title: 'expense_form_full_features'.tr(),
+              subtitle: 'expense_form_full_features_description'.tr(),
+              value: ref.watch(
+                  settings.provider(expenseFormFullFeaturesSettingDef)),
+              onChanged: (v) => ref
+                  .read(settings.provider(expenseFormFullFeaturesSettingDef).notifier)
+                  .set(v),
+            ),
+          ]),
           // Data & Backup: merged Data + old Backup
           _buildSection(context, ref, settings, dataBackupSection, [
             _buildLocalOnlyTile(context, ref, settings),

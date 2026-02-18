@@ -13,6 +13,7 @@ import '../../../core/services/permission_service.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/services/exchange_rate_service.dart';
 import '../../../core/telemetry/telemetry_service.dart';
+import '../../../core/navigation/route_paths.dart';
 import '../../../core/utils/currency_helpers.dart';
 import '../../../features/settings/providers/settings_framework_providers.dart';
 import '../../groups/providers/groups_provider.dart';
@@ -745,6 +746,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                     : participants.first.id);
             final tagsAsync = ref.watch(tagsByGroupProvider(widget.groupId));
             final customTags = tagsAsync.value ?? [];
+            final fullFeatures = ref.watch(expenseFormFullFeaturesProvider);
+            final showSimpleForm =
+                !fullFeatures && widget.expenseId == null;
 
             return Scaffold(
               appBar: AppBar(
@@ -756,6 +760,18 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                   icon: const Icon(Icons.arrow_back),
                   onPressed: () => context.pop(),
                 ),
+                actions: showSimpleForm
+                    ? [
+                        Tooltip(
+                          message: 'expense_form_full_features_tooltip'.tr(),
+                          child: IconButton(
+                            icon: const Icon(Icons.info_outline),
+                            onPressed: () =>
+                                _showExpenseFormInfoDialog(context),
+                          ),
+                        ),
+                      ]
+                    : null,
               ),
               body: Form(
                 key: _formKey,
@@ -765,40 +781,42 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                     vertical: 12,
                   ),
                   children: [
-                    ExpenseTransactionTypePill(
-                      value: _transactionType,
-                      onChanged: (type) {
-                        setState(() {
-                          _transactionType = type;
-                          if (type == TransactionType.transfer &&
-                              _toParticipantId == null) {
-                            final participants =
-                                ref
-                                    .read(
-                                      participantsByGroupProvider(
-                                        widget.groupId,
-                                      ),
+                    if (!showSimpleForm) ...[
+                      ExpenseTransactionTypePill(
+                        value: _transactionType,
+                        onChanged: (type) {
+                          setState(() {
+                            _transactionType = type;
+                            if (type == TransactionType.transfer &&
+                                _toParticipantId == null) {
+                              final participants =
+                                  ref
+                                      .read(
+                                        participantsByGroupProvider(
+                                          widget.groupId,
+                                        ),
+                                      )
+                                      .value ??
+                                  [];
+                              final payerId =
+                                  _payerParticipantId ??
+                                  (participants.isNotEmpty
+                                      ? participants.first.id
+                                      : null);
+                              if (participants.length > 1 && payerId != null) {
+                                _toParticipantId = participants
+                                    .firstWhere(
+                                      (p) => p.id != payerId,
+                                      orElse: () => participants.first,
                                     )
-                                    .value ??
-                                [];
-                            final payerId =
-                                _payerParticipantId ??
-                                (participants.isNotEmpty
-                                    ? participants.first.id
-                                    : null);
-                            if (participants.length > 1 && payerId != null) {
-                              _toParticipantId = participants
-                                  .firstWhere(
-                                    (p) => p.id != payerId,
-                                    orElse: () => participants.first,
-                                  )
-                                  .id;
+                                    .id;
+                              }
                             }
-                          }
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 24),
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                    ],
                     if (!isTransfer) ...[
                       ExpenseTitleSection(
                         controller: _titleController,
@@ -1051,6 +1069,29 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => Scaffold(body: Center(child: Text('$e'))),
+    );
+  }
+
+  void _showExpenseFormInfoDialog(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('expense_form_full_features_tooltip_title'.tr()),
+        content: Text('expense_form_full_features_tooltip'.tr()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('cancel'.tr()),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              context.go(RoutePaths.settings);
+            },
+            child: Text('settings'.tr()),
+          ),
+        ],
+      ),
     );
   }
 

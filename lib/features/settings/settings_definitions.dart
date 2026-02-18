@@ -18,19 +18,28 @@ final appearanceSection = const SettingSection(
   initiallyExpanded: true,
 );
 
+/// Toggles that change app behavior (e.g. expense form mode).
+final functionalSection = const SettingSection(
+  key: 'functional',
+  titleKey: 'functional_settings',
+  icon: Icons.tune,
+  order: 1,
+  initiallyExpanded: true,
+);
+
 /// Merged from old Data + Backup sections.
 final dataBackupSection = const SettingSection(
   key: 'data_backup',
   titleKey: 'data_backup',
   icon: Icons.storage,
-  order: 1,
+  order: 2,
 );
 
 final receiptAiSection = const SettingSection(
   key: 'receipt_ai',
   titleKey: 'receipt_ai_section',
   icon: Icons.receipt_long,
-  order: 2,
+  order: 3,
 );
 
 /// Renamed from old Logging section.
@@ -38,7 +47,7 @@ final privacySection = const SettingSection(
   key: 'privacy',
   titleKey: 'privacy',
   icon: Icons.shield_outlined,
-  order: 3,
+  order: 4,
 );
 
 /// When true, send anonymous usage data to telemetry endpoint. No-op if endpoint is empty.
@@ -66,14 +75,14 @@ final advancedSection = const SettingSection(
   key: 'advanced',
   titleKey: 'advanced',
   icon: Icons.build,
-  order: 4,
+  order: 5,
 );
 
 final aboutSection = const SettingSection(
   key: 'about',
   titleKey: 'about',
   icon: Icons.info,
-  order: 5,
+  order: 6,
 );
 
 final themeModeSettingDef = const EnumSetting(
@@ -240,6 +249,7 @@ final openaiApiKeySettingDef = const StringSetting(
 final allSections = [
   accountSection,
   appearanceSection,
+  functionalSection,
   dataBackupSection,
   receiptAiSection,
   privacySection,
@@ -259,6 +269,17 @@ final favoriteCurrenciesSettingDef = const StringSetting(
   order: 4,
 );
 
+/// When true, expense form shows full options (Expense / Income / Transfer pill).
+/// When false (default), only expense addition is shown; pill is hidden.
+final expenseFormFullFeaturesSettingDef = const BoolSetting(
+  'expense_form_full_features',
+  defaultValue: false,
+  titleKey: 'expense_form_full_features',
+  icon: Icons.receipt_long_outlined,
+  section: 'functional',
+  order: 0,
+);
+
 final allSettings = <SettingDefinition>[
   onboardingCompletedSettingDef,
   onboardingOnlinePendingSettingDef,
@@ -269,6 +290,7 @@ final allSettings = <SettingDefinition>[
   languageSettingDef,
   fontSizeScaleSettingDef,
   favoriteCurrenciesSettingDef,
+  expenseFormFullFeaturesSettingDef,
   localOnlySettingDef,
   receiptOcrEnabledSettingDef,
   receiptAiEnabledSettingDef,
