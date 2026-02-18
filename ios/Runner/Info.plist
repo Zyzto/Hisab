@@ -60,7 +60,13 @@
 	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Hisab needs camera access to scan receipts</string>
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>Hisab uses notifications to alert you about group activity</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Hisab needs photo library access to pick receipt images</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>
