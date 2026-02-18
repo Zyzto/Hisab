@@ -78,7 +78,6 @@ const schema = Schema([
     Column.integer('is_active'),
   ]),
   Table('invite_usages', [
-    Column.text('id'),
     Column.text('invite_id'),
     Column.text('user_id'),
     Column.text('accepted_at'),
