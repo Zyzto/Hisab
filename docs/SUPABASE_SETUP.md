@@ -17,6 +17,11 @@ This guide walks you through setting up the Supabase backend for Hisab from scra
    - [Migration 4: Security Hardening](#migration-4-security-hardening)
    - [Migration 5: Device Tokens (Push Notifications)](#migration-5-device-tokens-push-notifications)
    - [Migration 6: Notification Triggers](#migration-6-notification-triggers)
+   - [Migration 7: Schema Additions (drift fix)](#migration-7-schema-additions-drift-fix)
+   - [Migration 8: RPC updates (invites)](#migration-8-rpc-updates-invites)
+   - [Migration 9: Security hardening (search_path, revoke/toggle RPCs)](#migration-9-security-hardening-search_path-revoketoggle-rpcs)
+   - [Migration 10: RLS performance (auth initplan and merged groups SELECT)](#migration-10-rls-performance-auth-initplan-and-merged-groups-select)
+   - [Migration 11: Indexes (composite, partial, and FK)](#migration-11-indexes-composite-partial-and-fk)
 4. [Configure Authentication](#4-configure-authentication)
 5. [Deploy Edge Functions](#5-deploy-edge-functions)
 6. [Configure the Flutter App](#6-configure-the-flutter-app)
@@ -168,7 +173,9 @@ CREATE INDEX idx_group_members_group_id ON public.group_members(group_id);
 CREATE INDEX idx_group_members_user_id ON public.group_members(user_id);
 CREATE INDEX idx_group_invites_group_id ON public.group_invites(group_id);
 CREATE INDEX idx_participants_group_id ON public.participants(group_id);
+CREATE INDEX idx_participants_group_id_sort_order ON public.participants(group_id, sort_order);
 CREATE INDEX idx_expenses_group_id ON public.expenses(group_id);
+CREATE INDEX idx_expenses_group_id_date_desc ON public.expenses(group_id, date DESC);
 CREATE INDEX idx_expense_tags_group_id ON public.expense_tags(group_id);
 
 -- Updated-at triggers
@@ -226,18 +233,16 @@ ALTER TABLE public.group_invites ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.telemetry ENABLE ROW LEVEL SECURITY;
 
 -- =============================================
--- Groups Policies
+-- Groups Policies (single SELECT for performance; (select auth.uid()) for initplan)
 -- =============================================
-CREATE POLICY "groups_select_members" ON public.groups
-  FOR SELECT USING (public.is_group_member(id));
-
--- Allow creator to SELECT their own group (owner_id = auth.uid()) so that
--- group_members_insert can succeed when adding the first owner row.
-CREATE POLICY "groups_select_owner" ON public.groups
-  FOR SELECT USING (owner_id = auth.uid());
+CREATE POLICY "groups_select" ON public.groups
+  FOR SELECT USING (
+    public.is_group_member(id)
+    OR (SELECT auth.uid()) = owner_id
+  );
 
 CREATE POLICY "groups_insert_authenticated" ON public.groups
-  FOR INSERT WITH CHECK (auth.uid() IS NOT NULL AND owner_id = auth.uid());
+  FOR INSERT WITH CHECK ((SELECT auth.uid()) IS NOT NULL AND owner_id = (SELECT auth.uid()));
 
 CREATE POLICY "groups_update_owner_admin" ON public.groups
   FOR UPDATE USING (public.get_user_role(id) IN ('owner', 'admin'));
@@ -255,9 +260,9 @@ CREATE POLICY "group_members_insert" ON public.group_members
   FOR INSERT WITH CHECK (
     public.get_user_role(group_id) IN ('owner', 'admin')
     OR (
-      user_id = auth.uid()
+      user_id = (SELECT auth.uid())
       AND role = 'owner'
-      AND (SELECT g.owner_id FROM public.groups g WHERE g.id = group_id) = auth.uid()
+      AND (SELECT g.owner_id FROM public.groups g WHERE g.id = group_id) = (SELECT auth.uid())
     )
   );
 
@@ -267,7 +272,7 @@ CREATE POLICY "group_members_update" ON public.group_members
 CREATE POLICY "group_members_delete" ON public.group_members
   FOR DELETE USING (
     public.get_user_role(group_id) IN ('owner', 'admin')
-    OR user_id = auth.uid()
+    OR user_id = (SELECT auth.uid())
   );
 
 -- =============================================
@@ -283,6 +288,7 @@ CREATE POLICY "participants_insert" ON public.participants
       public.get_user_role(group_id) = 'member'
       AND (SELECT g.allow_member_add_participant FROM public.groups g WHERE g.id = group_id) = true
     )
+    OR (SELECT g.owner_id FROM public.groups g WHERE g.id = group_id) = (SELECT auth.uid())
   );
 
 CREATE POLICY "participants_update" ON public.participants
@@ -386,6 +392,7 @@ CREATE POLICY "group_invites_delete" ON public.group_invites
 
 -- =============================================
 -- Telemetry Policies (insert-only, any user including anonymous)
+-- Intentional: anonymous usage events; WITH CHECK (true) is deliberate.
 -- =============================================
 CREATE POLICY "telemetry_insert" ON public.telemetry
   FOR INSERT WITH CHECK (true);
@@ -715,11 +722,11 @@ ALTER FUNCTION public.create_invite(UUID, TEXT, TEXT) SET search_path = '';
 
 ### Migration 5: Device Tokens (Push Notifications)
 
-Creates the `device_tokens` table for storing FCM push notification tokens per user/device.
+Creates the `public.device_tokens` table for storing FCM push notification tokens per user/device. The table lives in the `public` schema; one row per (user_id, token) is enforced by the unique index.
 
 ```sql
--- Device tokens table for FCM push notifications
-CREATE TABLE device_tokens (
+-- Device tokens table for FCM push notifications (public schema)
+CREATE TABLE public.device_tokens (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   token TEXT NOT NULL,
@@ -728,32 +735,32 @@ CREATE TABLE device_tokens (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE UNIQUE INDEX idx_device_tokens_unique ON device_tokens(user_id, token);
-CREATE INDEX idx_device_tokens_user ON device_tokens(user_id);
+CREATE UNIQUE INDEX idx_device_tokens_unique ON public.device_tokens(user_id, token);
+CREATE INDEX idx_device_tokens_user ON public.device_tokens(user_id);
 
 -- Trigger to auto-update updated_at
 CREATE TRIGGER set_device_tokens_updated_at
-  BEFORE UPDATE ON device_tokens
-  FOR EACH ROW EXECUTE FUNCTION handle_updated_at();
+  BEFORE UPDATE ON public.device_tokens
+  FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
 -- RLS: users can only manage their own tokens
-ALTER TABLE device_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.device_tokens ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can view own tokens"
-  ON device_tokens FOR SELECT
+  ON public.device_tokens FOR SELECT
   USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can insert own tokens"
-  ON device_tokens FOR INSERT
+  ON public.device_tokens FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Users can update own tokens"
-  ON device_tokens FOR UPDATE
+  ON public.device_tokens FOR UPDATE
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY "Users can delete own tokens"
-  ON device_tokens FOR DELETE
+  ON public.device_tokens FOR DELETE
   USING (auth.uid() = user_id);
 ```
 
@@ -863,6 +870,374 @@ CREATE TRIGGER notify_on_member_join
   EXECUTE FUNCTION notify_group_activity();
 ```
 
+### Migration 7: Schema Additions (drift fix)
+
+Run this migration after Migrations 1–6 to add columns and the `invite_usages` table so the schema matches what the app expects. Safe for existing projects (uses `ALTER TABLE` / `CREATE TABLE`); new projects run 1–6 then 7 for a full schema.
+
+```sql
+-- =============================================
+-- Schema additions: columns and invite_usages
+-- =============================================
+
+-- group_invites: optional label, usage limits, creator, active flag
+ALTER TABLE public.group_invites
+  ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS label TEXT,
+  ADD COLUMN IF NOT EXISTS max_uses INT,
+  ADD COLUMN IF NOT EXISTS use_count INT DEFAULT 0 NOT NULL,
+  ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true NOT NULL;
+
+-- invite_usages: track who accepted which invite (for max_uses and UI)
+CREATE TABLE IF NOT EXISTS public.invite_usages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  invite_id UUID NOT NULL REFERENCES public.group_invites(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  accepted_at TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_invite_usages_invite_id ON public.invite_usages(invite_id);
+CREATE INDEX IF NOT EXISTS idx_invite_usages_invite_id_accepted_at ON public.invite_usages(invite_id, accepted_at DESC);
+
+ALTER TABLE public.invite_usages ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "invite_usages_select_members" ON public.invite_usages
+  FOR SELECT USING (
+    public.is_group_member((SELECT group_id FROM public.group_invites WHERE id = invite_id))
+  );
+CREATE POLICY "invite_usages_insert_own" ON public.invite_usages
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- participants: link to auth user and avatar
+ALTER TABLE public.participants
+  ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS avatar_id TEXT;
+
+-- expenses: multi-currency and base amount
+ALTER TABLE public.expenses
+  ADD COLUMN IF NOT EXISTS exchange_rate DOUBLE PRECISION DEFAULT 1.0,
+  ADD COLUMN IF NOT EXISTS base_amount_cents INT;
+
+-- groups: optional icon and color (app display); ensure permission columns exist (older projects may lack them)
+ALTER TABLE public.groups
+  ADD COLUMN IF NOT EXISTS icon TEXT,
+  ADD COLUMN IF NOT EXISTS color INT,
+  ADD COLUMN IF NOT EXISTS allow_member_add_participant BOOLEAN DEFAULT true NOT NULL,
+  ADD COLUMN IF NOT EXISTS require_participant_assignment BOOLEAN DEFAULT false NOT NULL;
+
+-- Composite indexes for common query patterns (if not already in Migration 1)
+CREATE INDEX IF NOT EXISTS idx_expenses_group_id_date_desc ON public.expenses(group_id, date DESC);
+CREATE INDEX IF NOT EXISTS idx_participants_group_id_sort_order ON public.participants(group_id, sort_order);
+
+-- Partial index for active invites (optional, helps list-invites-by-group)
+CREATE INDEX IF NOT EXISTS idx_group_invites_active ON public.group_invites(group_id) WHERE expires_at > now();
+```
+
+### Migration 8: RPC updates (invites)
+
+Run after Migration 7 so `group_invites` and `invite_usages` have the new columns/table. This replaces `create_invite` and `accept_invite` with versions that support label, max_uses, use_count, and invite_usages.
+
+```sql
+-- Drop old create_invite (3 args) so only the extended version remains
+DROP FUNCTION IF EXISTS public.create_invite(UUID, TEXT, TEXT);
+
+-- =============================================
+-- create_invite: extended with label, max_uses, expires_in, created_by
+-- =============================================
+CREATE OR REPLACE FUNCTION public.create_invite(
+  p_group_id UUID,
+  p_invitee_email TEXT DEFAULT NULL,
+  p_role TEXT DEFAULT 'member',
+  p_label TEXT DEFAULT NULL,
+  p_max_uses INT DEFAULT NULL,
+  p_expires_in TEXT DEFAULT NULL
+)
+RETURNS TABLE(id UUID, token TEXT) AS $$
+DECLARE
+  v_user_id UUID;
+  v_user_role TEXT;
+  v_token TEXT;
+  v_invite_id UUID;
+  v_expires_at TIMESTAMPTZ;
+BEGIN
+  v_user_id := auth.uid();
+
+  SELECT gm.role INTO v_user_role FROM public.group_members gm
+  WHERE gm.group_id = p_group_id AND gm.user_id = v_user_id;
+
+  IF v_user_role NOT IN ('owner', 'admin') THEN
+    RAISE EXCEPTION 'Only owner or admin can create invites';
+  END IF;
+
+  v_token := pg_catalog.encode(extensions.gen_random_bytes(18), 'base64');
+  v_token := replace(replace(replace(v_token, '+', ''), '/', ''), '=', '');
+  v_token := substr(v_token, 1, 24);
+
+  v_expires_at := now() + COALESCE(p_expires_in::interval, interval '7 days');
+
+  INSERT INTO public.group_invites (
+    group_id, token, invitee_email, role, expires_at,
+    created_by, label, max_uses, use_count, is_active
+  )
+  VALUES (
+    p_group_id, v_token, p_invitee_email, p_role, v_expires_at,
+    v_user_id, p_label, p_max_uses, 0, true
+  )
+  RETURNING group_invites.id INTO v_invite_id;
+
+  RETURN QUERY SELECT v_invite_id, v_token;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- =============================================
+-- accept_invite: record usage, respect max_uses and is_active, delete only when exhausted
+-- =============================================
+CREATE OR REPLACE FUNCTION public.accept_invite(
+  p_token TEXT,
+  p_participant_id UUID DEFAULT NULL,
+  p_new_participant_name TEXT DEFAULT NULL
+)
+RETURNS UUID AS $$
+DECLARE
+  v_invite RECORD;
+  v_user_id UUID;
+  v_group_id UUID;
+  v_new_participant_id UUID;
+  v_use_count INT;
+  v_max_uses INT;
+BEGIN
+  v_user_id := auth.uid();
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  SELECT * INTO v_invite FROM public.group_invites
+  WHERE group_invites.token = p_token AND expires_at > now();
+
+  IF v_invite IS NULL THEN
+    RAISE EXCEPTION 'Invalid or expired invite';
+  END IF;
+
+  IF (v_invite.is_active IS NOT NULL AND NOT v_invite.is_active) THEN
+    RAISE EXCEPTION 'Invite is not active';
+  END IF;
+
+  v_use_count := COALESCE(v_invite.use_count, 0);
+  v_max_uses := v_invite.max_uses;
+  IF v_max_uses IS NOT NULL AND v_use_count >= v_max_uses THEN
+    RAISE EXCEPTION 'Invite has reached max uses';
+  END IF;
+
+  v_group_id := v_invite.group_id;
+
+  IF EXISTS (SELECT 1 FROM public.group_members WHERE group_id = v_group_id AND user_id = v_user_id) THEN
+    RAISE EXCEPTION 'Already a member of this group';
+  END IF;
+
+  IF p_new_participant_name IS NOT NULL AND p_new_participant_name != '' THEN
+    INSERT INTO public.participants (group_id, name, sort_order)
+    VALUES (v_group_id, p_new_participant_name,
+      (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM public.participants WHERE group_id = v_group_id))
+    RETURNING id INTO v_new_participant_id;
+    p_participant_id := v_new_participant_id;
+  END IF;
+
+  INSERT INTO public.group_members (group_id, user_id, role, participant_id)
+  VALUES (v_group_id, v_user_id, v_invite.role, p_participant_id);
+
+  INSERT INTO public.invite_usages (invite_id, user_id)
+  VALUES (v_invite.id, v_user_id);
+
+  UPDATE public.group_invites
+  SET use_count = v_use_count + 1
+  WHERE id = v_invite.id;
+
+  IF v_max_uses IS NOT NULL AND (v_use_count + 1) >= v_max_uses THEN
+    DELETE FROM public.group_invites WHERE id = v_invite.id;
+  END IF;
+
+  RETURN v_group_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Security: set search_path on new/updated function signatures
+ALTER FUNCTION public.create_invite(UUID, TEXT, TEXT, TEXT, INT, TEXT) SET search_path = '';
+ALTER FUNCTION public.accept_invite(TEXT, UUID, TEXT) SET search_path = '';
+```
+
+### Migration 9: Security hardening (search_path, revoke/toggle RPCs)
+
+Ensures all invite-related RPCs have `search_path` set and adds `revoke_invite` and `toggle_invite_active` if your project uses them (app calls these). Run after Migration 8.
+
+```sql
+-- =============================================
+-- revoke_invite: deactivate an invite (owner/admin)
+-- =============================================
+CREATE OR REPLACE FUNCTION public.revoke_invite(p_invite_id UUID)
+RETURNS VOID AS $$
+DECLARE
+  v_group_id UUID;
+  v_user_role TEXT;
+BEGIN
+  SELECT group_id INTO v_group_id FROM public.group_invites WHERE id = p_invite_id;
+  IF v_group_id IS NULL THEN
+    RAISE EXCEPTION 'Invite not found';
+  END IF;
+  SELECT role INTO v_user_role FROM public.group_members
+  WHERE group_id = v_group_id AND user_id = auth.uid();
+  IF v_user_role NOT IN ('owner', 'admin') THEN
+    RAISE EXCEPTION 'Only owner or admin can revoke invites';
+  END IF;
+  UPDATE public.group_invites SET is_active = false WHERE id = p_invite_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
+
+-- =============================================
+-- toggle_invite_active: set is_active on an invite (owner/admin)
+-- =============================================
+CREATE OR REPLACE FUNCTION public.toggle_invite_active(p_invite_id UUID, p_active BOOLEAN)
+RETURNS VOID AS $$
+DECLARE
+  v_group_id UUID;
+  v_user_role TEXT;
+BEGIN
+  SELECT group_id INTO v_group_id FROM public.group_invites WHERE id = p_invite_id;
+  IF v_group_id IS NULL THEN
+    RAISE EXCEPTION 'Invite not found';
+  END IF;
+  SELECT role INTO v_user_role FROM public.group_members
+  WHERE group_id = v_group_id AND user_id = auth.uid();
+  IF v_user_role NOT IN ('owner', 'admin') THEN
+    RAISE EXCEPTION 'Only owner or admin can toggle invites';
+  END IF;
+  UPDATE public.group_invites SET is_active = p_active WHERE id = p_invite_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
+
+-- Ensure search_path is set on all other invite/auth-related functions (idempotent)
+ALTER FUNCTION public.get_invite_by_token(TEXT) SET search_path = '';
+ALTER FUNCTION public.accept_invite(TEXT, UUID, TEXT) SET search_path = '';
+DO $$ BEGIN ALTER FUNCTION public.accept_invite(TEXT) SET search_path = ''; EXCEPTION WHEN undefined_function THEN NULL; END $$;
+-- 6-arg create_invite: Migration 8 may use TEXT or INTERVAL for last param; set both so one succeeds
+DO $$ BEGIN ALTER FUNCTION public.create_invite(UUID, TEXT, TEXT, TEXT, INT, TEXT) SET search_path = ''; EXCEPTION WHEN undefined_function THEN NULL; END $$;
+DO $$ BEGIN ALTER FUNCTION public.create_invite(UUID, TEXT, TEXT, TEXT, INT, INTERVAL) SET search_path = ''; EXCEPTION WHEN undefined_function THEN NULL; END $$;
+DO $$ BEGIN ALTER FUNCTION public.create_invite(UUID, TEXT, TEXT) SET search_path = ''; EXCEPTION WHEN undefined_function THEN NULL; END $$;
+```
+
+### Migration 10: RLS performance (auth initplan and merged groups SELECT)
+
+Recreates policies so `auth.uid()` is evaluated once per query via `(select auth.uid())`, and merges the two groups SELECT policies into one. Run after Migration 9.
+
+```sql
+-- =============================================
+-- Groups: single SELECT policy (owner or member)
+-- =============================================
+DROP POLICY IF EXISTS "groups_select" ON public.groups;
+DROP POLICY IF EXISTS "groups_select_members" ON public.groups;
+DROP POLICY IF EXISTS "groups_select_owner" ON public.groups;
+CREATE POLICY "groups_select" ON public.groups
+  FOR SELECT USING (
+    public.is_group_member(id)
+    OR (SELECT auth.uid()) = owner_id
+  );
+
+-- =============================================
+-- Groups INSERT: use (select auth.uid())
+-- =============================================
+DROP POLICY IF EXISTS "groups_insert_authenticated" ON public.groups;
+CREATE POLICY "groups_insert_authenticated" ON public.groups
+  FOR INSERT WITH CHECK ((SELECT auth.uid()) IS NOT NULL AND owner_id = (SELECT auth.uid()));
+
+-- =============================================
+-- Group members: auth initplan
+-- =============================================
+DROP POLICY IF EXISTS "group_members_insert" ON public.group_members;
+CREATE POLICY "group_members_insert" ON public.group_members
+  FOR INSERT WITH CHECK (
+    public.get_user_role(group_id) IN ('owner', 'admin')
+    OR (
+      user_id = (SELECT auth.uid())
+      AND role = 'owner'
+      AND (SELECT g.owner_id FROM public.groups g WHERE g.id = group_id) = (SELECT auth.uid())
+    )
+  );
+DROP POLICY IF EXISTS "group_members_delete" ON public.group_members;
+CREATE POLICY "group_members_delete" ON public.group_members
+  FOR DELETE USING (
+    public.get_user_role(group_id) IN ('owner', 'admin')
+    OR user_id = (SELECT auth.uid())
+  );
+
+-- =============================================
+-- Participants INSERT: use (select auth.uid()) where applicable
+-- =============================================
+DROP POLICY IF EXISTS "participants_insert" ON public.participants;
+CREATE POLICY "participants_insert" ON public.participants
+  FOR INSERT WITH CHECK (
+    public.get_user_role(group_id) IN ('owner', 'admin')
+    OR (
+      public.get_user_role(group_id) = 'member'
+      AND (SELECT g.allow_member_add_participant FROM public.groups g WHERE g.id = group_id) = true
+    )
+    OR (SELECT g.owner_id FROM public.groups g WHERE g.id = group_id) = (SELECT auth.uid())
+  );
+
+-- =============================================
+-- Invite usages: SELECT with initplan; ensure INSERT policy exists
+-- =============================================
+DROP POLICY IF EXISTS "Group members can view invite usages" ON public.invite_usages;
+DROP POLICY IF EXISTS "invite_usages_select_members" ON public.invite_usages;
+CREATE POLICY "invite_usages_select_members" ON public.invite_usages
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.group_invites gi
+      JOIN public.group_members gm ON gm.group_id = gi.group_id AND gm.user_id = (SELECT auth.uid())
+      WHERE gi.id = invite_usages.invite_id
+    )
+  );
+DROP POLICY IF EXISTS "invite_usages_insert_own" ON public.invite_usages;
+CREATE POLICY "invite_usages_insert_own" ON public.invite_usages
+  FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
+
+-- =============================================
+-- Device tokens: all policies with (select auth.uid())
+-- =============================================
+DROP POLICY IF EXISTS "Users can view own tokens" ON public.device_tokens;
+DROP POLICY IF EXISTS "Users can insert own tokens" ON public.device_tokens;
+DROP POLICY IF EXISTS "Users can update own tokens" ON public.device_tokens;
+DROP POLICY IF EXISTS "Users can delete own tokens" ON public.device_tokens;
+CREATE POLICY "Users can view own tokens" ON public.device_tokens
+  FOR SELECT USING ((SELECT auth.uid()) = user_id);
+CREATE POLICY "Users can insert own tokens" ON public.device_tokens
+  FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
+CREATE POLICY "Users can update own tokens" ON public.device_tokens
+  FOR UPDATE USING ((SELECT auth.uid()) = user_id) WITH CHECK ((SELECT auth.uid()) = user_id);
+CREATE POLICY "Users can delete own tokens" ON public.device_tokens
+  FOR DELETE USING ((SELECT auth.uid()) = user_id);
+```
+
+### Migration 11: Indexes (composite, partial, and FK)
+
+Adds composite/partial indexes for app query patterns and indexes on foreign key columns recommended by the Supabase linter. Run after Migration 10.
+
+```sql
+-- Composite indexes for common query patterns
+CREATE INDEX IF NOT EXISTS idx_expenses_group_id_date_desc ON public.expenses(group_id, date DESC);
+CREATE INDEX IF NOT EXISTS idx_participants_group_id_sort_order ON public.participants(group_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_invite_usages_invite_id_accepted_at ON public.invite_usages(invite_id, accepted_at DESC);
+-- Partial index using now() is not allowed (predicate must be IMMUTABLE). Omit if you get an error:
+-- CREATE INDEX IF NOT EXISTS idx_group_invites_active ON public.group_invites(group_id) WHERE expires_at > now();
+
+-- Indexes on foreign key columns (performance)
+CREATE INDEX IF NOT EXISTS idx_expenses_payer_participant_id ON public.expenses(payer_participant_id);
+CREATE INDEX IF NOT EXISTS idx_expenses_to_participant_id ON public.expenses(to_participant_id);
+CREATE INDEX IF NOT EXISTS idx_group_invites_created_by ON public.group_invites(created_by);
+CREATE INDEX IF NOT EXISTS idx_group_members_participant_id ON public.group_members(participant_id);
+CREATE INDEX IF NOT EXISTS idx_groups_treasurer_participant_id ON public.groups(treasurer_participant_id);
+CREATE INDEX IF NOT EXISTS idx_groups_owner_id ON public.groups(owner_id);
+CREATE INDEX IF NOT EXISTS idx_invite_usages_user_id ON public.invite_usages(user_id);
+CREATE INDEX IF NOT EXISTS idx_participants_user_id ON public.participants(user_id);
+```
+
 ---
 
 ## 4. Configure Authentication
@@ -870,6 +1245,8 @@ CREATE TRIGGER notify_on_member_join
 ### Email/Password Authentication
 
 Email auth is enabled by default in Supabase. No additional configuration needed.
+
+**Leaked password protection:** Supabase can block sign-up/sign-in with compromised passwords (HaveIBeenPwned). Enable in **Authentication > Settings > Security > Leaked password protection** for better security.
 
 ### Magic Link Authentication
 
@@ -1152,20 +1529,47 @@ Add to `.vscode/launch.json`:
 
 After completing all steps:
 
-1. **Database**: Go to Supabase Table Editor and verify all 7 tables exist (`groups`, `group_members`, `participants`, `expenses`, `expense_tags`, `group_invites`, `telemetry`).
+1. **Database**: Go to Supabase Table Editor and verify core tables exist: `groups`, `group_members`, `participants`, `expenses`, `expense_tags`, `group_invites`, `telemetry`, `public.device_tokens`, and (after Migration 7) `invite_usages`.
 
 2. **RLS**: Go to **Authentication > Policies** and verify each table has its RLS policies enabled.
 
-3. **Functions**: Go to **Database > Functions** and verify all RPC functions exist:
-   - `handle_updated_at`
-   - `get_user_role`, `is_group_member`
-   - `get_invite_by_token`, `accept_invite`, `transfer_ownership`, `leave_group`, `kick_member`, `update_member_role`, `assign_participant`, `create_invite`
+3. **Functions**: Go to **Database > Functions** and verify RPC functions exist:
+   - `handle_updated_at`, `get_user_role`, `is_group_member`
+   - `get_invite_by_token`, `accept_invite`, `create_invite`, `revoke_invite`, `toggle_invite_active`
+   - `transfer_ownership`, `leave_group`, `kick_member`, `update_member_role`, `assign_participant` (optional if app does not assign participants from UI)
 
 4. **Edge Functions**: Go to **Edge Functions** and verify `invite-redirect` and `telemetry` are deployed and active.
 
 5. **Auth**: Try signing up with email/password in the app. Check the Supabase **Authentication > Users** page to confirm the user was created.
 
 6. **Sync**: After signing in, create a group in the app. Check the Supabase Table Editor to verify the group appears in the `groups` table with the correct `owner_id`.
+
+### Current schema reference (verified via Supabase MCP)
+
+The following matches the live schema when Migrations 1–8 (or equivalent) are applied. Use **Supabase MCP** `list_tables` with your `project_id` to verify your project.
+
+| Table | Key columns (public schema) |
+|-------|-----------------------------|
+| **groups** | id, name, currency_code, owner_id, settlement_method, treasurer_participant_id, settlement_freeze_at, settlement_snapshot_json, allow_member_add_expense, allow_member_add_participant, allow_member_change_settings, require_participant_assignment, icon, color, created_at, updated_at |
+| **participants** | id, group_id, name, sort_order, user_id, avatar_id, created_at, updated_at |
+| **group_members** | id, group_id, user_id, role, participant_id, joined_at |
+| **expenses** | id, group_id, payer_participant_id, amount_cents, currency_code, exchange_rate, base_amount_cents, title, description, date, split_type, split_shares_json, type, to_participant_id, tag, line_items_json, receipt_image_path, created_at, updated_at |
+| **expense_tags** | id, group_id, label, icon_name, created_at, updated_at |
+| **group_invites** | id, group_id, token, invitee_email, role, created_at, expires_at, created_by, label, max_uses, use_count, is_active |
+| **invite_usages** | id, invite_id, user_id, accepted_at |
+| **device_tokens** | id, user_id, token, platform, created_at, updated_at |
+| **telemetry** | id, event, timestamp, data |
+
+**Note:** Existing projects that lack `allow_member_add_participant` or `require_participant_assignment` on `groups` will get them when you run Migration 7 (it uses `ADD COLUMN IF NOT EXISTS`).
+
+### Verifying with Supabase MCP
+
+If you use the [Supabase MCP](https://supabase.com/docs/guides/getting-started/mcp) (e.g. in Cursor), you can verify schema and run advisors:
+
+- **list_tables** with your `project_id`: lists tables, columns, RLS, row counts.
+- **get_advisors** with `type: "security"` and `type: "performance"`: returns lints (e.g. function `search_path`, unindexed FKs, RLS auth initplan). Re-run after applying migrations to confirm issues are resolved.
+
+The "Current schema reference" table above can be re-verified with `list_tables`.
 
 ---
 
@@ -1202,6 +1606,12 @@ After completing all steps:
 | **Owner** | Full control: CRUD all data, manage members, change settings, delete group, transfer ownership |
 | **Admin** | Manage members, create invites, CRUD expenses/participants/tags, change group settings |
 | **Member** | Conditional: add expenses (if `allow_member_add_expense`), add participants (if `allow_member_add_participant`), change settings (if `allow_member_change_settings`) |
+
+### Schema and behavior notes
+
+- **device_tokens**: Table lives in `public.device_tokens`. One row per (user_id, token); `updated_at` is maintained by trigger. RLS restricts access to the current user’s rows only.
+- **groups.owner_id**: References `auth.users(id)` with `ON DELETE SET NULL`. If an auth user is deleted (e.g. account removal), their groups are not deleted; `owner_id` becomes NULL. Ownership can be reassigned via `transfer_ownership` or `leave_group` (oldest member becomes owner). Consider documenting this for support.
+- **telemetry**: Append-only table; no SELECT policy (insert-only for analytics). No built-in retention; the table can grow without bound. For production, consider a retention strategy (e.g. periodic delete of rows older than N months, or partitioning by month and dropping old partitions). Add an index on `(timestamp)` or `(event, timestamp)` if you run reporting queries.
 
 ---
 
