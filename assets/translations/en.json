@@ -438,5 +438,10 @@
   "permission_notification_message": "Notifications are disabled. Enable them in Settings to get updates when group members add expenses.",
   "permission_open_settings": "Open Settings",
   "permission_cancel": "Not Now",
-  "notifications_unavailable": "Push notifications are not available. Please check that Google services are configured correctly."
+  "notifications_unavailable": "Push notifications are not available. Please check that Google services are configured correctly.",
+  "functional_settings": "Functional",
+  "expense_form_full_features": "Full expense form (Income & Transfer)",
+  "expense_form_full_features_description": "Show Expense / Income / Transfer tabs when adding an expense",
+  "expense_form_full_features_tooltip": "To use income, transfer, and other options, enable them in Settings.",
+  "expense_form_full_features_tooltip_title": "More options"
 }
