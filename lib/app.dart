@@ -46,14 +46,6 @@ class App extends ConsumerWidget {
         ref.read(notificationServiceProvider.notifier).unregisterToken();
       }
     });
-    // Handle already-authenticated on first build (initialize() is idempotent).
-    if (ref.read(isAuthenticatedProvider) &&
-        ref.read(notificationsEnabledProvider)) {
-      Future.microtask(() {
-        if (!context.mounted) return;
-        ref.read(notificationServiceProvider.notifier).initialize(context);
-      });
-    }
 
     // Locale is read exclusively from EasyLocalization (context.locale) so that
     // locale: and localizationsDelegates always come from the same frame.

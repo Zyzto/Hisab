@@ -231,27 +231,23 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   final notifier = ref.read(settings
                       .provider(notificationsEnabledSettingDef)
                       .notifier);
-                  notifier.set(v);
                   if (v) {
                     final ok = await ref
                         .read(notificationServiceProvider.notifier)
                         .initialize(context);
-                    if (!ok) {
-                      // Revert the toggle — notifications couldn't be enabled.
-                      notifier.set(false);
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                                'notifications_unavailable'.tr()),
-                          ),
-                        );
-                      }
+                    notifier.set(ok);
+                    if (!ok && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('notifications_unavailable'.tr()),
+                        ),
+                      );
                     }
                   } else {
                     ref
                         .read(notificationServiceProvider.notifier)
                         .unregisterToken();
+                    notifier.set(false);
                   }
                 },
               ),
