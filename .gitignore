@@ -69,3 +69,6 @@ node_modules/
 
 # Private / personal notes (not for other developers or users)
 docs/_private/
+
+# Supabase database backups (never commit)
+supabase_backups/

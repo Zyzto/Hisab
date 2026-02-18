@@ -13,7 +13,9 @@ const schema = Schema([
     Column.text('settlement_freeze_at'),
     Column.text('settlement_snapshot_json'),
     Column.integer('allow_member_add_expense'),
+    Column.integer('allow_member_add_participant'),
     Column.integer('allow_member_change_settings'),
+    Column.integer('require_participant_assignment'),
     Column.text('icon'),
     Column.integer('color'),
     Column.text('created_at'),
@@ -76,6 +78,7 @@ const schema = Schema([
     Column.integer('is_active'),
   ]),
   Table('invite_usages', [
+    Column.text('id'),
     Column.text('invite_id'),
     Column.text('user_id'),
     Column.text('accepted_at'),

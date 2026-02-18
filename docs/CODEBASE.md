@@ -168,9 +168,11 @@ This repo contains one Edge Function source: `supabase/functions/invite-redirect
 
 The app also depends on Supabase-side schema, RLS, RPCs, and additional edge functions documented in `docs/SUPABASE_SETUP.md`, including:
 
-- tables such as `groups`, `group_members`, `participants`, `expenses`, `expense_tags`, `group_invites`, `telemetry`, `device_tokens`
+- tables such as `groups`, `group_members`, `participants`, `expenses`, `expense_tags`, `group_invites`, `invite_usages`, `telemetry`, `device_tokens`
 - RPCs such as `accept_invite`, `transfer_ownership`, `leave_group`, `kick_member`, `update_member_role`, `create_invite`, etc.
 - optional edge functions `telemetry` and `send-notification` (documented, not committed in this repo snapshot)
+
+Schema and security/performance can be re-verified via [Supabase MCP](https://supabase.com/docs/guides/getting-started/mcp) (`list_tables`, `get_advisors`).
 
 ## Configuration
 
