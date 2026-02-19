@@ -718,8 +718,27 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     SettingsProviders settings,
     bool v,
   ) async {
-    // Switching to local: user decided; set immediately.
+    // Switching to local: show confirm then set.
     if (v == true) {
+      if (!context.mounted) return;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('local_only_confirm_title'.tr()),
+          content: Text('local_only_confirm_body'.tr()),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text('cancel'.tr()),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text('local_only'.tr()),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !context.mounted) return;
       ref.read(settings.provider(localOnlySettingDef).notifier).set(true);
       ref
           .read(settings.provider(settingsOnlinePendingSettingDef).notifier)
