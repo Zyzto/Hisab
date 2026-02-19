@@ -70,7 +70,7 @@ void main() {
     });
 
     test('fromJson round-trip with items', () {
-      final t = SettlementTransaction(
+      final t = const SettlementTransaction(
         fromParticipantId: 'p-a',
         toParticipantId: 'p-b',
         amountCents: 100,

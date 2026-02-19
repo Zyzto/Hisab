@@ -85,8 +85,8 @@ void main() {
           supportedLocales: const [Locale('en')],
           startLocale: const Locale('en'),
           fallbackLocale: const Locale('en'),
-          child: MaterialApp(
-            home: const Scaffold(
+          child: const MaterialApp(
+            home: Scaffold(
               body: BalanceList(groupId: groupId),
             ),
           ),

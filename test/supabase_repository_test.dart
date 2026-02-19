@@ -8,7 +8,6 @@ import 'package:supabase/supabase.dart';
 
 import 'package:hisab/core/database/powersync_schema.dart' as ps;
 import 'package:hisab/core/repository/powersync_repository.dart';
-import 'package:hisab/domain/domain.dart';
 
 class MockSupabaseClient extends Mock implements SupabaseClient {}
 
