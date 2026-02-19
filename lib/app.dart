@@ -27,6 +27,11 @@ class App extends ConsumerStatefulWidget {
 
 class _AppState extends ConsumerState<App> {
   late final Upgrader _upgrader;
+  /// In release, defer UpgradeAlert until after first frame to avoid any
+  /// upgrader work blocking the first paint (splash can disappear).
+  bool _showUpgradeAlert = kDebugMode;
+  /// Hide debug FAB while the debug menu sheet is open so it doesn't obstruct it.
+  bool _debugFabVisible = true;
 
   @override
   void initState() {
@@ -35,6 +40,11 @@ class _AppState extends ConsumerState<App> {
       durationUntilAlertAgain: const Duration(days: 3),
       messages: HisabUpgraderMessages(context: context),
     );
+    if (!kDebugMode) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _showUpgradeAlert = true);
+      });
+    }
   }
 
   @override
@@ -92,6 +102,40 @@ class _AppState extends ConsumerState<App> {
           final isRtl = context.locale.languageCode == 'ar';
           final isDebug =
               ref.watch(isDebugBuildProvider).asData?.value == true;
+          final innerContent = GestureDetector(
+            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+            behavior: HitTestBehavior.deferToChild,
+            child: Directionality(
+              textDirection:
+                  isRtl ? ui.TextDirection.rtl : ui.TextDirection.ltr,
+              child: child ?? const SizedBox.shrink(),
+            ),
+          );
+          // In release, first frame paints without UpgradeAlert to avoid
+          // any upgrader init blocking splash removal.
+          if (!_showUpgradeAlert) {
+            return Stack(
+              children: [
+                innerContent,
+                if (isDebug && _debugFabVisible)
+                  Positioned(
+                    bottom: 96,
+                    left: isRtl ? null : 8,
+                    right: isRtl ? 8 : null,
+                    child: DebugMenuFab(
+                      upgrader: _upgrader,
+                      navigatorContext:
+                          router.routerDelegate.navigatorKey.currentContext,
+                      localeContext: context,
+                      onBeforeOpen: () =>
+                          setState(() => _debugFabVisible = false),
+                      whenSheetClosed: () =>
+                          setState(() => _debugFabVisible = true),
+                    ),
+                  ),
+              ],
+            );
+          }
           return Stack(
             children: [
               UpgradeAlert(
@@ -105,25 +149,22 @@ class _AppState extends ConsumerState<App> {
                   }
                   return true;
                 },
-                child: GestureDetector(
-                  onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-                  behavior: HitTestBehavior.deferToChild,
-                  child: Directionality(
-                    textDirection:
-                        isRtl ? ui.TextDirection.rtl : ui.TextDirection.ltr,
-                    child: child ?? const SizedBox.shrink(),
-                  ),
-                ),
+                child: innerContent,
               ),
-              if (isDebug)
+              if (isDebug && _debugFabVisible)
                 Positioned(
                   bottom: 96,
-                  right: 8,
+                  left: isRtl ? null : 8,
+                  right: isRtl ? 8 : null,
                   child: DebugMenuFab(
                     upgrader: _upgrader,
                     navigatorContext:
                         router.routerDelegate.navigatorKey.currentContext,
                     localeContext: context,
+                    onBeforeOpen: () =>
+                        setState(() => _debugFabVisible = false),
+                    whenSheetClosed: () =>
+                        setState(() => _debugFabVisible = true),
                   ),
                 ),
             ],

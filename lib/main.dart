@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -8,12 +10,13 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:powersync/powersync.dart';
+import 'package:powersync/powersync.dart' show PowerSyncDatabase, Schema;
 import 'package:pwa_install/pwa_install.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/constants/supabase_config.dart';
 import 'core/database/database_providers.dart';
+import 'core/database/delete_db_file.dart';
 import 'core/image_picker_init.dart';
 import 'core/database/powersync_schema.dart' as ps;
 import 'core/services/notification_service.dart';
@@ -80,39 +83,62 @@ void main() async {
       crashLogFileName: 'hisab_crashes.log',
     ),
   );
-  Log.debug('Logging initialized');
+  Log.info('main: LoggingService initialized');
 
-  await EasyLocalization.ensureInitialized();
+  // Timeout to avoid release hang if asset loading never completes (e.g. release bundle)
+  bool easyLocalizationReady = false;
+  const easyLocalizationTimeout = Duration(seconds: 15);
+  try {
+    await EasyLocalization.ensureInitialized().timeout(
+      easyLocalizationTimeout,
+      onTimeout: () {
+        throw TimeoutException(
+          'EasyLocalization.ensureInitialized()',
+          easyLocalizationTimeout,
+        );
+      },
+    );
+    easyLocalizationReady = true;
+  } on TimeoutException catch (e) {
+    Log.warning(
+      'main: EasyLocalization.ensureInitialized() timed out after ${e.duration?.inSeconds ?? 15}s, using fallback locale',
+    );
+  }
   // Reduce console noise from easy_localization [DEBUG] / [INFO] messages
   EasyLocalization.logger.enableBuildModes = [];
-  Log.debug('Easy Localization initialized');
+  if (easyLocalizationReady) {
+    Log.info('main: EasyLocalization initialized');
+  } else {
+    Log.info('main: EasyLocalization skipped (timeout), using fallback locale');
+  }
 
   // Use Android Photo Picker for gallery (no READ_MEDIA_IMAGES required).
   initImagePicker();
 
   final settingsProviders = await initializeHisabSettings();
   if (settingsProviders != null) {
-    Log.debug('Settings framework initialized');
+    Log.info('main: Settings framework initialized');
   } else {
-    Log.warning('Settings framework init returned null, using defaults');
+    Log.warning('main: Settings framework init returned null, using defaults');
   }
 
   // --------------------------------------------------------------------------
   // Local SQLite database (always initialized — works offline)
   // --------------------------------------------------------------------------
+  Log.info('main: Opening PowerSync database...');
   final dbPath = kIsWeb
       ? 'hisab.db'
       : join((await getApplicationDocumentsDirectory()).path, 'hisab.db');
-  final db = PowerSyncDatabase(schema: ps.schema, path: dbPath);
-  await db.initialize();
-  Log.info('PowerSync database initialized (local SQLite)');
+  final db = await _initializePowerSyncDatabase(ps.schema, dbPath);
+  Log.info('main: PowerSync database initialized (local SQLite)');
 
   // --------------------------------------------------------------------------
   // Supabase (ONLY if configured via --dart-define)
   // --------------------------------------------------------------------------
   if (supabaseConfigAvailable) {
+    Log.info('main: Initializing Supabase...');
     await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
-    Log.info('Supabase client initialized');
+    Log.info('main: Supabase client initialized');
 
     if (settingsProviders != null) {
       final session = Supabase.instance.client.auth.currentSession;
@@ -176,7 +202,7 @@ void main() async {
       }
     }
   } else {
-    Log.info('Supabase not configured — running in local-only mode');
+    Log.info('main: Supabase not configured — running in local-only mode');
   }
 
   // --------------------------------------------------------------------------
@@ -184,14 +210,15 @@ void main() async {
   // --------------------------------------------------------------------------
   if (supabaseConfigAvailable) {
     try {
+      Log.info('main: Initializing Firebase...');
       await Firebase.initializeApp();
       firebaseInitialized = true;
       FirebaseMessaging.onBackgroundMessage(
         firebaseMessagingBackgroundHandler,
       );
-      Log.info('Firebase initialized');
+      Log.info('main: Firebase initialized');
     } catch (e, st) {
-      Log.warning('Firebase init failed (push notifications disabled)',
+      Log.warning('main: Firebase init failed (push notifications disabled)',
           error: e, stackTrace: st);
     }
   }
@@ -201,10 +228,11 @@ void main() async {
   // setState-after-dispose from its async asset loading. We sync locale
   // by calling setLocale when languageProvider changes (_LocaleSync).
   // --------------------------------------------------------------------------
-  final startLocale = settingsProviders != null
+  final startLocale = easyLocalizationReady && settingsProviders != null
       ? Locale(settingsProviders.controller.get(languageSettingDef))
       : const Locale('en');
 
+  Log.info('main: Starting app (runApp)');
   runApp(
     EasyLocalization(
       supportedLocales: const [Locale('en'), Locale('ar')],
@@ -230,6 +258,43 @@ void main() async {
       ),
     ),
   );
+}
+
+/// Initialize PowerSync DB. On failure (e.g. schema mismatch from upgrade),
+/// deletes the DB file and retries once when not on web (schema recovery).
+Future<PowerSyncDatabase> _initializePowerSyncDatabase(
+  Schema schema,
+  String dbPath,
+) async {
+  var db = PowerSyncDatabase(schema: schema, path: dbPath);
+  try {
+    await db.initialize();
+    return db;
+  } catch (e, st) {
+    Log.warning(
+      'main: PowerSync db.initialize() failed (will retry after DB reset)',
+      error: e,
+      stackTrace: st,
+    );
+    if (!kIsWeb) {
+      try {
+        await deleteDbFile(dbPath);
+        Log.info('main: Deleted existing DB file for schema recovery');
+        db = PowerSyncDatabase(schema: schema, path: dbPath);
+        await db.initialize();
+        return db;
+      } catch (e2, st2) {
+        Log.error(
+          'main: PowerSync re-initialization after DB delete failed',
+          error: e2,
+          stackTrace: st2,
+        );
+        rethrow;
+      }
+    } else {
+      rethrow;
+    }
+  }
 }
 
 /// Keeps Easy Localization's locale in sync with [languageProvider].
