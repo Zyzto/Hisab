@@ -36,6 +36,7 @@ dependencies:
 
   # UI & animations
   animations: ^2.1.0
+  custom_sliding_segmented_control: ^1.8.5
 
   # Date & currency
   intl: ^0.20.2
