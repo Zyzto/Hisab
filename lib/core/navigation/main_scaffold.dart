@@ -31,6 +31,8 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
   int _currentIndex = 0;
   final _homePage = const HomePage();
   final _settingsPage = const SettingsPage();
+  DateTime? _lastBackPressAt;
+  static const _doubleBackExitWindow = Duration(seconds: 2);
 
   @override
   void initState() {
@@ -51,6 +53,19 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
         widget.location == RoutePaths.settings;
   }
 
+  void _onBackPressed(BuildContext context) {
+    final now = DateTime.now();
+    if (_lastBackPressAt != null &&
+        now.difference(_lastBackPressAt!) < _doubleBackExitWindow) {
+      SystemNavigator.pop();
+      return;
+    }
+    setState(() => _lastBackPressAt = now);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('press_back_again_to_exit'.tr())),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Access context.locale to register as a dependent of EasyLocalization's
@@ -59,8 +74,9 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     context.locale;
 
     final showNavBar = _shouldShowNavBar();
+    final isHome = widget.location == RoutePaths.home;
 
-    return Scaffold(
+    Widget scaffold = Scaffold(
       body: Stack(
         children: [
           Padding(
@@ -142,6 +158,18 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
         ],
       ),
     );
+
+    if (isHome) {
+      scaffold = PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop) _onBackPressed(context);
+        },
+        child: scaffold,
+      );
+    }
+
+    return scaffold;
   }
 
   Widget _buildMainContent() {
