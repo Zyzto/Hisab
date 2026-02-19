@@ -158,7 +158,6 @@ class _FakeSyncBackend implements SyncBackend {
     this.expenses = const [],
     this.tags = const [],
     this.invites = const [],
-    this.inviteUsages = const [],
     List<Map<String, dynamic>>? capture,
   }) : _captured = capture;
 
@@ -170,7 +169,7 @@ class _FakeSyncBackend implements SyncBackend {
   final List<Map<String, dynamic>> expenses;
   final List<Map<String, dynamic>> tags;
   final List<Map<String, dynamic>> invites;
-  final List<Map<String, dynamic>> inviteUsages;
+  final List<Map<String, dynamic>> inviteUsages = const [];
   final List<Map<String, dynamic>>? _captured;
 
   @override
