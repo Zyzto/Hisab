@@ -32,17 +32,25 @@ final isDebugBuildProvider = FutureProvider<bool>((ref) async {
 /// navigator overlay, which may not see EasyLocalization; wrapping the
 /// sheet in EasyLocalization with this context's locale avoids
 /// "Localization not found for current context".
+///
+/// [onBeforeOpen] is called when the FAB is tapped, before showing the sheet
+/// (e.g. to hide the FAB). [whenSheetClosed] is called when the sheet is
+/// dismissed (e.g. to show the FAB again).
 class DebugMenuFab extends ConsumerWidget {
   const DebugMenuFab({
     super.key,
     required this.upgrader,
     required this.navigatorContext,
     required this.localeContext,
+    this.onBeforeOpen,
+    this.whenSheetClosed,
   });
 
   final Upgrader upgrader;
   final BuildContext? navigatorContext;
   final BuildContext? localeContext;
+  final VoidCallback? onBeforeOpen;
+  final VoidCallback? whenSheetClosed;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -59,6 +67,7 @@ class DebugMenuFab extends ConsumerWidget {
             navContext.mounted &&
             locContext != null &&
             locContext.mounted) {
+          onBeforeOpen?.call();
           showModalBottomSheet<void>(
             context: navContext,
             isScrollControlled: true,
@@ -69,7 +78,7 @@ class DebugMenuFab extends ConsumerWidget {
               startLocale: locContext.locale,
               child: _DebugMenuSheet(upgrader: upgrader),
             ),
-          );
+          ).then((_) => whenSheetClosed?.call());
         }
       },
       child: const Icon(Icons.bug_report_outlined, size: 20),
