@@ -20,6 +20,7 @@ import '../../../core/constants/supabase_config.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/repository/repository_providers.dart';
+import '../../../core/update/update_check_providers.dart';
 import '../../../core/services/migration_service.dart';
 import '../../../core/services/connectivity_service.dart';
 import '../../../core/services/notification_service.dart';
@@ -966,9 +967,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             final version = snapshot.hasData
                 ? '${snapshot.data!.appName} ${snapshot.data!.version}+${snapshot.data!.buildNumber}'
                 : '—';
-            return InfoSettingsTile(
+            return NavigationSettingsTile(
+              leading: const Icon(Icons.info_outline),
               title: Text('version'.tr()),
-              value: Text(version),
+              subtitle: Text(version),
+              onTap: () {
+                final trigger = ref.read(updateCheckTriggerProvider).callback;
+                if (trigger != null) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('checking_for_updates'.tr())),
+                    );
+                  }
+                  trigger(context);
+                }
+              },
             );
           },
         ),

@@ -140,6 +140,7 @@ Settings integration:
   - telemetry + notifications toggles
   - logs viewer/clear/report flow
   - feedback capture integration
+  - About: version row tappable to check for updates manually
 - `features/onboarding`: two-page onboarding with mode selection and auth gate for online mode
 
 ## Settings Framework

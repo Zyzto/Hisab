@@ -10,6 +10,7 @@ import 'core/database/database_providers.dart';
 import 'core/services/notification_service.dart';
 import 'core/debug/debug_menu.dart';
 import 'core/update/app_update_helper.dart';
+import 'core/update/update_check_providers.dart';
 import 'core/update/upgrader_messages.dart';
 import 'features/settings/providers/settings_framework_providers.dart';
 import 'core/theme/app_scroll_behavior.dart';
@@ -32,12 +33,14 @@ class _AppState extends ConsumerState<App> {
   bool _showUpgradeAlert = kDebugMode;
   /// Hide debug FAB while the debug menu sheet is open so it doesn't obstruct it.
   bool _debugFabVisible = true;
+  bool _updateTriggerRegistered = false;
 
   @override
   void initState() {
     super.initState();
     _upgrader = Upgrader(
       durationUntilAlertAgain: const Duration(days: 3),
+      debugLogging: kDebugMode,
       messages: HisabUpgraderMessages(context: context),
     );
     if (!kDebugMode) {
@@ -47,8 +50,35 @@ class _AppState extends ConsumerState<App> {
     }
   }
 
+  void _registerUpdateCheckTrigger() {
+    if (_updateTriggerRegistered) return;
+    _updateTriggerRegistered = true;
+    ref.read(updateCheckTriggerProvider).callback = (BuildContext context) {
+      Future<void>(() async {
+        Upgrader.clearSavedSettings();
+        await _upgrader.updateVersionInfo();
+        if (!mounted) return;
+        _upgrader.updateState(
+          _upgrader.state.copyWith(debugDisplayAlways: true),
+        );
+        await Future.delayed(const Duration(milliseconds: 400));
+        if (!mounted) return;
+        final shouldShow = _upgrader.shouldDisplayUpgrade();
+        if (!shouldShow && context.mounted) {
+          final msg = _upgrader.versionInfo == null
+              ? 'could_not_check_for_updates'.tr()
+              : 'no_update_available'.tr();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(msg)),
+          );
+        }
+      });
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
+    _registerUpdateCheckTrigger();
     final router = ref.watch(routerProvider);
     final themes = ref.watch(appThemesProvider);
     final themeMode = ref.watch(appThemeModeProvider);
