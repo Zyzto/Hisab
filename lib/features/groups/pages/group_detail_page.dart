@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:custom_sliding_segmented_control/custom_sliding_segmented_control.dart';
 import '../providers/groups_provider.dart';
 import '../providers/group_member_provider.dart';
-import '../widgets/segmented_tab_bar.dart';
 import '../widgets/create_invite_sheet.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/navigation/route_paths.dart';
@@ -60,22 +60,28 @@ class _GroupDetailContent extends ConsumerStatefulWidget {
       _GroupDetailContentState();
 }
 
-class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
+  int _selectedTabIndex = 0;
   late ValueNotifier<int> _tabIndexNotifier;
+  late PageController _pageController;
+  late CustomSegmentedController<int> _segmentController;
+  /// When non-null, we're animating to this page from a segment tap; ignore
+  /// intermediate [onPageChanged] until we reach this index.
+  int? _programmaticTargetPage;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     _tabIndexNotifier = ValueNotifier<int>(0);
+    _pageController = PageController(initialPage: 0);
+    _segmentController = CustomSegmentedController<int>(value: 0);
   }
 
   @override
   void dispose() {
     _tabIndexNotifier.dispose();
-    _tabController.dispose();
+    _pageController.dispose();
+    _segmentController.dispose();
     super.dispose();
   }
 
@@ -213,18 +219,120 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
       ),
       body: Column(
         children: [
-          SegmentedTabBar(
-            controller: _tabController,
-            labels: [
-              'expenses'.tr(),
-              'balance'.tr(),
-              'people'.tr(),
-            ],
-            currentIndexNotifier: _tabIndexNotifier,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Theme(
+              data: Theme.of(context).copyWith(
+                splashFactory: NoSplash.splashFactory,
+                highlightColor: Colors.transparent,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Builder(
+                  builder: (context) {
+                    final theme = Theme.of(context);
+                    final colorScheme = theme.colorScheme;
+                    return CustomSlidingSegmentedControl<int>(
+                      controller: _segmentController,
+                      children: {
+                        0: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Text(
+                            'expenses'.tr(),
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: _selectedTabIndex == 0
+                                  ? colorScheme.primary
+                                  : colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                        1: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Text(
+                            'balance'.tr(),
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: _selectedTabIndex == 1
+                                  ? colorScheme.primary
+                                  : colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                        2: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Text(
+                            'people'.tr(),
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: _selectedTabIndex == 2
+                                  ? colorScheme.primary
+                                  : colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      },
+                      height: 52,
+                      padding: 16,
+                      innerPadding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHighest
+                            .withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      thumbDecoration: BoxDecoration(
+                        color: colorScheme.surface,
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [
+                          BoxShadow(
+                            color: colorScheme.shadow.withValues(alpha: 0.1),
+                            blurRadius: 3,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      isStretch: true,
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeInOut,
+                      onValueChanged: (v) {
+                        setState(() {
+                          _selectedTabIndex = v;
+                          _programmaticTargetPage = v;
+                        });
+                        _tabIndexNotifier.value = v;
+                        _pageController.animateToPage(
+                          v,
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                        ).whenComplete(() {
+                          if (mounted) {
+                            setState(() => _programmaticTargetPage = null);
+                          }
+                        });
+                      },
+                    );
+                  },
+                ),
+              ),
+            ),
           ),
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
+            child: PageView(
+              controller: _pageController,
+              onPageChanged: (i) {
+                if (_programmaticTargetPage != null && i != _programmaticTargetPage) {
+                  return;
+                }
+                if (_programmaticTargetPage != null) {
+                  setState(() => _programmaticTargetPage = null);
+                }
+                setState(() => _selectedTabIndex = i);
+                _tabIndexNotifier.value = i;
+                _segmentController.value = i;
+              },
               children: [
                 _ExpensesTab(groupId: widget.group.id, group: widget.group),
                 _BalanceTab(groupId: widget.group.id),
@@ -653,7 +761,9 @@ class _PeopleTab extends ConsumerWidget {
         ref.invalidate(participantsByGroupProvider(groupId));
       }
     } finally {
-      nameController.dispose();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        nameController.dispose();
+      });
     }
   }
 
@@ -911,10 +1021,13 @@ class _FABWithLabel extends StatelessWidget {
         Material(
           color: theme.colorScheme.primary,
           borderRadius: BorderRadius.circular(16),
+          clipBehavior: Clip.antiAlias,
           elevation: 4,
           shadowColor: theme.colorScheme.shadow,
           child: InkWell(
             borderRadius: BorderRadius.circular(16),
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
             onTap: onTap,
             child: SizedBox(
               width: 56,
@@ -973,6 +1086,8 @@ Future<void> _showAddParticipant(
           .create(groupId, name, currentCount);
     }
   } finally {
-    nameController.dispose();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      nameController.dispose();
+    });
   }
 }
