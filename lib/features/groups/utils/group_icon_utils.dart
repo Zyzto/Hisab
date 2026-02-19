@@ -31,16 +31,18 @@ const groupIcons = [
 ];
 
 const groupColors = [
-  Color(0xFF2E7D32), // green
-  Color(0xFF1565C0), // blue
   Color(0xFFC62828), // red
-  Color(0xFFF57F17), // amber
-  Color(0xFF6A1B9A), // purple
-  Color(0xFF00838F), // teal
-  Color(0xFFEF6C00), // orange
-  Color(0xFF37474F), // blue-grey
   Color(0xFFAD1457), // pink
+  Color(0xFF6A1B9A), // purple
   Color(0xFF283593), // indigo
+  Color(0xFF1565C0), // blue
+  Color(0xFF0097A7), // cyan
+  Color(0xFF00838F), // teal
+  Color(0xFF2E7D32), // green
+  Color(0xFFF57F17), // amber
+  Color(0xFFEF6C00), // orange
+  Color(0xFF5D4037), // brown
+  Color(0xFF37474F), // blue-grey
 ];
 
 /// Returns the [IconData] for a group icon key, or `null` if the key is
