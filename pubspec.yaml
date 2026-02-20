@@ -78,6 +78,7 @@ dependencies:
   url_launcher: ^6.2.5
   material_symbols_icons: ^4.2906.0
   pretty_qr_code: ^3.6.0
+  mobile_scanner: ^6.0.2
   connectivity_plus: ^7.0.0
   app_links: ^6.3.2
   currency_picker: ^2.0.21

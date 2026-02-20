@@ -22,6 +22,7 @@ class RoutePaths {
   static String groupInvites(String groupId) => '/groups/$groupId/invites';
 
   static String inviteAccept(String token) => '/invite/$token';
+  static const String scanInvite = '/scan-invite';
 
   static String? extractGroupId(String path) {
     final match = RegExp(r'/groups/([^/]+)').firstMatch(path);

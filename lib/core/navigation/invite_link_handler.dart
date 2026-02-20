@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app_router.dart';
-import 'route_paths.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
 import '../../features/settings/settings_definitions.dart';
 
@@ -62,16 +61,22 @@ class _InviteLinkHandlerState extends ConsumerState<InviteLinkHandler> {
     final appLinks = AppLinks();
 
     // Initial link (cold start from invite link)
-    final initialUri = await appLinks.getInitialLink();
+    Uri? initialUri = await appLinks.getInitialLink();
+    // Some platforms deliver the intent slightly after cold start; retry once.
+    if (initialUri == null) {
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      initialUri = await appLinks.getInitialLink();
+    }
     final initialToken = extractInviteTokenFromUri(initialUri);
     if (initialToken != null) {
       notifier.set(initialToken);
       final onboardingCompleted = ref.read(onboardingCompletedProvider);
       if (onboardingCompleted) {
+        // Let router redirect handle navigation (it reads pending token and redirects).
+        // Use postFrameCallback so navigator is ready; refresh() re-runs redirect.
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
-          ref.read(routerProvider).go(RoutePaths.inviteAccept(initialToken));
-          notifier.set('');
+          ref.read(routerProvider).refresh();
         });
       }
     }
@@ -79,7 +84,12 @@ class _InviteLinkHandlerState extends ConsumerState<InviteLinkHandler> {
     // Link stream (app opened from background with invite link)
     _linkSubscription = appLinks.uriLinkStream.listen((Uri uri) {
       final token = extractInviteTokenFromUri(uri);
-      if (token != null) notifier.set(token);
+      if (token != null) {
+        notifier.set(token);
+        if (mounted && ref.read(onboardingCompletedProvider)) {
+          ref.read(routerProvider).refresh();
+        }
+      }
     });
   }
 

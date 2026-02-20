@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-const WEB_URL = Deno.env.get("SITE_URL") ?? "https://hisab-c8eb1.web.app";
+const WEB_URL = Deno.env.get("SITE_URL") ?? "https://hisab.shenepoy.com";
 
 Deno.serve(async (req: Request) => {
   const url = new URL(req.url);

@@ -126,7 +126,9 @@ class _CreateInviteSheetState extends ConsumerState<_CreateInviteSheet> {
         left: ThemeConfig.spacingL,
         right: ThemeConfig.spacingL,
         top: ThemeConfig.spacingL,
-        bottom: MediaQuery.of(context).viewInsets.bottom + ThemeConfig.spacingL,
+        bottom: MediaQuery.of(context).padding.bottom +
+            MediaQuery.of(context).viewInsets.bottom +
+            ThemeConfig.spacingL,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -254,7 +256,12 @@ class _InviteResultView extends StatelessWidget {
 
     if (url.isEmpty) {
       return Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.only(
+          left: 24,
+          right: 24,
+          top: 24,
+          bottom: 24 + MediaQuery.of(context).padding.bottom,
+        ),
         child: Center(
           child: Text(
             'invite_requires_online'.tr(),
@@ -266,7 +273,12 @@ class _InviteResultView extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 24,
+        bottom: 24 + MediaQuery.of(context).padding.bottom,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

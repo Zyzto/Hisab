@@ -539,13 +539,17 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
       builder: (ctx) {
         return SafeArea(
           child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(bottom: ThemeConfig.spacingM),
-                  child: Text(
-                    'settlement_method'.tr(),
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).padding.bottom + ThemeConfig.spacingM,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: ThemeConfig.spacingM),
+                    child: Text(
+                      'settlement_method'.tr(),
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -583,6 +587,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                 }),
                 const SizedBox(height: ThemeConfig.spacingM),
               ],
+            ),
             ),
           ),
         );
@@ -957,11 +962,11 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
         builder: (ctx, setSheetState) {
           return SingleChildScrollView(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(
+              padding: EdgeInsets.fromLTRB(
                 ThemeConfig.spacingM,
                 0,
                 ThemeConfig.spacingM,
-                ThemeConfig.spacingM,
+                ThemeConfig.spacingM + MediaQuery.of(ctx).padding.bottom,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -1319,17 +1324,24 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.75,
       ),
-      builder: (ctx) => SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: others
-              .map(
-                (m) => ListTile(
-                  title: Text('${m.userId.substring(0, 8)}... (${m.role})'),
-                  onTap: () => Navigator.pop(ctx, m.id),
-                ),
-              )
-              .toList(),
+      builder: (ctx) => SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).padding.bottom + 16,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: others
+                  .map(
+                    (m) => ListTile(
+                      title: Text('${m.userId.substring(0, 8)}... (${m.role})'),
+                      onTap: () => Navigator.pop(ctx, m.id),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
         ),
       ),
     );
