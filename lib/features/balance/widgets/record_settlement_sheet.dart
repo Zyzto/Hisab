@@ -20,6 +20,7 @@ Future<bool> showRecordSettlementSheet(
 }) async {
   final result = await showModalBottomSheet<bool>(
     context: context,
+    useSafeArea: true,
     builder: (ctx) => _RecordSettlementSheet(
       groupId: groupId,
       currencyCode: currencyCode,
@@ -88,7 +89,12 @@ class _RecordSettlementSheet extends StatelessWidget {
     );
 
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.fromLTRB(
+        24,
+        24,
+        24,
+        24 + MediaQuery.of(context).padding.bottom,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

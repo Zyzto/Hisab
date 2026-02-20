@@ -1,7 +1,7 @@
 import 'package:currency_picker/currency_picker.dart';
-// ignore: implementation_imports
-import 'package:currency_picker/src/currency_list_view.dart';
 import 'package:flutter/material.dart';
+
+import '../widgets/currency_picker_list.dart';
 
 /// Thin wrapper around [currency_picker] package for app-wide currency utilities.
 class CurrencyHelpers {
@@ -65,24 +65,27 @@ class CurrencyHelpers {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       showDragHandle: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       constraints: BoxConstraints(maxHeight: maxHeight),
-      builder: (_) => CurrencyListView(
-        onSelect: (currency) {
-          // CurrencyListView already calls Navigator.pop internally after
-          // onSelect, so we must NOT pop here to avoid a double-pop that
-          // would dismiss the parent page route.
-          onSelect(currency);
-        },
-        favorite: favorite,
-        currencyFilter: currencyFilter,
-        showFlag: true,
-        showSearchField: true,
-        showCurrencyName: true,
-        showCurrencyCode: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(ctx).padding.bottom + 24,
+        ),
+        child: AppCurrencyPickerList(
+          onSelect: (currency) {
+            onSelect(currency);
+          },
+          favorite: favorite,
+          currencyFilter: currencyFilter,
+          showFlag: true,
+          showSearchField: true,
+          showCurrencyName: true,
+          showCurrencyCode: true,
+        ),
       ),
     );
   }
