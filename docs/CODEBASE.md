@@ -158,6 +158,7 @@ Major persisted keys include:
 
 - PWA manifest: `web/manifest.json`
 - Install prompt integration: `pwa_install` package + `PwaInstallBanner` widget
+- Invite links use the web app domain (e.g. hisab.shenepoy.com) when `INVITE_BASE_URL` is set. The route `/functions/v1/invite-redirect` is handled by the Flutter web app, which redirects to the Supabase Edge Function so the token is validated and the user is sent to `redirect.html`.
 - Invite redirect static page: `web/redirect.html`
   - desktop -> web invite route
   - mobile -> attempts app deep link with timed web fallback

@@ -150,7 +150,7 @@ Go to **repo Settings** → **Secrets and variables** → **Actions** and add ea
 |--------|--------------|
 | `SUPABASE_URL` | Supabase Dashboard → **Settings** → **API** → Project URL |
 | `SUPABASE_ANON_KEY` | Supabase Dashboard → **Settings** → **API** → `anon` `public` key |
-| `SITE_URL` | Your web app URL, e.g. `https://hisab-c8eb1.web.app` |
+| `SITE_URL` | Your web app URL, e.g. `https://hisab.shenepoy.com` |
 
 #### Firebase Hosting
 
