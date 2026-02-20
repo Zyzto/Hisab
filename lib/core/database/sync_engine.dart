@@ -233,8 +233,9 @@ class SyncEngine {
       }
       for (final usage in inviteUsages) {
         await tx.execute(
-          'INSERT INTO invite_usages (invite_id, user_id, accepted_at) VALUES (?, ?, ?)',
+          'INSERT INTO invite_usages (id, invite_id, user_id, accepted_at) VALUES (?, ?, ?, ?)',
           [
+            usage['id'] as String,
             usage['invite_id'],
             usage['user_id'],
             usage['accepted_at'],

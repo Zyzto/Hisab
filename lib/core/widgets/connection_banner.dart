@@ -72,7 +72,7 @@ class _ConnectionBannerState extends ConsumerState<ConnectionBanner>
 
   @override
   Widget build(BuildContext context) {
-    final status = ref.watch(syncStatusProvider);
+    final status = ref.watch(syncStatusForDisplayProvider);
 
     // Detect transitions.
     if (status != _prevStatus) {

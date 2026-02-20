@@ -1,10 +1,13 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:upgrader/upgrader.dart';
 
 import '../database/database_providers.dart';
+import '../navigation/route_paths.dart';
+import '../services/connectivity_service.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
 import '../../features/settings/settings_definitions.dart';
 
@@ -132,13 +135,62 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
     _setStatus('Onboarding reset — restart the app');
   }
 
+  void _openInviteByToken() {
+    final controller = TextEditingController();
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Open invite by token'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'Paste invite token',
+            border: OutlineInputBorder(),
+          ),
+          autofocus: true,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) {
+            final token = controller.text.trim();
+            if (token.isNotEmpty) {
+              context.go(RoutePaths.inviteAccept(token));
+              Navigator.of(ctx).pop();
+            }
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final token = controller.text.trim();
+              if (token.isEmpty) return;
+              context.go(RoutePaths.inviteAccept(token));
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('Open'),
+          ),
+        ],
+      ),
+    ).then((_) {
+      controller.dispose();
+      if (mounted) Navigator.of(context).pop();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          12,
+          16,
+          MediaQuery.of(context).padding.bottom + 24,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -217,6 +269,58 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
               label: 'Reset onboarding',
               subtitle: 'Shows onboarding flow on next restart',
               onTap: _resetOnboarding,
+            ),
+            _DebugAction(
+              icon: Icons.link,
+              label: 'Open invite by token',
+              subtitle: 'Paste token to test invite flow in debug',
+              onTap: _openInviteByToken,
+            ),
+
+            // Sync status override (for testing chip/banner)
+            const SizedBox(height: 8),
+            Text(
+              'Sync status (override)',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                _SyncStatusChip(
+                  label: 'Connected',
+                  onTap: () => ref
+                      .read(debugSyncStatusOverrideProvider.notifier)
+                      .state = SyncStatus.connected,
+                ),
+                _SyncStatusChip(
+                  label: 'Syncing',
+                  onTap: () => ref
+                      .read(debugSyncStatusOverrideProvider.notifier)
+                      .state = SyncStatus.syncing,
+                ),
+                _SyncStatusChip(
+                  label: 'Offline',
+                  onTap: () => ref
+                      .read(debugSyncStatusOverrideProvider.notifier)
+                      .state = SyncStatus.offline,
+                ),
+                _SyncStatusChip(
+                  label: 'Local only',
+                  onTap: () => ref
+                      .read(debugSyncStatusOverrideProvider.notifier)
+                      .state = SyncStatus.localOnly,
+                ),
+                _SyncStatusChip(
+                  label: 'Clear',
+                  onTap: () =>
+                      ref.read(debugSyncStatusOverrideProvider.notifier).state =
+                          null,
+                ),
+              ],
             ),
 
             // Status feedback
@@ -297,6 +401,25 @@ class _DebugAction extends StatelessWidget {
       dense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 4),
       onTap: onTap,
+    );
+  }
+}
+
+class _SyncStatusChip extends StatelessWidget {
+  const _SyncStatusChip({
+    required this.label,
+    required this.onTap,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilterChip(
+      label: Text(label),
+      selected: false,
+      onSelected: (_) => onTap(),
     );
   }
 }

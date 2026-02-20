@@ -1,12 +1,18 @@
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter_riverpod/legacy.dart' show StateProvider;
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../features/settings/providers/settings_framework_providers.dart';
 
 part 'connectivity_service.g.dart';
+
+/// Debug-only: when non-null, UI shows this instead of real sync status.
+/// Set from debug menu to test chip/banner for each status.
+final debugSyncStatusOverrideProvider =
+    StateProvider<SyncStatus?>((ref) => null);
 
 /// Sync status exposed to the UI for the connection status icon.
 enum SyncStatus {
@@ -86,4 +92,12 @@ class SyncStatusNotifier extends _$SyncStatusNotifier {
       state = hasNetwork ? SyncStatus.connected : SyncStatus.offline;
     }
   }
+}
+
+/// Sync status shown in UI; respects [debugSyncStatusOverrideProvider] when set.
+@Riverpod(keepAlive: true)
+SyncStatus syncStatusForDisplay(Ref ref) {
+  final override = ref.watch(debugSyncStatusOverrideProvider);
+  if (override != null) return override;
+  return ref.watch(syncStatusProvider);
 }

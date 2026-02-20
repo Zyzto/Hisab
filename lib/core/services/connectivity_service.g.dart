@@ -187,3 +187,50 @@ abstract class _$SyncStatusNotifier extends $Notifier<SyncStatus> {
     element.handleCreate(ref, build);
   }
 }
+
+/// Sync status shown in UI; respects [debugSyncStatusOverrideProvider] when set.
+
+@ProviderFor(syncStatusForDisplay)
+final syncStatusForDisplayProvider = SyncStatusForDisplayProvider._();
+
+/// Sync status shown in UI; respects [debugSyncStatusOverrideProvider] when set.
+
+final class SyncStatusForDisplayProvider
+    extends $FunctionalProvider<SyncStatus, SyncStatus, SyncStatus>
+    with $Provider<SyncStatus> {
+  /// Sync status shown in UI; respects [debugSyncStatusOverrideProvider] when set.
+  SyncStatusForDisplayProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'syncStatusForDisplayProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$syncStatusForDisplayHash();
+
+  @$internal
+  @override
+  $ProviderElement<SyncStatus> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  SyncStatus create(Ref ref) {
+    return syncStatusForDisplay(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(SyncStatus value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<SyncStatus>(value),
+    );
+  }
+}
+
+String _$syncStatusForDisplayHash() =>
+    r'c6c4a6284cc9574d745325ccd8d44dcf2bee7f9d';
