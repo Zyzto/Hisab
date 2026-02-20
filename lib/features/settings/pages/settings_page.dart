@@ -68,11 +68,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(hisabSettingsProvidersProvider);
+
     if (settings == null) {
       return Scaffold(
         appBar: AppBar(
+          leading: const SyncStatusChip(),
           title: Text('settings'.tr()),
-          actions: const [SyncStatusChip(), SizedBox(width: 12)],
         ),
         body: Center(child: Text('settings_unavailable'.tr())),
       );
@@ -80,8 +81,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: const SyncStatusChip(),
         title: Text('settings'.tr()),
-        actions: const [SyncStatusChip(), SizedBox(width: 12)],
       ),
       body: ListView(
         children: [
@@ -365,7 +366,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   ) {
     final profileAsync = ref.watch(authUserProfileProvider);
     final user = ref.watch(currentUserProvider);
-    final syncStatus = ref.watch(syncStatusProvider);
+    final syncStatus = ref.watch(syncStatusForDisplayProvider);
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -864,23 +865,28 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
           builder: (ctx) => SafeArea(
             child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      'language'.tr(),
-                      style: Theme.of(ctx).textTheme.titleMedium,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(ctx).padding.bottom + 16,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        'language'.tr(),
+                        style: Theme.of(ctx).textTheme.titleMedium,
+                      ),
                     ),
-                  ),
-                  ..._supportedLocales.map(
-                    (locale) => ListTile(
-                      title: Text(_localeDisplayName(locale)),
-                      onTap: () => Navigator.of(ctx).pop(locale),
+                    ..._supportedLocales.map(
+                      (locale) => ListTile(
+                        title: Text(_localeDisplayName(locale)),
+                        onTap: () => Navigator.of(ctx).pop(locale),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -1605,7 +1611,12 @@ class _FavoriteCurrenciesSheetState extends State<_FavoriteCurrenciesSheet> {
           const SizedBox(height: 8),
           // Actions
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            padding: EdgeInsets.fromLTRB(
+              16,
+              0,
+              16,
+              16 + MediaQuery.of(context).padding.bottom,
+            ),
             child: Row(
               children: [
                 Expanded(
