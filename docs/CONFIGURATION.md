@@ -16,14 +16,14 @@ flutter run \
   --dart-define=SUPABASE_ANON_KEY=eyJhbGci...
 ```
 
-With a custom domain for invite links and/or correct email verification redirect (optional):
+With a custom domain for invite links and/or correct email verification redirect (optional). Use the same domain as your web app (e.g. Firebase custom domain) so invite links look like `https://hisab.shenepoy.com/functions/v1/invite-redirect?token=...`:
 
 ```bash
 flutter run \
   --dart-define=SUPABASE_URL=https://xxxxx.supabase.co \
   --dart-define=SUPABASE_ANON_KEY=eyJhbGci... \
-  --dart-define=INVITE_BASE_URL=https://invite.yourdomain.com \
-  --dart-define=SITE_URL=https://yourdomain.com
+  --dart-define=INVITE_BASE_URL=https://hisab.shenepoy.com \
+  --dart-define=SITE_URL=https://hisab.shenepoy.com
 ```
 
 `SITE_URL` is used as the redirect URL in magic links and sign-up confirmation emails. If unset, Supabase uses the project **Site URL** from the dashboard (often localhost in dev). Add the same URL to **Supabase Dashboard → Authentication → URL Configuration → Redirect URLs**.
@@ -44,8 +44,8 @@ The app works fully offline with no configuration. Authentication, sync, invites
 |-----------|----------|-------------|
 | `SUPABASE_URL` | For online mode | Your Supabase project URL (e.g. `https://xxxxx.supabase.co`) |
 | `SUPABASE_ANON_KEY` | For online mode | Your Supabase anon/public key (starts with `eyJ...`) |
-| `INVITE_BASE_URL` | Optional | Custom base URL for invite links (e.g. `https://invite.yourdomain.com`). When set, share links and QR codes use this instead of the Supabase URL. See [Invite links with a custom domain](#invite-links-with-a-custom-domain). |
-| `SITE_URL` | Optional | Redirect URL for auth emails (magic link, sign-up confirmation). When set (e.g. `https://yourdomain.com`), verification and magic links in emails point here instead of the Supabase default (e.g. localhost). Must be in Supabase **Redirect URLs**. |
+| `INVITE_BASE_URL` | Optional | Custom base URL for invite links (e.g. `https://hisab.shenepoy.com`). When set, share links and QR codes use this instead of the Supabase URL. The web app proxies `/functions/v1/invite-redirect` to Supabase. See [Invite links with a custom domain](#invite-links-with-a-custom-domain). |
+| `SITE_URL` | Optional | Redirect URL for auth emails (magic link, sign-up confirmation). When set (e.g. `https://hisab.shenepoy.com`), verification and magic links in emails point here instead of the Supabase default (e.g. localhost). Must be in Supabase **Redirect URLs**. |
 | `FCM_VAPID_KEY` | Optional | VAPID key for Firebase Cloud Messaging on web (Web Push certificates in Firebase Console). Required for web push token. |
 
 Find these values in:
@@ -55,19 +55,20 @@ Find these values in:
 
 ## Invite links with a custom domain
 
-Invite links normally use your Supabase project URL (e.g. `https://xxxxx.supabase.co/functions/v1/invite-redirect?token=...`). To show your own domain (e.g. `https://invite.yourdomain.com/functions/v1/invite-redirect?token=...`) **without running your own server**, use Supabase's **Custom Domain** and the app's optional `INVITE_BASE_URL`:
+Invite links normally use your Supabase project URL (e.g. `https://xxxxx.supabase.co/functions/v1/invite-redirect?token=...`). To use your **web app’s domain** (e.g. `https://hisab.shenepoy.com/functions/v1/invite-redirect?token=...`) so shared links match your brand:
 
-1. **Supabase (paid plan)**  
-   In the [Supabase Dashboard](https://supabase.com/dashboard): **Project → Settings → Custom Domains** (or [Add-ons](https://supabase.com/docs/guides/platform/custom-domains)). Add a subdomain (e.g. `invite.yourdomain.com`), add the CNAME and TXT records at your DNS provider, then verify and activate. Your Edge Functions (including `invite-redirect`) are then available at that domain.
+1. **Web app (Firebase Hosting or similar)**  
+   The Flutter web app is served from your custom domain (e.g. hisab.shenepoy.com). It handles the path `/functions/v1/invite-redirect` by immediately redirecting the browser to the Supabase Edge Function. No Supabase Custom Domain is required.
 
 2. **App**  
-   Build/run with the same URL as the invite base:
+   Build/run with the same URL as your web app for the invite base:
    ```bash
-   --dart-define=INVITE_BASE_URL=https://invite.yourdomain.com
+   --dart-define=INVITE_BASE_URL=https://hisab.shenepoy.com
    ```
-   Share links and QR codes will use this URL. The redirect still hits the same Supabase Edge Function; no extra hosting is required.
+   Share links and QR codes will use this URL. When a user opens the link, they hit your domain first, then the app redirects to Supabase for token validation; Supabase then redirects back to your domain’s `redirect.html` (set `SITE_URL` in Supabase Edge Function secrets to the same domain).
 
-If you prefer to use the custom domain for all Supabase traffic (Auth, API, Edge Functions), you can set `SUPABASE_URL` to your custom domain instead and omit `INVITE_BASE_URL`. See [Supabase Custom Domains](https://supabase.com/docs/guides/platform/custom-domains).
+**Alternative: Supabase Custom Domain**  
+If you prefer a separate subdomain for invite links (e.g. `https://invite.yourdomain.com`) without the web app proxy, use [Supabase Custom Domains](https://supabase.com/docs/guides/platform/custom-domains) (paid plan) and set `INVITE_BASE_URL` to that subdomain.
 
 ---
 
@@ -189,10 +190,11 @@ Set `SITE_URL` to your Firebase Hosting URL so auth redirects (magic link, email
 flutter build web \
   --dart-define=SUPABASE_URL=https://xxxxx.supabase.co \
   --dart-define=SUPABASE_ANON_KEY=eyJhbGci... \
-  --dart-define=SITE_URL=https://YOUR_PROJECT.web.app
+  --dart-define=INVITE_BASE_URL=https://hisab.shenepoy.com \
+  --dart-define=SITE_URL=https://hisab.shenepoy.com
 ```
 
-Optional: if you use a custom domain for Hosting, use that for `SITE_URL` and add it to Supabase redirect URLs.
+If you use the default Firebase URL instead of a custom domain, use that for `SITE_URL` (e.g. `https://YOUR_PROJECT.web.app`) and add it to Supabase redirect URLs.
 
 ### 2. Deploy
 
