@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -227,7 +228,21 @@ void main() async {
   // Run app — EasyLocalization stays mounted (no key change) to avoid
   // setState-after-dispose from its async asset loading. We sync locale
   // by calling setLocale when languageProvider changes (_LocaleSync).
+  // First initial language (onboarding, default): system locale if supported, else English.
   // --------------------------------------------------------------------------
+  if (settingsProviders != null &&
+      easyLocalizationReady &&
+      !settingsProviders.controller.get(onboardingCompletedSettingDef) &&
+      settingsProviders.controller.get(languageSettingDef) == 'en') {
+    final resolved = ui.PlatformDispatcher.instance
+        .computePlatformResolvedLocale(const [
+      Locale('en'),
+      Locale('ar'),
+    ]);
+    if (resolved != null) {
+      settingsProviders.controller.set(languageSettingDef, resolved.languageCode);
+    }
+  }
   final startLocale = easyLocalizationReady && settingsProviders != null
       ? Locale(settingsProviders.controller.get(languageSettingDef))
       : const Locale('en');

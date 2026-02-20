@@ -129,23 +129,28 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
           ),
           builder: (ctx) => SafeArea(
             child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      'language'.tr(),
-                      style: Theme.of(ctx).textTheme.titleMedium,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(ctx).padding.bottom + 16,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        'language'.tr(),
+                        style: Theme.of(ctx).textTheme.titleMedium,
+                      ),
                     ),
-                  ),
-                  ..._supportedLocales.map(
-                    (locale) => ListTile(
-                      title: Text(_localeDisplayName(locale)),
-                      onTap: () => Navigator.of(ctx).pop(locale),
+                    ..._supportedLocales.map(
+                      (locale) => ListTile(
+                        title: Text(_localeDisplayName(locale)),
+                        onTap: () => Navigator.of(ctx).pop(locale),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
