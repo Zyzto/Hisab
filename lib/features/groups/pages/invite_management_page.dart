@@ -10,6 +10,7 @@ import '../../../core/repository/repository_providers.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../domain/domain.dart';
 import '../providers/group_invite_provider.dart';
+import '../providers/groups_provider.dart';
 import '../widgets/create_invite_sheet.dart';
 
 class InviteManagementPage extends ConsumerStatefulWidget {
@@ -318,12 +319,18 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.75,
       ),
       builder: (ctx) => SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.fromLTRB(
+            24,
+            24,
+            24,
+            24 + MediaQuery.of(ctx).padding.bottom,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -550,7 +557,8 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
                     style: theme.textTheme.titleSmall,
                   ),
                   const SizedBox(height: ThemeConfig.spacingXS),
-                  _UsageHistoryList(inviteId: invite.id),
+                  _UsageHistoryList(
+                      inviteId: invite.id, groupId: widget.groupId),
                 ],
               ],
             ],
@@ -602,12 +610,15 @@ class _ActionChip extends StatelessWidget {
 
 class _UsageHistoryList extends ConsumerWidget {
   final String inviteId;
-  const _UsageHistoryList({required this.inviteId});
+  final String groupId;
+  const _UsageHistoryList(
+      {required this.inviteId, required this.groupId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final usagesAsync = ref.watch(inviteUsagesProvider(inviteId));
+    final participantsAsync = ref.watch(participantsByGroupProvider(groupId));
 
     return usagesAsync.when(
       data: (usages) {
@@ -617,10 +628,25 @@ class _UsageHistoryList extends ConsumerWidget {
             style: theme.textTheme.bodySmall,
           );
         }
+        final participants = switch (participantsAsync) {
+          AsyncData(value: final list) => list,
+          _ => <Participant>[],
+        };
+        final userIdToName = <String, String>{
+          for (final p in participants)
+            if (p.userId != null &&
+                p.name.isNotEmpty &&
+                p.userId!.isNotEmpty)
+              p.userId!: p.name,
+        };
         return Column(
           children: usages.map((usage) {
             final dateStr =
                 DateFormat.yMMMd().add_jm().format(usage.acceptedAt);
+            final displayLabel = userIdToName[usage.userId] ??
+                (usage.userId.length > 8
+                    ? '${usage.userId.substring(0, 8)}...'
+                    : usage.userId);
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 2),
               child: Row(
@@ -633,9 +659,7 @@ class _UsageHistoryList extends ConsumerWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      usage.userId.length > 8
-                          ? '${usage.userId.substring(0, 8)}...'
-                          : usage.userId,
+                      displayLabel,
                       style: theme.textTheme.bodySmall,
                     ),
                   ),

@@ -10,6 +10,7 @@ import '../../../core/repository/repository_providers.dart';
 import '../../../core/telemetry/telemetry_service.dart';
 import '../../../domain/domain.dart';
 import '../providers/group_invite_provider.dart';
+import '../providers/groups_provider.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 
 class InviteAcceptPage extends ConsumerStatefulWidget {
@@ -24,6 +25,8 @@ class InviteAcceptPage extends ConsumerStatefulWidget {
 class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
   bool _accepting = false;
   String? _error;
+  /// Set when accept fails because user is already a member; enables "Open Group" action.
+  String? _alreadyMemberGroupId;
 
   @override
   Widget build(BuildContext context) {
@@ -123,7 +126,9 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                     Text(
                       _error!,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.error,
+                        color: _alreadyMemberGroupId != null
+                            ? theme.colorScheme.onSurface
+                            : theme.colorScheme.error,
                       ),
                     ),
                   ],
@@ -132,16 +137,22 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
             ),
           ),
           const SizedBox(height: 32),
-          FilledButton(
-            onPressed: _accepting ? null : () => _accept(context, group),
-            child: _accepting
-                ? const SizedBox(
-                    height: 24,
-                    width: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text('accept_invite'.tr()),
-          ),
+          if (_alreadyMemberGroupId != null)
+            FilledButton(
+              onPressed: () => context.go(RoutePaths.groupDetail(_alreadyMemberGroupId!)),
+              child: Text('open_group'.tr()),
+            )
+          else
+            FilledButton(
+              onPressed: _accepting ? null : () => _accept(context, group),
+              child: _accepting
+                  ? const SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text('accept_invite'.tr()),
+            ),
         ],
       ),
     );
@@ -167,6 +178,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
     setState(() {
       _accepting = true;
       _error = null;
+      _alreadyMemberGroupId = null;
     });
 
     try {
@@ -176,18 +188,29 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
         'groupId': groupId,
       }, enabled: ref.read(telemetryEnabledProvider));
       Log.info('Invite accepted: token=${widget.token} groupId=$groupId');
+      ref.invalidate(groupsProvider);
+      ref.invalidate(futureGroupProvider(groupId));
       if (context.mounted) {
         context.go(RoutePaths.groupDetail(groupId));
       }
     } catch (e, st) {
       Log.warning('Invite accept failed', error: e, stackTrace: st);
       if (mounted) {
+        final isAlreadyMember = e.toString().contains('Already a member of this group');
         setState(() {
-          _accepting = false;
-          _error = e.toString().contains('Unauthenticated')
-              ? 'sign_in_required'.tr()
-              : e.toString();
+          if (isAlreadyMember) {
+            _error = 'invite_already_member'.tr();
+            _alreadyMemberGroupId = group.id;
+          } else {
+            _error = e.toString().contains('Unauthenticated')
+                ? 'sign_in_required'.tr()
+                : e.toString();
+          }
         });
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _accepting = false);
       }
     }
   }

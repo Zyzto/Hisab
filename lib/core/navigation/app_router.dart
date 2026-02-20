@@ -12,6 +12,8 @@ import '../../features/groups/pages/group_detail_page.dart';
 import '../../features/groups/pages/group_settings_page.dart';
 import '../../features/groups/pages/invite_accept_page.dart';
 import '../../features/groups/pages/invite_management_page.dart';
+import '../../features/groups/pages/invite_redirect_proxy_page.dart';
+import '../../features/groups/pages/invite_scan_page.dart';
 import '../../features/expenses/pages/expense_form_page.dart';
 import '../../features/expenses/pages/expense_detail_page.dart';
 import '../../features/settings/widgets/privacy_policy_page.dart';
@@ -98,6 +100,16 @@ GoRouter router(Ref ref) {
           final token = state.pathParameters['token'] ?? '';
           return InviteAcceptPage(token: token);
         },
+      ),
+      GoRoute(
+        path: RoutePaths.scanInvite,
+        builder: (context, state) => const InviteScanPage(),
+      ),
+      // Custom-domain invite link: hisab.shenepoy.com/functions/v1/invite-redirect?token=...
+      // Redirects to Supabase Edge Function so token is validated and user sent to redirect.html.
+      GoRoute(
+        path: '/functions/v1/invite-redirect',
+        builder: (context, state) => InviteRedirectProxyPage(uri: state.uri),
       ),
       GoRoute(
         path: '/groups/create',
