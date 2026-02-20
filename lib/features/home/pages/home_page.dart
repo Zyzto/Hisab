@@ -7,6 +7,7 @@ import '../../../core/navigation/route_paths.dart';
 import '../../../core/widgets/async_value_builder.dart';
 import '../../../core/widgets/sync_status_icon.dart';
 import '../../groups/providers/groups_provider.dart';
+import '../../settings/providers/settings_framework_providers.dart';
 import '../../groups/widgets/group_card.dart';
 import '../../../domain/domain.dart';
 
@@ -21,14 +22,12 @@ class HomePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final groupsAsync = ref.watch(groupsProvider);
+    final localOnly = ref.watch(effectiveLocalOnlyProvider);
 
     return Scaffold(
       appBar: AppBar(
+        leading: const SyncStatusChip(),
         title: Text('app_name'.tr()),
-        actions: const [
-          SyncStatusChip(),
-          SizedBox(width: 12),
-        ],
       ),
       body: AsyncValueBuilder<List<Group>>(
         value: groupsAsync,
@@ -102,10 +101,27 @@ class HomePage extends ConsumerWidget {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push(RoutePaths.groupCreate),
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: localOnly
+          ? FloatingActionButton(
+              onPressed: () => context.push(RoutePaths.groupCreate),
+              child: const Icon(Icons.add),
+            )
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                FloatingActionButton(
+                  heroTag: 'scan_invite',
+                  onPressed: () => context.push(RoutePaths.scanInvite),
+                  child: const Icon(Icons.qr_code_scanner),
+                ),
+                const SizedBox(height: 12),
+                FloatingActionButton(
+                  onPressed: () => context.push(RoutePaths.groupCreate),
+                  child: const Icon(Icons.add),
+                ),
+              ],
+            ),
     );
   }
 }
