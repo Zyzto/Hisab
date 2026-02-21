@@ -4,6 +4,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/app_config.dart';
+import '../../core/widgets/toast.dart';
 import 'feedback_clipboard.dart';
 import 'feedback_upload.dart';
 
@@ -55,13 +56,8 @@ Future<void> handleFeedback(
   }
 
   if (context.mounted) {
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          reportIssueUrl.isEmpty ? 'logs_copied_paste'.tr() : 'logs_copied'.tr(),
-        ),
-      ),
+    context.showSuccess(
+      reportIssueUrl.isEmpty ? 'logs_copied_paste'.tr() : 'logs_copied'.tr(),
     );
   }
 }

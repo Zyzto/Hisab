@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/auth/sign_in_sheet.dart';
+import '../../../core/widgets/toast.dart';
 import '../../../core/constants/supabase_config.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/theme/theme_config.dart';
@@ -682,11 +683,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
             return; // Page will reload, main.dart handles completion
           case SignInResult.cancelled:
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('onboarding_online_requires_sign_in'.tr()),
-                ),
-              );
+              context.showToast('onboarding_online_requires_sign_in'.tr());
             }
             return;
         }
