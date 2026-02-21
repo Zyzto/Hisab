@@ -108,23 +108,19 @@ Redirect behavior:
 
 ## Notifications (FCM)
 
-Implemented in `lib/core/services/notification_service.dart`:
+Push notifications are sent when expenses are added/edited or members join a group. The pipeline is: **Supabase (trigger) → pg_net → send-notification Edge Function → Firebase Cloud Messaging → Flutter**. Full setup and verification are in [SUPABASE_SETUP.md](SUPABASE_SETUP.md) (Section 5: send-notification, “Push notifications: end-to-end flow and verification”, and Section 9: “Push notifications not received”).
 
-- requests notification permission
-- registers/unregisters device token in Supabase `device_tokens`
-- handles token refresh
-- handles foreground display (mobile local notifications)
-- handles tap navigation to group details
+**Flutter** (`lib/core/services/notification_service.dart`):
 
-Web-specific pieces:
+- Requests notification permission; registers/unregisters FCM token in Supabase `device_tokens` (upsert on `user_id,token`).
+- Handles token refresh, foreground display (mobile: local notifications), and tap → navigate to group detail using `message.data['group_id']`.
+- Expects incoming messages to have `notification` (title, body) and `data.group_id` (string).
 
-- `web/index.html` initializes Firebase web SDK and listens for service worker click messages
-- `web/firebase-messaging-sw.js` handles background push and notification clicks
+**Backend:** Database trigger `notify_on_expense_change` (and `notify_on_member_join`) calls `notify_group_activity()`, which POSTs to the `send-notification` Edge Function with `group_id`, `actor_user_id`, `action`, and optional expense fields. The Edge Function (`supabase/functions/send-notification/index.ts`) loads other group members’ tokens from `device_tokens` and sends FCM v1 messages (one per token).
 
-Settings integration:
+**Web:** `web/index.html` initializes Firebase web SDK; `web/firebase-messaging-sw.js` handles background push and clicks. Web token registration requires `FCM_VAPID_KEY` at build time.
 
-- `notifications_enabled` controls initialization/token registration.
-- Toggle only appears in online mode.
+**Settings:** `notifications_enabled` controls initialization and token registration; the toggle is shown only in online mode.
 
 ## Feature Modules
 
@@ -172,7 +168,7 @@ The app also depends on Supabase-side schema, RLS, RPCs, and additional edge fun
 
 - tables such as `groups`, `group_members`, `participants`, `expenses`, `expense_tags`, `group_invites`, `invite_usages`, `telemetry`, `device_tokens`
 - RPCs such as `accept_invite`, `transfer_ownership`, `leave_group`, `kick_member`, `update_member_role`, `create_invite`, etc.
-- optional edge functions `telemetry` and `send-notification` (documented, not committed in this repo snapshot)
+- optional edge functions `telemetry` (documented in setup docs) and `send-notification` (implemented in `supabase/functions/send-notification/`)
 
 Schema and security/performance can be re-verified via [Supabase MCP](https://supabase.com/docs/guides/getting-started/mcp) (`list_tables`, `get_advisors`).
 
