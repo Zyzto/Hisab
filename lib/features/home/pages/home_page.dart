@@ -28,6 +28,13 @@ class HomePage extends ConsumerWidget {
       appBar: AppBar(
         leading: const SyncStatusChip(),
         title: Text('app_name'.tr()),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.archive_outlined),
+            onPressed: () => context.push(RoutePaths.archivedGroups),
+            tooltip: 'archived_groups'.tr(),
+          ),
+        ],
       ),
       body: AsyncValueBuilder<List<Group>>(
         value: groupsAsync,
