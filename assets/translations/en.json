@@ -217,6 +217,7 @@
   "invite_requires_online": "Invites require online mode. Switch to online in settings.",
   "invite_expired": "Invite expired or invalid",
   "invite_to_group": "Invite to {name}",
+  "invite_to_group_prefix": "Invite to ",
   "accept_invite": "Accept Invite",
   "invite_already_member": "You're already a member of this group.",
   "open_group": "Open Group",
