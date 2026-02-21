@@ -1,5 +1,11 @@
 {
   "files.associations": {
     ".github/workflows/*.yml": "yaml"
+  },
+  "files.exclude": {
+      ".github/workflows/**": true,
+  },
+  "files.watcherExclude": {
+    ".github/workflows/**": true,
   }
 }
