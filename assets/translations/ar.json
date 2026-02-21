@@ -468,5 +468,9 @@
   "expense_form_full_features": "نموذج مصروف كامل (دخل وتحويل)",
   "expense_form_full_features_description": "إظهار تبويبات الحساب / الدخل / التحويل عند إضافة مصروف",
   "expense_form_full_features_tooltip": "لاستخدام الدخل والتحويل وخيارات أخرى، فعّلها من الإعدادات.",
-  "expense_form_full_features_tooltip_title": "خيارات إضافية"
+  "expense_form_full_features_tooltip_title": "خيارات إضافية",
+  "notification_new_expense": "مصروف جديد",
+  "notification_expense_updated": "تم تحديث المصروف",
+  "notification_group_activity": "نشاط المجموعة",
+  "notification_member_joined": "انضم عضو جديد إلى المجموعة."
 }
