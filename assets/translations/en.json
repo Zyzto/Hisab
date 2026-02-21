@@ -468,5 +468,9 @@
   "expense_form_full_features": "Full expense form (Income & Transfer)",
   "expense_form_full_features_description": "Show Expense / Income / Transfer tabs when adding an expense",
   "expense_form_full_features_tooltip": "To use income, transfer, and other options, enable them in Settings.",
-  "expense_form_full_features_tooltip_title": "More options"
+  "expense_form_full_features_tooltip_title": "More options",
+  "notification_new_expense": "New expense",
+  "notification_expense_updated": "Expense updated",
+  "notification_group_activity": "Group activity",
+  "notification_member_joined": "A new member joined the group."
 }
