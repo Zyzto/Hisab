@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/auth/sign_in_sheet.dart';
+import '../../../core/database/database_providers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../core/repository/repository_providers.dart';
@@ -118,9 +119,21 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'invite_to_group'.tr().replaceAll('{name}', group.name),
-                    style: theme.textTheme.titleLarge,
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        'invite_to_group_prefix'.tr(),
+                        style: theme.textTheme.titleLarge,
+                      ),
+                      Text(
+                        group.name,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ],
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 12),
@@ -180,19 +193,27 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
     });
 
     try {
+      final profile = ref.read(authServiceProvider).getUserProfile();
+      final name = profile?.name?.trim();
+      final displayName = (name != null && name.isNotEmpty)
+          ? name
+          : (ref.read(currentUserProvider)?.email ?? 'Member');
       final repo = ref.read(groupInviteRepositoryProvider);
-      final groupId = await repo.accept(widget.token);
+      final groupId = await repo.accept(widget.token, newParticipantName: displayName);
       TelemetryService.sendEvent('invite_accepted', {
         'groupId': groupId,
       }, enabled: ref.read(telemetryEnabledProvider));
       Log.info('Invite accepted: token=${widget.token} groupId=$groupId');
+      Log.info('Syncing after invite accept (groupId=$groupId)');
+      await ref.read(dataSyncServiceProvider.notifier).syncNow();
+      Log.info('Sync after invite complete, navigating to group $groupId');
       ref.invalidate(groupsProvider);
       ref.invalidate(futureGroupProvider(groupId));
       if (context.mounted) {
         context.go(RoutePaths.groupDetail(groupId));
       }
     } catch (e, st) {
-      Log.warning('Invite accept failed', error: e, stackTrace: st);
+      Log.warning('Invite accept or sync failed', error: e, stackTrace: st);
       if (mounted) {
         final isAlreadyMember = e.toString().contains('Already a member of this group');
         setState(() {
