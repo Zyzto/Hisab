@@ -22,8 +22,10 @@ This guide walks you through setting up the Supabase backend for Hisab from scra
    - [Migration 9: Security hardening (search_path, revoke/toggle RPCs)](#migration-9-security-hardening-search_path-revoketoggle-rpcs)
    - [Migration 10: RLS performance (auth initplan and merged groups SELECT)](#migration-10-rls-performance-auth-initplan-and-merged-groups-select)
    - [Migration 11: Indexes (composite, partial, and FK)](#migration-11-indexes-composite-partial-and-fk)
+   - [Migration 12: Groups archive (archived_at)](#migration-12-groups-archive-archived_at)
 4. [Configure Authentication](#4-configure-authentication)
 5. [Deploy Edge Functions](#5-deploy-edge-functions)
+   - [Push notifications: end-to-end flow and verification](#push-notifications-end-to-end-flow-and-verification)
 6. [Configure the Flutter App](#6-configure-the-flutter-app)
 7. [Verify the Setup](#7-verify-the-setup)
 8. [Architecture Overview](#8-architecture-overview)
@@ -776,6 +778,7 @@ Enables the `pg_net` extension and creates database triggers that asynchronously
    -- Run this in the SQL Editor (replace with your actual service role key from Dashboard > Settings > API)
    SELECT vault.create_secret('YOUR_SERVICE_ROLE_KEY_HERE', 'service_role_key');
    ```
+3. **Before running the migration:** Replace `YOUR_SUPABASE_URL` in the trigger function below with your actual Supabase project URL (e.g. `https://xxxxxxxxxxxxx.supabase.co`). You can copy it from **Settings > API > Project URL** in the dashboard. If you run the migration without replacing it, the trigger will POST to an invalid host and no notifications will be sent.
 
 ```sql
 -- Enable pg_net extension for async HTTP calls from triggers
@@ -783,7 +786,7 @@ CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
 
 -- Trigger function: sends a notification payload to the send-notification
 -- edge function via pg_net (async, fire-and-forget).
--- IMPORTANT: Replace YOUR_SUPABASE_URL with your actual project URL.
+-- IMPORTANT: Replace YOUR_SUPABASE_URL with your actual project URL (Settings > API > Project URL).
 CREATE OR REPLACE FUNCTION notify_group_activity()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -1239,6 +1242,17 @@ CREATE INDEX IF NOT EXISTS idx_invite_usages_user_id ON public.invite_usages(use
 CREATE INDEX IF NOT EXISTS idx_participants_user_id ON public.participants(user_id);
 ```
 
+### Migration 12: Groups archive (archived_at)
+
+Adds soft-archive support so the owner can archive a group. Run after Migration 11.
+
+```sql
+ALTER TABLE public.groups
+  ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
+```
+
+No new RPC or RLS change: existing `groups_update_owner_admin` allows owner/admin to update any column, including `archived_at`.
+
 ---
 
 ## 4. Configure Authentication
@@ -1438,7 +1452,7 @@ supabase functions deploy telemetry --no-verify-jwt
 
 ### send-notification
 
-Sends FCM push notifications to group members when expenses are created/updated or new members join. Called by the database trigger (Migration 6) via `pg_net`.
+Sends FCM push notifications to group members when expenses are created/updated or new members join. Called by the database trigger (Migration 6) via `pg_net`. The function queries `group_members` and `device_tokens` for the group (excluding the actor), then sends FCM HTTP v1 messages with `notification` (title/body) and `data.group_id` so the Flutter app can display and navigate to the group on tap.
 
 **Prerequisites:**
 1. Create a Firebase project and add apps for Android, iOS, and Web.
@@ -1457,12 +1471,43 @@ supabase secrets set FCM_SERVICE_ACCOUNT_KEY='{"type":"service_account",...}'
 SELECT vault.create_secret('YOUR_SERVICE_ROLE_KEY_HERE', 'service_role_key');
 ```
 
+**File**: `supabase/functions/send-notification/index.ts`
+
+The implementation in the repo uses the trigger payload (`group_id`, `actor_user_id`, `action`, `expense_title`, `amount_cents`, `currency_code`) to build a notification title/body, fetches FCM tokens for other group members from `device_tokens`, obtains an OAuth2 access token from the Firebase service account, and sends one FCM v1 request per token. The Flutter app expects `message.notification` (title, body) and `message.data.group_id` (string) for tap navigation; see `lib/core/services/notification_service.dart`.
+
 **Deploy with CLI**:
 ```bash
 supabase functions deploy send-notification --no-verify-jwt
 ```
 
-> **Note**: `--no-verify-jwt` is used because the function validates the service role key in the request header instead.
+> **Note**: `--no-verify-jwt` is used because the function validates the service role key in the request header (sent by the database trigger via pg_net).
+
+#### Push notifications: end-to-end flow and verification
+
+The following describes the full pipeline so you can verify or debug each step.
+
+**Flow (expense add/edit):**
+
+1. **Flutter app** (online): User adds or edits an expense → [PowerSyncRepository](lib/core/repository/powersync_repository.dart) writes to Supabase `expenses` via `Supabase.instance.client` (authenticated). Offline writes are queued in `pending_writes` and pushed later by [DataSyncService](lib/core/database/database_providers.dart) using the same client, so the trigger runs with `auth.uid()` set.
+2. **Supabase Postgres**: `AFTER INSERT OR UPDATE ON expenses` fires trigger `notify_on_expense_change` → function `notify_group_activity()` runs. It reads `v_supabase_url` (must be your project URL, not `YOUR_SUPABASE_URL`) and the service role key from **Vault** (`service_role_key`). If either is missing, it logs and returns without calling the edge function.
+3. **pg_net**: `net.http_post` sends a POST to `{v_supabase_url}/functions/v1/send-notification` with JSON body `group_id`, `actor_user_id`, `action`, `expense_title`, `amount_cents`, `currency_code` and header `Authorization: Bearer <service_role_key>`.
+4. **Edge function `send-notification`**: Validates the Bearer token against `SUPABASE_SERVICE_ROLE_KEY`, then uses `FCM_PROJECT_ID` and `FCM_SERVICE_ACCOUNT_KEY` to obtain a Google OAuth2 access token and send FCM HTTP v1 messages to all group members’ device tokens (from `device_tokens`) except the actor. Each message includes `notification: { title, body }` and `data: { group_id }` (string).
+5. **Flutter app** (on other devices): Receives the message via Firebase; [NotificationService](lib/core/services/notification_service.dart) displays it and, on tap, navigates to the group using `message.data['group_id']`.
+
+**Verification checklist:**
+
+| Step | Where to check | What to verify |
+|------|----------------|----------------|
+| 1. Edge function deployed | Dashboard → Edge Functions | `send-notification` is listed and ACTIVE. |
+| 2. Edge function secrets | Dashboard → Project Settings → Edge Functions → Secrets | `FCM_PROJECT_ID` and `FCM_SERVICE_ACCOUNT_KEY` are set. Use the same Firebase project as your Flutter app (e.g. `google-services.json` / web config). |
+| 3. Vault secret | SQL Editor: `SELECT name FROM vault.decrypted_secrets WHERE name = 'service_role_key';` | One row returned. If not, run `SELECT vault.create_secret('<your-service-role-key>', 'service_role_key');` (key from Settings → API). |
+| 4. Trigger URL | Database → Functions → `notify_group_activity` → view source | `v_supabase_url` is your project URL (e.g. `https://xxxxxxxxxxxxx.supabase.co`), not `YOUR_SUPABASE_URL`. If wrong, re-run the Migration 6 function with the correct URL. |
+| 5. pg_net enabled | Database → Extensions | `pg_net` (schema `extensions`) is installed. |
+| 6. Triggers exist | Database → Tables → `expenses` → Triggers | `notify_on_expense_change` (AFTER INSERT OR UPDATE). Similarly `group_members` has `notify_on_member_join`. |
+| 7. Device tokens | Table Editor → `device_tokens` | Rows exist for users who should receive notifications. The app registers tokens when the user is signed in, has notifications enabled in settings, and has granted permission. On web, `FCM_VAPID_KEY` must be set at build time. |
+| 8. Flutter | App Settings | Notifications toggle is on; app has requested and been granted notification permission. |
+
+**Testing delivery:** You can send a test FCM message to a registration token (e.g. from `device_tokens`) using the Firebase Console (Cloud Messaging) or an API client. If the device receives that test but not expense-triggered notifications, the issue is upstream (trigger, Vault, or edge function secrets/logs).
 
 ---
 
@@ -1539,7 +1584,7 @@ After completing all steps:
    - `get_invite_by_token`, `accept_invite`, `create_invite`, `revoke_invite`, `toggle_invite_active`
    - `transfer_ownership`, `leave_group`, `kick_member`, `update_member_role`, `assign_participant` (optional if app does not assign participants from UI)
 
-4. **Edge Functions**: Go to **Edge Functions** and verify `invite-redirect` and `telemetry` are deployed and active.
+4. **Edge Functions**: Go to **Edge Functions** and verify `invite-redirect`, `telemetry`, and `send-notification` are deployed and active (for push notifications, also set `FCM_PROJECT_ID` and `FCM_SERVICE_ACCOUNT_KEY` secrets; see Section 5).
 
 5. **Auth**: Try signing up with email/password in the app. Check the Supabase **Authentication > Users** page to confirm the user was created.
 
@@ -1646,6 +1691,15 @@ The "Current schema reference" table above can be re-verified with `list_tables`
 - Verify the redirect URL is added to **Authentication > URL Configuration > Redirect URLs**.
 - For mobile, ensure the app scheme (`io.supabase.hisab`) is registered in your Android/iOS configuration.
 - For web, ensure the site URL matches your deployment URL.
+
+### Push notifications not received
+
+- **Checklist:** Follow the [Push notifications: end-to-end flow and verification](#push-notifications-end-to-end-flow-and-verification) table in Section 5. Common causes:
+  - **Vault:** `service_role_key` not created or wrong name → trigger never calls the edge function (check Postgres logs for "service_role_key not found in vault").
+  - **Trigger URL:** Still set to `YOUR_SUPABASE_URL` → pg_net POST fails; fix by re-creating `notify_group_activity()` with the real project URL.
+  - **Edge function secrets:** `FCM_PROJECT_ID` or `FCM_SERVICE_ACCOUNT_KEY` missing or invalid → function returns 500 or FCM rejects sends; check Edge Functions → send-notification → Logs.
+  - **No device tokens:** Recipients must be signed in with notifications enabled and permission granted; tokens are stored in `device_tokens`. On web, `FCM_VAPID_KEY` must be set at build time or the web token is never registered.
+- **Verify FCM separately:** Send a test message to a token from `device_tokens` via Firebase Console (Cloud Messaging) or the FCM API. If that works but expense-triggered notifications do not, the problem is the Supabase pipeline (trigger/Vault/edge function).
 
 ---
 
