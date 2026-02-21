@@ -122,6 +122,7 @@ class _AppState extends ConsumerState<App> {
       child: InviteLinkHandler(
         ref: ref,
         child: ToastificationWrapper(
+          config: const ToastificationConfig(alignment: Alignment.bottomCenter),
           child: MaterialApp.router(
         title: 'Hisab',
         debugShowCheckedModeBanner: false,

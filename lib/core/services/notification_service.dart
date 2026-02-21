@@ -12,7 +12,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants/supabase_config.dart';
 import '../navigation/app_router.dart';
 import '../navigation/route_paths.dart';
+import '../../features/settings/providers/settings_framework_providers.dart';
 import 'permission_service.dart';
+import 'notification_service_web_stub.dart'
+    if (dart.library.html) 'notification_service_web_impl.dart' as web_notifications;
 
 part 'notification_service.g.dart';
 
@@ -24,6 +27,69 @@ part 'notification_service.g.dart';
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   Log.debug('FCM background message: ${message.messageId}');
+
+  // If we receive a data-only message (no notification payload), show a local
+  // notification so the user still sees something. Current Edge Function always
+  // sends notification + data; this supports future data-only sends.
+  if (!kIsWeb &&
+      message.notification == null &&
+      message.data.isNotEmpty &&
+      message.data['group_id'] != null) {
+    await _showDataOnlyNotificationInBackground(message);
+  }
+}
+
+/// Shows a local notification from a data-only FCM message. Runs in background isolate.
+@pragma('vm:entry-point')
+Future<void> _showDataOnlyNotificationInBackground(RemoteMessage message) async {
+  try {
+    final plugin = FlutterLocalNotificationsPlugin();
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const darwinInit = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
+    await plugin.initialize(
+      const InitializationSettings(
+        android: androidInit,
+        iOS: darwinInit,
+        macOS: darwinInit,
+      ),
+    );
+    final androidPlugin = plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    await androidPlugin?.createNotificationChannel(_androidChannel);
+
+    final title = message.data['title'] as String? ?? 'Group activity';
+    final body = message.data['body'] as String? ?? 'Tap to open';
+    final groupId = message.data['group_id'] as String? ?? '';
+    final id = (message.messageId ?? groupId).hashCode.abs() % 0x7FFFFFFF;
+
+    await plugin.show(
+      id,
+      title,
+      body,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _androidChannel.id,
+          _androidChannel.name,
+          channelDescription: _androidChannel.description,
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: '@mipmap/ic_launcher',
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      ),
+      payload: groupId.isNotEmpty ? groupId : null,
+    );
+  } catch (e) {
+    Log.warning('NotificationService: data-only background notification failed', error: e);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -71,6 +137,13 @@ class NotificationService extends _$NotificationService {
       _openedAppSub?.cancel();
       _initialized = false;
       _initializing = false;
+    });
+
+    // When user changes language and notifications are already on, re-send token so device_tokens.locale stays in sync
+    ref.listen(languageProvider, (prev, next) {
+      if (prev != null && prev != next && _initialized) {
+        _registerToken();
+      }
     });
   }
 
@@ -245,7 +318,7 @@ class NotificationService extends _$NotificationService {
           ? 'web'
           : (defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android');
 
-      // Upsert into device_tokens
+      // Upsert into device_tokens (include locale for language-aware notifications)
       final client = Supabase.instance.client;
       final userId = client.auth.currentUser?.id;
       if (userId == null) {
@@ -253,11 +326,14 @@ class NotificationService extends _$NotificationService {
         return;
       }
 
+      final locale = ref.read(languageProvider);
+
       await client.from('device_tokens').upsert(
         {
           'user_id': userId,
           'token': token,
           'platform': platform,
+          'locale': locale,
           'updated_at': DateTime.now().toUtc().toIso8601String(),
         },
         onConflict: 'user_id,token',
@@ -280,8 +356,11 @@ class NotificationService extends _$NotificationService {
     if (notification == null) return;
 
     if (kIsWeb) {
-      // On web, the service worker handles display; nothing to do here.
-      // Optionally, we could show an in-app banner/snackbar.
+      web_notifications.showWebForegroundNotification(
+        notification.title ?? '',
+        notification.body ?? '',
+        message.data['group_id'] as String?,
+      );
       return;
     }
 
