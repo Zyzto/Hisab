@@ -17,6 +17,7 @@ This guide walks you through setting up the Supabase backend for Hisab from scra
    - [Migration 4: Security Hardening](#migration-4-security-hardening)
    - [Migration 5: Device Tokens (Push Notifications)](#migration-5-device-tokens-push-notifications)
    - [Migration 6: Notification Triggers](#migration-6-notification-triggers)
+   - [Migration 6b: device_tokens locale (language-aware notifications)](#migration-6b-device_tokens-locale-language-aware-notifications)
    - [Migration 7: Schema Additions (drift fix)](#migration-7-schema-additions-drift-fix)
    - [Migration 8: RPC updates (invites)](#migration-8-rpc-updates-invites)
    - [Migration 9: Security hardening (search_path, revoke/toggle RPCs)](#migration-9-security-hardening-search_path-revoketoggle-rpcs)
@@ -874,6 +875,16 @@ CREATE TRIGGER notify_on_member_join
   EXECUTE FUNCTION notify_group_activity();
 ```
 
+### Migration 6b: device_tokens locale (language-aware notifications)
+
+Adds an optional `locale` column to `device_tokens` so the send-notification Edge Function can deliver push notifications in the recipient's app language (e.g. `en`, `ar`). Run after Migration 6. Existing rows keep `locale` null and receive English. The Flutter app sends the current app language when registering or refreshing the FCM token so each device gets notifications in the right language.
+
+```sql
+-- device_tokens: optional locale for localized push notification text
+ALTER TABLE public.device_tokens
+  ADD COLUMN IF NOT EXISTS locale TEXT;
+```
+
 ### Migration 7: Schema Additions (drift fix)
 
 Run this migration after Migrations 1–6 to add columns and the `invite_usages` table so the schema matches what the app expects. Safe for existing projects (uses `ALTER TABLE` / `CREATE TABLE`); new projects run 1–6 then 7 for a full schema.
@@ -1669,7 +1680,7 @@ The following matches the live schema when Migrations 1–8 (or equivalent) are 
 | **expense_tags** | id, group_id, label, icon_name, created_at, updated_at |
 | **group_invites** | id, group_id, token, invitee_email, role, created_at, expires_at, created_by, label, max_uses, use_count, is_active |
 | **invite_usages** | id, invite_id, user_id, accepted_at |
-| **device_tokens** | id, user_id, token, platform, created_at, updated_at |
+| **device_tokens** | id, user_id, token, platform, locale, created_at, updated_at |
 | **telemetry** | id, event, timestamp, data |
 
 **Note:** Existing projects that lack `allow_member_add_participant` or `require_participant_assignment` on `groups` will get them when you run Migration 7 (it uses `ADD COLUMN IF NOT EXISTS`).
@@ -1721,7 +1732,7 @@ The "Current schema reference" table above can be re-verified with `list_tables`
 
 ### Schema and behavior notes
 
-- **device_tokens**: Table lives in `public.device_tokens`. One row per (user_id, token); `updated_at` is maintained by trigger. RLS restricts access to the current user’s rows only.
+- **device_tokens**: Table lives in `public.device_tokens`. One row per (user_id, token); optional `locale` (e.g. `en`, `ar`) is sent by the app on token register/refresh for language-aware push notifications; `updated_at` is maintained by trigger. RLS restricts access to the current user’s rows only.
 - **groups.owner_id**: References `auth.users(id)` with `ON DELETE SET NULL`. If an auth user is deleted (e.g. account removal), their groups are not deleted; `owner_id` becomes NULL. Ownership can be reassigned via `transfer_ownership` or `leave_group` (oldest member becomes owner). Consider documenting this for support.
 - **telemetry**: Append-only table; no SELECT policy (insert-only for analytics). No built-in retention; the table can grow without bound. For production, consider a retention strategy (e.g. periodic delete of rows older than N months, or partitioning by month and dropping old partitions). Add an index on `(timestamp)` or `(event, timestamp)` if you run reporting queries.
 
