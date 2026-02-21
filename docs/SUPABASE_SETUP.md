@@ -1253,6 +1253,72 @@ ALTER TABLE public.groups
 
 No new RPC or RLS change: existing `groups_update_owner_admin` allows owner/admin to update any column, including `archived_at`.
 
+### Migration 13: merge_participant_with_member (merge manual participant with user)
+
+Lets owner/admin link a manually created participant to an existing group member and set the participant's name/avatar from that user's auth profile. Run after Migration 12.
+
+```sql
+-- merge_participant_with_member: link participant to member and set participant name/user_id/avatar from auth.
+-- If the member had a different participant linked, that participant is deleted (left-out) when safe:
+-- only when no expense has them as payer (to avoid cascading expense deletion).
+CREATE OR REPLACE FUNCTION public.merge_participant_with_member(
+  p_group_id UUID,
+  p_participant_id UUID,
+  p_member_id UUID
+)
+RETURNS VOID AS $$
+DECLARE
+  v_caller_role TEXT;
+  v_member_user_id UUID;
+  v_display_name TEXT;
+  v_avatar_id TEXT;
+  v_old_participant_id UUID;
+BEGIN
+  SELECT role INTO v_caller_role FROM public.group_members
+  WHERE group_id = p_group_id AND user_id = auth.uid();
+  IF v_caller_role NOT IN ('owner', 'admin') THEN
+    RAISE EXCEPTION 'Only owner or admin can merge participant with member';
+  END IF;
+
+  SELECT user_id, participant_id INTO v_member_user_id, v_old_participant_id
+  FROM public.group_members
+  WHERE id = p_member_id AND group_id = p_group_id;
+  IF v_member_user_id IS NULL THEN
+    RAISE EXCEPTION 'Member not found in this group';
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM public.participants WHERE id = p_participant_id AND group_id = p_group_id) THEN
+    RAISE EXCEPTION 'Participant not found in this group';
+  END IF;
+
+  UPDATE public.group_members SET participant_id = p_participant_id
+  WHERE id = p_member_id AND group_id = p_group_id;
+
+  SELECT COALESCE(
+    NULLIF(TRIM(u.raw_user_meta_data->>'full_name'), ''),
+    NULLIF(TRIM(u.raw_user_meta_data->>'name'), ''),
+    u.email
+  ) INTO v_display_name FROM auth.users u WHERE u.id = v_member_user_id;
+  SELECT u.raw_user_meta_data->>'avatar_id' INTO v_avatar_id FROM auth.users u WHERE u.id = v_member_user_id;
+
+  UPDATE public.participants
+  SET
+    name = COALESCE(NULLIF(TRIM(v_display_name), ''), name),
+    user_id = v_member_user_id,
+    avatar_id = COALESCE(v_avatar_id, avatar_id),
+    updated_at = now()
+  WHERE id = p_participant_id AND group_id = p_group_id;
+
+  -- Delete the previously linked participant (left-out) if different and not used as payer in any expense
+  IF v_old_participant_id IS NOT NULL AND v_old_participant_id != p_participant_id THEN
+    DELETE FROM public.participants
+    WHERE id = v_old_participant_id AND group_id = p_group_id
+      AND NOT EXISTS (SELECT 1 FROM public.expenses WHERE payer_participant_id = v_old_participant_id);
+  END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
+```
+
 ---
 
 ## 4. Configure Authentication
@@ -1582,7 +1648,7 @@ After completing all steps:
 3. **Functions**: Go to **Database > Functions** and verify RPC functions exist:
    - `handle_updated_at`, `get_user_role`, `is_group_member`
    - `get_invite_by_token`, `accept_invite`, `create_invite`, `revoke_invite`, `toggle_invite_active`
-   - `transfer_ownership`, `leave_group`, `kick_member`, `update_member_role`, `assign_participant` (optional if app does not assign participants from UI)
+   - `transfer_ownership`, `leave_group`, `kick_member`, `update_member_role`, `assign_participant`, `merge_participant_with_member`
 
 4. **Edge Functions**: Go to **Edge Functions** and verify `invite-redirect`, `telemetry`, and `send-notification` are deployed and active (for push notifications, also set `FCM_PROJECT_ID` and `FCM_SERVICE_ACCOUNT_KEY` secrets; see Section 5).
 
@@ -1700,6 +1766,16 @@ The "Current schema reference" table above can be re-verified with `list_tables`
   - **Edge function secrets:** `FCM_PROJECT_ID` or `FCM_SERVICE_ACCOUNT_KEY` missing or invalid → function returns 500 or FCM rejects sends; check Edge Functions → send-notification → Logs.
   - **No device tokens:** Recipients must be signed in with notifications enabled and permission granted; tokens are stored in `device_tokens`. On web, `FCM_VAPID_KEY` must be set at build time or the web token is never registered.
 - **Verify FCM separately:** Send a test message to a token from `device_tokens` via Firebase Console (Cloud Messaging) or the FCM API. If that works but expense-triggered notifications do not, the problem is the Supabase pipeline (trigger/Vault/edge function).
+
+### "Could not find the 'archived_at' column of 'groups'" (PGRST204)
+
+- **Cause:** PostgREST’s schema cache doesn’t include `archived_at` because [Migration 12](#migration-12-groups-archive-archived_at) has not been applied.
+- **Fix:** In the Supabase **SQL Editor**, run Migration 12:
+  ```sql
+  ALTER TABLE public.groups
+    ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
+  ```
+- After this, group name/icon/color changes and archive/unarchive will work. The app also omits `archived_at` from group updates when the column is missing so that name/icon/color changes can succeed before the migration.
 
 ---
 
