@@ -7,6 +7,7 @@ import 'package:custom_sliding_segmented_control/custom_sliding_segmented_contro
 import '../providers/groups_provider.dart';
 import '../providers/group_member_provider.dart';
 import '../widgets/create_invite_sheet.dart';
+import '../../../core/database/database_providers.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -86,7 +87,15 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
     super.dispose();
   }
 
-  void _onRefresh() {
+  Future<void> _onRefresh() async {
+    final localOnly = ref.read(effectiveLocalOnlyProvider);
+    if (!localOnly) {
+      Log.info('Group detail refresh: syncing group ${widget.group.id}');
+      await ref.read(dataSyncServiceProvider.notifier).syncNow();
+      Log.info('Group detail refresh: sync complete, invalidating providers');
+    } else {
+      Log.debug('Group detail refresh: local-only, invalidating providers only');
+    }
     ref.invalidate(futureGroupProvider(widget.group.id));
     ref.invalidate(expensesByGroupProvider(widget.group.id));
     ref.invalidate(participantsByGroupProvider(widget.group.id));
