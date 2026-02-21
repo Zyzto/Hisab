@@ -33,6 +33,7 @@ import '../widgets/logs_viewer_dialog.dart';
 import '../widgets/edit_profile_sheet.dart';
 import '../../../core/auth/predefined_avatars.dart';
 import '../../../core/widgets/sync_status_icon.dart';
+import '../../../core/widgets/toast.dart';
 import '../../../domain/domain.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
@@ -252,11 +253,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         .initialize(context);
                     notifier.set(ok);
                     if (!ok && context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('notifications_unavailable'.tr()),
-                        ),
-                      );
+                      context.showToast('notifications_unavailable'.tr());
                     }
                   } else {
                     ref
@@ -565,9 +562,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       Log.warning('Sign-out failed', error: e, stackTrace: st);
     }
     if (!context.mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('signed_out_message'.tr())));
+    context.showToast('signed_out_message'.tr());
   }
 
   Widget _buildSection(
@@ -650,9 +645,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     await settings.controller.resetAll();
     if (!context.mounted) return;
     // _LocaleSync handles locale sync automatically via languageProvider
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('reset_all_settings_done'.tr())));
+    context.showSuccess('reset_all_settings_done'.tr());
   }
 
   static Future<void> _deleteAllData(
@@ -697,17 +690,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 .read(settings.provider(onboardingCompletedSettingDef).notifier)
                 .set(false);
           }
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('delete_all_data_done'.tr())));
+          context.showSuccess('delete_all_data_done'.tr());
           context.go(RoutePaths.onboarding);
         }
       } catch (e, st) {
         Log.warning('Delete all data failed', error: e, stackTrace: st);
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('delete_all_data_failed'.tr())),
-          );
+          context.showError('delete_all_data_failed'.tr());
         }
       }
     }
@@ -810,14 +799,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       case MigrationResult.noData:
         ref.read(settings.provider(localOnlySettingDef).notifier).set(false);
         Log.info('Switched to online mode after migration');
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('migration_success'.tr())));
+        context.showSuccess('migration_success'.tr());
       case MigrationResult.failed:
       case null:
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('migration_failed'.tr())));
+        context.showError('migration_failed'.tr());
     }
   }
 
@@ -1000,9 +985,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 final trigger = ref.read(updateCheckTriggerProvider).callback;
                 if (trigger != null) {
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('checking_for_updates'.tr())),
-                    );
+                    context.showToast('checking_for_updates'.tr());
                   }
                   trigger(context);
                 }
@@ -1108,9 +1091,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         onCopy: () async {
           await Clipboard.setData(ClipboardData(text: content));
           if (scaffoldContext.mounted) {
-            ScaffoldMessenger.of(
-              scaffoldContext,
-            ).showSnackBar(SnackBar(content: Text('logs_copied'.tr())));
+            scaffoldContext.showSuccess('logs_copied'.tr());
           }
         },
         onClear: () async {
@@ -1136,15 +1117,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               await LoggingService.clearLogs();
               if (ctx.mounted) Navigator.pop(ctx);
               if (scaffoldContext.mounted) {
-                ScaffoldMessenger.of(
-                  scaffoldContext,
-                ).showSnackBar(SnackBar(content: Text('logs_cleared'.tr())));
+                scaffoldContext.showSuccess('logs_cleared'.tr());
               }
             } catch (e) {
               if (scaffoldContext.mounted) {
-                ScaffoldMessenger.of(scaffoldContext).showSnackBar(
-                  SnackBar(content: Text('logs_not_available'.tr())),
-                );
+                scaffoldContext.showToast('logs_not_available'.tr());
               }
             }
           }
@@ -1197,21 +1174,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         await launchUrl(Uri.parse(reportIssueUrl));
       }
       if (scaffoldContext.mounted) {
-        ScaffoldMessenger.of(scaffoldContext).showSnackBar(
-          SnackBar(
-            content: Text(
-              reportIssueUrl.isEmpty
-                  ? 'logs_copied_paste'.tr()
-                  : 'logs_copied'.tr(),
-            ),
-          ),
+        scaffoldContext.showSuccess(
+          reportIssueUrl.isEmpty
+              ? 'logs_copied_paste'.tr()
+              : 'logs_copied'.tr(),
         );
       }
     } catch (e) {
       if (scaffoldContext.mounted) {
-        ScaffoldMessenger.of(
-          scaffoldContext,
-        ).showSnackBar(SnackBar(content: Text('logs_not_available'.tr())));
+        scaffoldContext.showToast('logs_not_available'.tr());
       }
     }
   }
@@ -1236,21 +1207,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       if (context.mounted) {
         if (result != null && result.isNotEmpty) {
           Log.info('Backup exported to $result');
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('export_success'.tr())));
+          context.showSuccess('export_success'.tr());
         } else {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('export_cancelled'.tr())));
+          context.showToast('export_cancelled'.tr());
         }
       }
     } catch (e, st) {
       Log.warning('Backup export failed', error: e, stackTrace: st);
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('export_failed'.tr())));
+        context.showError('export_failed'.tr());
       }
     }
   }
@@ -1283,18 +1248,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       if (result == null || result.files.isEmpty || !context.mounted) return;
       final bytes = result.files.single.bytes;
       if (bytes == null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('import_failed'.tr())));
+        context.showError('import_failed'.tr());
         return;
       }
       final jsonString = utf8.decode(bytes);
       final backup = parseBackupJson(jsonString);
       if (backup == null) {
         if (context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('import_invalid_file'.tr())));
+          context.showError('import_invalid_file'.tr());
         }
         return;
       }
@@ -1359,16 +1320,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       }
       Log.info('Backup import completed');
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('import_success'.tr())));
+        context.showSuccess('import_success'.tr());
       }
     } catch (e, st) {
       Log.warning('Backup import failed', error: e, stackTrace: st);
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('import_failed'.tr())));
+        context.showError('import_failed'.tr());
       }
     }
   }
@@ -1385,9 +1342,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('donate'.tr())));
+        context.showToast('donate'.tr());
       }
     }
   }
