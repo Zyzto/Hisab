@@ -170,9 +170,14 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
-      # PowerSync needs a WASM binary for web SQLite.
-      - name: Set up PowerSync web (sqlite3.wasm)
+      # PowerSync web needs sqlite3.wasm and worker JS (required for live site; missing = "Unexpected token '<'" / wrong WASM MIME).
+      - name: Set up PowerSync web (sqlite3.wasm + workers)
         run: dart run powersync:setup_web
+
+      - name: Ensure PowerSync web assets exist
+        run: |
+          test -f web/sqlite3.wasm || (echo "Missing web/sqlite3.wasm after setup_web" && exit 1)
+          test -f web/powersync_db.worker.js || (echo "Missing web/powersync_db.worker.js after setup_web" && exit 1)
 
       - name: Build web
         run: |
@@ -183,8 +188,12 @@ jobs:
             --dart-define=SITE_URL=${{ secrets.SITE_URL }} \
             --dart-define=FCM_VAPID_KEY=${{ secrets.FCM_VAPID_KEY }}
 
-      - name: Copy privacy policy page for Firebase Hosting
-        run: cp -r web/privacy build/web/
+      - name: Copy static pages and PowerSync web assets for Firebase Hosting
+        run: |
+          cp -r web/privacy build/web/
+          cp web/redirect.html build/web/
+          cp web/sqlite3.wasm build/web/ 2>/dev/null || true
+          for f in web/*.worker.js; do [ -f "$f" ] && cp "$f" build/web/; done
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
