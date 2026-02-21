@@ -16,8 +16,10 @@ import 'features/settings/providers/settings_framework_providers.dart';
 import 'core/theme/app_scroll_behavior.dart';
 import 'core/theme/theme_config.dart';
 import 'core/theme/theme_providers.dart';
+import 'package:toastification/toastification.dart';
 import 'core/navigation/app_router.dart';
 import 'core/navigation/invite_link_handler.dart';
+import 'core/widgets/toast.dart';
 
 class App extends ConsumerStatefulWidget {
   const App({super.key});
@@ -68,9 +70,7 @@ class _AppState extends ConsumerState<App> {
           final msg = _upgrader.versionInfo == null
               ? 'could_not_check_for_updates'.tr()
               : 'no_update_available'.tr();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(msg)),
-          );
+          context.showToast(msg);
         }
       });
     };
@@ -121,7 +121,8 @@ class _AppState extends ConsumerState<App> {
       localeOverride: context.locale,
       child: InviteLinkHandler(
         ref: ref,
-        child: MaterialApp.router(
+        child: ToastificationWrapper(
+          child: MaterialApp.router(
         title: 'Hisab',
         debugShowCheckedModeBanner: false,
         scrollBehavior: AppScrollBehavior(),
@@ -204,6 +205,7 @@ class _AppState extends ConsumerState<App> {
         darkTheme: themes.dark,
         themeMode: themeMode,
         routerConfig: router,
+        ),
         ),
       ),
     );
