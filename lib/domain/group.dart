@@ -17,6 +17,7 @@ class Group {
   final bool allowMemberChangeSettings;
   final String? icon;
   final int? color;
+  final DateTime? archivedAt;
 
   const Group({
     required this.id,
@@ -33,9 +34,11 @@ class Group {
     this.allowMemberChangeSettings = true,
     this.icon,
     this.color,
+    this.archivedAt,
   });
 
   bool get isSettlementFrozen => settlementFreezeAt != null;
+  bool get isArchived => archivedAt != null;
 
   Group copyWith({
     String? id,
@@ -52,6 +55,7 @@ class Group {
     bool? allowMemberChangeSettings,
     String? icon,
     int? color,
+    DateTime? archivedAt,
   }) {
     return Group(
       id: id ?? this.id,
@@ -72,6 +76,7 @@ class Group {
           allowMemberChangeSettings ?? this.allowMemberChangeSettings,
       icon: icon ?? this.icon,
       color: color ?? this.color,
+      archivedAt: archivedAt ?? this.archivedAt,
     );
   }
 
@@ -91,5 +96,6 @@ class Group {
     allowMemberChangeSettings: allowMemberChangeSettings,
     icon: icon,
     color: color,
+    archivedAt: archivedAt,
   );
 }

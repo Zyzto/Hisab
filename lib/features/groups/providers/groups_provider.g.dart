@@ -48,6 +48,45 @@ final class GroupsProvider
 
 String _$groupsHash() => r'40c1e7ad4827007c027292f814d5e8064c097143';
 
+@ProviderFor(archivedGroups)
+final archivedGroupsProvider = ArchivedGroupsProvider._();
+
+final class ArchivedGroupsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<Group>>,
+          List<Group>,
+          Stream<List<Group>>
+        >
+    with $FutureModifier<List<Group>>, $StreamProvider<List<Group>> {
+  ArchivedGroupsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'archivedGroupsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$archivedGroupsHash();
+
+  @$internal
+  @override
+  $StreamProviderElement<List<Group>> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<List<Group>> create(Ref ref) {
+    return archivedGroups(ref);
+  }
+}
+
+String _$archivedGroupsHash() => r'7c8ccc56915d5b508095faca65f4239477ccc4cb';
+
 @ProviderFor(futureGroup)
 final futureGroupProvider = FutureGroupFamily._();
 

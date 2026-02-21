@@ -6,6 +6,7 @@ import 'package:easy_localization/easy_localization.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/auth/sign_in_sheet.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/widgets/toast.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/telemetry/telemetry_service.dart';
 import '../../../domain/domain.dart';
@@ -160,7 +161,6 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
 
   Future<void> _accept(BuildContext context, Group group) async {
     if (!ref.read(isAuthenticatedProvider)) {
-      final messenger = ScaffoldMessenger.of(context);
       final result = await showSignInSheet(context, ref);
       switch (result) {
         case SignInResult.success:
@@ -168,9 +168,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
         case SignInResult.pendingRedirect:
           return;
         case SignInResult.cancelled:
-          messenger.showSnackBar(
-            SnackBar(content: Text('sign_in_required'.tr())),
-          );
+          if (context.mounted) context.showToast('sign_in_required'.tr());
           return;
       }
     }

@@ -8,6 +8,7 @@ import 'package:pretty_qr_code/pretty_qr_code.dart';
 import '../../../core/constants/supabase_config.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/theme/theme_config.dart';
+import '../../../core/widgets/toast.dart';
 import '../../../domain/domain.dart';
 import '../providers/group_invite_provider.dart';
 import '../providers/groups_provider.dart';
@@ -275,8 +276,7 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
     } catch (e, st) {
       Log.warning('Toggle invite failed', error: e, stackTrace: st);
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('$e')));
+        context.showError('$e');
       }
     }
     if (mounted) setState(() => _actionLoading = false);
@@ -307,8 +307,7 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
     } catch (e, st) {
       Log.warning('Revoke invite failed', error: e, stackTrace: st);
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('$e')));
+        context.showError('$e');
       }
     }
     if (mounted) setState(() => _actionLoading = false);
@@ -366,9 +365,7 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
               FilledButton.tonalIcon(
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: url));
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    SnackBar(content: Text('invite_link_copied'.tr())),
-                  );
+                  ctx.showSuccess('invite_link_copied'.tr());
                 },
                 icon: const Icon(Icons.copy),
                 label: Text('copy_link'.tr()),
@@ -512,11 +509,7 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
                               ClipboardData(
                                   text: _inviteUrl(invite.token)),
                             );
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                  content:
-                                      Text('invite_link_copied'.tr())),
-                            );
+                            context.showSuccess('invite_link_copied'.tr());
                           },
                         ),
                         _ActionChip(

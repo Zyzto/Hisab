@@ -18,6 +18,7 @@ import '../../../core/services/settle_up_service.dart';
 import '../../../core/telemetry/telemetry_service.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/currency_helpers.dart';
+import '../../../core/widgets/toast.dart';
 import '../../../domain/domain.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 
@@ -803,6 +804,21 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     } else {
       myRoleAsync.whenData((myRole) {
         if (myRole == GroupRole.owner) {
+          if (group.isArchived) {
+            actions.add(_dangerButton(
+              icon: Icons.unarchive_outlined,
+              label: 'unarchive_group'.tr(),
+              color: errorColor,
+              onTap: _saving ? null : () => _showUnarchiveGroup(context, ref),
+            ));
+          } else {
+            actions.add(_dangerButton(
+              icon: Icons.archive_outlined,
+              label: 'archive_group'.tr(),
+              color: errorColor,
+              onTap: _saving ? null : () => _showArchiveGroup(context, ref),
+            ));
+          }
           actions.add(_dangerButton(
             icon: Icons.swap_horiz,
             label: 'transfer_ownership'.tr(),
@@ -910,9 +926,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
 
     if (newName == null || newName.isEmpty || newName == group.name) {
       if (newName != null && newName.isEmpty && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('group_name_empty'.tr())),
-        );
+        context.showToast('group_name_empty'.tr());
       }
       return;
     }
@@ -924,9 +938,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
           );
       ref.invalidate(futureGroupProvider(widget.groupId));
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('group_name_updated'.tr())),
-        );
+        context.showSuccess('group_name_updated'.tr());
       }
     } catch (e, st) {
       Log.warning('Name change failed', error: e, stackTrace: st);
@@ -1145,9 +1157,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
           );
       ref.invalidate(futureGroupProvider(widget.groupId));
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('group_icon_color_updated'.tr())),
-        );
+        context.showSuccess('group_icon_color_updated'.tr());
       }
     } catch (e, st) {
       Log.warning('Icon/color change failed', error: e, stackTrace: st);
@@ -1313,9 +1323,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     if (!context.mounted) return;
     final others = members.where((m) => m.role != 'owner').toList();
     if (others.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('no_other_members'.tr())));
+      context.showToast('no_other_members'.tr());
       return;
     }
     final chosen = await showModalBottomSheet<String>(
@@ -1357,16 +1365,65 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
       ref.invalidate(futureGroupProvider(widget.groupId));
       ref.invalidate(myRoleInGroupProvider(widget.groupId));
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('ownership_transferred'.tr())));
+        context.showSuccess('ownership_transferred'.tr());
       }
     } catch (e, st) {
       Log.warning('Transfer failed', error: e, stackTrace: st);
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('$e')));
+        context.showError('$e');
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _showArchiveGroup(BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('archive_group'.tr()),
+        content: Text('archive_group_confirm'.tr()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('cancel'.tr()),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('archive_group'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    setState(() => _saving = true);
+    try {
+      await ref.read(groupRepositoryProvider).archive(widget.groupId);
+      if (context.mounted) {
+        context.showSuccess('group_archived'.tr());
+        context.pop();
+      }
+    } catch (e, st) {
+      Log.warning('Archive group failed', error: e, stackTrace: st);
+      if (context.mounted) {
+        context.showError('$e');
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _showUnarchiveGroup(BuildContext context, WidgetRef ref) async {
+    setState(() => _saving = true);
+    try {
+      await ref.read(groupRepositoryProvider).unarchive(widget.groupId);
+      if (context.mounted) {
+        context.showSuccess('group_unarchived'.tr());
+      }
+    } catch (e, st) {
+      Log.warning('Unarchive group failed', error: e, stackTrace: st);
+      if (context.mounted) {
+        context.showError('$e');
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -1391,9 +1448,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     } catch (e, st) {
       Log.warning('Delete group failed', error: e, stackTrace: st);
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('$e')));
+        context.showError('$e');
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -1425,9 +1480,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     } catch (e, st) {
       Log.warning('Leave failed', error: e, stackTrace: st);
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('$e')));
+        context.showError('$e');
       }
     } finally {
       if (mounted) setState(() => _saving = false);

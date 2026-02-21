@@ -8,6 +8,7 @@ import '../../../core/constants/supabase_config.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/telemetry/telemetry_service.dart';
 import '../../../core/theme/theme_config.dart';
+import '../../../core/widgets/toast.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 
 /// Expiry option for invite creation.
@@ -107,8 +108,7 @@ class _CreateInviteSheetState extends ConsumerState<_CreateInviteSheet> {
       Log.warning('Create invite failed', error: e, stackTrace: st);
       setState(() => _creating = false);
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('$e')));
+        context.showError('$e');
       }
     }
   }
@@ -345,9 +345,7 @@ class _InviteResultView extends StatelessWidget {
               FilledButton.tonalIcon(
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: url));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('invite_link_copied'.tr())),
-                  );
+                  context.showSuccess('invite_link_copied'.tr());
                 },
                 icon: const Icon(Icons.copy),
                 label: Text('copy_link'.tr()),

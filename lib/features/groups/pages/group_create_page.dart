@@ -7,6 +7,7 @@ import 'package:easy_localization/easy_localization.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/telemetry/telemetry_service.dart';
+import '../../../core/widgets/toast.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/currency_helpers.dart';
 import '../../settings/providers/settings_framework_providers.dart';
@@ -133,9 +134,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
     } catch (e, st) {
       Log.warning('Group create failed', error: e, stackTrace: st);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('create_group_failed'.tr())),
-        );
+        context.showError('create_group_failed'.tr());
       }
     } finally {
       if (mounted) setState(() => _saving = false);

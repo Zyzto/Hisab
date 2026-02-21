@@ -17,6 +17,7 @@ class RoutePaths {
       '/groups/$groupId/participants/$participantId/edit';
 
   static const String groupCreate = '/groups/create';
+  static const String archivedGroups = '/archived';
   static String groupEdit(String groupId) => '/groups/$groupId/edit';
   static String groupSettings(String groupId) => '/groups/$groupId/settings';
   static String groupInvites(String groupId) => '/groups/$groupId/invites';
