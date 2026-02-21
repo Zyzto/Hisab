@@ -671,12 +671,16 @@ class _PeopleTab extends ConsumerWidget {
                         trailing: _buildTrailing(
                           context,
                           ref,
+                          groupId,
                           p,
                           linkedMember,
                           isActive,
                           isLeft,
                           isOwnerOrAdmin,
                           myRole,
+                          localOnly,
+                          members,
+                          participants,
                         ),
                       );
                     },
@@ -694,12 +698,16 @@ class _PeopleTab extends ConsumerWidget {
   Widget? _buildTrailing(
     BuildContext context,
     WidgetRef ref,
+    String groupId,
     Participant participant,
     GroupMember? linkedMember,
     bool isActive,
     bool isLeft,
     bool isOwnerOrAdmin,
     GroupRole? myRole,
+    bool localOnly,
+    List<GroupMember> members,
+    List<Participant> participants,
   ) {
     // Active member with member-management actions
     if (isActive && isOwnerOrAdmin && linkedMember!.role != 'owner') {
@@ -716,7 +724,7 @@ class _PeopleTab extends ConsumerWidget {
         itemBuilder: (ctx) => [
           PopupMenuItem(
             value: 'edit',
-            child: Text('edit_expense'.tr()),
+            child: Text('edit_name'.tr()),
           ),
           if (myRole == GroupRole.owner) ...[
             PopupMenuItem(
@@ -736,7 +744,7 @@ class _PeopleTab extends ConsumerWidget {
       );
     }
 
-    // Standalone participant (no userId) or local-only mode — allow edit/delete
+    // Standalone participant (no userId) or local-only mode — allow edit/delete/merge
     if (!isActive && !isLeft && isOwnerOrAdmin) {
       return PopupMenuButton<String>(
         onSelected: (v) {
@@ -744,16 +752,30 @@ class _PeopleTab extends ConsumerWidget {
             _showEditParticipant(context, ref, participant);
           } else if (v == 'delete') {
             _showDeleteParticipant(context, ref, participant);
+          } else if (v == 'merge') {
+            _showMergeWithUser(
+              context,
+              ref,
+              groupId,
+              participant,
+              members,
+              participants,
+            );
           }
         },
         itemBuilder: (ctx) => [
           PopupMenuItem(
             value: 'edit',
-            child: Text('edit_expense'.tr()),
+            child: Text('edit_name'.tr()),
           ),
+          if (!localOnly)
+            PopupMenuItem(
+              value: 'merge',
+              child: Text('merge_with_user'.tr()),
+            ),
           PopupMenuItem(
             value: 'delete',
-            child: Text('delete_group'.tr()),
+            child: Text('delete_participant'.tr()),
           ),
         ],
       );
@@ -814,8 +836,10 @@ class _PeopleTab extends ConsumerWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('delete_group'.tr()),
-        content: Text(participant.name),
+        title: Text('delete_participant'.tr()),
+        content: Text(
+          'delete_participant_confirm'.tr().replaceAll('{name}', participant.name),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -823,7 +847,7 @@ class _PeopleTab extends ConsumerWidget {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text('done'.tr()),
+            child: Text('delete'.tr()),
           ),
         ],
       ),
@@ -838,6 +862,81 @@ class _PeopleTab extends ConsumerWidget {
           context.showError('$e');
         }
       }
+    }
+  }
+
+  Future<void> _showMergeWithUser(
+    BuildContext context,
+    WidgetRef ref,
+    String groupId,
+    Participant participant,
+    List<GroupMember> members,
+    List<Participant> participants,
+  ) async {
+    final theme = Theme.of(context);
+    final chosen = await showModalBottomSheet<GroupMember>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'merge_with_user'.tr(),
+                style: theme.textTheme.titleLarge,
+              ),
+            ),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: members.length,
+                itemBuilder: (ctx, i) {
+                  final m = members[i];
+                  Participant? linked;
+                  if (m.participantId != null) {
+                    try {
+                      linked = participants.firstWhere(
+                        (p) => p.id == m.participantId,
+                      );
+                    } catch (_) {
+                      linked = null;
+                    }
+                  } else {
+                    linked = null;
+                  }
+                  final label = linked?.name ?? 'group_member'.tr();
+                  return ListTile(
+                    title: Text(label),
+                    subtitle: Text(_roleLabel(m.role)),
+                    onTap: () => Navigator.pop(ctx, m),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (chosen == null || !context.mounted) return;
+    try {
+      await ref.read(groupMemberRepositoryProvider).mergeParticipantWithMember(
+            groupId,
+            participant.id,
+            chosen.id,
+          );
+      ref.invalidate(participantsByGroupProvider(groupId));
+      ref.invalidate(membersByGroupProvider(groupId));
+      if (!ref.read(effectiveLocalOnlyProvider)) {
+        await ref.read(dataSyncServiceProvider.notifier).syncNow();
+      }
+      if (context.mounted) {
+        context.showSuccess('merge_with_user_success'.tr());
+      }
+    } catch (e, st) {
+      Log.warning('Merge participant failed', error: e, stackTrace: st);
+      if (context.mounted) context.showError('$e');
     }
   }
 
