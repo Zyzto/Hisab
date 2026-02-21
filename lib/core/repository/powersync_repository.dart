@@ -449,7 +449,10 @@ class PowerSyncGroupRepository implements IGroupRepository {
     };
 
     if (!_isLocalOnly && _isOnline && _client != null) {
-      await _client.from('groups').update(data).eq('id', group.id);
+      // Omit archived_at for Supabase in case Migration 12 not applied (PGRST204).
+      final supabaseData = Map<String, dynamic>.from(data)
+        ..remove('archived_at');
+      await _client.from('groups').update(supabaseData).eq('id', group.id);
     }
 
     await _db.execute(
@@ -1140,6 +1143,27 @@ class PowerSyncGroupMemberRepository implements IGroupMemberRepository {
     }
   }
 
+  @override
+  Future<void> mergeParticipantWithMember(
+    String groupId,
+    String participantId,
+    String memberId,
+  ) async {
+    final client = _supabase;
+    if (client != null) {
+      await client.rpc(
+        'merge_participant_with_member',
+        params: {
+          'p_group_id': groupId,
+          'p_participant_id': participantId,
+          'p_member_id': memberId,
+        },
+      );
+      Log.info('Participant merged with member via RPC');
+    } else {
+      throw UnsupportedError('mergeParticipantWithMember requires online mode');
+    }
+  }
 }
 
 // =============================================================================
