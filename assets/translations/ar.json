@@ -217,6 +217,7 @@
   "invite_requires_online": "الدعوات تتطلب الوضع المتصل. انتقل إلى المتصل في الإعدادات.",
   "invite_expired": "انتهت صلاحية الدعوة أو غير صالحة",
   "invite_to_group": "دعوة إلى {name}",
+  "invite_to_group_prefix": "دعوة إلى ",
   "accept_invite": "قبول الدعوة",
   "invite_already_member": "أنت بالفعل عضو في هذه المجموعة.",
   "open_group": "فتح المجموعة",
