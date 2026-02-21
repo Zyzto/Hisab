@@ -12,17 +12,22 @@ h3{font-size:1.25rem;margin-bottom:8px}
 p{color:#666;margin-bottom:20px;font-size:.95rem}
 .spinner{width:32px;height:32px;border:3px solid #e0e0e0;border-top-color:#007AFF;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 20px}
 @keyframes spin{to{transform:rotate(360deg)}}
-.btn{display:inline-block;background:#007AFF;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-size:.95rem;transition:background .2s}
-.btn:hover{background:#0062cc}
+.btn{display:inline-block;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-size:.95rem;transition:background .2s,border-color .2s}
+.btn-primary{background:#007AFF;color:#fff}
+.btn-primary:hover{background:#0062cc}
+.btn-outline{background:transparent;color:#007AFF;border:2px solid #007AFF}
+.btn-outline:hover{background:#f0f4ff}
+.btn + .btn{margin-top:12px}
 .error-icon{font-size:48px;margin-bottom:12px}
 </style>
 </head>
 <body>
 <div class="card" id="content">
   <div class="spinner" id="spinner"></div>
-  <h3 id="heading">Opening Hisab...</h3>
-  <p id="message">If nothing happens, tap the button below.</p>
-  <a id="fallback" href="#" class="btn">Open in Browser</a>
+  <h3 id="heading" data-i18n="redirect.heading">Opening Hisab...</h3>
+  <p id="message" data-i18n="redirect.message">If nothing happens, tap the button below.</p>
+  <a id="openApp" href="#" class="btn btn-primary" style="display:none" data-i18n="redirect.openInApp">Open in Hisab</a>
+  <a id="fallback" href="#" class="btn btn-outline" style="display:none" data-i18n="redirect.openInBrowser">Open in Browser</a>
 </div>
 
 <script>
@@ -33,6 +38,7 @@ p{color:#666;margin-bottom:20px;font-size:.95rem}
 
   var heading = document.getElementById("heading");
   var message = document.getElementById("message");
+  var openApp = document.getElementById("openApp");
   var fallback = document.getElementById("fallback");
   var spinner = document.getElementById("spinner");
 
@@ -43,6 +49,7 @@ p{color:#666;margin-bottom:20px;font-size:.95rem}
     message.textContent = error === "expired"
       ? "This invite link is invalid or expired."
       : "Missing or invalid invite link.";
+    openApp.style.display = "none";
     fallback.style.display = "none";
     return;
   }
@@ -50,7 +57,7 @@ p{color:#666;margin-bottom:20px;font-size:.95rem}
   var encodedToken = encodeURIComponent(token);
   var webUrl = window.location.origin + "/invite?token=" + encodedToken;
 
-  // Set fallback button
+  // Set fallback button (web/PWA)
   fallback.href = webUrl;
 
   // Detect platform
@@ -59,11 +66,28 @@ p{color:#666;margin-bottom:20px;font-size:.95rem}
   var isIOS = /iphone|ipad|ipod/i.test(ua);
   var isMobile = isAndroid || isIOS || /mobile/i.test(ua);
 
-  // Desktop: go straight to web app
+  // Desktop: go straight to web app (no desktop app)
   if (!isMobile) {
     window.location.replace(webUrl);
     return;
   }
+
+  // Mobile: show "Open in Hisab" (user gesture) and "Open in Browser" (web/PWA)
+  var appUrl;
+  if (isAndroid) {
+    appUrl = "intent://invite?token=" + encodedToken
+      + "#Intent"
+      + ";scheme=io.supabase.hisab"
+      + ";package=com.shenepoy.hisab"
+      + ";S.browser_fallback_url=" + encodeURIComponent(webUrl)
+      + ";end";
+  } else {
+    appUrl = "io.supabase.hisab://invite?token=" + encodedToken;
+  }
+  openApp.href = appUrl;
+  openApp.style.display = "inline-block";
+  fallback.style.display = "inline-block";
+  spinner.style.display = "none";
 
   var done = false;
   function goWeb() {
@@ -78,23 +102,13 @@ p{color:#666;margin-bottom:20px;font-size:.95rem}
     if (document.hidden) done = true;
   });
 
-  // Try to open the app
-  if (isAndroid) {
-    // Android: intent:// with browser_fallback_url
-    var intentUrl = "intent://invite?token=" + encodedToken
-      + "#Intent"
-      + ";scheme=io.supabase.hisab"
-      + ";package=com.shenepoy.hisab"
-      + ";S.browser_fallback_url=" + encodeURIComponent(webUrl)
-      + ";end";
-    window.location.href = intentUrl;
-  } else {
-    // iOS / other: custom scheme
-    window.location.href = "io.supabase.hisab://invite?token=" + encodedToken;
-  }
+  // Optional: try programmatic open after short delay (some browsers allow it)
+  setTimeout(function() {
+    if (!done) window.location.href = appUrl;
+  }, 1500);
 
-  // Fallback timer
-  setTimeout(goWeb, 2500);
+  // Fallback to web/PWA after 3s if user does not tap or app does not open
+  setTimeout(goWeb, 3000);
 })();
 </script>
 </body>
