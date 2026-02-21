@@ -38,22 +38,26 @@ if (messaging) {
   messaging.onBackgroundMessage((payload) => {
     console.log("[firebase-messaging-sw] Background message:", payload);
 
-    // If FCM already shows a notification (via `notification` field), skip.
-    if (payload.notification) {
-      return;
-    }
-
-    // Fallback: show notification from data payload
     const data = payload.data || {};
-    const title = data.title || "Hisab";
-    const body = data.body || "You have a new notification";
-
-    return self.registration.showNotification(title, {
-      body: body,
+    const opts = {
       icon: "/icons/Icon-192.png",
       badge: "/icons/Icon-192.png",
       data: data,
-    });
+    };
+
+    // When notification payload exists, always show ourselves so the notification
+    // is guaranteed (some browsers/configs may not auto-show FCM notifications).
+    if (payload.notification) {
+      const n = payload.notification;
+      const title = n.title || "Hisab";
+      const body = n.body || "New notification";
+      return self.registration.showNotification(title, { ...opts, body });
+    }
+
+    // Data-only fallback: show notification from data payload
+    const title = data.title || "Hisab";
+    const body = data.body || "You have a new notification";
+    return self.registration.showNotification(title, { ...opts, body });
   });
 } else {
   console.warn(
