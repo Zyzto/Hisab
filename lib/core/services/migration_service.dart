@@ -68,6 +68,7 @@ class MigrationService {
               g['allow_member_change_settings'] == 1,
           'icon': g['icon'],
           'color': g['color'],
+          'archived_at': g['archived_at'],
           'created_at': g['created_at'],
           'updated_at': g['updated_at'],
         });

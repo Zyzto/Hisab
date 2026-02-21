@@ -142,6 +142,7 @@ Group _groupFromRow(Map<String, dynamic> row) => Group(
   allowMemberChangeSettings: _parseBool(row['allow_member_change_settings']),
   icon: row['icon'] as String?,
   color: _colorToUnsigned((row['color'] as num?)?.toInt()),
+  archivedAt: _parseDateTimeNullable(row['archived_at']),
 );
 
 Participant _participantFromRow(Map<String, dynamic> row) => Participant(
@@ -261,10 +262,15 @@ class PowerSyncGroupRepository implements IGroupRepository {
        _isOnline = isOnline,
        _isLocalOnly = isLocalOnly;
 
+  static const _activeGroupsWhere =
+      "(archived_at IS NULL OR archived_at = '')";
+  static const _archivedGroupsWhere =
+      "archived_at IS NOT NULL AND archived_at != ''";
+
   @override
   Future<List<Group>> getAll() async {
     final rows = await _db.getAll(
-      'SELECT * FROM groups ORDER BY updated_at DESC',
+      'SELECT * FROM groups WHERE $_activeGroupsWhere ORDER BY updated_at DESC',
     );
     return rows.map(_groupFromRow).toList();
   }
@@ -274,12 +280,28 @@ class PowerSyncGroupRepository implements IGroupRepository {
     if (kIsWeb) {
       return _pollStream(() async {
         final rows = await _db.getAll(
-            'SELECT * FROM groups ORDER BY updated_at DESC');
+            'SELECT * FROM groups WHERE $_activeGroupsWhere ORDER BY updated_at DESC');
         return rows.map(_groupFromRow).toList();
       });
     }
     return _db
-        .watch('SELECT * FROM groups ORDER BY updated_at DESC')
+        .watch(
+            'SELECT * FROM groups WHERE $_activeGroupsWhere ORDER BY updated_at DESC')
+        .map((rows) => rows.map(_groupFromRow).toList());
+  }
+
+  @override
+  Stream<List<Group>> watchArchived() {
+    if (kIsWeb) {
+      return _pollStream(() async {
+        final rows = await _db.getAll(
+            'SELECT * FROM groups WHERE $_archivedGroupsWhere ORDER BY updated_at DESC');
+        return rows.map(_groupFromRow).toList();
+      });
+    }
+    return _db
+        .watch(
+            'SELECT * FROM groups WHERE $_archivedGroupsWhere ORDER BY updated_at DESC')
         .map((rows) => rows.map(_groupFromRow).toList());
   }
 
@@ -375,8 +397,8 @@ class PowerSyncGroupRepository implements IGroupRepository {
 
     // Always write to local DB
     await _db.execute(
-      'INSERT INTO groups (id, name, currency_code, owner_id, icon, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, name, currencyCode, ownerId, icon, color, now, now],
+      'INSERT INTO groups (id, name, currency_code, owner_id, icon, color, archived_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, name, currencyCode, ownerId, icon, color, null, now, now],
     );
     // Local participant for owner
     await _db.execute(
@@ -422,6 +444,7 @@ class PowerSyncGroupRepository implements IGroupRepository {
       'allow_member_change_settings': group.allowMemberChangeSettings,
       'icon': group.icon,
       'color': _colorToSigned(group.color),
+      'archived_at': group.archivedAt?.toUtc().toIso8601String(),
       'updated_at': now,
     };
 
@@ -434,7 +457,8 @@ class PowerSyncGroupRepository implements IGroupRepository {
         name = ?, currency_code = ?, settlement_method = ?,
         treasurer_participant_id = ?, settlement_freeze_at = ?,
         settlement_snapshot_json = ?, allow_member_add_expense = ?,
-        allow_member_change_settings = ?, icon = ?, color = ?, updated_at = ?
+        allow_member_change_settings = ?, icon = ?, color = ?,
+        archived_at = ?, updated_at = ?
       WHERE id = ?''',
       [
         group.name,
@@ -447,9 +471,40 @@ class PowerSyncGroupRepository implements IGroupRepository {
         group.allowMemberChangeSettings ? 1 : 0,
         group.icon,
         _colorToSigned(group.color),
+        group.archivedAt?.toUtc().toIso8601String(),
         now,
         group.id,
       ],
+    );
+  }
+
+  @override
+  Future<void> archive(String groupId) async {
+    final now = _nowIso();
+    if (!_isLocalOnly && _isOnline && _client != null) {
+      await _client
+          .from('groups')
+          .update({'archived_at': now, 'updated_at': now})
+          .eq('id', groupId);
+    }
+    await _db.execute(
+      'UPDATE groups SET archived_at = ?, updated_at = ? WHERE id = ?',
+      [now, now, groupId],
+    );
+  }
+
+  @override
+  Future<void> unarchive(String groupId) async {
+    final now = _nowIso();
+    if (!_isLocalOnly && _isOnline && _client != null) {
+      await _client
+          .from('groups')
+          .update({'archived_at': null, 'updated_at': now})
+          .eq('id', groupId);
+    }
+    await _db.execute(
+      'UPDATE groups SET archived_at = NULL, updated_at = ? WHERE id = ?',
+      [now, groupId],
     );
   }
 
