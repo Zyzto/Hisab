@@ -5,6 +5,7 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/widgets/toast.dart';
 import '../../../domain/domain.dart';
 
 /// Show a confirmation bottom sheet to record a settlement payment.
@@ -55,9 +56,7 @@ Future<bool> showRecordSettlementSheet(
     } catch (e, st) {
       Log.error('Failed to record settlement', error: e, stackTrace: st);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('record_settlement_failed'.tr())),
-        );
+        context.showError('record_settlement_failed'.tr());
       }
       return false;
     }
