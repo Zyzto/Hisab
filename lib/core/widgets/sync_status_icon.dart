@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 
 import '../services/connectivity_service.dart';
+import 'toast.dart';
 
 /// Animated chip that shows the current sync status.
 /// Icon-only: circle. With label: rounded rectangle. Transitions are animated.
@@ -179,15 +180,8 @@ class _SyncStatusChipState extends ConsumerState<SyncStatusChip> {
       SyncStatus.localOnly => '',
     };
     if (message.isEmpty) return;
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          duration: const Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+    context.dismissAllToasts();
+    context.showToast(message, duration: const Duration(seconds: 2));
   }
 }
 

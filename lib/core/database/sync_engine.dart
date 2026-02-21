@@ -111,8 +111,8 @@ class SyncEngine {
           '''INSERT INTO groups (id, name, currency_code, owner_id, settlement_method,
             treasurer_participant_id, settlement_freeze_at, settlement_snapshot_json,
             allow_member_add_expense, allow_member_add_participant, allow_member_change_settings,
-            require_participant_assignment, icon, color, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            require_participant_assignment, icon, color, archived_at, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
           [
             g['id'],
             g['name'],
@@ -128,6 +128,7 @@ class SyncEngine {
             g['require_participant_assignment'] == true ? 1 : 0,
             g['icon'],
             g['color'],
+            g['archived_at'],
             g['created_at'],
             g['updated_at'],
           ],

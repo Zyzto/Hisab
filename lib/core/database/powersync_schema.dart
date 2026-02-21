@@ -18,6 +18,7 @@ const schema = Schema([
     Column.integer('require_participant_assignment'),
     Column.text('icon'),
     Column.integer('color'),
+    Column.text('archived_at'),
     Column.text('created_at'),
     Column.text('updated_at'),
   ]),
