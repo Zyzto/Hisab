@@ -10,6 +10,11 @@ Stream<List<Group>> groups(Ref ref) {
 }
 
 @riverpod
+Stream<List<Group>> archivedGroups(Ref ref) {
+  return ref.watch(groupRepositoryProvider).watchArchived();
+}
+
+@riverpod
 Future<Group?> futureGroup(Ref ref, String groupId) async {
   return ref.read(groupRepositoryProvider).getById(groupId);
 }

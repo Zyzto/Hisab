@@ -6,6 +6,7 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 import '../../../core/constants/supabase_config.dart';
 import '../../../core/repository/repository_providers.dart';
+import '../../../core/widgets/toast.dart';
 import '../../../core/telemetry/telemetry_service.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 
@@ -33,7 +34,7 @@ Future<void> createAndShowInviteSheet(
   } catch (e, st) {
     Log.warning('Create invite failed', error: e, stackTrace: st);
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      context.showError('$e');
     }
   }
 }

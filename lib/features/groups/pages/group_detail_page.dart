@@ -11,6 +11,7 @@ import '../../../core/repository/repository_providers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/widgets/async_value_builder.dart';
+import '../../../core/widgets/toast.dart';
 import '../../expenses/widgets/expense_list_tile.dart';
 import '../../expenses/category_icons.dart';
 import '../../balance/widgets/balance_list.dart';
@@ -137,6 +138,34 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
     );
   }
 
+  Widget _buildArchivedBanner(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.colorScheme.surfaceContainerHighest,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            Icon(
+              Icons.archive_outlined,
+              size: 20,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'group_archived'.tr(),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget? _buildFAB(
     BuildContext context,
     int index,
@@ -219,6 +248,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
       ),
       body: Column(
         children: [
+          if (widget.group.isArchived) _buildArchivedBanner(context),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Theme(
@@ -796,9 +826,7 @@ class _PeopleTab extends ConsumerWidget {
       } catch (e, st) {
         Log.warning('Delete participant failed', error: e, stackTrace: st);
         if (context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('$e')));
+          context.showError('$e');
         }
       }
     }
@@ -856,9 +884,7 @@ class _PeopleTab extends ConsumerWidget {
       } catch (e, st) {
         Log.warning('Change role failed', error: e, stackTrace: st);
         if (context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('$e')));
+          context.showError('$e');
         }
       }
     }
@@ -877,16 +903,12 @@ class _PeopleTab extends ConsumerWidget {
       ref.invalidate(membersByGroupProvider(groupId));
       ref.invalidate(myRoleInGroupProvider(groupId));
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('ownership_transferred'.tr())));
+        context.showSuccess('ownership_transferred'.tr());
       }
     } catch (e, st) {
       Log.warning('Transfer failed', error: e, stackTrace: st);
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('$e')));
+        context.showError('$e');
       }
     }
   }
@@ -923,9 +945,7 @@ class _PeopleTab extends ConsumerWidget {
       } catch (e, st) {
         Log.warning('Kick failed', error: e, stackTrace: st);
         if (context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('$e')));
+          context.showError('$e');
         }
       }
     }
