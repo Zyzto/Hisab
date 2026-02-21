@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:go_router/go_router.dart';
 import 'route_paths.dart';
@@ -15,7 +15,8 @@ import '../../features/groups/pages/invite_management_page.dart';
 import '../../features/groups/pages/invite_redirect_proxy_page.dart';
 import '../../features/groups/pages/invite_scan_page.dart';
 import '../../features/expenses/pages/expense_form_page.dart';
-import '../../features/expenses/pages/expense_detail_page.dart';
+import '../../features/expenses/pages/expense_detail_shell.dart';
+import '../../features/expenses/widgets/expense_detail_body.dart';
 import '../../features/settings/widgets/privacy_policy_page.dart';
 import 'main_scaffold.dart';
 
@@ -144,12 +145,36 @@ GoRouter router(Ref ref) {
         },
       ),
       GoRoute(
-        path: '/groups/:id/expenses/:eid',
-        builder: (context, state) {
-          final groupId = state.pathParameters['id'] ?? '';
-          final expenseId = state.pathParameters['eid'] ?? '';
-          return ExpenseDetailPage(groupId: groupId, expenseId: expenseId);
-        },
+        path: '/groups/:id/expenses',
+        builder: (context, state) => const SizedBox.shrink(),
+        routes: [
+          ShellRoute(
+            builder: (context, state, child) {
+              final groupId = state.pathParameters['id'] ?? '';
+              final pathSegments = state.uri.pathSegments;
+              final expenseId = state.pathParameters['eid'] ??
+                  (pathSegments.length >= 4 ? pathSegments[3] : '');
+              return ExpenseDetailShell(
+                groupId: groupId,
+                expenseId: expenseId,
+                child: child,
+              );
+            },
+            routes: [
+              GoRoute(
+                path: ':eid',
+                builder: (context, state) {
+                  final groupId = state.pathParameters['id'] ?? '';
+                  final expenseId = state.pathParameters['eid'] ?? '';
+                  return ExpenseDetailBody(
+                    groupId: groupId,
+                    expenseId: expenseId,
+                  );
+                },
+              ),
+            ],
+          ),
+        ],
       ),
       GoRoute(
         path: '/groups/:id/expenses/:eid/edit',

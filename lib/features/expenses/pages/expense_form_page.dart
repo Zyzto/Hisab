@@ -16,6 +16,7 @@ import '../../../core/services/exchange_rate_service.dart';
 import '../../../core/telemetry/telemetry_service.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/utils/currency_helpers.dart';
+import '../../../core/widgets/toast.dart';
 import '../../../features/settings/providers/settings_framework_providers.dart';
 import '../../groups/providers/groups_provider.dart';
 import '../constants/expense_form_constants.dart';
@@ -276,9 +277,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     final amountText = _amountController.text.trim();
     final amount = (double.tryParse(amountText) ?? 0) * 100;
     if (amount <= 0) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('amount_positive'.tr())));
+      context.showToast('amount_positive'.tr());
       return;
     }
     final participants = await ref
@@ -286,9 +285,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         .getByGroupId(widget.groupId);
     if (!mounted) return;
     if (participants.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('add_participants_first'.tr())));
+      context.showToast('add_participants_first'.tr());
       return;
     }
 
@@ -296,9 +293,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     final isTransfer = _transactionType == TransactionType.transfer;
     if (isTransfer) {
       if (_toParticipantId == null || _toParticipantId == payerId) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('choose_different_to'.tr())));
+        context.showToast('choose_different_to'.tr());
         return;
       }
     }
@@ -307,9 +302,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         .where((p) => _includedInSplitIds.contains(p.id))
         .toList();
     if (!isTransfer && included.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('include_at_least_one'.tr())));
+      context.showToast('include_at_least_one'.tr());
       return;
     }
 
@@ -373,9 +366,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           }
           if (sumCents != totalCents) {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('amounts_must_equal_total'.tr())),
-              );
+              context.showToast('amounts_must_equal_total'.tr());
               setState(() => _saving = false);
             }
             return;
@@ -1461,9 +1452,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   Future<void> _pickReceiptImage() async {
     if (kIsWeb) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('receipt_scan_web_unavailable'.tr())),
-        );
+        context.showToast('receipt_scan_web_unavailable'.tr());
       }
       return;
     }
@@ -1525,9 +1514,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       final result = await processReceiptFile(file, ref, _date);
       if (!mounted) return;
       if (result == null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('receipt_no_text'.tr())));
+        context.showToast('receipt_no_text'.tr());
         return;
       }
       switch (result) {
@@ -1537,27 +1524,21 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
             _date = result.date;
             _amountController.text = result.total.toStringAsFixed(2);
           });
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('receipt_scan_applied'.tr())));
+          context.showSuccess('receipt_scan_applied'.tr());
         case ReceiptScanFallback():
           setState(() {
             _titleController.text = 'Receipt';
             _descriptionController.text = result.ocrText;
             _receiptImagePath = result.receiptImagePath;
           });
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('receipt_attached'.tr())));
+          context.showSuccess('receipt_attached'.tr());
       }
     } catch (e, stack) {
       if (mounted) {
         final msg = shortReceiptErrorMessage(e);
         debugPrint('Receipt scan error: $e');
         debugPrintStack(stackTrace: stack);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('receipt_scan_error'.tr(args: [msg]))),
-        );
+        context.showError('receipt_scan_error'.tr(args: [msg]));
       }
     }
   }

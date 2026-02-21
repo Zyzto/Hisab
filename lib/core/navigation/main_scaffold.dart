@@ -1,3 +1,4 @@
+import 'package:back_button_interceptor/back_button_interceptor.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,7 @@ import '../../features/settings/pages/settings_page.dart';
 import '../widgets/connection_banner.dart';
 import '../widgets/floating_nav_bar.dart';
 import '../widgets/pwa_install_banner.dart';
+import '../widgets/toast.dart';
 import 'route_paths.dart';
 
 class MainScaffold extends ConsumerStatefulWidget {
@@ -38,6 +40,34 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
   void initState() {
     super.initState();
     _currentIndex = widget.selectedIndex;
+    BackButtonInterceptor.add(_onBackInterceptor, context: context);
+  }
+
+  @override
+  void dispose() {
+    BackButtonInterceptor.remove(_onBackInterceptor);
+    super.dispose();
+  }
+
+  bool _onBackInterceptor(bool stopDefaultButtonEvent, RouteInfo info) {
+    if (info.ifRouteChanged(context)) return false;
+    // Use the actual top route from GoRouter so we only intercept when the user
+    // is really on home/settings, not when they are on group/expense (pushed on top).
+    final currentPath =
+        GoRouter.of(context).routerDelegate.currentConfiguration.uri.path;
+    final isAtSettings =
+        currentPath == RoutePaths.settings ||
+        currentPath.startsWith('${RoutePaths.settings}/');
+    final isAtHome = currentPath == RoutePaths.home;
+    if (isAtSettings) {
+      context.go(RoutePaths.home);
+      return true;
+    }
+    if (isAtHome) {
+      _onBackPressed(context);
+      return true;
+    }
+    return false;
   }
 
   @override
@@ -61,9 +91,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
       return;
     }
     setState(() => _lastBackPressAt = now);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('press_back_again_to_exit'.tr())),
-    );
+    context.showToast('press_back_again_to_exit'.tr());
   }
 
   @override
@@ -74,9 +102,8 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     context.locale;
 
     final showNavBar = _shouldShowNavBar();
-    final isHome = widget.location == RoutePaths.home;
 
-    Widget scaffold = Scaffold(
+    final scaffold = Scaffold(
       body: Stack(
         children: [
           Padding(
@@ -158,16 +185,6 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
         ],
       ),
     );
-
-    if (isHome) {
-      scaffold = PopScope(
-        canPop: false,
-        onPopInvokedWithResult: (didPop, result) {
-          if (!didPop) _onBackPressed(context);
-        },
-        child: scaffold,
-      );
-    }
 
     return scaffold;
   }
