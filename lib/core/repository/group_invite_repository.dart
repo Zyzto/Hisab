@@ -10,7 +10,7 @@ abstract class IGroupInviteRepository {
     int? maxUses,
     Duration? expiresIn,
   });
-  Future<String> accept(String token);
+  Future<String> accept(String token, {String? newParticipantName});
   Future<List<GroupInvite>> listByGroup(String groupId);
   Stream<List<GroupInvite>> watchByGroup(String groupId);
   Future<void> revoke(String inviteId);

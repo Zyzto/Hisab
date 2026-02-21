@@ -1237,7 +1237,7 @@ class PowerSyncGroupInviteRepository implements IGroupInviteRepository {
   }
 
   @override
-  Future<String> accept(String token) async {
+  Future<String> accept(String token, {String? newParticipantName}) async {
     final client = supabaseClient;
     if (client == null) {
       throw UnsupportedError('accept requires online mode');
@@ -1247,7 +1247,7 @@ class PowerSyncGroupInviteRepository implements IGroupInviteRepository {
       params: {
         'p_token': token,
         'p_participant_id': null,
-        'p_new_participant_name': null,
+        'p_new_participant_name': newParticipantName,
       },
     );
     Log.info('Invite accepted');
