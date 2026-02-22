@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../domain/domain.dart';
@@ -16,15 +17,19 @@ class GroupCard extends StatelessWidget {
         group.color != null ? Color(group.color!) : theme.colorScheme.primary;
     final iconData = groupIconFromKey(group.icon);
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          onTap?.call();
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
+    return Semantics(
+      label: group.name,
+      hint: 'open_group'.tr(),
+      button: true,
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            onTap?.call();
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
@@ -67,6 +72,7 @@ class GroupCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }

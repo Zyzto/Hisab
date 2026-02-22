@@ -16,6 +16,7 @@ import '../../../core/services/exchange_rate_service.dart';
 import '../../../core/telemetry/telemetry_service.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/utils/currency_helpers.dart';
+import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../features/settings/providers/settings_framework_providers.dart';
 import '../../groups/providers/groups_provider.dart';
@@ -1149,12 +1150,32 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           },
           loading: () =>
               const Scaffold(body: Center(child: CircularProgressIndicator())),
-          error: (e, _) => Scaffold(body: Center(child: Text('$e'))),
+          error: (e, _) => Scaffold(
+            body: Center(
+              child: ErrorContentWidget(
+                message: e.toString(),
+                onRetry: () {
+                  ref.invalidate(futureGroupProvider(widget.groupId));
+                  ref.invalidate(participantsByGroupProvider(widget.groupId));
+                },
+              ),
+            ),
+          ),
         );
       },
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (e, _) => Scaffold(body: Center(child: Text('$e'))),
+      error: (e, _) => Scaffold(
+        body: Center(
+          child: ErrorContentWidget(
+            message: e.toString(),
+            onRetry: () {
+              ref.invalidate(futureGroupProvider(widget.groupId));
+              ref.invalidate(participantsByGroupProvider(widget.groupId));
+            },
+          ),
+        ),
+      ),
     );
   }
 

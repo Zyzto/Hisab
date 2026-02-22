@@ -8,6 +8,7 @@ import '../../../core/auth/auth_providers.dart';
 import '../../../core/auth/sign_in_sheet.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/telemetry/telemetry_service.dart';
@@ -121,17 +122,9 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.error_outline,
-                size: 64,
-                color: Theme.of(context).colorScheme.error,
-              ),
-              const SizedBox(height: 16),
-              Text('$e', style: Theme.of(context).textTheme.bodyMedium),
-            ],
+          child: ErrorContentWidget(
+            message: e.toString(),
+            onRetry: () => ref.invalidate(inviteByTokenProvider(widget.token)),
           ),
         ),
       ),

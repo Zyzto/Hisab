@@ -46,7 +46,7 @@ final class GroupsProvider
   }
 }
 
-String _$groupsHash() => r'40c1e7ad4827007c027292f814d5e8064c097143';
+String _$groupsHash() => r'48fe58e6c4faa27f5cbf2813c95ad887b210acfc';
 
 @ProviderFor(archivedGroups)
 final archivedGroupsProvider = ArchivedGroupsProvider._();
@@ -86,6 +86,86 @@ final class ArchivedGroupsProvider
 }
 
 String _$archivedGroupsHash() => r'7c8ccc56915d5b508095faca65f4239477ccc4cb';
+
+@ProviderFor(locallyArchivedGroups)
+final locallyArchivedGroupsProvider = LocallyArchivedGroupsProvider._();
+
+final class LocallyArchivedGroupsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<Group>>,
+          List<Group>,
+          Stream<List<Group>>
+        >
+    with $FutureModifier<List<Group>>, $StreamProvider<List<Group>> {
+  LocallyArchivedGroupsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'locallyArchivedGroupsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$locallyArchivedGroupsHash();
+
+  @$internal
+  @override
+  $StreamProviderElement<List<Group>> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<List<Group>> create(Ref ref) {
+    return locallyArchivedGroups(ref);
+  }
+}
+
+String _$locallyArchivedGroupsHash() =>
+    r'fc0c3daf028580a15a4471eed0be8c002419b240';
+
+@ProviderFor(locallyArchivedGroupIds)
+final locallyArchivedGroupIdsProvider = LocallyArchivedGroupIdsProvider._();
+
+final class LocallyArchivedGroupIdsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<Set<String>>,
+          Set<String>,
+          Stream<Set<String>>
+        >
+    with $FutureModifier<Set<String>>, $StreamProvider<Set<String>> {
+  LocallyArchivedGroupIdsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'locallyArchivedGroupIdsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$locallyArchivedGroupIdsHash();
+
+  @$internal
+  @override
+  $StreamProviderElement<Set<String>> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<Set<String>> create(Ref ref) {
+    return locallyArchivedGroupIds(ref);
+  }
+}
+
+String _$locallyArchivedGroupIdsHash() =>
+    r'fa92c92d006bc461b11e0adaf49ecfab0f21e962';
 
 @ProviderFor(futureGroup)
 final futureGroupProvider = FutureGroupFamily._();

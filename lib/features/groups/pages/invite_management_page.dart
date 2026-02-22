@@ -8,6 +8,7 @@ import 'package:pretty_qr_code/pretty_qr_code.dart';
 import '../../../core/constants/supabase_config.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/theme/theme_config.dart';
+import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../domain/domain.dart';
 import '../providers/group_invite_provider.dart';
@@ -144,7 +145,12 @@ class _InviteManagementPageState extends ConsumerState<InviteManagementPage> {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('$e')),
+        error: (e, _) => Center(
+          child: ErrorContentWidget(
+            message: e.toString(),
+            onRetry: () => ref.invalidate(invitesByGroupProvider(widget.groupId)),
+          ),
+        ),
       ),
     );
   }
