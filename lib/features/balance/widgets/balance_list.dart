@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/widgets/error_content.dart';
 import '../providers/balance_provider.dart';
 import 'record_settlement_sheet.dart';
 
@@ -167,13 +168,16 @@ class BalanceList extends ConsumerWidget {
                   ],
                 ),
                 trailing: !hasFrozen
-                    ? IconButton(
-                        icon: Icon(
-                          Icons.payments_outlined,
-                          color: theme.colorScheme.primary,
-                        ),
-                        tooltip: 'record_settlement'.tr(),
-                        onPressed: () => showRecordSettlementSheet(
+                    ? Semantics(
+                        label: 'record_settlement'.tr(),
+                        button: true,
+                        child: IconButton(
+                          icon: Icon(
+                            Icons.payments_outlined,
+                            color: theme.colorScheme.primary,
+                          ),
+                          tooltip: 'record_settlement'.tr(),
+                          onPressed: () => showRecordSettlementSheet(
                           context,
                           ref,
                           groupId: groupId,
@@ -182,7 +186,8 @@ class BalanceList extends ConsumerWidget {
                           fromName: from,
                           toName: to,
                         ),
-                      )
+                      ),
+                    )
                     : null,
                 onTap: hasFrozen
                     ? null
@@ -201,7 +206,12 @@ class BalanceList extends ConsumerWidget {
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Error: $e')),
+      error: (e, _) => Center(
+        child: ErrorContentWidget(
+          message: e.toString(),
+          onRetry: () => ref.invalidate(groupBalanceProvider(groupId)),
+        ),
+      ),
     );
   }
 }

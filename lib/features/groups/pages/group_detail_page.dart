@@ -12,6 +12,7 @@ import '../../../core/repository/repository_providers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/widgets/async_value_builder.dart';
+import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/toast.dart';
 import '../../expenses/widgets/expense_list_tile.dart';
 import '../../expenses/category_icons.dart';
@@ -544,18 +545,24 @@ class _ExpensesTab extends ConsumerWidget {
           },
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, st) => Center(
-            child: Text(
-              e.toString(),
-              style: Theme.of(context).textTheme.bodyMedium,
+            child: ErrorContentWidget(
+              message: e.toString(),
+              onRetry: () {
+                ref.invalidate(expensesByGroupProvider(groupId));
+                ref.invalidate(participantsByGroupProvider(groupId));
+              },
             ),
           ),
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, st) => Center(
-        child: Text(
-          e.toString(),
-          style: Theme.of(context).textTheme.bodyMedium,
+        child: ErrorContentWidget(
+          message: e.toString(),
+          onRetry: () {
+            ref.invalidate(expensesByGroupProvider(groupId));
+            ref.invalidate(participantsByGroupProvider(groupId));
+          },
         ),
       ),
     );
@@ -618,7 +625,14 @@ class _PeopleTab extends ConsumerWidget {
               }
             }
 
-            if (participants.isEmpty) {
+            final activeParticipants = participants
+                .where((p) => p.leftAt == null)
+                .toList();
+            final pastParticipants = participants
+                .where((p) => p.leftAt != null)
+                .toList();
+
+            if (activeParticipants.isEmpty && pastParticipants.isEmpty) {
               return Center(
                 child: Text(
                   'add_participants_first'.tr(),
@@ -627,91 +641,153 @@ class _PeopleTab extends ConsumerWidget {
               );
             }
 
-            return ListView.builder(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 8,
-                      horizontal: 16,
-                    ),
-                    itemCount: participants.length,
-                    itemBuilder: (context, index) {
-                      final p = participants[index];
-                      final linkedMember = memberByParticipantId[p.id];
-                      final hasUserId = p.userId != null;
-                      final isActive = linkedMember != null;
-                      final isLeft = hasUserId && !isActive;
+            return ListView(
+              padding: const EdgeInsets.symmetric(
+                vertical: 8,
+                horizontal: 16,
+              ),
+              children: [
+                ...activeParticipants.map((p) {
+                  final linkedMember = memberByParticipantId[p.id];
+                  final hasUserId = p.userId != null;
+                  final isActive = linkedMember != null;
+                  final isLeft = hasUserId && !isActive;
 
-                      final emoji = avatarEmoji(p.avatarId);
+                  final emoji = avatarEmoji(p.avatarId);
 
-                      return ListTile(
-                        key: ValueKey(p.id),
-                        leading: CircleAvatar(
-                          backgroundColor: isLeft
-                              ? theme.colorScheme.surfaceContainerHighest
-                              : null,
-                          child: emoji != null
-                              ? Text(
-                                  emoji,
-                                  style: TextStyle(
-                                    fontSize: 22,
-                                    color: isLeft
-                                        ? theme.colorScheme.onSurfaceVariant
-                                        : null,
-                                  ),
-                                )
-                              : Text(
-                                  p.name.isNotEmpty
-                                      ? p.name[0].toUpperCase()
-                                      : '?',
-                                  style: isLeft
-                                      ? TextStyle(
-                                          color: theme.colorScheme.onSurfaceVariant,
-                                        )
-                                      : null,
-                                ),
-                        ),
-                        title: Text(
-                          p.name,
-                          style: isLeft
-                              ? TextStyle(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                )
-                              : null,
-                        ),
-                        subtitle: isActive
-                            ? Text(_roleLabel(linkedMember.role))
-                            : isLeft
-                                ? Text(
-                                    'left'.tr(),
-                                    style: TextStyle(
+                  return ListTile(
+                    key: ValueKey(p.id),
+                    leading: CircleAvatar(
+                      backgroundColor: isLeft
+                          ? theme.colorScheme.surfaceContainerHighest
+                          : null,
+                      child: emoji != null
+                          ? Text(
+                              emoji,
+                              style: TextStyle(
+                                fontSize: 22,
+                                color: isLeft
+                                    ? theme.colorScheme.onSurfaceVariant
+                                    : null,
+                              ),
+                            )
+                          : Text(
+                              p.name.isNotEmpty
+                                  ? p.name[0].toUpperCase()
+                                  : '?',
+                              style: isLeft
+                                  ? TextStyle(
                                       color: theme.colorScheme.onSurfaceVariant,
-                                      fontStyle: FontStyle.italic,
-                                    ),
-                                  )
-                                : null,
-                        trailing: _buildTrailing(
-                          context,
-                          ref,
-                          groupId,
-                          p,
-                          linkedMember,
-                          isActive,
-                          isLeft,
-                          isOwnerOrAdmin,
-                          myRole,
-                          localOnly,
-                          members,
-                          participants,
-                        ),
-                      );
-                    },
+                                    )
+                                  : null,
+                            ),
+                    ),
+                    title: Text(
+                      p.name,
+                      style: isLeft
+                          ? TextStyle(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            )
+                          : null,
+                    ),
+                    subtitle: isActive
+                        ? Text(_roleLabel(linkedMember.role))
+                        : isLeft
+                            ? Text(
+                                'left'.tr(),
+                                style: TextStyle(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              )
+                            : null,
+                    trailing: _buildTrailing(
+                      context,
+                      ref,
+                      groupId,
+                      p,
+                      linkedMember,
+                      isActive,
+                      isLeft,
+                      isOwnerOrAdmin,
+                      myRole,
+                      localOnly,
+                      members,
+                      participants,
+                    ),
                   );
+                }),
+                if (pastParticipants.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 16, bottom: 8),
+                    child: Text(
+                      'past_members'.tr(),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  ...pastParticipants.map((p) {
+                    final emoji = avatarEmoji(p.avatarId);
+                    return ListTile(
+                      key: ValueKey('past_${p.id}'),
+                      leading: CircleAvatar(
+                        backgroundColor:
+                            theme.colorScheme.surfaceContainerHighest,
+                        child: emoji != null
+                            ? Text(
+                                emoji,
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              )
+                            : Text(
+                                p.name.isNotEmpty
+                                    ? p.name[0].toUpperCase()
+                                    : '?',
+                                style: TextStyle(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                      ),
+                      title: Text(
+                        p.name,
+                        style: TextStyle(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'left'.tr(),
+                        style: TextStyle(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                      trailing: null,
+                    );
+                  }),
+                ],
+              ],
+            );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('Error: $e')),
+          error: (e, _) => Center(
+            child: ErrorContentWidget(
+              message: e.toString(),
+              onRetry: () => ref.invalidate(participantsByGroupProvider(groupId)),
+            ),
+          ),
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Error: $e')),
+      error: (e, _) => Center(
+        child: ErrorContentWidget(
+          message: e.toString(),
+          onRetry: () => ref.invalidate(participantsByGroupProvider(groupId)),
+        ),
+      ),
     );
   }
 
@@ -764,6 +840,23 @@ class _PeopleTab extends ConsumerWidget {
       );
     }
 
+    // Left participant (had userId, no current member) — allow archive to remove from list
+    if (isLeft && isOwnerOrAdmin) {
+      return PopupMenuButton<String>(
+        onSelected: (v) {
+          if (v == 'archive') {
+            _showArchiveParticipant(context, ref, groupId, participant);
+          }
+        },
+        itemBuilder: (ctx) => [
+          PopupMenuItem(
+            value: 'archive',
+            child: Text('archive_participant'.tr()),
+          ),
+        ],
+      );
+    }
+
     // Standalone participant (no userId) or local-only mode — allow edit/delete/merge
     if (!isActive && !isLeft && isOwnerOrAdmin) {
       return PopupMenuButton<String>(
@@ -802,6 +895,50 @@ class _PeopleTab extends ConsumerWidget {
     }
 
     return null;
+  }
+
+  Future<void> _showArchiveParticipant(
+    BuildContext context,
+    WidgetRef ref,
+    String groupId,
+    Participant participant,
+  ) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('archive_participant'.tr()),
+        content: Text(
+          'archive_participant_confirm'.tr().replaceAll('{name}', participant.name),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('cancel'.tr()),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('archive_participant'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && context.mounted) {
+      try {
+        await ref.read(participantRepositoryProvider).archive(groupId, participant.id);
+        ref.invalidate(participantsByGroupProvider(groupId));
+        if (!ref.read(effectiveLocalOnlyProvider)) {
+          await ref.read(dataSyncServiceProvider.notifier).syncNow();
+        }
+        if (context.mounted) {
+          context.showSuccess('archive_participant'.tr());
+        }
+      } catch (e, st) {
+        Log.warning('Archive participant failed', error: e, stackTrace: st);
+        if (context.mounted) {
+          context.showError('$e');
+        }
+      }
+    }
   }
 
   Future<void> _showEditParticipant(
@@ -1166,21 +1303,25 @@ class _FABWithLabel extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Material(
-          color: theme.colorScheme.primary,
-          borderRadius: BorderRadius.circular(16),
-          clipBehavior: Clip.antiAlias,
-          elevation: 4,
-          shadowColor: theme.colorScheme.shadow,
-          child: InkWell(
+        Semantics(
+          label: label,
+          button: true,
+          child: Material(
+            color: theme.colorScheme.primary,
             borderRadius: BorderRadius.circular(16),
-            splashColor: Colors.transparent,
-            highlightColor: Colors.transparent,
-            onTap: onTap,
-            child: SizedBox(
-              width: 56,
-              height: 56,
-              child: Icon(icon, color: Colors.white, size: 28),
+            clipBehavior: Clip.antiAlias,
+            elevation: 4,
+            shadowColor: theme.colorScheme.shadow,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              splashColor: Colors.transparent,
+              highlightColor: Colors.transparent,
+              onTap: onTap,
+              child: SizedBox(
+                width: 56,
+                height: 56,
+                child: Icon(icon, color: Colors.white, size: 28),
+              ),
             ),
           ),
         ),
