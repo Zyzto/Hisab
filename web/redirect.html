@@ -100,10 +100,10 @@ p{color:#666;margin-bottom:20px;font-size:.95rem}
   hintEl.textContent = "Didn't open? You can continue in the browser to sign in and accept the invite.";
   document.getElementById("content").appendChild(hintEl);
 
-  // Optional: try programmatic open after short delay (some browsers allow it)
-  setTimeout(function() {
-    window.location.href = appUrl;
-  }, 1500);
+  var tapHintEl = document.createElement("p");
+  tapHintEl.style.cssText = "color:#555;font-size:0.9rem;margin-bottom:12px";
+  tapHintEl.textContent = "Tap below to open in the app.";
+  document.getElementById("content").insertBefore(tapHintEl, openApp);
 
   // After 8s, show hint if still on page (no auto-redirect)
   setTimeout(function() {
