@@ -1881,6 +1881,7 @@ After completing all steps:
    - `handle_updated_at`, `get_user_role`, `is_group_member`
    - `get_invite_by_token`, `accept_invite`, `create_invite`, `revoke_invite`, `toggle_invite_active`
    - `transfer_ownership`, `leave_group`, `kick_member`, `update_member_role`, `assign_participant`, `merge_participant_with_member`
+   - `get_delete_my_data_preview`, `delete_my_data` (for Settings > Delete cloud data; see migration `20250222100000_delete_my_data_and_leave_group_updates.sql`. `leave_group` is updated in that migration to clear treasurer when the leaving member is treasurer and to delete the group when the leaving member is the only member.)
 
 4. **Edge Functions**: Go to **Edge Functions** and verify `invite-redirect`, `telemetry`, and `send-notification` are deployed and active (for push notifications, also set `FCM_PROJECT_ID` and `FCM_SERVICE_ACCOUNT_KEY` secrets; see Section 5).
 
