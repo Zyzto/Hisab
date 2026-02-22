@@ -53,6 +53,10 @@ The app works fully offline with no configuration. Authentication, sync, invites
 Find these values in:
 - **Supabase**: Dashboard → Settings → API
 
+### Receipt AI (optional)
+
+Receipt scanning can use **Gemini** or **OpenAI** for parsing receipt images (vendor, date, total). API keys are **user-provided** and stored **only on the device** in app settings (via the settings framework). They are not sent to Supabase or committed to the repo. Configure them in the app under Settings → Receipt AI. If no key is set, receipt flow falls back to OCR-only or attach-only.
+
 ---
 
 ## Invite links with a custom domain
