@@ -72,7 +72,7 @@ p{color:#666;margin-bottom:20px;font-size:.95rem}
     return;
   }
 
-  // Mobile: show "Open in Hisab" (user gesture) and "Open in Browser" (web/PWA)
+  // Mobile: show "Open in Hisab app" and "Continue in browser" (user choice, no auto-redirect)
   var appUrl;
   if (isAndroid) {
     appUrl = "intent://invite?token=" + encodedToken
@@ -85,30 +85,31 @@ p{color:#666;margin-bottom:20px;font-size:.95rem}
     appUrl = "io.supabase.hisab://invite?token=" + encodedToken;
   }
   openApp.href = appUrl;
+  fallback.href = webUrl;
+  heading.textContent = "You have a group invite";
+  message.textContent = "You can open the invite in the Hisab app or continue in the browser to sign in and accept it.";
+  openApp.textContent = "Open in Hisab app";
+  fallback.textContent = "Continue in browser";
   openApp.style.display = "inline-block";
   fallback.style.display = "inline-block";
   spinner.style.display = "none";
 
-  var done = false;
-  function goWeb() {
-    if (!done) {
-      done = true;
-      window.location.replace(webUrl);
-    }
-  }
-
-  // Cancel web fallback if app opens (page goes hidden)
-  document.addEventListener("visibilitychange", function() {
-    if (document.hidden) done = true;
-  });
+  var hintEl = document.createElement("p");
+  hintEl.id = "hint";
+  hintEl.style.cssText = "color:#888;font-size:0.85rem;margin-top:24px;display:none";
+  hintEl.textContent = "Didn't open? You can continue in the browser to sign in and accept the invite.";
+  document.getElementById("content").appendChild(hintEl);
 
   // Optional: try programmatic open after short delay (some browsers allow it)
   setTimeout(function() {
-    if (!done) window.location.href = appUrl;
+    window.location.href = appUrl;
   }, 1500);
 
-  // Fallback to web/PWA after 3s if user does not tap or app does not open
-  setTimeout(goWeb, 3000);
+  // After 8s, show hint if still on page (no auto-redirect)
+  setTimeout(function() {
+    var h = document.getElementById("hint");
+    if (h) h.style.display = "block";
+  }, 8000);
 })();
 </script>
 </body>

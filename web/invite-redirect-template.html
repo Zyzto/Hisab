@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Redirecting...</title>
+<script>
+(function() {
+  var base = "__SUPABASE_URL__".replace(/\/$/, "");
+  var target = base + "/functions/v1/invite-redirect" + (window.location.search || "");
+  window.location.replace(target);
+})();
+</script>
+</head>
+<body>
+<p>Redirecting...</p>
+</body>
+</html>
