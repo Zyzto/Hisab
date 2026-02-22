@@ -35,6 +35,7 @@ const schema = Schema([
     Column.integer('sort_order'),
     Column.text('user_id'),
     Column.text('avatar_id'),
+    Column.text('left_at'),
     Column.text('created_at'),
     Column.text('updated_at'),
   ]),
@@ -82,6 +83,13 @@ const schema = Schema([
     Column.text('invite_id'),
     Column.text('user_id'),
     Column.text('accepted_at'),
+  ]),
+
+  // ── Local-only (not synced) ──────────────────────────────────────────
+  // Per-user "hide from my list" for non-owners; never written by sync.
+  Table('local_archived_groups', [
+    Column.text('group_id'),
+    Column.text('archived_at'),
   ]),
 
   // ── Offline queue ────────────────────────────────────────────────────

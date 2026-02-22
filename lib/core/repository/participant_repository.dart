@@ -7,5 +7,6 @@ abstract class IParticipantRepository {
   Future<String> create(String groupId, String name, int order, {String? userId, String? avatarId});
   Future<void> update(Participant participant);
   Future<void> updateProfileByUserId(String userId, String newName, {String? avatarId});
+  Future<void> archive(String groupId, String participantId);
   Future<void> delete(String id);
 }
