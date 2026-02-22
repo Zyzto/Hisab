@@ -149,7 +149,7 @@ class SyncEngine {
       }
       for (final p in participants) {
         await tx.execute(
-          'INSERT INTO participants (id, group_id, name, sort_order, user_id, avatar_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          'INSERT INTO participants (id, group_id, name, sort_order, user_id, avatar_id, left_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [
             p['id'],
             p['group_id'],
@@ -157,6 +157,7 @@ class SyncEngine {
             p['sort_order'],
             p['user_id'],
             p['avatar_id'],
+            p['left_at'],
             p['created_at'],
             p['updated_at'],
           ],

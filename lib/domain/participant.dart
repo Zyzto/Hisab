@@ -16,6 +16,10 @@ class Participant {
   /// Avatar identifier (matches a key in [predefinedAvatars]).
   /// Null means the user hasn't set one (falls back to initials).
   final String? avatarId;
+
+  /// When set, this participant is treated as left/archived (hidden from main list; expense history kept).
+  final DateTime? leftAt;
+
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -26,6 +30,7 @@ class Participant {
     required this.order,
     this.userId,
     this.avatarId,
+    this.leftAt,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -37,6 +42,7 @@ class Participant {
     int? order,
     String? userId,
     String? avatarId,
+    DateTime? leftAt,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -47,6 +53,7 @@ class Participant {
       order: order ?? this.order,
       userId: userId ?? this.userId,
       avatarId: avatarId ?? this.avatarId,
+      leftAt: leftAt ?? this.leftAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

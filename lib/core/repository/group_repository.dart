@@ -12,4 +12,11 @@ abstract class IGroupRepository {
   Future<void> unfreezeSettlement(String groupId);
   Future<void> archive(String groupId);
   Future<void> unarchive(String groupId);
+
+  /// Local-only: hide group from current user's list (non-owners). Not synced.
+  Future<void> setLocalArchived(String groupId);
+  Future<void> clearLocalArchived(String groupId);
+  Future<Set<String>> getLocallyArchivedGroupIds();
+  Stream<Set<String>> watchLocallyArchivedGroupIds();
+  Stream<List<Group>> watchLocallyArchivedGroups();
 }
