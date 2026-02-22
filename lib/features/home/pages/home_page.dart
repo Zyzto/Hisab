@@ -29,10 +29,14 @@ class HomePage extends ConsumerWidget {
         leading: const SyncStatusChip(),
         title: Text('app_name'.tr()),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.archive_outlined),
-            onPressed: () => context.push(RoutePaths.archivedGroups),
-            tooltip: 'archived_groups'.tr(),
+          Semantics(
+            label: 'archived_groups'.tr(),
+            button: true,
+            child: IconButton(
+              icon: const Icon(Icons.archive_outlined),
+              onPressed: () => context.push(RoutePaths.archivedGroups),
+              tooltip: 'archived_groups'.tr(),
+            ),
           ),
         ],
       ),
@@ -109,23 +113,35 @@ class HomePage extends ConsumerWidget {
         },
       ),
       floatingActionButton: localOnly
-          ? FloatingActionButton(
-              onPressed: () => context.push(RoutePaths.groupCreate),
-              child: const Icon(Icons.add),
+          ? Semantics(
+              label: 'create_group'.tr(),
+              button: true,
+              child: FloatingActionButton(
+                onPressed: () => context.push(RoutePaths.groupCreate),
+                child: const Icon(Icons.add),
+              ),
             )
           : Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                FloatingActionButton(
-                  heroTag: 'scan_invite',
-                  onPressed: () => context.push(RoutePaths.scanInvite),
-                  child: const Icon(Icons.qr_code_scanner),
+                Semantics(
+                  label: 'scan_invite'.tr(),
+                  button: true,
+                  child: FloatingActionButton(
+                    heroTag: 'scan_invite',
+                    onPressed: () => context.push(RoutePaths.scanInvite),
+                    child: const Icon(Icons.qr_code_scanner),
+                  ),
                 ),
                 const SizedBox(height: 12),
-                FloatingActionButton(
-                  onPressed: () => context.push(RoutePaths.groupCreate),
-                  child: const Icon(Icons.add),
+                Semantics(
+                  label: 'create_group'.tr(),
+                  button: true,
+                  child: FloatingActionButton(
+                    onPressed: () => context.push(RoutePaths.groupCreate),
+                    child: const Icon(Icons.add),
+                  ),
                 ),
               ],
             ),

@@ -18,6 +18,7 @@ import '../../../core/services/settle_up_service.dart';
 import '../../../core/telemetry/telemetry_service.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/currency_helpers.dart';
+import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../domain/domain.dart';
 import '../../settings/providers/settings_framework_providers.dart';
@@ -45,6 +46,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     final myRoleAsync = localOnly
         ? const AsyncValue.data(null)
         : ref.watch(myRoleInGroupProvider(widget.groupId));
+    final localArchivedIdsAsync = ref.watch(locallyArchivedGroupIdsProvider);
 
     return groupAsync.when(
       data: (group) {
@@ -186,7 +188,32 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
 
               // ── Danger Zone ──
               const SizedBox(height: ThemeConfig.spacingXL),
-              _buildDangerZone(context, group, localOnly, myRoleAsync, ref),
+              localArchivedIdsAsync.when(
+                data: (ids) => _buildDangerZone(
+                  context,
+                  group,
+                  localOnly,
+                  myRoleAsync,
+                  ref,
+                  isLocallyArchived: ids.contains(widget.groupId),
+                ),
+                loading: () => _buildDangerZone(
+                  context,
+                  group,
+                  localOnly,
+                  myRoleAsync,
+                  ref,
+                  isLocallyArchived: false,
+                ),
+                error: (_, _) => _buildDangerZone(
+                  context,
+                  group,
+                  localOnly,
+                  myRoleAsync,
+                  ref,
+                  isLocallyArchived: false,
+                ),
+              ),
               const SizedBox(height: ThemeConfig.spacingXL),
             ],
           ),
@@ -196,7 +223,12 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
           const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => Scaffold(
         appBar: AppBar(title: Text('group_settings'.tr())),
-        body: Center(child: Text('Error: $e')),
+        body: Center(
+          child: ErrorContentWidget(
+            message: e.toString(),
+            onRetry: () => ref.invalidate(futureGroupProvider(widget.groupId)),
+          ),
+        ),
       ),
     );
   }
@@ -785,8 +817,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     Group group,
     bool localOnly,
     AsyncValue<GroupRole?> myRoleAsync,
-    WidgetRef ref,
-  ) {
+    WidgetRef ref, {
+    required bool isLocallyArchived,
+  }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final errorColor = colorScheme.error;
@@ -833,6 +866,23 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
             color: errorColor,
             onTap: _saving ? null : () => _showDeleteGroup(context, ref),
           ));
+        } else if (myRole != null) {
+          // Non-owner: Hide from my list / Unhide from my list (local-only archive)
+          if (isLocallyArchived) {
+            actions.add(_dangerButton(
+              icon: Icons.visibility_outlined,
+              label: 'unhide_from_my_list'.tr(),
+              color: errorColor,
+              onTap: _saving ? null : () => _showUnhideFromMyList(context, ref),
+            ));
+          } else {
+            actions.add(_dangerButton(
+              icon: Icons.archive_outlined,
+              label: 'hide_from_my_list'.tr(),
+              color: errorColor,
+              onTap: _saving ? null : () => _showHideFromMyList(context, ref),
+            ));
+          }
         }
         if (myRole != null) {
           actions.add(_dangerButton(
@@ -1422,6 +1472,59 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
       }
     } catch (e, st) {
       Log.warning('Unarchive group failed', error: e, stackTrace: st);
+      if (context.mounted) {
+        context.showError('$e');
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _showHideFromMyList(BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('hide_from_my_list'.tr()),
+        content: Text('hide_from_my_list_confirm'.tr()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('cancel'.tr()),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('hide_from_my_list'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    setState(() => _saving = true);
+    try {
+      await ref.read(groupRepositoryProvider).setLocalArchived(widget.groupId);
+      if (context.mounted) {
+        context.showSuccess('group_hidden_from_list'.tr());
+        context.pop();
+      }
+    } catch (e, st) {
+      Log.warning('Hide from list failed', error: e, stackTrace: st);
+      if (context.mounted) {
+        context.showError('$e');
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _showUnhideFromMyList(BuildContext context, WidgetRef ref) async {
+    setState(() => _saving = true);
+    try {
+      await ref.read(groupRepositoryProvider).clearLocalArchived(widget.groupId);
+      if (context.mounted) {
+        context.showSuccess('group_unhidden_from_list'.tr());
+      }
+    } catch (e, st) {
+      Log.warning('Unhide from list failed', error: e, stackTrace: st);
       if (context.mounted) {
         context.showError('$e');
       }
