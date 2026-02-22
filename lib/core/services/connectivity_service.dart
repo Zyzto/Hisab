@@ -27,6 +27,9 @@ enum SyncStatus {
 
   /// Online mode, no network connectivity.
   offline,
+
+  /// Online mode, last sync failed (auth or after retries).
+  syncFailed,
 }
 
 /// Whether the device currently has network connectivity.
@@ -85,11 +88,19 @@ class SyncStatusNotifier extends _$SyncStatusNotifier {
     }
   }
 
-  /// Call when a sync operation completes.
+  /// Call when a sync operation completes successfully.
   void setSynced() {
-    if (state == SyncStatus.syncing) {
+    if (state == SyncStatus.syncing || state == SyncStatus.syncFailed) {
       final hasNetwork = ref.read(connectivityProvider);
       state = hasNetwork ? SyncStatus.connected : SyncStatus.offline;
+    }
+  }
+
+  /// Call when sync failed (auth error or after retries). Next successful
+  /// sync or connectivity change will clear this.
+  void setSyncFailed() {
+    if (state == SyncStatus.syncing) {
+      state = SyncStatus.syncFailed;
     }
   }
 }
