@@ -175,6 +175,17 @@ async function handleNotificationRequest(req: Request): Promise<Response> {
     });
   }
 
+  // Normalize actor so joinee is never sent member_joined (handles UUID/casing from trigger).
+  const actorNorm = String(payload?.actor_user_id ?? "").trim().toLowerCase();
+  if (payload.action === "member_joined" && !actorNorm) {
+    console.log("send-notification: member_joined with no actor, skipping");
+    return new Response(
+      JSON.stringify({ sent: 0, message: "member_joined: no actor, skipping" }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  }
+  console.log("send-notification: request", { action: payload.action, actor_user_id: payload.actor_user_id });
+
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
@@ -185,7 +196,7 @@ async function handleNotificationRequest(req: Request): Promise<Response> {
   const memberCount = (members ?? []).length;
   const userIds = (members ?? [])
     .map((r) => r.user_id as string)
-    .filter((id) => id !== payload.actor_user_id);
+    .filter((id) => String(id ?? "").trim().toLowerCase() !== actorNorm);
   if (userIds.length === 0) {
     console.log("send-notification: No other members to notify", {
       group_id: payload.group_id,
@@ -203,7 +214,10 @@ async function handleNotificationRequest(req: Request): Promise<Response> {
     .from("device_tokens")
     .select("token, locale, user_id")
     .in("user_id", userIds);
-  const rows = (tokenRows ?? []).filter((r) => r.token && r.user_id);
+  // Exclude actor from send list (defense-in-depth so joinee never gets member_joined).
+  const rows = (tokenRows ?? []).filter(
+    (r) => r.token && r.user_id && String(r.user_id).trim().toLowerCase() !== actorNorm,
+  );
   const tokenCount = rows.length;
   if (tokenCount === 0) {
     console.log("send-notification: No device tokens for members", {
@@ -239,6 +253,8 @@ async function handleNotificationRequest(req: Request): Promise<Response> {
   for (const row of rows) {
     const token = row.token as string;
     const userId = row.user_id as string;
+    // Never send to the actor (person who made the change)
+    if (String(userId ?? "").trim().toLowerCase() === actorNorm) continue;
     const locale = (row.locale as string | null) ?? null;
     const { title, body } = buildNotificationText(payload, locale);
     const result = await sendFcmMessage(
