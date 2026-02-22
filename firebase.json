@@ -2,12 +2,10 @@
   "hosting": {
     "public": "build/web",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-    "rewrites": [{ "source": "**", "destination": "/index.html" }],
-    "headers": [
-      {
-        "source": "**/*.wasm",
-        "headers": [{ "key": "Content-Type", "value": "application/wasm" }]
-      }
-    ]
+    "rewrites": [
+      {"source": "/functions/v1/invite-redirect", "destination": "/invite-redirect.html"},
+      {"source": "**", "destination": "/index.html"}
+    ],
+    "headers": [{"source": "**/*.wasm", "headers": [{"key": "Content-Type", "value": "application/wasm"}]}]
   }
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
@@ -33,8 +34,44 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
   @override
   Widget build(BuildContext context) {
     final localOnly = ref.watch(effectiveLocalOnlyProvider);
+    final isAuthenticated = ref.watch(isAuthenticatedProvider);
     final inviteAsync = ref.watch(inviteByTokenProvider(widget.token));
 
+    // Web: when local-only or not signed in, show "Accept invite in browser" landing with Sign in CTA
+    if (kIsWeb && (localOnly || !isAuthenticated)) {
+      return Scaffold(
+        appBar: AppBar(title: Text('invite'.tr())),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'invite_web_heading'.tr(),
+                  style: Theme.of(context).textTheme.headlineSmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'invite_web_message'.tr(),
+                  style: Theme.of(context).textTheme.bodyLarge,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 32),
+                FilledButton.icon(
+                  onPressed: () => _openSignInForWebInvite(context),
+                  icon: const Icon(Icons.login),
+                  label: Text('invite_web_sign_in'.tr()),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Native app in local-only: show generic online-required message
     if (localOnly) {
       return Scaffold(
         appBar: AppBar(title: Text('invite'.tr())),
@@ -170,6 +207,20 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
         ],
       ),
     );
+  }
+
+  Future<void> _openSignInForWebInvite(BuildContext context) async {
+    final result = await showSignInSheet(context, ref);
+    switch (result) {
+      case SignInResult.success:
+        // Page will rebuild; invite content or accept button will show
+        break;
+      case SignInResult.pendingRedirect:
+        break;
+      case SignInResult.cancelled:
+        if (context.mounted) context.showToast('sign_in_required'.tr());
+        break;
+    }
   }
 
   Future<void> _accept(BuildContext context, Group group) async {
