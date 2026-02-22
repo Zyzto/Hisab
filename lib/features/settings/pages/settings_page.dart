@@ -486,6 +486,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         colorScheme.error,
         'sync_offline'.tr(),
       ),
+      SyncStatus.syncFailed => (
+        Icons.cloud_off_outlined,
+        colorScheme.error,
+        'sync_failed'.tr(),
+      ),
       SyncStatus.localOnly => (
         Icons.storage,
         colorScheme.onSurfaceVariant,
@@ -1252,13 +1257,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         return;
       }
       final jsonString = utf8.decode(bytes);
-      final backup = parseBackupJson(jsonString);
-      if (backup == null) {
+      final parseResult = parseBackupJson(jsonString);
+      if (parseResult.data == null) {
         if (context.mounted) {
-          context.showError('import_invalid_file'.tr());
+          final message = parseResult.errorMessageKey?.tr() ?? 'import_invalid_file'.tr();
+          context.showError(message);
         }
         return;
       }
+      final backup = parseResult.data!;
       final groupRepo = ref.read(groupRepositoryProvider);
       final participantRepo = ref.read(participantRepositoryProvider);
       final expenseRepo = ref.read(expenseRepositoryProvider);
@@ -1316,6 +1323,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         final newGroupId = idMap[t.groupId];
         if (newGroupId != null) {
           await tagRepo.create(newGroupId, t.label, t.iconName);
+        }
+      }
+      for (final oldId in backup.localArchivedGroupIds) {
+        final newId = idMap[oldId];
+        if (newId != null) {
+          await groupRepo.setLocalArchived(newId);
         }
       }
       Log.info('Backup import completed');

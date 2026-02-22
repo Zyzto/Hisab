@@ -34,6 +34,9 @@ Future<Map<String, dynamic>> exportDataToJson({
     expenseTags.addAll(await tagRepo.getByGroupId(g.id));
   }
 
+  final localArchivedGroupIds =
+      await groupRepo.getLocallyArchivedGroupIds();
+
   return {
     'version': 1,
     'exportedAt': DateTime.now().toIso8601String(),
@@ -41,6 +44,7 @@ Future<Map<String, dynamic>> exportDataToJson({
     'participants': participants.map((p) => _participantToMap(p)).toList(),
     'expenses': expenses.map((e) => _expenseToMap(e)).toList(),
     'expense_tags': expenseTags.map((t) => _tagToMap(t)).toList(),
+    'localArchivedGroupIds': localArchivedGroupIds.toList(),
   };
 }
 
@@ -64,6 +68,7 @@ Map<String, dynamic> _participantToMap(Participant p) => {
   'groupId': p.groupId,
   'name': p.name,
   'order': p.order,
+  'leftAt': p.leftAt?.toIso8601String(),
   'createdAt': p.createdAt.toIso8601String(),
   'updatedAt': p.updatedAt.toIso8601String(),
 };
@@ -97,13 +102,28 @@ Map<String, dynamic> _tagToMap(ExpenseTag t) => {
   'updatedAt': t.updatedAt.toIso8601String(),
 };
 
-/// Validate and parse backup JSON. Returns null if invalid.
-BackupData? parseBackupJson(String jsonString) {
+/// Result of parsing a backup JSON string. [data] is non-null on success;
+/// [errorMessageKey] is a translation key for the UI when parsing failed.
+class BackupParseResult {
+  const BackupParseResult({this.data, this.errorMessageKey});
+
+  final BackupData? data;
+  /// Translation key (e.g. backup_parse_unsupported_version) for UI to show.
+  final String? errorMessageKey;
+}
+
+/// Validate and parse backup JSON. Returns [BackupParseResult] with [data]
+/// on success or [errorMessageKey] set when invalid.
+BackupParseResult parseBackupJson(String jsonString) {
   try {
     final map = jsonDecode(jsonString) as Map<String, dynamic>?;
-    if (map == null) return null;
+    if (map == null) {
+      return const BackupParseResult(errorMessageKey: 'backup_parse_invalid_format');
+    }
     final version = map['version'] as int?;
-    if (version == null || version != 1) return null;
+    if (version == null || version != 1) {
+      return const BackupParseResult(errorMessageKey: 'backup_parse_unsupported_version');
+    }
     final groups =
         (map['groups'] as List<dynamic>?)
             ?.map((e) => _mapToGroup(e as Map<String, dynamic>))
@@ -124,15 +144,25 @@ BackupData? parseBackupJson(String jsonString) {
             ?.map((e) => _mapToTag(e as Map<String, dynamic>))
             .toList() ??
         [];
-    return BackupData(
-      groups: groups,
-      participants: participants,
-      expenses: expenses,
-      expenseTags: expenseTags,
+    final localArchivedGroupIds =
+        (map['localArchivedGroupIds'] as List<dynamic>?)
+            ?.map((e) => e as String)
+            .toList() ??
+        [];
+    return BackupParseResult(
+      data: BackupData(
+        groups: groups,
+        participants: participants,
+        expenses: expenses,
+        expenseTags: expenseTags,
+        localArchivedGroupIds: localArchivedGroupIds,
+      ),
     );
+  } on FormatException catch (_) {
+    return const BackupParseResult(errorMessageKey: 'backup_parse_invalid_format');
   } catch (e) {
     Log.warning('Backup parse failed', error: e);
-    return null;
+    return const BackupParseResult(errorMessageKey: 'backup_parse_failed');
   }
 }
 
@@ -174,14 +204,18 @@ Group _mapToGroup(Map<String, dynamic> m) {
   );
 }
 
-Participant _mapToParticipant(Map<String, dynamic> m) => Participant(
-  id: m['id'] as String,
-  groupId: m['groupId'] as String,
-  name: m['name'] as String,
-  order: m['order'] as int,
-  createdAt: DateTime.parse(m['createdAt'] as String),
-  updatedAt: DateTime.parse(m['updatedAt'] as String),
-);
+Participant _mapToParticipant(Map<String, dynamic> m) {
+  final leftAt = m['leftAt'] as String?;
+  return Participant(
+    id: m['id'] as String,
+    groupId: m['groupId'] as String,
+    name: m['name'] as String,
+    order: m['order'] as int,
+    leftAt: leftAt != null ? DateTime.tryParse(leftAt) : null,
+    createdAt: DateTime.parse(m['createdAt'] as String),
+    updatedAt: DateTime.parse(m['updatedAt'] as String),
+  );
+}
 
 Expense _mapToExpense(Map<String, dynamic> m) {
   final lineItems = m['lineItems'] as List<dynamic>?;
@@ -233,10 +267,12 @@ class BackupData {
     required this.participants,
     required this.expenses,
     required this.expenseTags,
+    this.localArchivedGroupIds = const [],
   });
 
   final List<Group> groups;
   final List<Participant> participants;
   final List<Expense> expenses;
   final List<ExpenseTag> expenseTags;
+  final List<String> localArchivedGroupIds;
 }
