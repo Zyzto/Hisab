@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:currency_picker/currency_picker.dart';
 import 'package:flutter/material.dart';
@@ -23,6 +24,7 @@ import '../../../core/repository/repository_providers.dart';
 import '../../../core/update/update_check_providers.dart';
 import '../../../core/services/migration_service.dart';
 import '../../../core/services/connectivity_service.dart';
+import '../../../core/services/delete_my_data_service.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/utils/currency_helpers.dart';
 import '../settings_definitions.dart';
@@ -283,11 +285,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               onTap: () => _resetAllSettings(context, ref, settings),
             ),
             ActionSettingsTile(
-              leading: const Icon(Icons.delete_forever),
-              title: Text('delete_all_data'.tr()),
-              subtitle: Text('delete_all_data_description'.tr()),
-              onTap: () => _deleteAllData(context, ref),
+              leading: const Icon(Icons.phone_android),
+              title: Text('delete_local_data'.tr()),
+              subtitle: Text('delete_local_data_description'.tr()),
+              onTap: () => _showDeleteLocalData(context, ref),
             ),
+            if (supabaseConfigAvailable && ref.watch(currentUserProvider) != null)
+              ActionSettingsTile(
+                leading: const Icon(Icons.cloud),
+                title: Text('delete_cloud_data'.tr()),
+                subtitle: Text('delete_cloud_data_description'.tr()),
+                onTap: () => _showDeleteCloudData(context, ref),
+              )
+            else
+              ActionSettingsTile(
+                leading: const Icon(Icons.cloud),
+                title: Text('delete_cloud_data'.tr()),
+                subtitle: Text('delete_cloud_data_sign_in_required'.tr()),
+                onTap: null,
+              ),
           ]),
           _buildAboutSection(context, ref, settings),
         ],
@@ -653,28 +669,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     context.showSuccess('reset_all_settings_done'.tr());
   }
 
-  static Future<void> _deleteAllData(
+  static Future<void> _showDeleteLocalData(
     BuildContext context,
     WidgetRef ref,
   ) async {
+    final counts = await _getLocalDataCounts(ref);
+    if (!context.mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('delete_all_data'.tr()),
-        content: Text('delete_all_data_confirm'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('cancel'.tr()),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('delete_all_data'.tr()),
-          ),
-        ],
+      builder: (ctx) => _DeleteLocalDataDialogContent(
+        groups: counts.groups,
+        participants: counts.participants,
+        expenses: counts.expenses,
+        expenseTags: counts.expenseTags,
+        groupInvites: counts.groupInvites,
       ),
     );
     if (confirmed == true && context.mounted) {
@@ -687,7 +695,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         await db.execute('DELETE FROM group_invites');
         await db.execute('DELETE FROM groups');
         await db.execute('DELETE FROM pending_writes');
-        Log.info('All data deleted');
+        Log.info('Local data deleted');
         if (context.mounted) {
           final settings = ref.read(hisabSettingsProvidersProvider);
           if (settings != null) {
@@ -695,14 +703,90 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 .read(settings.provider(onboardingCompletedSettingDef).notifier)
                 .set(false);
           }
-          context.showSuccess('delete_all_data_done'.tr());
+          context.showSuccess('delete_local_data_done'.tr());
           context.go(RoutePaths.onboarding);
         }
       } catch (e, st) {
-        Log.warning('Delete all data failed', error: e, stackTrace: st);
+        Log.warning('Delete local data failed', error: e, stackTrace: st);
         if (context.mounted) {
-          context.showError('delete_all_data_failed'.tr());
+          context.showError('delete_local_data_failed'.tr());
         }
+      }
+    }
+  }
+
+  static Future<({int groups, int participants, int expenses, int expenseTags, int groupInvites})> _getLocalDataCounts(WidgetRef ref) async {
+    final db = ref.read(powerSyncDatabaseProvider);
+    final groupRows = await db.getAll('SELECT COUNT(*) as cnt FROM groups');
+    final participantRows = await db.getAll('SELECT COUNT(*) as cnt FROM participants');
+    final expenseRows = await db.getAll('SELECT COUNT(*) as cnt FROM expenses');
+    final tagRows = await db.getAll('SELECT COUNT(*) as cnt FROM expense_tags');
+    final inviteRows = await db.getAll('SELECT COUNT(*) as cnt FROM group_invites');
+    int fromFirst(List<dynamic> rows) {
+      if (rows.isEmpty) return 0;
+      final r = rows.first;
+      if (r is Map) {
+        final v = r['cnt'];
+        if (v == null) return 0;
+        if (v is int) return v;
+        if (v is num) return v.toInt();
+        return int.tryParse(v.toString()) ?? 0;
+      }
+      return 0;
+    }
+    return (
+      groups: fromFirst(groupRows),
+      participants: fromFirst(participantRows),
+      expenses: fromFirst(expenseRows),
+      expenseTags: fromFirst(tagRows),
+      groupInvites: fromFirst(inviteRows),
+    );
+  }
+
+  static Future<void> _showDeleteCloudData(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    try {
+      final preview = await ref.read(deleteMyDataServiceProvider).getDeleteMyDataPreview();
+      if (!context.mounted) return;
+      final result = await showDialog<bool?>(
+        context: context,
+        builder: (ctx) => _DeleteCloudDataDialogContent(preview: preview),
+      );
+      // result: null = cancel, true = alsoDeleteLocal, false = cloud only
+      if (result == null || !context.mounted) return;
+      final alsoDeleteLocal = result;
+      await ref.read(deleteMyDataServiceProvider).deleteMyData();
+      if (!context.mounted) return;
+      await ref.read(authServiceProvider).signOut();
+      if (!context.mounted) return;
+      if (alsoDeleteLocal) {
+        final db = ref.read(powerSyncDatabaseProvider);
+        await db.execute('DELETE FROM expenses');
+        await db.execute('DELETE FROM expense_tags');
+        await db.execute('DELETE FROM participants');
+        await db.execute('DELETE FROM group_members');
+        await db.execute('DELETE FROM group_invites');
+        await db.execute('DELETE FROM groups');
+        await db.execute('DELETE FROM pending_writes');
+        final settings = ref.read(hisabSettingsProvidersProvider);
+        if (settings != null) {
+          ref
+              .read(settings.provider(onboardingCompletedSettingDef).notifier)
+              .set(false);
+        }
+        if (context.mounted) {
+          context.showSuccess('delete_local_data_done'.tr());
+          context.go(RoutePaths.onboarding);
+        }
+      } else if (context.mounted) {
+        context.showSuccess('delete_cloud_data_done'.tr());
+      }
+    } catch (e, st) {
+      Log.warning('Delete cloud data failed', error: e, stackTrace: st);
+      if (context.mounted) {
+        context.showError('delete_cloud_data_failed'.tr());
       }
     }
   }
@@ -1608,6 +1692,194 @@ class _FavoriteCurrenciesSheetState extends State<_FavoriteCurrenciesSheet> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _DeleteLocalDataDialogContent extends StatefulWidget {
+  const _DeleteLocalDataDialogContent({
+    required this.groups,
+    required this.participants,
+    required this.expenses,
+    required this.expenseTags,
+    required this.groupInvites,
+  });
+
+  final int groups;
+  final int participants;
+  final int expenses;
+  final int expenseTags;
+  final int groupInvites;
+
+  @override
+  State<_DeleteLocalDataDialogContent> createState() =>
+      _DeleteLocalDataDialogContentState();
+}
+
+class _DeleteLocalDataDialogContentState
+    extends State<_DeleteLocalDataDialogContent> {
+  int _secondsLeft = 30;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() {
+        if (_secondsLeft > 0) _secondsLeft--;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final canConfirm = _secondsLeft <= 0;
+    final summary = 'delete_local_data_summary'.tr(namedArgs: {
+      'groups': '${widget.groups}',
+      'participants': '${widget.participants}',
+      'expenses': '${widget.expenses}',
+    });
+    return AlertDialog(
+      title: Text('delete_local_data'.tr()),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(summary),
+            const SizedBox(height: 16),
+            Text(
+              canConfirm
+                  ? 'delete_confirm_ready'.tr()
+                  : 'delete_confirm_countdown'.tr(namedArgs: {
+                      'seconds': '$_secondsLeft',
+                    }),
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: Text('cancel'.tr()),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+          onPressed: canConfirm ? () => Navigator.pop(context, true) : null,
+          child: Text('delete_local_data_confirm_label'.tr()),
+        ),
+      ],
+    );
+  }
+}
+
+class _DeleteCloudDataDialogContent extends StatefulWidget {
+  const _DeleteCloudDataDialogContent({required this.preview});
+
+  final DeleteMyDataPreview preview;
+
+  @override
+  State<_DeleteCloudDataDialogContent> createState() =>
+      _DeleteCloudDataDialogContentState();
+}
+
+class _DeleteCloudDataDialogContentState
+    extends State<_DeleteCloudDataDialogContent> {
+  int _secondsLeft = 30;
+  bool _alsoDeleteLocal = false;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() {
+        if (_secondsLeft > 0) _secondsLeft--;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final canConfirm = _secondsLeft <= 0;
+    final p = widget.preview;
+    final summary = 'delete_cloud_data_summary'.tr(namedArgs: {
+      'ownerGroups': '${p.groupsWhereOwner}',
+      'memberships': '${p.groupMemberships}',
+      'tokens': '${p.deviceTokensCount}',
+      'invites': '${p.inviteUsagesCount}',
+    });
+    return AlertDialog(
+      title: Text('delete_cloud_data'.tr()),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(summary),
+            if (p.soleMemberGroupCount > 0) ...[
+              const SizedBox(height: 8),
+              Text(
+                'delete_cloud_data_sole_member_warning'.tr(namedArgs: {
+                  'count': '${p.soleMemberGroupCount}',
+                }),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            CheckboxListTile(
+              value: _alsoDeleteLocal,
+              onChanged: (v) => setState(() => _alsoDeleteLocal = v ?? false),
+              title: Text('also_delete_local_data_option'.tr()),
+              controlAffinity: ListTileControlAffinity.leading,
+              contentPadding: EdgeInsets.zero,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              canConfirm
+                  ? 'delete_confirm_ready'.tr()
+                  : 'delete_confirm_countdown'.tr(namedArgs: {
+                      'seconds': '$_secondsLeft',
+                    }),
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, null),
+          child: Text('cancel'.tr()),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+          onPressed: canConfirm
+              ? () => Navigator.pop(context, _alsoDeleteLocal)
+              : null,
+          child: Text('delete_cloud_data_confirm_label'.tr()),
+        ),
+      ],
     );
   }
 }
