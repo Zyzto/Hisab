@@ -166,7 +166,7 @@ final class SyncStatusNotifierProvider
 }
 
 String _$syncStatusNotifierHash() =>
-    r'f97f094c92e0b5e5f6e098b84758400ab8785ac8';
+    r'608cd92c2bb9d1fdcf0ff619eb0673d86af44d81';
 
 /// High-level sync status for the UI status icon.
 
