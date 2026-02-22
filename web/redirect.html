@@ -5,24 +5,46 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>Hisab - Redirecting...</title>
 <style>
+:root{
+  --bg: #fafafa;
+  --card-bg: #fff;
+  --text: #333;
+  --muted: #666;
+  --border: #e0e0e0;
+  --accent: #22c55e;
+  --accent-hover: #16a34a;
+  --outline-hover: #f0fdf4;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg: #1a1a1a;
+    --card-bg: #2d2d2d;
+    --text: #eee;
+    --muted: #aaa;
+    --border: #444;
+    --outline-hover: #1a2e1a;
+  }
+}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,system-ui,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;text-align:center;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:#fafafa;color:#333}
-.card{max-width:360px;width:100%;padding:40px 24px;background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
-h3{font-size:1.25rem;margin-bottom:8px}
-p{color:#666;margin-bottom:20px;font-size:.95rem}
-.spinner{width:32px;height:32px;border:3px solid #e0e0e0;border-top-color:#007AFF;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 20px}
+body{font-family:-apple-system,system-ui,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;text-align:center;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--bg);color:var(--text)}
+.card{max-width:360px;width:100%;padding:40px 24px;background:var(--card-bg);border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+.logo{display:block;max-width:72px;max-height:72px;margin:0 auto 20px}
+h3{font-size:1.25rem;margin-bottom:8px;color:var(--text)}
+p{color:var(--muted);margin-bottom:20px;font-size:.95rem}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 20px}
 @keyframes spin{to{transform:rotate(360deg)}}
 .btn{display:inline-block;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-size:.95rem;transition:background .2s,border-color .2s}
-.btn-primary{background:#007AFF;color:#fff}
-.btn-primary:hover{background:#0062cc}
-.btn-outline{background:transparent;color:#007AFF;border:2px solid #007AFF}
-.btn-outline:hover{background:#f0f4ff}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-hover)}
+.btn-outline{background:transparent;color:var(--accent);border:2px solid var(--accent)}
+.btn-outline:hover{background:var(--outline-hover)}
 .btn + .btn{margin-top:12px}
 .error-icon{font-size:48px;margin-bottom:12px}
 </style>
 </head>
 <body>
 <div class="card" id="content">
+  <img class="logo" src="/icons/Icon-192.png" alt="Hisab">
   <div class="spinner" id="spinner"></div>
   <h3 id="heading" data-i18n="redirect.heading">Opening Hisab...</h3>
   <p id="message" data-i18n="redirect.message">If nothing happens, tap the button below.</p>
@@ -32,6 +54,37 @@ p{color:#666;margin-bottom:20px;font-size:.95rem}
 
 <script>
 (function() {
+  var i18n = {
+    en: {
+      title: "Hisab - Redirecting...",
+      errorTitle: "Error",
+      expired: "This invite link is invalid or expired.",
+      missing: "Missing or invalid invite link.",
+      heading: "You have a group invite",
+      message: "You can open the invite in the Hisab app or continue in the browser to sign in and accept it.",
+      openApp: "Open in Hisab app",
+      fallback: "Continue in browser",
+      tapHint: "Tap below to open in the app.",
+      hint: "Didn't open? You can continue in the browser to sign in and accept the invite."
+    },
+    ar: {
+      title: "حساب - جاري التوجيه...",
+      errorTitle: "خطأ",
+      expired: "رابط الدعوة غير صالح أو منتهي الصلاحية.",
+      missing: "رابط الدعوة مفقود أو غير صالح.",
+      heading: "لديك دعوة لمجموعة",
+      message: "يمكنك فتح الدعوة في تطبيق حساب أو المتابعة في المتصفح لتسجيل الدخول وقبولها.",
+      openApp: "فتح في تطبيق حساب",
+      fallback: "المتابعة في المتصفح",
+      tapHint: "اضغط أدناه لفتح التطبيق.",
+      hint: "لم يفتح؟ يمكنك المتابعة في المتصفح لتسجيل الدخول وقبول الدعوة."
+    }
+  };
+  var locale = navigator.language && navigator.language.toLowerCase().startsWith("ar") ? "ar" : "en";
+  document.documentElement.lang = locale;
+  document.documentElement.dir = locale === "ar" ? "rtl" : "ltr";
+  document.title = i18n[locale].title;
+
   var params = new URLSearchParams(window.location.search);
   var token = params.get("token");
   var error = params.get("error");
@@ -45,10 +98,8 @@ p{color:#666;margin-bottom:20px;font-size:.95rem}
   // Error state
   if (error || !token) {
     spinner.style.display = "none";
-    heading.textContent = "Error";
-    message.textContent = error === "expired"
-      ? "This invite link is invalid or expired."
-      : "Missing or invalid invite link.";
+    heading.textContent = i18n[locale].errorTitle;
+    message.textContent = error === "expired" ? i18n[locale].expired : i18n[locale].missing;
     openApp.style.display = "none";
     fallback.style.display = "none";
     return;
@@ -86,23 +137,23 @@ p{color:#666;margin-bottom:20px;font-size:.95rem}
   }
   openApp.href = appUrl;
   fallback.href = webUrl;
-  heading.textContent = "You have a group invite";
-  message.textContent = "You can open the invite in the Hisab app or continue in the browser to sign in and accept it.";
-  openApp.textContent = "Open in Hisab app";
-  fallback.textContent = "Continue in browser";
+  heading.textContent = i18n[locale].heading;
+  message.textContent = i18n[locale].message;
+  openApp.textContent = i18n[locale].openApp;
+  fallback.textContent = i18n[locale].fallback;
   openApp.style.display = "inline-block";
   fallback.style.display = "inline-block";
   spinner.style.display = "none";
 
   var hintEl = document.createElement("p");
   hintEl.id = "hint";
-  hintEl.style.cssText = "color:#888;font-size:0.85rem;margin-top:24px;display:none";
-  hintEl.textContent = "Didn't open? You can continue in the browser to sign in and accept the invite.";
+  hintEl.style.cssText = "color:var(--muted);font-size:0.85rem;margin-top:24px;display:none";
+  hintEl.textContent = i18n[locale].hint;
   document.getElementById("content").appendChild(hintEl);
 
   var tapHintEl = document.createElement("p");
-  tapHintEl.style.cssText = "color:#555;font-size:0.9rem;margin-bottom:12px";
-  tapHintEl.textContent = "Tap below to open in the app.";
+  tapHintEl.style.cssText = "color:var(--muted);font-size:0.9rem;margin-bottom:12px";
+  tapHintEl.textContent = i18n[locale].tapHint;
   document.getElementById("content").insertBefore(tapHintEl, openApp);
 
   // After 8s, show hint if still on page (no auto-redirect)
