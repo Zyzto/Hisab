@@ -21,18 +21,38 @@ import '../../../core/auth/predefined_avatars.dart';
 import '../../../domain/domain.dart';
 import '../utils/group_icon_utils.dart';
 
-class GroupDetailPage extends ConsumerWidget {
+class GroupDetailPage extends ConsumerStatefulWidget {
   final String groupId;
 
   const GroupDetailPage({super.key, required this.groupId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final groupAsync = ref.watch(futureGroupProvider(groupId));
+  ConsumerState<GroupDetailPage> createState() => _GroupDetailPageState();
+}
+
+class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
+  bool _nullRetryDone = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final groupAsync = ref.watch(futureGroupProvider(widget.groupId));
     return AsyncValueBuilder<Group?>(
       value: groupAsync,
       data: (context, group) {
         if (group == null) {
+          if (!_nullRetryDone) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted || _nullRetryDone) return;
+              setState(() => _nullRetryDone = true);
+              Future.delayed(const Duration(milliseconds: 300), () {
+                if (!mounted) return;
+                ref.invalidate(futureGroupProvider(widget.groupId));
+              });
+            });
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (context.mounted) {
               if (context.canPop()) {

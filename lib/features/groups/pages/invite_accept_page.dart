@@ -257,11 +257,25 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
       Log.info('Invite accepted: token=${widget.token} groupId=$groupId');
       Log.info('Syncing after invite accept (groupId=$groupId)');
       await ref.read(dataSyncServiceProvider.notifier).syncNow();
+      // Ensure group is in local DB so GroupDetailPage does not redirect to home.
+      const maxAttempts = 3;
+      const retryDelay = Duration(milliseconds: 450);
+      Group? groupInDb;
+      for (var i = 0; i < maxAttempts; i++) {
+        groupInDb = await ref.read(groupRepositoryProvider).getById(groupId);
+        if (groupInDb != null) break;
+        if (i < maxAttempts - 1) await Future.delayed(retryDelay);
+      }
+      if (groupInDb == null) {
+        Log.info('Group $groupId not in DB after $maxAttempts attempts, syncing once more');
+        await ref.read(dataSyncServiceProvider.notifier).syncNow();
+      }
       Log.info('Sync after invite complete, navigating to group $groupId');
       ref.invalidate(groupsProvider);
       ref.invalidate(futureGroupProvider(groupId));
       if (context.mounted) {
-        context.go(RoutePaths.groupDetail(groupId));
+        context.go(RoutePaths.home);
+        if (context.mounted) context.push(RoutePaths.groupDetail(groupId));
       }
     } catch (e, st) {
       Log.warning('Invite accept or sync failed', error: e, stackTrace: st);
