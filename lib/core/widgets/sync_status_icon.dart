@@ -57,10 +57,12 @@ class _SyncStatusChipState extends ConsumerState<SyncStatusChip> {
     }
 
     final data = _chipData(status, Theme.of(context).colorScheme);
-
-    return GestureDetector(
-      onTap: () => _showStatusSnackBar(context, status),
-      child: Padding(
+    return Semantics(
+      label: data.label,
+      button: true,
+      child: GestureDetector(
+        onTap: () => _showStatusSnackBar(context, status),
+        child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -125,6 +127,7 @@ class _SyncStatusChipState extends ConsumerState<SyncStatusChip> {
           },
         ),
       ),
+      ),
     );
   }
 
@@ -163,6 +166,12 @@ class _SyncStatusChipState extends ConsumerState<SyncStatusChip> {
         foregroundColor: cs.onErrorContainer,
         backgroundColor: cs.errorContainer,
       ),
+      SyncStatus.syncFailed => _ChipData(
+        icon: Icons.cloud_off_outlined,
+        label: 'sync_failed'.tr(),
+        foregroundColor: cs.onErrorContainer,
+        backgroundColor: cs.errorContainer,
+      ),
       SyncStatus.localOnly => _ChipData(
         icon: Icons.storage,
         label: '',
@@ -177,6 +186,7 @@ class _SyncStatusChipState extends ConsumerState<SyncStatusChip> {
       SyncStatus.connected => 'sync_data_auto'.tr(),
       SyncStatus.syncing => 'sync_data_uploading'.tr(),
       SyncStatus.offline => 'sync_offline_banner'.tr(),
+      SyncStatus.syncFailed => 'sync_failed_banner'.tr(),
       SyncStatus.localOnly => '',
     };
     if (message.isEmpty) return;

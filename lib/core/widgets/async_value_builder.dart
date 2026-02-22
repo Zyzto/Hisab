@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -44,7 +45,7 @@ class AsyncValueBuilder<T> extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'An Error Occurred',
+                  'generic_error'.tr(),
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
