@@ -191,6 +191,61 @@ The following MCP (Model Context Protocol) servers are enabled in this project. 
 
 Tool descriptors (names and parameters) live under `.cursor/projects/.../mcps/<server>/tools/*.json`. Check each tool’s schema before calling.
 
+### Example: cross-MCP workflow (Supabase → Firebase)
+
+A typical flow using both Supabase and Firebase MCP:
+
+1. **Find a user in Supabase**  
+   Use Supabase MCP `execute_sql` with `project_id` from `list_projects`. Example: look up by name in `auth.users` (`raw_user_meta_data->>'full_name'`) or in `public.participants` (`name`, `user_id`). Use the returned `user_id` (UUID) for the next step.
+
+2. **Get the user’s FCM token**  
+   Query `public.device_tokens` with that `user_id` to get `token` and `platform` (e.g. `android`, `ios`, `web`). The `token` is the FCM registration token needed for sending a push.
+
+3. **Send a push via Firebase MCP**  
+   Call Firebase MCP tool `messaging_send_message` with:
+   - `registration_token`: the token from step 2  
+   - `title`: notification title (e.g. app name)  
+   - `body`: notification body text  
+
+   The Firebase server may appear as `project-0-hisab-firebase` in Cursor (not `firebase`). If a tool call fails with “MCP server does not exist: firebase”, use the server name listed in the error under “Available servers”.
+
+### How to use Supabase MCP
+
+The Supabase MCP server (`plugin-supabase-supabase`) talks to your linked Supabase project. Use it from the IDE (e.g. Cursor) so the AI or you can run schema checks, apply migrations, and run SQL without leaving the editor.
+
+1. **Get the project ID**  
+   Call `list_projects` (no arguments). Use the `id` of the project you care about (e.g. **Hisab_01**) as `project_id` for all other Supabase MCP tools.
+
+2. **Common operations**
+   - **Schema:** `list_tables` — `project_id`, `schemas` (default `["public"]`). Returns tables, columns, RLS, row counts, and FKs.
+   - **Migrations:** `list_migrations` — `project_id`. Shows applied migrations.  
+   - **Apply a migration:** `apply_migration` — `project_id`, `name` (snake_case, e.g. `participants_left_at_and_rejoin_reuse`), `query` (full SQL string). Use the contents of a file under `supabase/migrations/*.sql` for `query`; do not hardcode generated IDs in data migrations.
+   - **Run SQL:** `execute_sql` — `project_id`, `query`. For one-off or read-only checks.
+   - **Advisors:** `get_advisors` — `project_id`. Security and performance suggestions for the project.
+
+3. **Tool schemas**  
+   Before calling a tool, read its descriptor under `.cursor/projects/<workspace>/mcps/plugin-supabase-supabase/tools/<tool_name>.json` to see required and optional arguments and types.
+
+4. **Docs**  
+   [Supabase MCP guide](https://supabase.com/docs/guides/getting-started/mcp) — setup and overview.
+
+### How to use Firebase MCP
+
+The Firebase MCP server is configured in `.cursor/mcp.json` as `firebase` (command: `npx -y firebase-tools@latest mcp`). When Cursor loads it for this project, the **server identifier** may be `project-0-hisab-firebase` — use that name when calling Firebase MCP tools (e.g. from the AI or from scripts that invoke MCP).
+
+1. **Auth and project**  
+   Many tools require the user to be signed in (`npx firebase-tools login`) and a Firebase project to be set. The server uses the same credentials as the Firebase CLI in the environment where Cursor runs.
+
+2. **Sending a push notification**  
+   Use the `messaging_send_message` tool with:
+   - `registration_token`: FCM device token (from app registration, or from Supabase `device_tokens.token` for a user)
+   - `title` (optional): notification title  
+   - `body` (optional): notification body  
+   Supply either `registration_token` or `topic`, not both. See the tool descriptor under `mcps/<firebase-server>/tools/` for the full schema.
+
+3. **Other capabilities**  
+   The Firebase MCP also exposes tools for Firestore, Auth, Remote Config, Crashlytics, Realtime Database, Hosting, and prompts/resources for init and deploy. Check the tool list in the server’s `tools/` folder.
+
 ## Configuration
 
 Build-time config is via `--dart-define` in `lib/core/constants/supabase_config.dart`:
@@ -242,6 +297,28 @@ iOS declarations are present in `ios/Runner/Info.plist`, including:
 - permissions: `permission_handler`
 - feedback: `feedback`
 - backup/file ops: `file_picker`
+
+## Testing
+
+- **Run all tests:** `flutter test`
+- **Coverage:** Unit tests (domain, settle-up, sync error classification, backup parse, translations), widget tests (app, balance list, error content), and integration-style tests (local PowerSync DB, sync engine with fake backend). See `test/README.md` for integration test requirements (PowerSync native binary).
+- **Generated code:** Run `dart run build_runner build` (or `watch`) to regenerate `.g.dart` files before running tests or when changing providers/settings.
+
+## Development
+
+- **Codegen:** Use `dart run build_runner build` after changing Riverpod providers, settings, or other annotated code so `.g.dart` files stay in sync.
+- **Tooling:** Prefer the Dart and Supabase MCP servers (see “MCP available in the IDE” above) for analysis, format, schema checks, and migrations instead of running CLI tools manually.
+
+## Recent improvements (documented changes)
+
+The following improvements are reflected in the codebase and docs:
+
+- **Sync:** DataSyncService retries sync on transient errors (up to 3 attempts with backoff). Auth errors (401/403) do not retry and set a “sync failed” UI status. See `lib/core/database/sync_errors.dart` and `SyncStatus.syncFailed` in `lib/core/services/connectivity_service.dart`.
+- **Error UX:** Default async error title is localized (`generic_error`). Shared `ErrorContentWidget` (with optional retry) is used for error states in balance, group detail, invite accept/management, archived groups, expense form, and group settings. See `lib/core/widgets/error_content.dart`.
+- **Backup import:** `parseBackupJson()` returns `BackupParseResult` with `data` and `errorMessageKey` so the settings import UI can show specific messages (invalid format, unsupported version, or parse failure). See `lib/features/settings/backup_helper.dart`.
+- **Accessibility:** Semantics/semanticsLabel added for main actions (create group, scan invite, archived, open group, add expense/participant, record settlement) and for the sync status chip. See home, group card, group detail, balance list, sync_status_icon.
+- **Tests:** Unit tests for sync error classification (`test/sync_errors_test.dart`), backup parse result (`test/backup_parse_test.dart`), and ErrorContentWidget (`test/error_content_widget_test.dart`). CODEBASE “Testing” and “Development” sections describe how to run tests and use build_runner/MCP.
+- **Config/docs:** Receipt AI API keys documented as user-provided and device-only in `docs/CONFIGURATION.md`. Custom `ErrorWidget.builder` in `main.dart` for framework build errors.
 
 ## Related Docs
 
