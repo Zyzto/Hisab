@@ -23,7 +23,9 @@
 | `assets/translations/` | Localization JSON files |
 | `web/` | PWA shell, Firebase web messaging config, redirect pages, static privacy page |
 | `ios/Runner/Info.plist` | iOS permissions/deep-link/background notification config |
-| `supabase/functions/invite-redirect/` | Edge Function source for invite redirect |
+| `supabase/functions/invite-redirect/` | Edge Function: invite token validation and redirect |
+| `supabase/functions/send-notification/` | Edge Function: FCM push (expenses, member_joined; excludes joinee) |
+| `supabase/functions/telemetry/` | Edge Function: anonymous telemetry ingest |
 | `docs/` | Setup and architecture documentation |
 | `.github/workflows/release.yml` | CI/CD for Android builds/releases + web deploy |
 
@@ -116,7 +118,7 @@ Push notifications are sent when expenses are added/edited or members join a gro
 - Handles token refresh, foreground display (mobile: local notifications), and tap → navigate to group detail using `message.data['group_id']`.
 - Expects incoming messages to have `notification` (title, body) and `data.group_id` (string).
 
-**Backend:** Database trigger `notify_on_expense_change` (and `notify_on_member_join`) calls `notify_group_activity()`, which POSTs to the `send-notification` Edge Function with `group_id`, `actor_user_id`, `action`, and optional expense fields. The Edge Function (`supabase/functions/send-notification/index.ts`) loads other group members’ tokens and `locale` from `device_tokens` and sends FCM v1 messages (one per token). Notification title and body are localized per device using the stored `locale` (en/ar; fallback en).
+**Backend:** Database trigger `notify_on_expense_change` (and `notify_on_member_join`) calls `notify_group_activity()`, which POSTs to the `send-notification` Edge Function with `group_id`, `actor_user_id`, `action`, and optional expense fields. The Edge Function (`supabase/functions/send-notification/index.ts`) loads other group members’ tokens and `locale` from `device_tokens` and sends FCM v1 messages (one per token). For `member_joined`, the actor is the new member; the Edge Function excludes the actor so the joinee does not receive a push notification. Notification title and body are localized per device using the stored `locale` (en/ar; fallback en).
 
 **Web:** `web/index.html` initializes Firebase web SDK; `web/firebase-messaging-sw.js` handles background push and clicks. Web token registration requires `FCM_VAPID_KEY` at build time.
 
@@ -162,13 +164,16 @@ Major persisted keys include:
 
 ## Supabase Backend Contract
 
-This repo contains one Edge Function source: `supabase/functions/invite-redirect/index.ts`.
+This repo is the **source of truth** for all Supabase Edge Functions. See [EDGE_FUNCTIONS.md](EDGE_FUNCTIONS.md) for the list and deploy commands.
 
-The app also depends on Supabase-side schema, RLS, RPCs, and additional edge functions documented in `docs/SUPABASE_SETUP.md`, including:
+- `supabase/functions/invite-redirect/index.ts` — validates invite token and redirects to `redirect.html`
+- `supabase/functions/send-notification/index.ts` — sends FCM push notifications (expenses, member_joined; excludes joinee)
+- `supabase/functions/telemetry/index.ts` — accepts anonymous usage telemetry events
+
+The app also depends on Supabase-side schema, RLS, and RPCs documented in `docs/SUPABASE_SETUP.md`, including:
 
 - tables such as `groups`, `group_members`, `participants`, `expenses`, `expense_tags`, `group_invites`, `invite_usages`, `telemetry`, `device_tokens`
 - RPCs such as `accept_invite`, `transfer_ownership`, `leave_group`, `kick_member`, `update_member_role`, `create_invite`, etc.
-- optional edge functions `telemetry` (documented in setup docs) and `send-notification` (implemented in `supabase/functions/send-notification/`)
 
 Schema and security/performance can be re-verified via [Supabase MCP](https://supabase.com/docs/guides/getting-started/mcp) (`list_tables`, `get_advisors`).
 
