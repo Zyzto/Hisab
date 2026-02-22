@@ -152,6 +152,7 @@ Participant _participantFromRow(Map<String, dynamic> row) => Participant(
   order: (row['sort_order'] as num?)?.toInt() ?? 0,
   userId: row['user_id'] as String?,
   avatarId: row['avatar_id'] as String?,
+  leftAt: _parseDateTimeNullable(row['left_at']),
   createdAt: _parseDateTime(row['created_at']),
   updatedAt: _parseDateTime(row['updated_at']),
 );
@@ -511,6 +512,75 @@ class PowerSyncGroupRepository implements IGroupRepository {
     );
   }
 
+  /// Local-only: not written to pending_writes or Supabase. Persists on device only.
+  @override
+  Future<void> setLocalArchived(String groupId) async {
+    final now = _nowIso();
+    await _db.execute(
+      'DELETE FROM local_archived_groups WHERE group_id = ?',
+      [groupId],
+    );
+    await _db.execute(
+      'INSERT INTO local_archived_groups (id, group_id, archived_at) VALUES (?, ?, ?)',
+      [groupId, groupId, now],
+    );
+  }
+
+  @override
+  Future<void> clearLocalArchived(String groupId) async {
+    await _db.execute(
+      'DELETE FROM local_archived_groups WHERE group_id = ?',
+      [groupId],
+    );
+  }
+
+  @override
+  Future<Set<String>> getLocallyArchivedGroupIds() async {
+    final rows = await _db.getAll('SELECT group_id FROM local_archived_groups');
+    return rows
+        .map((r) => r['group_id'] as String?)
+        .whereType<String>()
+        .toSet();
+  }
+
+  @override
+  Stream<Set<String>> watchLocallyArchivedGroupIds() {
+    const q = 'SELECT group_id FROM local_archived_groups';
+    if (kIsWeb) {
+      return _pollStream(() async {
+        final rows = await _db.getAll(q);
+        return rows
+            .map((r) => r['group_id'] as String?)
+            .whereType<String>()
+            .toSet();
+      });
+    }
+    return _db.watch(q).map((rows) => rows
+        .map((r) => r['group_id'] as String?)
+        .whereType<String>()
+        .toSet());
+  }
+
+  static const _locallyArchivedGroupsQuery = '''
+    SELECT g.* FROM groups g
+    INNER JOIN local_archived_groups l ON g.id = l.group_id
+    WHERE (g.archived_at IS NULL OR g.archived_at = '')
+    ORDER BY g.updated_at DESC
+  ''';
+
+  @override
+  Stream<List<Group>> watchLocallyArchivedGroups() {
+    if (kIsWeb) {
+      return _pollStream(() async {
+        final rows = await _db.getAll(_locallyArchivedGroupsQuery);
+        return rows.map(_groupFromRow).toList();
+      });
+    }
+    return _db
+        .watch(_locallyArchivedGroupsQuery)
+        .map((rows) => rows.map(_groupFromRow).toList());
+  }
+
   @override
   Future<void> delete(String id) async {
     if (!_isLocalOnly && _isOnline && _client != null) {
@@ -636,8 +706,8 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
     }
 
     await _db.execute(
-      'INSERT INTO participants (id, group_id, name, sort_order, user_id, avatar_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, groupId, name, order, userId, avatarId, now, now],
+      'INSERT INTO participants (id, group_id, name, sort_order, user_id, avatar_id, left_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, groupId, name, order, userId, avatarId, null, now, now],
     );
     return id;
   }
@@ -646,6 +716,7 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
   Future<void> update(Participant participant) async {
     final now = _nowIso();
 
+    final leftAtIso = participant.leftAt?.toUtc().toIso8601String();
     if (!_isLocalOnly && _isOnline && _client != null) {
       await _client
           .from('participants')
@@ -653,14 +724,31 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
             'name': participant.name,
             'sort_order': participant.order,
             'avatar_id': participant.avatarId,
+            'left_at': leftAtIso,
             'updated_at': now,
           })
           .eq('id', participant.id);
     }
 
     await _db.execute(
-      'UPDATE participants SET name = ?, sort_order = ?, avatar_id = ?, updated_at = ? WHERE id = ?',
-      [participant.name, participant.order, participant.avatarId, now, participant.id],
+      'UPDATE participants SET name = ?, sort_order = ?, avatar_id = ?, left_at = ?, updated_at = ? WHERE id = ?',
+      [participant.name, participant.order, participant.avatarId, leftAtIso, now, participant.id],
+    );
+  }
+
+  @override
+  Future<void> archive(String groupId, String participantId) async {
+    final now = _nowIso();
+    if (!_isLocalOnly && _isOnline && _client != null) {
+      await _client.rpc(
+        'archive_participant',
+        params: {'p_group_id': groupId, 'p_participant_id': participantId},
+      );
+      Log.info('Participant archived via RPC');
+    }
+    await _db.execute(
+      'UPDATE participants SET left_at = ?, updated_at = ? WHERE id = ?',
+      [now, now, participantId],
     );
   }
 

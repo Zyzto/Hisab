@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_logging_service/flutter_logging_service.dart';
-import 'package:powersync/powersync.dart';
+import 'package:powersync/powersync.dart' hide SyncStatus;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -10,6 +10,7 @@ import '../constants/supabase_config.dart';
 import '../services/connectivity_service.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
 import 'sync_engine.dart';
+import 'sync_errors.dart';
 
 part 'database_providers.g.dart';
 
@@ -79,34 +80,75 @@ class DataSyncService extends _$DataSyncService {
   /// Trigger an immediate sync (push pending + full fetch).
   Future<void> syncNow() => _syncNow();
 
+  static const int _maxSyncAttempts = 3;
+  static const Duration _initialRetryDelay = Duration(seconds: 1);
+
   Future<void> _syncNow() async {
     if (_isSyncing) return;
     _isSyncing = true;
 
-    final syncStatus = ref.read(syncStatusProvider.notifier);
-    syncStatus.setSyncing();
+    final syncStatusNotifier = ref.read(syncStatusProvider.notifier);
+    syncStatusNotifier.setSyncing();
 
     try {
       final db = ref.read(powerSyncDatabaseProvider);
       final client = Supabase.instance.client;
-
       final engine = SyncEngine();
-      final pendingRows = await db.getAll(
-        'SELECT * FROM pending_writes ORDER BY created_at ASC',
-      );
-      if (pendingRows.isNotEmpty) {
-        Log.info('DataSyncService: pushing ${pendingRows.length} pending writes');
-      }
-      await engine.pushPendingWrites(db, client);
-      await engine.fetchAll(db, client);
 
-      Log.info('DataSyncService: sync complete');
-    } catch (e, st) {
-      Log.error('DataSyncService: sync failed', error: e, stackTrace: st);
+      Object? lastError;
+      StackTrace? lastStack;
+      for (var attempt = 1; attempt <= _maxSyncAttempts; attempt++) {
+        try {
+          final pendingRows = await db.getAll(
+            'SELECT * FROM pending_writes ORDER BY created_at ASC',
+          );
+          if (pendingRows.isNotEmpty) {
+            Log.info(
+              'DataSyncService: pushing ${pendingRows.length} pending writes',
+            );
+          }
+          await engine.pushPendingWrites(db, client);
+          await engine.fetchAll(db, client);
+          Log.info('DataSyncService: sync complete');
+          syncStatusNotifier.setSynced();
+          return;
+        } catch (e, st) {
+          lastError = e;
+          lastStack = st;
+          if (isSyncAuthError(e)) {
+            Log.error(
+              'DataSyncService: sync failed (auth)',
+              error: e,
+              stackTrace: st,
+            );
+            syncStatusNotifier.setSyncFailed();
+            return;
+          }
+          if (attempt < _maxSyncAttempts && isSyncTransientError(e)) {
+            final delay = _initialRetryDelay * attempt;
+            Log.warning(
+              'DataSyncService: sync attempt $attempt failed, retrying in ${delay.inSeconds}s',
+              error: e,
+            );
+            await Future<void>.delayed(delay);
+          } else {
+            break;
+          }
+        }
+      }
+      Log.error(
+        'DataSyncService: sync failed after $_maxSyncAttempts attempts',
+        error: lastError,
+        stackTrace: lastStack,
+      );
+      syncStatusNotifier.setSyncFailed();
     } finally {
       _isSyncing = false;
-      final syncStatus = ref.read(syncStatusProvider.notifier);
-      syncStatus.setSynced();
+      // If we didn't already set synced/syncFailed (e.g. early return), set synced so UI isn't stuck on "syncing".
+      final current = ref.read(syncStatusProvider);
+      if (current == SyncStatus.syncing) {
+        ref.read(syncStatusProvider.notifier).setSynced();
+      }
     }
   }
 }
