@@ -77,6 +77,36 @@ void main() async {
     return true;
   };
 
+  // Friendlier error widget when the framework hits a build error (e.g. missing
+  // provider or invalid widget state) instead of the default gray box.
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    return Material(
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.error_outline,
+                size: 48,
+                color: Colors.red,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                details.exceptionAsString(),
+                style: const TextStyle(fontSize: 14),
+                textAlign: TextAlign.center,
+                maxLines: 8,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  };
+
   await LoggingService.init(
     const LoggingConfig(
       appName: 'Hisab',
