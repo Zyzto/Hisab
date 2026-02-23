@@ -280,6 +280,26 @@ final expenseFormFullFeaturesSettingDef = const BoolSetting(
   order: 0,
 );
 
+/// When true, the description section in the expense form starts expanded.
+final expenseFormExpandDescriptionSettingDef = const BoolSetting(
+  'expense_form_expand_description',
+  defaultValue: false,
+  titleKey: 'expense_form_expand_description',
+  icon: Icons.text_fields,
+  section: 'functional',
+  order: 1,
+);
+
+/// When true, the bill breakdown section in the expense form starts expanded.
+final expenseFormExpandBillBreakdownSettingDef = const BoolSetting(
+  'expense_form_expand_bill_breakdown',
+  defaultValue: false,
+  titleKey: 'expense_form_expand_bill_breakdown',
+  icon: Icons.receipt_long,
+  section: 'functional',
+  order: 2,
+);
+
 final allSettings = <SettingDefinition>[
   onboardingCompletedSettingDef,
   onboardingOnlinePendingSettingDef,
@@ -291,6 +311,8 @@ final allSettings = <SettingDefinition>[
   fontSizeScaleSettingDef,
   favoriteCurrenciesSettingDef,
   expenseFormFullFeaturesSettingDef,
+  expenseFormExpandDescriptionSettingDef,
+  expenseFormExpandBillBreakdownSettingDef,
   localOnlySettingDef,
   receiptOcrEnabledSettingDef,
   receiptAiEnabledSettingDef,

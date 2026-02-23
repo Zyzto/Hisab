@@ -765,3 +765,89 @@ final class ExpenseFormFullFeaturesProvider
 
 String _$expenseFormFullFeaturesHash() =>
     r'9d8cf0c3ba7f994110ad662ff2a2267b84121f1b';
+
+@ProviderFor(expenseFormExpandDescription)
+final expenseFormExpandDescriptionProvider =
+    ExpenseFormExpandDescriptionProvider._();
+
+final class ExpenseFormExpandDescriptionProvider
+    extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  ExpenseFormExpandDescriptionProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'expenseFormExpandDescriptionProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$expenseFormExpandDescriptionHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return expenseFormExpandDescription(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$expenseFormExpandDescriptionHash() =>
+    r'2b242e70ccee260f787b7919362324ff72c89698';
+
+@ProviderFor(expenseFormExpandBillBreakdown)
+final expenseFormExpandBillBreakdownProvider =
+    ExpenseFormExpandBillBreakdownProvider._();
+
+final class ExpenseFormExpandBillBreakdownProvider
+    extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  ExpenseFormExpandBillBreakdownProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'expenseFormExpandBillBreakdownProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$expenseFormExpandBillBreakdownHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return expenseFormExpandBillBreakdown(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$expenseFormExpandBillBreakdownHash() =>
+    r'12c230c9d0faf5db26acd8755c0efca568efd468';

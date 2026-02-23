@@ -138,6 +138,40 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   )
                   .set(v),
             ),
+            SwitchSettingsTile.fromSetting(
+              setting: expenseFormExpandDescriptionSettingDef,
+              title: 'expense_form_expand_description'.tr(),
+              subtitle: 'expense_form_expand_description_setting'.tr(),
+              value: ref.watch(
+                settings.provider(expenseFormExpandDescriptionSettingDef),
+              ),
+              onChanged: (v) => ref
+                  .read(
+                    settings
+                        .provider(expenseFormExpandDescriptionSettingDef)
+                        .notifier,
+                  )
+                  .set(v),
+            ),
+            SwitchSettingsTile.fromSetting(
+              setting: expenseFormExpandBillBreakdownSettingDef,
+              title: 'expense_form_expand_bill_breakdown'.tr(),
+              subtitle: 'expense_form_expand_bill_breakdown_setting'.tr(),
+              value: ref.watch(
+                settings.provider(
+                  expenseFormExpandBillBreakdownSettingDef,
+                ),
+              ),
+              onChanged: (v) => ref
+                  .read(
+                    settings
+                        .provider(
+                          expenseFormExpandBillBreakdownSettingDef,
+                        )
+                        .notifier,
+                  )
+                  .set(v),
+            ),
           ]),
           // Data & Backup: merged Data + old Backup
           _buildSection(context, ref, settings, dataBackupSection, [
