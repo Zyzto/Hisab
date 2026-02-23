@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,7 @@ import '../../../core/repository/repository_providers.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../core/telemetry/telemetry_service.dart';
 import '../../settings/providers/settings_framework_providers.dart';
+import '../utils/invite_share_helper.dart';
 
 /// Creates an invite and shows a bottom sheet with the share link and QR code.
 /// Call from group detail or settings when user is owner/admin and online.
@@ -40,10 +42,17 @@ Future<void> createAndShowInviteSheet(
 }
 
 /// Bottom sheet content showing invite link and QR code.
-class InviteLinkDisplay extends StatelessWidget {
+class InviteLinkDisplay extends StatefulWidget {
   final String token;
 
   const InviteLinkDisplay({super.key, required this.token});
+
+  @override
+  State<InviteLinkDisplay> createState() => _InviteLinkDisplayState();
+}
+
+class _InviteLinkDisplayState extends State<InviteLinkDisplay> {
+  final GlobalKey _qrKey = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +61,7 @@ class InviteLinkDisplay extends StatelessWidget {
         ? inviteLinkBaseUrl.substring(0, inviteLinkBaseUrl.length - 1)
         : inviteLinkBaseUrl;
     final url = supabaseConfigAvailable
-        ? '$base/functions/v1/invite-redirect?token=$token'
+        ? '$base/functions/v1/invite-redirect?token=${widget.token}'
         : '';
     // QR codes scan best with dark on light; use white bg + black modules
     return DraggableScrollableSheet(
@@ -97,22 +106,25 @@ class InviteLinkDisplay extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: SizedBox(
-                    width: fitQrSize,
-                    height: fitQrSize,
-                    child: PrettyQrView.data(
-                      data: url,
-                      errorCorrectLevel: QrErrorCorrectLevel.M,
-                      decoration: const PrettyQrDecoration(
-                        shape: PrettyQrSmoothSymbol(color: Colors.black),
-                        background: Colors.white,
-                        quietZone: PrettyQrQuietZone.zero,
+                RepaintBoundary(
+                  key: _qrKey,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: SizedBox(
+                      width: fitQrSize,
+                      height: fitQrSize,
+                      child: PrettyQrView.data(
+                        data: url,
+                        errorCorrectLevel: QrErrorCorrectLevel.M,
+                        decoration: const PrettyQrDecoration(
+                          shape: PrettyQrSmoothSymbol(color: Colors.black),
+                          background: Colors.white,
+                          quietZone: PrettyQrQuietZone.zero,
+                        ),
                       ),
                     ),
                   ),
@@ -126,10 +138,24 @@ class InviteLinkDisplay extends StatelessWidget {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
-                FilledButton.tonalIcon(
-                  onPressed: () => Clipboard.setData(ClipboardData(text: url)),
-                  icon: const Icon(Icons.copy),
-                  label: Text('copy_link'.tr()),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    FilledButton.tonalIcon(
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: url));
+                        context.showSuccess('invite_link_copied'.tr());
+                      },
+                      icon: const Icon(Icons.copy),
+                      label: Text('copy_link'.tr()),
+                    ),
+                    const SizedBox(width: 12),
+                    FilledButton.tonalIcon(
+                      onPressed: () => _share(context, url),
+                      icon: const Icon(Icons.share),
+                      label: Text('share'.tr()),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -137,5 +163,23 @@ class InviteLinkDisplay extends StatelessWidget {
         },
       ),
     );
+  }
+
+  Future<void> _share(BuildContext context, String url) async {
+    final boundary = _qrKey.currentContext?.findRenderObject()
+        as RenderRepaintBoundary?;
+    try {
+      await shareInviteLink(
+        url: url,
+        shareMessage: 'share_invite_message'.tr(),
+        boundary: boundary,
+      );
+      if (!context.mounted) return;
+      context.showSuccess('invite_shared'.tr());
+    } catch (_) {
+      await Clipboard.setData(ClipboardData(text: url));
+      if (!context.mounted) return;
+      context.showSuccess('invite_link_copied'.tr());
+    }
   }
 }
