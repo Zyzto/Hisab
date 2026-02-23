@@ -15,6 +15,7 @@ class Group {
   final String? ownerId;
   final bool allowMemberAddExpense;
   final bool allowMemberChangeSettings;
+  final bool allowExpenseAsOtherParticipant;
   final String? icon;
   final int? color;
   final DateTime? archivedAt;
@@ -32,6 +33,7 @@ class Group {
     this.ownerId,
     this.allowMemberAddExpense = true,
     this.allowMemberChangeSettings = true,
+    this.allowExpenseAsOtherParticipant = true,
     this.icon,
     this.color,
     this.archivedAt,
@@ -53,6 +55,7 @@ class Group {
     String? ownerId,
     bool? allowMemberAddExpense,
     bool? allowMemberChangeSettings,
+    bool? allowExpenseAsOtherParticipant,
     String? icon,
     int? color,
     DateTime? archivedAt,
@@ -74,6 +77,8 @@ class Group {
           allowMemberAddExpense ?? this.allowMemberAddExpense,
       allowMemberChangeSettings:
           allowMemberChangeSettings ?? this.allowMemberChangeSettings,
+      allowExpenseAsOtherParticipant:
+          allowExpenseAsOtherParticipant ?? this.allowExpenseAsOtherParticipant,
       icon: icon ?? this.icon,
       color: color ?? this.color,
       archivedAt: archivedAt ?? this.archivedAt,
@@ -94,6 +99,7 @@ class Group {
     ownerId: ownerId,
     allowMemberAddExpense: allowMemberAddExpense,
     allowMemberChangeSettings: allowMemberChangeSettings,
+    allowExpenseAsOtherParticipant: allowExpenseAsOtherParticipant,
     icon: icon,
     color: color,
     archivedAt: archivedAt,
