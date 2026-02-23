@@ -1878,7 +1878,7 @@ After completing all steps:
 2. **RLS**: Go to **Authentication > Policies** and verify each table has its RLS policies enabled.
 
 3. **Functions**: Go to **Database > Functions** and verify RPC functions exist:
-   - `handle_updated_at`, `get_user_role`, `is_group_member`
+   - `handle_updated_at`, `get_user_role`, `is_group_member`, `get_my_participant_id`
    - `get_invite_by_token`, `accept_invite`, `create_invite`, `revoke_invite`, `toggle_invite_active`
    - `transfer_ownership`, `leave_group`, `kick_member`, `update_member_role`, `assign_participant`, `merge_participant_with_member`
    - `get_delete_my_data_preview`, `delete_my_data` (for Settings > Delete cloud data; see migration `20250222100000_delete_my_data_and_leave_group_updates.sql`. `leave_group` is updated in that migration to clear treasurer when the leaving member is treasurer and to delete the group when the leaving member is the only member.)
@@ -1895,7 +1895,7 @@ The following matches the live schema when Migrations 1–8 (or equivalent) are 
 
 | Table | Key columns (public schema) |
 |-------|-----------------------------|
-| **groups** | id, name, currency_code, owner_id, settlement_method, treasurer_participant_id, settlement_freeze_at, settlement_snapshot_json, allow_member_add_expense, allow_member_add_participant, allow_member_change_settings, require_participant_assignment, icon, color, created_at, updated_at |
+| **groups** | id, name, currency_code, owner_id, settlement_method, treasurer_participant_id, settlement_freeze_at, settlement_snapshot_json, allow_member_add_expense, allow_member_add_participant, allow_member_change_settings, require_participant_assignment, allow_expense_as_other_participant, icon, color, created_at, updated_at |
 | **participants** | id, group_id, name, sort_order, user_id, avatar_id, left_at, created_at, updated_at |
 | **group_members** | id, group_id, user_id, role, participant_id, joined_at |
 | **expenses** | id, group_id, payer_participant_id, amount_cents, currency_code, exchange_rate, base_amount_cents, title, description, date, split_type, split_shares_json, type, to_participant_id, tag, line_items_json, receipt_image_path, created_at, updated_at |
@@ -1950,7 +1950,7 @@ The "Current schema reference" table above can be re-verified with `list_tables`
 |------|-------------|
 | **Owner** | Full control: CRUD all data, manage members, change settings, delete group, transfer ownership |
 | **Admin** | Manage members, create invites, CRUD expenses/participants/tags, change group settings |
-| **Member** | Conditional: add expenses (if `allow_member_add_expense`), add participants (if `allow_member_add_participant`), change settings (if `allow_member_change_settings`) |
+| **Member** | Conditional: add expenses (if `allow_member_add_expense`), add participants (if `allow_member_add_participant`), change settings (if `allow_member_change_settings`). When `allow_expense_as_other_participant` is false, members may only create/update expenses where they are the payer (payer_participant_id = their own participant). |
 
 ### Schema and behavior notes
 
