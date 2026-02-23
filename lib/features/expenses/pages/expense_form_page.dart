@@ -18,6 +18,7 @@ import '../../../core/telemetry/telemetry_service.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/utils/currency_helpers.dart';
 import '../../../core/widgets/error_content.dart';
+import '../../../core/widgets/expandable_section.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../features/settings/providers/settings_framework_providers.dart';
 import '../../groups/providers/group_member_provider.dart';
@@ -28,6 +29,9 @@ import '../widgets/expense_bill_breakdown_section.dart';
 import '../widgets/expense_title_section.dart';
 import '../widgets/expense_split_section.dart';
 import '../../../domain/domain.dart';
+
+/// Height of the floating submit bar (button + padding) for ListView bottom padding.
+const double _kSubmitBarHeight = 76.0;
 
 class ExpenseFormPage extends ConsumerStatefulWidget {
   final String groupId;
@@ -78,6 +82,12 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
 
   /// Once user edits any amount field, we stop auto-updating amounts from total (avoids grabbing first digit while typing total).
   bool _amountsFieldsTouched = false;
+
+  /// In amounts split: participant ids the user has explicitly edited; we never overwrite these when redistributing.
+  final Set<String> _amountsManuallySetIds = {};
+
+  /// Last expense total (cents) used in _applyAmountsChange; when total changes we clear _amountsManuallySetIds.
+  int? _lastAmountCentsForAmounts;
 
   /// Selected category/tag: preset id (e.g. 'food') or custom tag id (ExpenseTag.id).
   String? _selectedTag;
@@ -526,6 +536,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     return List.filled(participants.length, 0);
   }
 
+  String _formatCentsAsAmount(int cents) =>
+      (cents / 100).toStringAsFixed(2);
+
   /// Sum of amount fields in cents (for amounts split type validation).
   int _amountsSumCents(List<Participant> participants) {
     var sum = 0;
@@ -537,7 +550,41 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     return sum;
   }
 
-  /// Apply one participant's amount change and redistribute the rest so sum = total.
+  /// When an amount field loses focus with 0 or empty, fill with remainder so total matches.
+  void _handleAmountFieldUnfocused(Participant p) {
+    if (_splitType != SplitType.amounts) return;
+    final value = _splitEditControllers[p.id]?.text ?? '';
+    final v = double.tryParse(value.trim());
+    if (v != null && v > 0) return;
+    final participants = ref
+            .read(participantsByGroupProvider(widget.groupId))
+            .value ?? [];
+    final includedList = participants
+        .where((x) => _includedInSplitIds.contains(x.id))
+        .toList();
+    if (includedList.isEmpty) return;
+    final amountCentsInt =
+        ((double.tryParse(_amountController.text.trim()) ?? 0) * 100).round();
+    if (amountCentsInt <= 0) return;
+    var othersSumCents = 0;
+    for (final o in includedList) {
+      if (o.id == p.id) continue;
+      final ov = double.tryParse(_customSplitValues[o.id]?.trim() ?? '');
+      othersSumCents += (ov != null && ov >= 0) ? (ov * 100).round() : 0;
+    }
+    final remainderCents = (amountCentsInt - othersSumCents).clamp(0, amountCentsInt);
+    final fillValue = _formatCentsAsAmount(remainderCents);
+    final ctrl = _splitEditControllers[p.id];
+    if (!mounted) return;
+    setState(() {
+      _customSplitValues[p.id] = fillValue;
+      ctrl?.text = fillValue;
+      ctrl?.selection = TextSelection.collapsed(offset: fillValue.length);
+      _amountsManuallySetIds.add(p.id);
+    });
+  }
+
+  /// Apply one participant's amount change and redistribute the remainder only to participants not manually set.
   void _applyAmountsChange(
     Participant changedParticipant,
     String valueText,
@@ -546,6 +593,10 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     TextEditingController? controller,
   ) {
     _amountsFieldsTouched = true;
+    if (amountCents != _lastAmountCentsForAmounts) {
+      _lastAmountCentsForAmounts = amountCents;
+      _amountsManuallySetIds.clear();
+    }
     final totalCurrency = amountCents / 100.0;
     double val = double.tryParse(valueText) ?? 0;
     val = val.clamp(0.0, totalCurrency);
@@ -555,13 +606,23 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     _customSplitValues[changedParticipant.id] = str;
     controller?.text = str;
     controller?.selection = TextSelection.collapsed(offset: str.length);
+    _amountsManuallySetIds.add(changedParticipant.id);
     final others = includedList
         .where((x) => x.id != changedParticipant.id)
         .toList();
     if (others.isEmpty) return;
-    final remainder = totalCurrency - val;
+    final userSetOthers =
+        others.where((o) => _amountsManuallySetIds.contains(o.id)).toList();
+    final nonUserSetOthers =
+        others.where((o) => !_amountsManuallySetIds.contains(o.id)).toList();
+    double userSetSum = 0;
+    for (final o in userSetOthers) {
+      userSetSum +=
+          double.tryParse(_customSplitValues[o.id]?.trim() ?? '0') ?? 0;
+    }
+    final remainder = totalCurrency - val - userSetSum;
     if (remainder <= 0) {
-      for (final o in others) {
+      for (final o in nonUserSetOthers) {
         _customSplitValues[o.id] = '0';
         _splitEditControllers[o.id]?.text = '0';
         _splitEditControllers[o.id]?.selection = const TextSelection.collapsed(
@@ -570,18 +631,21 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       }
       return;
     }
-    double othersSum = 0;
-    for (final o in others) {
-      othersSum +=
+    if (nonUserSetOthers.isEmpty) return;
+    double nonUserSetSum = 0;
+    for (final o in nonUserSetOthers) {
+      nonUserSetSum +=
           double.tryParse(_customSplitValues[o.id]?.trim() ?? '0') ?? 0;
     }
-    if (othersSum <= 0) {
-      final each = remainder / others.length;
-      for (var i = 0; i < others.length; i++) {
-        final o = others[i];
-        final s = i == others.length - 1
-            ? (remainder - each * (others.length - 1)).toStringAsFixed(2)
-            : each.toStringAsFixed(2);
+    if (nonUserSetSum <= 0) {
+      final remainderCents = (remainder * 100).round();
+      final k = nonUserSetOthers.length;
+      final baseCents = k > 0 ? remainderCents ~/ k : 0;
+      final rem = k > 0 ? remainderCents - baseCents * k : 0;
+      for (var i = 0; i < nonUserSetOthers.length; i++) {
+        final o = nonUserSetOthers[i];
+        final shareCents = baseCents + (i < rem ? 1 : 0);
+        final s = _formatCentsAsAmount(shareCents);
         _customSplitValues[o.id] = s;
         _splitEditControllers[o.id]?.text = s;
         _splitEditControllers[o.id]?.selection = TextSelection.collapsed(
@@ -589,26 +653,24 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         );
       }
     } else {
-      final scale = remainder / othersSum;
-      var assigned = 0.0;
-      final newValues = <String, String>{};
-      for (final o in others) {
+      final remainderCents = (remainder * 100).round();
+      final targetCentsList = <int>[];
+      var sumCents = 0;
+      for (final o in nonUserSetOthers) {
         final ov =
             double.tryParse(_customSplitValues[o.id]?.trim() ?? '0') ?? 0;
-        final nv = ov * scale;
-        newValues[o.id] = nv == nv.roundToDouble()
-            ? nv.toInt().toString()
-            : nv.toStringAsFixed(2);
-        assigned += nv;
+        final targetCents =
+            (remainder * (ov / nonUserSetSum) * 100).round();
+        targetCentsList.add(targetCents);
+        sumCents += targetCents;
       }
-      final diff = remainder - assigned;
-      if (diff.abs() > 0.001 && others.isNotEmpty) {
-        final first = others.first.id;
-        final cur = double.tryParse(newValues[first] ?? '0') ?? 0;
-        newValues[first] = (cur + diff).toStringAsFixed(2);
+      final diffCents = remainderCents - sumCents;
+      if (nonUserSetOthers.isNotEmpty && diffCents != 0) {
+        targetCentsList[0] = targetCentsList[0] + diffCents;
       }
-      for (final o in others) {
-        final s = newValues[o.id] ?? '0';
+      for (var i = 0; i < nonUserSetOthers.length; i++) {
+        final o = nonUserSetOthers[i];
+        final s = _formatCentsAsAmount(targetCentsList[i]);
         _customSplitValues[o.id] = s;
         _splitEditControllers[o.id]?.text = s;
         _splitEditControllers[o.id]?.selection = TextSelection.collapsed(
@@ -633,17 +695,28 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         _customSplitValues.putIfAbsent(p.id, () => '1');
       }
     } else if (_splitType == SplitType.amounts) {
-      final each = n > 0 ? (amountCents / 100 / n) : 0.0;
-      for (final p in included) {
-        _customSplitValues.putIfAbsent(p.id, () => each.toStringAsFixed(2));
+      final shareStrings = <String>[];
+      if (n > 0 && amountCents >= 0) {
+        final baseCents = amountCents ~/ n;
+        final remainderCents = amountCents - baseCents * n;
+        for (var i = 0; i < n; i++) {
+          final shareCents = baseCents + (i < remainderCents ? 1 : 0);
+          shareStrings.add(_formatCentsAsAmount(shareCents));
+        }
+      }
+      for (var i = 0; i < included.length; i++) {
+        _customSplitValues.putIfAbsent(
+          included[i].id,
+          () => i < shareStrings.length ? shareStrings[i] : '0',
+        );
       }
       // Sync amounts to equal split when total changes, but only until user touches an amount field.
       if (amountCents > 0 && n > 0 && !_amountsFieldsTouched) {
-        final perPerson = (amountCents / 100 / n).toStringAsFixed(2);
-        for (final p in included) {
-          _customSplitValues[p.id] = perPerson;
-          _splitEditControllers[p.id]?.dispose();
-          _splitEditControllers.remove(p.id);
+        for (var i = 0; i < included.length; i++) {
+          final s = i < shareStrings.length ? shareStrings[i] : '0';
+          _customSplitValues[included[i].id] = s;
+          _splitEditControllers[included[i].id]?.dispose();
+          _splitEditControllers.remove(included[i].id);
         }
       }
     }
@@ -820,6 +893,10 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
             final fullFeatures = ref.watch(expenseFormFullFeaturesProvider);
             final showSimpleForm =
                 !fullFeatures && widget.expenseId == null;
+            final expandDescription =
+                ref.watch(expenseFormExpandDescriptionProvider);
+            final expandBillBreakdown =
+                ref.watch(expenseFormExpandBillBreakdownProvider);
 
             return Scaffold(
               appBar: AppBar(
@@ -847,9 +924,13 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
               body: Form(
                 key: _formKey,
                 child: ListView(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
+                  padding: EdgeInsets.only(
+                    left: 16,
+                    right: 16,
+                    top: 12,
+                    bottom: 12 +
+                        _kSubmitBarHeight +
+                        MediaQuery.of(context).padding.bottom,
                   ),
                   children: [
                     if (!showSimpleForm) ...[
@@ -864,8 +945,10 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                             builder: (context) {
                               final theme = Theme.of(context);
                               final colorScheme = theme.colorScheme;
-                              return CustomSlidingSegmentedControl<TransactionType>(
-                                controller: _transactionTypeSegmentController,
+                              return CustomSlidingSegmentedControl<
+                                  TransactionType>(
+                                controller:
+                                    _transactionTypeSegmentController,
                                 children: {
                                   TransactionType.expense: Padding(
                                     padding: const EdgeInsets.symmetric(
@@ -873,7 +956,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                     ),
                                     child: Text(
                                       'expenses'.tr(),
-                                      style: theme.textTheme.titleSmall?.copyWith(
+                                      style: theme.textTheme.titleSmall
+                                          ?.copyWith(
                                         fontWeight: FontWeight.w600,
                                         color: _transactionType ==
                                                 TransactionType.expense
@@ -888,7 +972,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                     ),
                                     child: Text(
                                       'income'.tr(),
-                                      style: theme.textTheme.titleSmall?.copyWith(
+                                      style: theme.textTheme.titleSmall
+                                          ?.copyWith(
                                         fontWeight: FontWeight.w600,
                                         color: _transactionType ==
                                                 TransactionType.income
@@ -903,7 +988,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                     ),
                                     child: Text(
                                       'transfer'.tr(),
-                                      style: theme.textTheme.titleSmall?.copyWith(
+                                      style: theme.textTheme.titleSmall
+                                          ?.copyWith(
                                         fontWeight: FontWeight.w600,
                                         color: _transactionType ==
                                                 TransactionType.transfer
@@ -1001,7 +1087,25 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                         ),
                       ],
                       const SizedBox(height: 20),
-                      _buildDescriptionSection(context),
+                      ListenableBuilder(
+                        listenable: _descriptionController,
+                        builder: (context, _) {
+                          final desc = _descriptionController.text.trim();
+                          return ExpandableSection(
+                            title: 'expense_description'.tr(),
+                            trailingSummary: desc.isNotEmpty
+                                ? (desc.length > 40
+                                    ? '${desc.substring(0, 40)}…'
+                                    : desc)
+                                : null,
+                            initiallyExpanded: expandDescription,
+                            child: _buildDescriptionSection(
+                              context,
+                              showLabel: false,
+                            ),
+                          );
+                        },
+                      ),
                       const SizedBox(height: 20),
                     ],
                     ListenableBuilder(
@@ -1042,39 +1146,50 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       ),
                     if (!isTransfer) ...[
                       const SizedBox(height: 20),
-                      ExpenseBillBreakdownSection(
-                        lineItems: _lineItems,
-                        lineItemControllers: _lineItemControllers,
-                        onAddItem: () {
-                          setState(() {
-                            _lineItems.add(
-                              const ReceiptLineItem(
-                                description: '',
-                                amountCents: 0,
-                              ),
-                            );
-                            _lineItemControllers.add((
-                              desc: TextEditingController(),
-                              amount: TextEditingController(),
-                            ));
-                          });
-                        },
-                        onRemoveItem: (i) {
-                          setState(() {
-                            _lineItemControllers[i].desc.dispose();
-                            _lineItemControllers[i].amount.dispose();
-                            _lineItemControllers.removeAt(i);
-                            _lineItems.removeAt(i);
-                          });
-                        },
-                        onItemChanged: (i, desc, amountCents) {
-                          setState(() {
-                            _lineItems[i] = ReceiptLineItem(
-                              description: desc,
-                              amountCents: amountCents,
-                            );
-                          });
-                        },
+                      ExpandableSection(
+                        title: 'bill_breakdown'.tr(),
+                        trailingSummary: _lineItems.isNotEmpty
+                            ? (_lineItems.length == 1
+                                ? 'bill_breakdown_item'.tr()
+                                : 'bill_breakdown_items'.tr(
+                                    args: ['${_lineItems.length}'],
+                                  ))
+                            : null,
+                        initiallyExpanded: expandBillBreakdown,
+                        child: ExpenseBillBreakdownSection(
+                          lineItems: _lineItems,
+                          lineItemControllers: _lineItemControllers,
+                          onAddItem: () {
+                            setState(() {
+                              _lineItems.add(
+                                const ReceiptLineItem(
+                                  description: '',
+                                  amountCents: 0,
+                                ),
+                              );
+                              _lineItemControllers.add((
+                                desc: TextEditingController(),
+                                amount: TextEditingController(),
+                              ));
+                            });
+                          },
+                          onRemoveItem: (i) {
+                            setState(() {
+                              _lineItemControllers[i].desc.dispose();
+                              _lineItemControllers[i].amount.dispose();
+                              _lineItemControllers.removeAt(i);
+                              _lineItems.removeAt(i);
+                            });
+                          },
+                          onItemChanged: (i, desc, amountCents) {
+                            setState(() {
+                              _lineItems[i] = ReceiptLineItem(
+                                description: desc,
+                                amountCents: amountCents,
+                              );
+                            });
+                          },
+                        ),
                       ),
                       const SizedBox(height: 24),
                       ListenableBuilder(
@@ -1138,7 +1253,15 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                       text: _customSplitValues[p.id] ?? '1',
                                     );
                                     _splitEditControllers[p.id] = c;
-                                    _splitFocusNodes[p.id] ??= FocusNode();
+                                    if (!_splitFocusNodes.containsKey(p.id)) {
+                                      final node = FocusNode();
+                                      node.addListener(() {
+                                        if (!node.hasFocus) {
+                                          _handleAmountFieldUnfocused(p);
+                                        }
+                                      });
+                                      _splitFocusNodes[p.id] = node;
+                                    }
                                   }
                                   return c;
                                 },
@@ -1152,6 +1275,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                       _includedInSplitIds.add(p.id);
                                     } else {
                                       _includedInSplitIds.remove(p.id);
+                                      _amountsManuallySetIds.remove(p.id);
                                       _customSplitValues.remove(p.id);
                                       _splitEditControllers[p.id]?.dispose();
                                       _splitEditControllers.remove(p.id);
@@ -1182,44 +1306,40 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                         },
                       ),
                     ],
-                    const SizedBox(height: 32),
-                    ListenableBuilder(
-                      listenable: _amountController,
-                      builder: (context, _) {
-                        final amountCentsInt =
-                            ((double.tryParse(_amountController.text.trim()) ??
-                                        0) *
-                                    100)
-                                .toInt();
-                        return SizedBox(
-                          height: 52,
-                          child: FilledButton(
-                            onPressed:
-                                (_saving ||
-                                    (_splitType == SplitType.amounts &&
-                                        _amountsSumCents(participants) !=
-                                            amountCentsInt))
-                                ? null
-                                : _save,
-                            child: _saving
-                                ? const SizedBox(
-                                    height: 24,
-                                    width: 24,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : Text(
-                                    (widget.expenseId != null
-                                            ? 'submit'
-                                            : 'add_expense')
-                                        .tr(),
-                                  ),
-                          ),
-                        );
-                      },
-                    ),
                   ],
+                ),
+              ),
+              bottomNavigationBar: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: ListenableBuilder(
+                    listenable: _amountController,
+                    builder: (context, _) {
+                      final amountCentsInt =
+                          ((double.tryParse(_amountController.text.trim()) ?? 0) * 100).toInt();
+                      return SizedBox(
+                        height: 52,
+                        child: FilledButton(
+                          onPressed:
+                              (_saving ||
+                                  (_splitType == SplitType.amounts &&
+                                      _amountsSumCents(participants) != amountCentsInt))
+                                  ? null
+                                  : _save,
+                          child: _saving
+                              ? const SizedBox(
+                                  height: 24,
+                                  width: 24,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : Text(
+                                  (widget.expenseId != null ? 'submit' : 'add_expense').tr(),
+                                ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
             );
@@ -1648,18 +1768,24 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     return filtered.isEmpty ? null : filtered;
   }
 
-  Widget _buildDescriptionSection(BuildContext context) {
+  Widget _buildDescriptionSection(
+    BuildContext context, {
+    bool showLabel = true,
+  }) {
     final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          'expense_description'.tr(),
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+        if (showLabel) ...[
+          Text(
+            'expense_description'.tr(),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
-        ),
-        const SizedBox(height: 6),
+          const SizedBox(height: 6),
+        ],
         TextFormField(
           controller: _descriptionController,
           decoration: InputDecoration(
@@ -2145,6 +2271,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     if (chosen != null) {
       setState(() {
         _splitType = chosen;
+        _amountsManuallySetIds.clear();
+        _lastAmountCentsForAmounts = null;
         if (chosen == SplitType.parts || chosen == SplitType.amounts) {
           _amountsFieldsTouched = false;
           for (final c in _splitEditControllers.values) {
