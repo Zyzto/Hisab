@@ -285,3 +285,39 @@ bool expenseFormFullFeatures(Ref ref) {
   }
 }
 
+@riverpod
+bool expenseFormExpandDescription(Ref ref) {
+  try {
+    final settings = ref.watch(hisabSettingsProvidersProvider);
+    if (settings == null) return false;
+    return ref.watch(
+      settings.provider(expenseFormExpandDescriptionSettingDef),
+    );
+  } catch (e, stackTrace) {
+    Log.warning(
+      'expenseFormExpandDescription read failed, defaulting to false',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return false;
+  }
+}
+
+@riverpod
+bool expenseFormExpandBillBreakdown(Ref ref) {
+  try {
+    final settings = ref.watch(hisabSettingsProvidersProvider);
+    if (settings == null) return false;
+    return ref.watch(
+      settings.provider(expenseFormExpandBillBreakdownSettingDef),
+    );
+  } catch (e, stackTrace) {
+    Log.warning(
+      'expenseFormExpandBillBreakdown read failed, defaulting to false',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return false;
+  }
+}
+
