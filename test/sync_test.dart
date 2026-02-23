@@ -75,6 +75,7 @@ void main() {
             'allow_member_add_participant': true,
             'allow_member_change_settings': true,
             'require_participant_assignment': false,
+            'allow_expense_as_other_participant': true,
             'icon': null,
             'color': null,
             'created_at': '2025-01-01T00:00:00Z',

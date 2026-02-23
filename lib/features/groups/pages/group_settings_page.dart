@@ -158,6 +158,18 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                                         allowMemberChangeSettings: v,
                                       ),
                             ),
+                            SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text('allow_expense_as_other'.tr()),
+                              value: group.allowExpenseAsOtherParticipant,
+                              onChanged: _saving
+                                  ? null
+                                  : (v) => _onPermissionChanged(
+                                        ref,
+                                        group,
+                                        allowExpenseAsOtherParticipant: v,
+                                      ),
+                            ),
                           ],
                         ),
                       ],
@@ -1341,6 +1353,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     Group group, {
     bool? allowMemberAddExpense,
     bool? allowMemberChangeSettings,
+    bool? allowExpenseAsOtherParticipant,
   }) async {
     setState(() => _saving = true);
     try {
@@ -1352,6 +1365,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                   allowMemberAddExpense ?? group.allowMemberAddExpense,
               allowMemberChangeSettings:
                   allowMemberChangeSettings ?? group.allowMemberChangeSettings,
+              allowExpenseAsOtherParticipant:
+                  allowExpenseAsOtherParticipant ??
+                      group.allowExpenseAsOtherParticipant,
               updatedAt: DateTime.now(),
             ),
           );

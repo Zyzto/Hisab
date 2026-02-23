@@ -66,6 +66,8 @@ class MigrationService {
           'allow_member_add_expense': g['allow_member_add_expense'] == 1,
           'allow_member_change_settings':
               g['allow_member_change_settings'] == 1,
+          'allow_expense_as_other_participant':
+              (g['allow_expense_as_other_participant'] ?? 1) == 1,
           'icon': g['icon'],
           'color': g['color'],
           'archived_at': g['archived_at'],
