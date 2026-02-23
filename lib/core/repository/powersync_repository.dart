@@ -140,6 +140,9 @@ Group _groupFromRow(Map<String, dynamic> row) => Group(
   ownerId: row['owner_id'] as String?,
   allowMemberAddExpense: _parseBool(row['allow_member_add_expense']),
   allowMemberChangeSettings: _parseBool(row['allow_member_change_settings']),
+  allowExpenseAsOtherParticipant: row['allow_expense_as_other_participant'] == null
+      ? true
+      : _parseBool(row['allow_expense_as_other_participant']),
   icon: row['icon'] as String?,
   color: _colorToUnsigned((row['color'] as num?)?.toInt()),
   archivedAt: _parseDateTimeNullable(row['archived_at']),
@@ -443,6 +446,7 @@ class PowerSyncGroupRepository implements IGroupRepository {
       'settlement_snapshot_json': group.settlementSnapshotJson,
       'allow_member_add_expense': group.allowMemberAddExpense,
       'allow_member_change_settings': group.allowMemberChangeSettings,
+      'allow_expense_as_other_participant': group.allowExpenseAsOtherParticipant,
       'icon': group.icon,
       'color': _colorToSigned(group.color),
       'archived_at': group.archivedAt?.toUtc().toIso8601String(),
@@ -461,8 +465,8 @@ class PowerSyncGroupRepository implements IGroupRepository {
         name = ?, currency_code = ?, settlement_method = ?,
         treasurer_participant_id = ?, settlement_freeze_at = ?,
         settlement_snapshot_json = ?, allow_member_add_expense = ?,
-        allow_member_change_settings = ?, icon = ?, color = ?,
-        archived_at = ?, updated_at = ?
+        allow_member_change_settings = ?, allow_expense_as_other_participant = ?,
+        icon = ?, color = ?, archived_at = ?, updated_at = ?
       WHERE id = ?''',
       [
         group.name,
@@ -473,6 +477,7 @@ class PowerSyncGroupRepository implements IGroupRepository {
         group.settlementSnapshotJson,
         group.allowMemberAddExpense ? 1 : 0,
         group.allowMemberChangeSettings ? 1 : 0,
+        group.allowExpenseAsOtherParticipant ? 1 : 0,
         group.icon,
         _colorToSigned(group.color),
         group.archivedAt?.toUtc().toIso8601String(),

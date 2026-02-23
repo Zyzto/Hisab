@@ -11,6 +11,7 @@ import '../../../core/receipt/receipt_image_view.dart';
 import '../../../core/platform_utils.dart';
 import '../../../core/receipt/receipt_scan_service.dart';
 import '../../../core/services/permission_service.dart';
+import '../../../core/auth/auth_providers.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/services/exchange_rate_service.dart';
 import '../../../core/telemetry/telemetry_service.dart';
@@ -19,6 +20,7 @@ import '../../../core/utils/currency_helpers.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../features/settings/providers/settings_framework_providers.dart';
+import '../../groups/providers/group_member_provider.dart';
 import '../../groups/providers/groups_provider.dart';
 import '../constants/expense_form_constants.dart';
 import '../widgets/expense_amount_section.dart';
@@ -290,10 +292,32 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       return;
     }
 
-    final payerId = _payerParticipantId ?? participants.first.id;
+    final group = await ref.read(groupRepositoryProvider).getById(widget.groupId);
+    if (!mounted || group == null) return;
+    final localOnly = ref.read(effectiveLocalOnlyProvider);
+    final myRole = await ref.read(myRoleInGroupProvider(widget.groupId).future);
+    final restrictPayerToSelf = !group.allowExpenseAsOtherParticipant &&
+        (localOnly ||
+            (myRole != GroupRole.owner && myRole != GroupRole.admin));
+    final currentUserId = ref.read(authServiceProvider).currentUser?.id;
+    var myParticipantId = participants
+        .where((p) => p.userId == currentUserId)
+        .firstOrNull
+        ?.id;
+    if (myParticipantId == null) {
+      final myMember = await ref.read(myMemberInGroupProvider(widget.groupId).future);
+      final pid = myMember?.participantId;
+      if (pid != null && participants.any((p) => p.id == pid)) {
+        myParticipantId = pid;
+      }
+    }
+    final payerId = restrictPayerToSelf
+        ? (myParticipantId ?? participants.first.id)
+        : (_payerParticipantId ?? participants.first.id);
     final isTransfer = _transactionType == TransactionType.transfer;
     if (isTransfer) {
       if (_toParticipantId == null || _toParticipantId == payerId) {
+        if (!mounted) return;
         context.showToast('choose_different_to'.tr());
         return;
       }
@@ -303,6 +327,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         .where((p) => _includedInSplitIds.contains(p.id))
         .toList();
     if (!isTransfer && included.isEmpty) {
+      if (!mounted) return;
       context.showToast('include_at_least_one'.tr());
       return;
     }
@@ -713,6 +738,28 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
               );
             }
             final payerId = _payerParticipantId ?? participants.first.id;
+            final localOnly = ref.watch(effectiveLocalOnlyProvider);
+            final myRole = ref.watch(myRoleInGroupProvider(widget.groupId)).value;
+            final restrictPayerToSelf = !group.allowExpenseAsOtherParticipant &&
+                (localOnly ||
+                    (myRole != GroupRole.owner && myRole != GroupRole.admin));
+            final currentUserId =
+                ref.read(authServiceProvider).currentUser?.id;
+            // Resolve "my" participant: by userId on participant, or by group_members.participant_id (more reliable when joined via invite)
+            var myParticipantId = participants
+                .where((p) => p.userId == currentUserId)
+                .firstOrNull
+                ?.id;
+            if (myParticipantId == null) {
+              final myMember = ref.watch(myMemberInGroupProvider(widget.groupId)).value;
+              final pid = myMember?.participantId;
+              if (pid != null && participants.any((p) => p.id == pid)) {
+                myParticipantId = pid;
+              }
+            }
+            final effectivePayerId = restrictPayerToSelf
+                ? (myParticipantId ?? participants.first.id)
+                : payerId;
             // Only add newly added participants to split by default (don't re-add unchecked)
             final currentIds = participants.map((p) => p.id).toSet();
             final newIds = currentIds.difference(_previousParticipantIds);
@@ -729,6 +776,33 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
             } else {
               _previousParticipantIds = Set.from(currentIds);
             }
+            // Default payer to current user when adding a new expense (once)
+            if (widget.expenseId == null &&
+                _payerParticipantId == null &&
+                participants.isNotEmpty) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                ref.read(myMemberInGroupProvider(widget.groupId).future).then((member) {
+                  if (!mounted) return;
+                  final currentUserId =
+                      ref.read(authServiceProvider).currentUser?.id;
+                  var resolvedPayerId = participants
+                      .where((p) => p.userId == currentUserId)
+                      .firstOrNull
+                      ?.id;
+                  if (resolvedPayerId == null) {
+                    final pid = member?.participantId;
+                    if (pid != null && participants.any((p) => p.id == pid)) {
+                      resolvedPayerId = pid;
+                    }
+                  }
+                  if (!mounted) return;
+                  setState(() {
+                    _payerParticipantId =
+                        resolvedPayerId ?? participants.first.id;
+                  });
+                });
+              });
+            }
 
             final isTransfer = _transactionType == TransactionType.transfer;
             final toId =
@@ -736,7 +810,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                 (participants.length > 1
                     ? participants
                           .firstWhere(
-                            (p) => p.id != payerId,
+                            (p) => p.id != effectivePayerId,
                             orElse: () => participants.first,
                           )
                           .id
@@ -953,8 +1027,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       _buildTransferFromToRow(
                         context,
                         participants,
-                        payerId,
+                        effectivePayerId,
                         toId,
+                        payerReadOnly: restrictPayerToSelf,
                       ),
                       const SizedBox(height: 20),
                       _buildWhenSection(context),
@@ -962,7 +1037,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       _buildPaidByAndWhenRow(
                         context,
                         participants,
-                        payerId,
+                        effectivePayerId,
+                        payerReadOnly: restrictPayerToSelf,
                       ),
                     if (!isTransfer) ...[
                       const SizedBox(height: 20),
@@ -1643,8 +1719,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   Widget _buildPaidByAndWhenRow(
     BuildContext context,
     List<Participant> participants,
-    String payerId,
-  ) {
+    String payerId, {
+    bool payerReadOnly = false,
+  }) {
     final theme = Theme.of(context);
     final payer = participants.firstWhere(
       (p) => p.id == payerId,
@@ -1667,34 +1744,49 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                 ),
               ),
               const SizedBox(height: 6),
-              InkWell(
-                onTap: () => _showPayerPicker(context, participants),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  height: 52,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  alignment: AlignmentDirectional.centerStart,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          payerName,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyLarge,
+              payerReadOnly
+                  ? Container(
+                      height: 52,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Text(
+                        payerName,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyLarge,
+                      ),
+                    )
+                  : InkWell(
+                      onTap: () => _showPayerPicker(context, participants),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        height: 52,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                payerName,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodyLarge,
+                              ),
+                            ),
+                            Icon(
+                              Icons.arrow_drop_down,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ],
                         ),
                       ),
-                      Icon(
-                        Icons.arrow_drop_down,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+                    ),
             ],
           ),
         ),
@@ -1757,8 +1849,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     BuildContext context,
     List<Participant> participants,
     String payerId,
-    String toId,
-  ) {
+    String toId, {
+    bool payerReadOnly = false,
+  }) {
     final theme = Theme.of(context);
     final payer = participants.firstWhere(
       (p) => p.id == payerId,
@@ -1784,34 +1877,49 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                 ),
               ),
               const SizedBox(height: 6),
-              InkWell(
-                onTap: () => _showPayerPicker(context, participants),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  height: 52,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  alignment: AlignmentDirectional.centerStart,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          payer.name,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyLarge,
+              payerReadOnly
+                  ? Container(
+                      height: 52,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Text(
+                        payer.name,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyLarge,
+                      ),
+                    )
+                  : InkWell(
+                      onTap: () => _showPayerPicker(context, participants),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        height: 52,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                payer.name,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodyLarge,
+                              ),
+                            ),
+                            Icon(
+                              Icons.arrow_drop_down,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ],
                         ),
                       ),
-                      Icon(
-                        Icons.arrow_drop_down,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+                    ),
             ],
           ),
         ),
