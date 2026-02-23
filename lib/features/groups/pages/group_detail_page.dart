@@ -424,14 +424,15 @@ class _ExpensesTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final expensesAsync = ref.watch(expensesByGroupProvider(groupId));
     final participantsAsync = ref.watch(participantsByGroupProvider(groupId));
+    final myMemberAsync = ref.watch(myMemberInGroupProvider(groupId));
     final tagsAsync = ref.watch(tagsByGroupProvider(groupId));
     final customTags = tagsAsync.value ?? [];
 
     return participantsAsync.when(
       data: (participants) {
         final nameOf = {for (final p in participants) p.id: p.name};
-        final firstParticipantId = participants.isNotEmpty
-            ? participants.first.id
+        final currentUserParticipantId = myMemberAsync is AsyncData<GroupMember?>
+            ? myMemberAsync.value?.participantId
             : null;
 
         return expensesAsync.when(
@@ -453,10 +454,10 @@ class _ExpensesTab extends ConsumerWidget {
             for (final e in sorted) {
               final key = _dateOnly(e.date);
               byDate.putIfAbsent(key, () => []).add(e);
-              totalCents += e.amountCents;
-              if (firstParticipantId != null &&
-                  e.payerParticipantId == firstParticipantId) {
-                myExpensesCents += e.amountCents;
+              totalCents += e.effectiveBaseAmountCents;
+              if (currentUserParticipantId != null &&
+                  e.payerParticipantId == currentUserParticipantId) {
+                myExpensesCents += e.effectiveBaseAmountCents;
               }
             }
             final dateKeys = byDate.keys.toList()
