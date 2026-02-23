@@ -11,6 +11,7 @@ import '../../../core/auth/sign_in_sheet.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../core/constants/supabase_config.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/services/permission_service.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 import '../../settings/settings_definitions.dart';
@@ -72,6 +73,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                 onPageChanged: (i) => setState(() => _currentPage = i),
                 children: [
                   _buildPage1(context, ref, settings),
+                  _buildPermissionsPage(context),
                   _buildPage2(context, ref, settings, onlineAvailable),
                 ],
               ),
@@ -90,7 +92,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       padding: const EdgeInsets.symmetric(vertical: ThemeConfig.spacingS),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: List.generate(2, (index) {
+        children: List.generate(3, (index) {
           final isActive = index == _currentPage;
           return AnimatedContainer(
             duration: const Duration(milliseconds: 200),
@@ -239,7 +241,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
           Expanded(
             child: Align(
               alignment: AlignmentDirectional.centerEnd,
-              child: _currentPage == 0
+              child: _currentPage < _lastPageIndex
                   ? FilledButton.icon(
                       onPressed: () {
                         _pageController.nextPage(
@@ -396,6 +398,145 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                     ),
                   ),
                 ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static const int _lastPageIndex = 2;
+
+  Widget _buildPermissionsPage(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SizedBox(
+          width: constraints.maxWidth,
+          height: constraints.maxHeight,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.center,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+              child: Padding(
+                padding: const EdgeInsets.all(ThemeConfig.spacingM),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: ThemeConfig.spacingL),
+                    Text(
+                      'onboarding_permissions_title'.tr(),
+                      style: Theme.of(context).textTheme.headlineMedium
+                          ?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: ThemeConfig.spacingS),
+                    Text(
+                      'onboarding_permissions_desc'.tr(),
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: ThemeConfig.spacingXL),
+                    _buildPermissionRow(
+                      context,
+                      icon: Icons.camera_alt_outlined,
+                      title: 'onboarding_permission_camera'.tr(),
+                      subtitle: 'onboarding_permission_camera_desc'.tr(),
+                      onAllow: () =>
+                          PermissionService.requestCameraPermission(context),
+                    ),
+                    _buildPermissionRow(
+                      context,
+                      icon: Icons.photo_library_outlined,
+                      title: 'onboarding_permission_photos'.tr(),
+                      subtitle: 'onboarding_permission_photos_desc'.tr(),
+                      onAllow: () =>
+                          PermissionService.requestPhotosPermission(context),
+                    ),
+                    _buildPermissionRow(
+                      context,
+                      icon: Icons.notifications_outlined,
+                      title: 'onboarding_permission_notifications'.tr(),
+                      subtitle:
+                          'onboarding_permission_notifications_desc'.tr(),
+                      onAllow: () =>
+                          PermissionService.requestNotificationPermission(
+                        context,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPermissionRow(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onAllow,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Card(
+      margin: const EdgeInsets.only(bottom: ThemeConfig.spacingS),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
+        side: BorderSide(color: colorScheme.outline.withValues(alpha: 0.2)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(ThemeConfig.spacingM),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(ThemeConfig.radiusM),
+              ),
+              child: Icon(
+                icon,
+                size: 24,
+                color: colorScheme.onPrimaryContainer,
+              ),
+            ),
+            const SizedBox(width: ThemeConfig.spacingM),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                  const SizedBox(height: ThemeConfig.spacingXS),
+                  Text(
+                    subtitle,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Semantics(
+              label: '$title ${'onboarding_permission_allow'.tr()}',
+              child: FilledButton.tonal(
+                onPressed: onAllow,
+                child: Text('onboarding_permission_allow'.tr()),
               ),
             ),
           ],
