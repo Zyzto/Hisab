@@ -157,9 +157,12 @@ class ExpenseSplitSection extends StatelessWidget {
                   const double kSplitInputWidth = 88;
                   const double kSplitAmountWidth = 100;
                   const double kMinTapHeight = 48;
+                  const int kPartsMin = 0;
+                  const int kPartsMax = 999;
 
                   Widget trailing;
                   if (isCustomSplit && included && controller != null) {
+                    final isParts = splitType == SplitType.parts;
                     trailing = Material(
                       color: Colors.transparent,
                       child: InkWell(
@@ -176,6 +179,36 @@ class ExpenseSplitSection extends StatelessWidget {
                               mainAxisAlignment: MainAxisAlignment.end,
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
+                                if (isParts) ...[
+                                  Semantics(
+                                    label: 'Decrease part',
+                                    button: true,
+                                    child: IconButton(
+                                      icon: const Icon(Icons.remove),
+                                      onPressed: () {
+                                        final cur = int.tryParse(
+                                              controller.text.trim(),
+                                            ) ??
+                                            1;
+                                        final next = (cur - 1)
+                                            .clamp(kPartsMin, kPartsMax);
+                                        final str = '$next';
+                                        controller.text = str;
+                                        controller.selection =
+                                            TextSelection.collapsed(
+                                          offset: str.length,
+                                        );
+                                        onPartsChanged(p, str);
+                                      },
+                                      style: IconButton.styleFrom(
+                                        minimumSize: const Size(40, 40),
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                      tooltip: 'Decrease part',
+                                    ),
+                                  ),
+                                ],
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(
                                     _kSplitRadius,
@@ -226,27 +259,36 @@ class ExpenseSplitSection extends StatelessWidget {
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 12),
-                                SizedBox(
-                                  width: kSplitAmountWidth,
-                                  child: Align(
-                                    alignment: AlignmentDirectional.centerEnd,
-                                    child: Text(
-                                      CurrencyFormatter.formatCents(
-                                        cents,
-                                        currencyCode,
+                                if (isParts) ...[
+                                  Semantics(
+                                    label: 'Increase part',
+                                    button: true,
+                                    child: IconButton(
+                                      icon: const Icon(Icons.add),
+                                      onPressed: () {
+                                        final cur = int.tryParse(
+                                              controller.text.trim(),
+                                            ) ??
+                                            0;
+                                        final next = (cur + 1)
+                                            .clamp(kPartsMin, kPartsMax);
+                                        final str = '$next';
+                                        controller.text = str;
+                                        controller.selection =
+                                            TextSelection.collapsed(
+                                          offset: str.length,
+                                        );
+                                        onPartsChanged(p, str);
+                                      },
+                                      style: IconButton.styleFrom(
+                                        minimumSize: const Size(40, 40),
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
                                       ),
-                                      style: theme.textTheme.bodyMedium
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w500,
-                                            color: theme
-                                                .colorScheme
-                                                .onSurfaceVariant,
-                                          ),
-                                      overflow: TextOverflow.ellipsis,
+                                      tooltip: 'Increase part',
                                     ),
                                   ),
-                                ),
+                                ],
                               ],
                             ),
                           ),
