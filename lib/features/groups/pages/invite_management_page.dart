@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,6 +14,7 @@ import '../../../core/widgets/toast.dart';
 import '../../../domain/domain.dart';
 import '../providers/group_invite_provider.dart';
 import '../providers/groups_provider.dart';
+import '../utils/invite_share_helper.dart';
 import '../widgets/create_invite_sheet.dart';
 
 class InviteManagementPage extends ConsumerStatefulWidget {
@@ -328,58 +330,7 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.75,
       ),
-      builder: (ctx) => SingleChildScrollView(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            24,
-            24,
-            24,
-            24 + MediaQuery.of(ctx).padding.bottom,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: SizedBox(
-                  width: 200,
-                  height: 200,
-                  child: PrettyQrView.data(
-                    data: url,
-                    errorCorrectLevel: QrErrorCorrectLevel.M,
-                    decoration: const PrettyQrDecoration(
-                      shape: PrettyQrSmoothSymbol(color: Colors.black),
-                      background: Colors.white,
-                      quietZone: PrettyQrQuietZone.zero,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                url,
-                style: Theme.of(ctx).textTheme.bodySmall,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              FilledButton.tonalIcon(
-                onPressed: () {
-                  Clipboard.setData(ClipboardData(text: url));
-                  ctx.showSuccess('invite_link_copied'.tr());
-                },
-                icon: const Icon(Icons.copy),
-                label: Text('copy_link'.tr()),
-              ),
-            ],
-          ),
-        ),
-      ),
+      builder: (ctx) => _InviteQrSheetContent(url: url),
     );
   }
 
@@ -686,5 +637,109 @@ class _UsageHistoryList extends ConsumerWidget {
       ),
       error: (e, _) => Text('$e', style: theme.textTheme.bodySmall),
     );
+  }
+}
+
+/// Bottom sheet content showing invite QR + Copy + Share (admin invite panel).
+class _InviteQrSheetContent extends StatefulWidget {
+  final String url;
+
+  const _InviteQrSheetContent({required this.url});
+
+  @override
+  State<_InviteQrSheetContent> createState() => _InviteQrSheetContentState();
+}
+
+class _InviteQrSheetContentState extends State<_InviteQrSheetContent> {
+  final GlobalKey _qrKey = GlobalKey();
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          24,
+          24,
+          24,
+          24 + MediaQuery.of(context).padding.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RepaintBoundary(
+              key: _qrKey,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: SizedBox(
+                  width: 200,
+                  height: 200,
+                  child: PrettyQrView.data(
+                    data: widget.url,
+                    errorCorrectLevel: QrErrorCorrectLevel.M,
+                    decoration: const PrettyQrDecoration(
+                      shape: PrettyQrSmoothSymbol(color: Colors.black),
+                      background: Colors.white,
+                      quietZone: PrettyQrQuietZone.zero,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              widget.url,
+              style: Theme.of(context).textTheme.bodySmall,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 12,
+              runSpacing: 8,
+              children: [
+                FilledButton.tonalIcon(
+                  onPressed: () {
+                    Clipboard.setData(
+                        ClipboardData(text: widget.url));
+                    context.showSuccess('invite_link_copied'.tr());
+                  },
+                  icon: const Icon(Icons.copy),
+                  label: Text('copy_link'.tr()),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: () => _share(context, widget.url),
+                  icon: const Icon(Icons.share),
+                  label: Text('share'.tr()),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _share(BuildContext context, String url) async {
+    final boundary =
+        _qrKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+    try {
+      await shareInviteLink(
+        url: url,
+        shareMessage: 'share_invite_message'.tr(),
+        boundary: boundary,
+      );
+      if (!context.mounted) return;
+      context.showSuccess('invite_shared'.tr());
+    } catch (_) {
+      await Clipboard.setData(ClipboardData(text: url));
+      if (!context.mounted) return;
+      context.showSuccess('invite_link_copied'.tr());
+    }
   }
 }
