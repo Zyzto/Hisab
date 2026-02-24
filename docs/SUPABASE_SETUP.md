@@ -26,6 +26,7 @@ This guide walks you through setting up the Supabase backend for Hisab from scra
    - [Migration 12: Groups archive (archived_at)](#migration-12-groups-archive-archived_at)
    - [Migration 13: merge_participant_with_member (merge manual participant with user)](#migration-13-merge_participant_with_member-merge-manual-participant-with-user)
    - [Migration 14: Participants left/archived (left_at) and re-join reuse](#migration-14-participants-leftarchived-left_at-and-re-join-reuse)
+   - [Migration 15: Receipt images Storage bucket](#migration-15-receipt-images-storage-bucket)
 4. [Configure Authentication](#4-configure-authentication)
 5. [Deploy Edge Functions](#5-deploy-edge-functions)
    - [Push notifications: end-to-end flow and verification](#push-notifications-end-to-end-flow-and-verification)
@@ -1550,6 +1551,17 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 ```
 
 **Note:** RLS already allows owner/admin to update participants; `left_at` is included. New RPC `archive_participant` is callable by owner/admin. Grant execute to authenticated if needed: `GRANT EXECUTE ON FUNCTION public.archive_participant(UUID, UUID) TO authenticated;` (typically RPCs are granted in Migration 4 or your project’s RPC grants).
+
+### Migration 15: Receipt images Storage bucket
+
+Expense receipt images are uploaded to Supabase Storage so all group members can see them. The app stores the public URL in `expenses.receipt_image_path`.
+
+1. **Create the bucket in the Dashboard**: Go to **Storage** → **New bucket**. Name: `receipt-images`. Set **Public bucket** to **Yes** (so `getPublicUrl()` works without signed URLs). Optionally set file size limit (e.g. 10 MB) and allowed MIME types (e.g. `image/jpeg`, `image/png`, `image/webp`, `image/heic`).
+2. **Apply the migration** (run the SQL in `supabase/migrations/20250224100000_receipt_images_storage_bucket.sql`) to add RLS policies on `storage.objects`:
+   - **INSERT**: Authenticated users can upload only into paths whose first folder is a group they belong to (`group_id/expense_id/filename`).
+   - **SELECT**: Authenticated users can read objects in groups they belong to.
+
+Path format in the bucket: `{group_id}/{expense_id}/{uuid}.{ext}`.
 
 ---
 
