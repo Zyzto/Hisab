@@ -273,7 +273,6 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
             onPressed: () =>
                 context.push(RoutePaths.groupSettings(widget.group.id)),
           ),
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _onRefresh),
         ],
       ),
       body: Column(
@@ -394,9 +393,20 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
                 _segmentController.value = i;
               },
               children: [
-                _ExpensesTab(groupId: widget.group.id, group: widget.group),
-                _BalanceTab(groupId: widget.group.id),
-                _PeopleTab(groupId: widget.group.id, group: widget.group),
+                _ExpensesTab(
+                  groupId: widget.group.id,
+                  group: widget.group,
+                  onRefresh: _onRefresh,
+                ),
+                _BalanceTab(
+                  groupId: widget.group.id,
+                  onRefresh: _onRefresh,
+                ),
+                _PeopleTab(
+                  groupId: widget.group.id,
+                  group: widget.group,
+                  onRefresh: _onRefresh,
+                ),
               ],
             ),
           ),
@@ -415,8 +425,13 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
 class _ExpensesTab extends ConsumerWidget {
   final String groupId;
   final Group group;
+  final Future<void> Function() onRefresh;
 
-  const _ExpensesTab({required this.groupId, required this.group});
+  const _ExpensesTab({
+    required this.groupId,
+    required this.group,
+    required this.onRefresh,
+  });
 
   static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
@@ -452,7 +467,7 @@ class _ExpensesTab extends ConsumerWidget {
             int myExpensesCents = 0;
             int totalCents = 0;
             for (final e in sorted) {
-              final key = _dateOnly(e.date);
+              final key = _dateOnly(e.date.isUtc ? e.date.toLocal() : e.date);
               byDate.putIfAbsent(key, () => []).add(e);
               totalCents += e.effectiveBaseAmountCents;
               if (currentUserParticipantId != null &&
@@ -481,10 +496,12 @@ class _ExpensesTab extends ConsumerWidget {
               }
             }
 
-            return ListView.builder(
-              padding: const EdgeInsets.only(bottom: 24),
-              itemCount: flattenedItems.length,
-              itemBuilder: (context, index) {
+            return RefreshIndicator(
+              onRefresh: onRefresh,
+              child: ListView.builder(
+                padding: const EdgeInsets.only(bottom: 24),
+                itemCount: flattenedItems.length,
+                itemBuilder: (context, index) {
                 final item = flattenedItems[index];
                 switch (item) {
                   case _ExpenseListSummaryItem():
@@ -542,6 +559,7 @@ class _ExpensesTab extends ConsumerWidget {
                     );
                 }
               },
+              ),
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
@@ -572,20 +590,26 @@ class _ExpensesTab extends ConsumerWidget {
 
 class _BalanceTab extends ConsumerWidget {
   final String groupId;
+  final Future<void> Function() onRefresh;
 
-  const _BalanceTab({required this.groupId});
+  const _BalanceTab({required this.groupId, required this.onRefresh});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return BalanceList(groupId: groupId);
+    return BalanceList(groupId: groupId, onRefresh: onRefresh);
   }
 }
 
 class _PeopleTab extends ConsumerWidget {
   final String groupId;
   final Group group;
+  final Future<void> Function() onRefresh;
 
-  const _PeopleTab({required this.groupId, required this.group});
+  const _PeopleTab({
+    required this.groupId,
+    required this.group,
+    required this.onRefresh,
+  });
 
   String _roleLabel(String role) {
     switch (role) {
@@ -642,12 +666,14 @@ class _PeopleTab extends ConsumerWidget {
               );
             }
 
-            return ListView(
-              padding: const EdgeInsets.symmetric(
-                vertical: 8,
-                horizontal: 16,
-              ),
-              children: [
+            return RefreshIndicator(
+              onRefresh: onRefresh,
+              child: ListView(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 8,
+                  horizontal: 16,
+                ),
+                children: [
                 ...activeParticipants.map((p) {
                   final linkedMember = memberByParticipantId[p.id];
                   final hasUserId = p.userId != null;
@@ -771,6 +797,7 @@ class _PeopleTab extends ConsumerWidget {
                   }),
                 ],
               ],
+              ),
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),

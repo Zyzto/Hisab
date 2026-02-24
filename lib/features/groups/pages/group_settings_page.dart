@@ -499,8 +499,10 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
             'Currency changed: groupId=${widget.groupId} currency=${currency.code}',
           );
           ref.invalidate(futureGroupProvider(widget.groupId));
+          if (mounted) context.showSuccess('group_currency_updated'.tr());
         } catch (e, st) {
           Log.warning('Currency change failed', error: e, stackTrace: st);
+          if (mounted) context.showError('$e');
         } finally {
           if (mounted) setState(() => _saving = false);
         }

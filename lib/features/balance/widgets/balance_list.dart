@@ -10,8 +10,9 @@ import 'record_settlement_sheet.dart';
 
 class BalanceList extends ConsumerWidget {
   final String groupId;
+  final Future<void> Function()? onRefresh;
 
-  const BalanceList({super.key, required this.groupId});
+  const BalanceList({super.key, required this.groupId, this.onRefresh});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -35,7 +36,7 @@ class BalanceList extends ConsumerWidget {
         var itemCount = (hasFrozen ? 1 : 0) + 4 + balances.length;
         itemCount += settlements.isEmpty ? 1 : settlements.length;
 
-        return ListView.builder(
+        final listView = ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: itemCount,
           itemBuilder: (context, index) {
@@ -204,6 +205,10 @@ class BalanceList extends ConsumerWidget {
             );
           },
         );
+        if (onRefresh != null) {
+          return RefreshIndicator(onRefresh: onRefresh!, child: listView);
+        }
+        return listView;
       },
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(
