@@ -269,6 +269,16 @@ final favoriteCurrenciesSettingDef = const StringSetting(
   order: 4,
 );
 
+/// When true, show times in 24-hour format (e.g. 14:30). When false, use 12-hour AM/PM.
+final use24HourFormatSettingDef = const BoolSetting(
+  'use_24_hour_format',
+  defaultValue: false,
+  titleKey: 'use_24_hour_format',
+  icon: Icons.schedule,
+  section: 'appearance',
+  order: 5,
+);
+
 /// When true, expense form shows full options (Expense / Income / Transfer pill).
 /// When false (default), only expense addition is shown; pill is hidden.
 final expenseFormFullFeaturesSettingDef = const BoolSetting(
@@ -310,6 +320,7 @@ final allSettings = <SettingDefinition>[
   languageSettingDef,
   fontSizeScaleSettingDef,
   favoriteCurrenciesSettingDef,
+  use24HourFormatSettingDef,
   expenseFormFullFeaturesSettingDef,
   expenseFormExpandDescriptionSettingDef,
   expenseFormExpandBillBreakdownSettingDef,

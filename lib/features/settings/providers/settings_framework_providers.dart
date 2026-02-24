@@ -228,6 +228,22 @@ String fontSizeScale(Ref ref) {
 }
 
 @riverpod
+bool use24HourFormat(Ref ref) {
+  try {
+    final settings = ref.watch(hisabSettingsProvidersProvider);
+    if (settings == null) return false;
+    return ref.watch(settings.provider(use24HourFormatSettingDef));
+  } catch (e, stackTrace) {
+    Log.warning(
+      'use24HourFormat read failed, defaulting to false',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return false;
+  }
+}
+
+@riverpod
 Future<AuthUserProfile?> authUserProfile(Ref ref) async {
   final localOnly = ref.watch(effectiveLocalOnlyProvider);
   if (localOnly) return null;

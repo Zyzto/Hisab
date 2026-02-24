@@ -602,6 +602,47 @@ final class FontSizeScaleProvider
 
 String _$fontSizeScaleHash() => r'8a20204a46a361746e07cba5a1f0c6c1b3187e6f';
 
+@ProviderFor(use24HourFormat)
+final use24HourFormatProvider = Use24HourFormatProvider._();
+
+final class Use24HourFormatProvider
+    extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  Use24HourFormatProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'use24HourFormatProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$use24HourFormatHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return use24HourFormat(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$use24HourFormatHash() => r'1d0dedb6f9ad10dcdc5dc1a32ba5dbb2a294bab8';
+
 @ProviderFor(authUserProfile)
 final authUserProfileProvider = AuthUserProfileProvider._();
 
