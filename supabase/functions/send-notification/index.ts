@@ -189,6 +189,8 @@ async function handleNotificationRequest(req: Request): Promise<Response> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
+  // For expense_created and expense_updated, the actor is the creator/editor; they must not
+  // receive a notification. Only other group members are notified (same as for member_joined).
   const { data: members } = await supabase
     .from("group_members")
     .select("user_id")
