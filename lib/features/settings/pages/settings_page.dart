@@ -120,6 +120,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   .set(v),
             ),
             _favoriteCurrenciesTile(context, ref, settings),
+            SwitchSettingsTile.fromSetting(
+              setting: use24HourFormatSettingDef,
+              title: 'use_24_hour_format'.tr(),
+              subtitle: 'use_24_hour_format_description'.tr(),
+              value: ref.watch(settings.provider(use24HourFormatSettingDef)),
+              onChanged: (v) =>
+                  ref.read(settings.provider(use24HourFormatSettingDef).notifier).set(v),
+            ),
           ]),
           // Functional: behavior toggles (expense form mode, etc.)
           _buildSection(context, ref, settings, functionalSection, [
