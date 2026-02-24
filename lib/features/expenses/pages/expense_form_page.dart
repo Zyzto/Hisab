@@ -8,8 +8,11 @@ import 'package:custom_sliding_segmented_control/custom_sliding_segmented_contro
 import 'package:easy_localization/easy_localization.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/receipt/receipt_image_view.dart';
+import '../../../core/receipt/receipt_storage_upload.dart';
+import '../../../core/receipt/receipt_utils.dart';
 import '../../../core/platform_utils.dart';
 import '../../../core/receipt/receipt_scan_service.dart';
+import '../../../core/services/connectivity_service.dart';
 import '../../../core/services/permission_service.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/repository/repository_providers.dart';
@@ -27,6 +30,7 @@ import '../constants/expense_form_constants.dart';
 import '../widgets/expense_amount_section.dart';
 import '../widgets/expense_bill_breakdown_section.dart';
 import '../widgets/expense_title_section.dart';
+import '../widgets/date_time_picker_dialog.dart';
 import '../widgets/expense_split_section.dart';
 import '../../../domain/domain.dart';
 
@@ -138,7 +142,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       _titleController.text = expense.title;
       _descriptionController.text = expense.description ?? '';
       _amountController.text = (expense.amountCents / 100).toStringAsFixed(2);
-      _date = expense.date;
+      _date = expense.date.toLocal();
       _payerParticipantId = expense.payerParticipantId;
       _transactionType = expense.transactionType;
       _transactionTypeSegmentController.value = expense.transactionType;
@@ -432,6 +436,24 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         }
       }
 
+      var receiptPath = _receiptImagePath;
+      final localOnly = ref.read(effectiveLocalOnlyProvider);
+      final isOnline = ref.read(connectivityProvider);
+      final shouldUploadReceipt = receiptPath != null &&
+          receiptPath.isNotEmpty &&
+          !isReceiptImageUrl(receiptPath) &&
+          !localOnly &&
+          isOnline;
+
+      if (_initialExpense != null && shouldUploadReceipt) {
+        final url = await uploadReceiptToStorage(
+          receiptPath,
+          widget.groupId,
+          _initialExpense!.id,
+        );
+        if (url != null) receiptPath = url;
+      }
+
       final expense = Expense(
         id: _initialExpense?.id ?? '',
         groupId: widget.groupId,
@@ -451,7 +473,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         toParticipantId: isTransfer ? _toParticipantId : null,
         tag: _selectedTag,
         lineItems: _effectiveLineItemsForSave(),
-        receiptImagePath: _receiptImagePath,
+        receiptImagePath: receiptPath,
       );
       if (_initialExpense != null) {
         await ref.read(expenseRepositoryProvider).update(expense);
@@ -460,6 +482,14 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         );
       } else {
         final id = await ref.read(expenseRepositoryProvider).create(expense);
+        if (shouldUploadReceipt && receiptPath != null && !isReceiptImageUrl(receiptPath)) {
+          final url = await uploadReceiptToStorage(receiptPath, widget.groupId, id);
+          if (url != null) {
+            await ref.read(expenseRepositoryProvider).update(
+                  expense.copyWith(id: id, receiptImagePath: url),
+                );
+          }
+        }
         Log.info(
           'Expense created: id=$id groupId=${expense.groupId} title="${expense.title}" amountCents=${expense.amountCents} currencyCode=${expense.currencyCode}',
         );
@@ -1738,13 +1768,15 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         case ReceiptScanParsed():
           setState(() {
             _titleController.text = result.vendor;
-            _date = result.date;
+            _date = result.date.isUtc ? result.date.toLocal() : result.date;
             _amountController.text = result.total.toStringAsFixed(2);
           });
           context.showSuccess('receipt_scan_applied'.tr());
         case ReceiptScanFallback():
           setState(() {
-            _titleController.text = 'Receipt';
+            if (_titleController.text.trim().isEmpty) {
+              _titleController.text = 'Receipt';
+            }
             _descriptionController.text = result.ocrText;
             _receiptImagePath = result.receiptImagePath;
           });
@@ -1854,7 +1886,6 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       orElse: () => participants.first,
     );
     final payerName = payer.name;
-    final dateFormat = DateFormat('MMMM d, yyyy');
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1918,54 +1949,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'when'.tr(),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 6),
-              InkWell(
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: _date,
-                    firstDate: DateTime(2000),
-                    lastDate: DateTime(2100),
-                  );
-                  if (picked != null) setState(() => _date = picked);
-                },
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  height: 52,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  alignment: AlignmentDirectional.centerStart,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          dateFormat.format(_date),
-                          style: theme.textTheme.bodyLarge,
-                        ),
-                      ),
-                      Icon(
-                        Icons.calendar_today,
-                        size: 18,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
+          child: _buildDateTimeField(context, label: 'when'.tr()),
         ),
       ],
     );
@@ -2133,14 +2117,19 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     );
   }
 
-  Widget _buildWhenSection(BuildContext context) {
+  /// Shared date+time field: label "Date & time" (or "when"), formatted value, tap opens combined picker.
+  Widget _buildDateTimeField(BuildContext context, {String? label}) {
     final theme = Theme.of(context);
-    final dateFormat = DateFormat('MMMM d, yyyy');
+    final use24h = ref.watch(use24HourFormatProvider);
+    final dateTimeFormat = use24h
+        ? DateFormat.yMMMd().add_Hm()
+        : DateFormat.yMMMd().add_jm();
+    final effectiveLabel = label ?? 'date_and_time'.tr();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'when'.tr(),
+          effectiveLabel,
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -2148,13 +2137,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         const SizedBox(height: 6),
         InkWell(
           onTap: () async {
-            final picked = await showDatePicker(
-              context: context,
-              initialDate: _date,
-              firstDate: DateTime(2000),
-              lastDate: DateTime(2100),
-            );
-            if (picked != null) setState(() => _date = picked);
+            final picked = await _showDateTimePicker(context);
+            if (picked != null && mounted) setState(() => _date = picked);
           },
           borderRadius: BorderRadius.circular(12),
           child: Container(
@@ -2169,7 +2153,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
               children: [
                 Expanded(
                   child: Text(
-                    dateFormat.format(_date),
+                    dateTimeFormat.format(_date),
                     style: theme.textTheme.bodyLarge,
                   ),
                 ),
@@ -2184,6 +2168,16 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         ),
       ],
     );
+  }
+
+  /// Single dialog: calendar on top, time selector (hour/minute/AM-PM) below, Cancel/OK. No tabs.
+  Future<DateTime?> _showDateTimePicker(BuildContext context) async {
+    final use24h = ref.read(use24HourFormatProvider);
+    return showDateTimePickerDialog(context, initial: _date, use24h: use24h);
+  }
+
+  Widget _buildWhenSection(BuildContext context) {
+    return _buildDateTimeField(context, label: 'when'.tr());
   }
 
   Future<void> _showPayerPicker(
@@ -2289,3 +2283,4 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     }
   }
 }
+
