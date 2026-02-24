@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../../core/receipt/receipt_image_view.dart';
+import '../../../features/settings/providers/settings_framework_providers.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../domain/domain.dart';
 import '../../groups/providers/groups_provider.dart';
@@ -40,7 +41,10 @@ class ExpenseDetailBody extends ConsumerWidget {
                 vertical: 16,
               ),
               children: [
-                ExpenseDetailBodyHeader(expense: expense),
+                ExpenseDetailBodyHeader(
+                  expense: expense,
+                  use24HourFormat: ref.watch(use24HourFormatProvider),
+                ),
                 if (expense.receiptImagePath != null &&
                     expense.receiptImagePath!.isNotEmpty) ...[
                   const SizedBox(height: 16),
@@ -154,14 +158,23 @@ class _ShareEntry {
 
 class ExpenseDetailBodyHeader extends StatelessWidget {
   final Expense expense;
+  final bool use24HourFormat;
 
-  const ExpenseDetailBodyHeader({super.key, required this.expense});
+  const ExpenseDetailBodyHeader({
+    super.key,
+    required this.expense,
+    this.use24HourFormat = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final icon = _iconForType(expense.transactionType);
-    final dateFormat = DateFormat('EEEE, MMMM d, yyyy');
+    final dateFormat = use24HourFormat
+        ? DateFormat('EEEE, MMMM d, yyyy').add_Hm()
+        : DateFormat('EEEE, MMMM d, yyyy').add_jm();
+    // Display in device timezone: stored date is UTC, convert for display.
+    final localDate = expense.date.isUtc ? expense.date.toLocal() : expense.date;
 
     return Column(
       children: [
@@ -176,7 +189,7 @@ class ExpenseDetailBodyHeader extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          dateFormat.format(expense.date),
+          dateFormat.format(localDate),
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
