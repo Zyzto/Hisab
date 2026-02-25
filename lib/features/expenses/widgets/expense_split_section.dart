@@ -155,6 +155,7 @@ class ExpenseSplitSection extends StatelessWidget {
                   final focusNode = getOrCreateFocusNode(p);
 
                   const double kSplitInputWidth = 88;
+                  const double kPartsInputWidth = 40;
                   const double kSplitAmountWidth = 100;
                   const double kMinTapHeight = 48;
                   const int kPartsMin = 0;
@@ -163,138 +164,235 @@ class ExpenseSplitSection extends StatelessWidget {
                   Widget trailing;
                   if (isCustomSplit && included && controller != null) {
                     final isParts = splitType == SplitType.parts;
-                    trailing = Material(
+                    final inputWidth =
+                        isParts ? kPartsInputWidth : kSplitInputWidth;
+                    const double kPartsTrailingWidth = 140;
+                    final content = Material(
                       color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () => focusNode?.requestFocus(),
-                        borderRadius: BorderRadius.circular(_kSplitRadius),
-                        child: ConstrainedBox(
+                      child: ConstrainedBox(
                           constraints: const BoxConstraints(
                             minHeight: kMinTapHeight,
                           ),
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            padding: EdgeInsets.symmetric(
+                              vertical: isParts ? 4 : 8,
+                            ),
                             child: Row(
-                              mainAxisSize: MainAxisSize.min,
+                              mainAxisSize: isParts
+                                  ? MainAxisSize.max
+                                  : MainAxisSize.min,
                               mainAxisAlignment: MainAxisAlignment.end,
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                if (isParts) ...[
-                                  Semantics(
-                                    label: 'Decrease part',
-                                    button: true,
-                                    child: IconButton(
-                                      icon: const Icon(Icons.remove),
-                                      onPressed: () {
-                                        final cur = int.tryParse(
-                                              controller.text.trim(),
-                                            ) ??
-                                            1;
-                                        final next = (cur - 1)
-                                            .clamp(kPartsMin, kPartsMax);
-                                        final str = '$next';
-                                        controller.text = str;
-                                        controller.selection =
-                                            TextSelection.collapsed(
-                                          offset: str.length,
-                                        );
-                                        onPartsChanged(p, str);
-                                      },
-                                      style: IconButton.styleFrom(
-                                        minimumSize: const Size(40, 40),
-                                        tapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
-                                      ),
-                                      tooltip: 'Decrease part',
-                                    ),
-                                  ),
-                                ],
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(
-                                    _kSplitRadius,
-                                  ),
-                                  child: SizedBox(
-                                    width: kSplitInputWidth,
-                                    height: kMinTapHeight - 12,
-                                    child: Align(
-                                      alignment: Alignment.center,
-                                      child: TextField(
-                                        focusNode: focusNode,
-                                        controller: controller,
-                                        keyboardType:
-                                            TextInputType.numberWithOptions(
-                                              decimal:
-                                                  splitType ==
-                                                  SplitType.amounts,
+                                if (isParts)
+                                  IntrinsicWidth(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      mainAxisSize: MainAxisSize.min,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Align(
+                                          alignment:
+                                              AlignmentDirectional.centerEnd,
+                                          child: Text(
+                                            customSplitValues[p.id] ??
+                                                controller.text,
+                                            style: theme.textTheme.bodyMedium
+                                                ?.copyWith(
+                                              fontWeight: FontWeight.w600,
+                                              color:
+                                                  theme.colorScheme.onSurface,
                                             ),
-                                        inputFormatters:
-                                            splitType == SplitType.amounts
-                                            ? [decimalOnlyFormatter]
-                                            : [
-                                                FilteringTextInputFormatter
-                                                    .digitsOnly,
-                                              ],
-                                        textAlign: TextAlign.center,
-                                        style: theme.textTheme.bodyMedium
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Align(
+                                          alignment:
+                                              AlignmentDirectional.centerEnd,
+                                          child: Text(
+                                            CurrencyFormatter.formatCents(
+                                              cents,
+                                              currencyCode,
+                                            ),
+                                            style: theme.textTheme.bodySmall
+                                                ?.copyWith(
+                                              fontWeight: FontWeight.w600,
+                                              color:
+                                                  theme.colorScheme.onSurface,
+                                              fontSize: 10,
                                               height: 1.0,
                                             ),
-                                        decoration: _splitInputDecoration(
-                                          theme,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                         ),
-                                        onChanged: (v) {
-                                          if (splitType == SplitType.amounts) {
-                                            onAmountChanged(
-                                              p,
-                                              v,
-                                              includedList,
-                                              controller,
-                                            );
-                                          } else {
-                                            onPartsChanged(p, v);
-                                          }
-                                        },
+                                      ],
+                                    ),
+                                  )
+                                else
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(
+                                      _kSplitRadius,
+                                    ),
+                                    child: SizedBox(
+                                      width: inputWidth,
+                                      height: kMinTapHeight - 12,
+                                      child: Align(
+                                        alignment: Alignment.center,
+                                        child: TextField(
+                                          focusNode: focusNode,
+                                          controller: controller,
+                                          keyboardType:
+                                              TextInputType.numberWithOptions(
+                                            decimal:
+                                                splitType ==
+                                                SplitType.amounts,
+                                          ),
+                                          inputFormatters:
+                                              splitType == SplitType.amounts
+                                              ? [decimalOnlyFormatter]
+                                              : [
+                                                  FilteringTextInputFormatter
+                                                      .digitsOnly,
+                                                ],
+                                          textAlign: TextAlign.center,
+                                          style: theme.textTheme.bodyMedium
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w500,
+                                                height: 1.0,
+                                              ),
+                                          decoration: _splitInputDecoration(
+                                            theme,
+                                          ),
+                                          onChanged: (v) {
+                                            if (splitType ==
+                                                SplitType.amounts) {
+                                              onAmountChanged(
+                                                p,
+                                                v,
+                                                includedList,
+                                                controller,
+                                              );
+                                            } else {
+                                              onPartsChanged(p, v);
+                                            }
+                                          },
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
                                 if (isParts) ...[
-                                  Semantics(
-                                    label: 'Increase part',
-                                    button: true,
-                                    child: IconButton(
-                                      icon: const Icon(Icons.add),
-                                      onPressed: () {
-                                        final cur = int.tryParse(
-                                              controller.text.trim(),
-                                            ) ??
-                                            0;
-                                        final next = (cur + 1)
-                                            .clamp(kPartsMin, kPartsMax);
-                                        final str = '$next';
-                                        controller.text = str;
-                                        controller.selection =
-                                            TextSelection.collapsed(
-                                          offset: str.length,
-                                        );
-                                        onPartsChanged(p, str);
-                                      },
-                                      style: IconButton.styleFrom(
-                                        minimumSize: const Size(40, 40),
-                                        tapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
+                                  const Spacer(),
+                                  Material(
+                                    color: theme
+                                        .colorScheme
+                                        .surfaceContainerHighest,
+                                    borderRadius:
+                                        BorderRadius.circular(8),
+                                    child: ConstrainedBox(
+                                      constraints: const BoxConstraints(
+                                        minHeight: 44,
                                       ),
-                                      tooltip: 'Increase part',
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Semantics(
+                                            label: 'Decrease part',
+                                            button: true,
+                                            child: IconButton(
+                                              icon: const Icon(
+                                                Icons.remove,
+                                                size: 22,
+                                              ),
+                                              onPressed: () {
+                                                final cur = int.tryParse(
+                                                      controller.text.trim(),
+                                                    ) ??
+                                                    1;
+                                                final next = (cur - 1)
+                                                    .clamp(
+                                                      kPartsMin,
+                                                      kPartsMax,
+                                                    );
+                                                final str = '$next';
+                                                controller.text = str;
+                                                controller.selection =
+                                                    TextSelection.collapsed(
+                                                  offset: str.length,
+                                                );
+                                                onPartsChanged(p, str);
+                                              },
+                                              style: IconButton.styleFrom(
+                                                minimumSize:
+                                                    const Size(44, 44),
+                                                padding: EdgeInsets.zero,
+                                                tapTargetSize:
+                                                    MaterialTapTargetSize
+                                                        .shrinkWrap,
+                                                visualDensity:
+                                                    VisualDensity.compact,
+                                              ),
+                                              tooltip: 'Decrease part',
+                                            ),
+                                          ),
+                                          Semantics(
+                                            label: 'Increase part',
+                                            button: true,
+                                            child: IconButton(
+                                              icon: const Icon(
+                                                Icons.add,
+                                                size: 22,
+                                              ),
+                                            onPressed: () {
+                                              final cur = int.tryParse(
+                                                    controller.text.trim(),
+                                                  ) ??
+                                                  0;
+                                              final next = (cur + 1)
+                                                  .clamp(
+                                                    kPartsMin,
+                                                    kPartsMax,
+                                                  );
+                                              final str = '$next';
+                                              controller.text = str;
+                                              controller.selection =
+                                                  TextSelection.collapsed(
+                                                offset: str.length,
+                                              );
+                                              onPartsChanged(p, str);
+                                            },
+                                            style: IconButton.styleFrom(
+                                              minimumSize:
+                                                  const Size(44, 44),
+                                              padding: EdgeInsets.zero,
+                                              tapTargetSize:
+                                                  MaterialTapTargetSize
+                                                      .shrinkWrap,
+                                              visualDensity:
+                                                  VisualDensity.compact,
+                                            ),
+                                            tooltip: 'Increase part',
+                                          ),
+                                        ),
+                                      ],
                                     ),
+                                  ),
                                   ),
                                 ],
                               ],
                             ),
                           ),
                         ),
-                      ),
                     );
+                    trailing = isParts
+                        ? SizedBox(
+                            width: kPartsTrailingWidth,
+                            child: content,
+                          )
+                        : content;
                   } else {
                     trailing = SizedBox(
                       width: kSplitAmountWidth,
