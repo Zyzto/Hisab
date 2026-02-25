@@ -257,10 +257,82 @@ final openaiApiKeySettingDef = const StringSetting(
   order: 4,
 );
 
+// --- Home list (home page groups/personal order and display) ---
+
+final homeListSection = const SettingSection(
+  key: 'home_list',
+  titleKey: 'home_list_options',
+  icon: Icons.view_list,
+  order: 0,
+  initiallyExpanded: true,
+);
+
+/// 'combined' = one list; 'separate' = Personal + Groups sections.
+final homeListDisplaySettingDef = const EnumSetting(
+  'home_list_display',
+  defaultValue: 'separate',
+  titleKey: 'home_list_display',
+  options: ['separate', 'combined'],
+  optionLabels: {
+    'separate': 'home_list_display_separate',
+    'combined': 'home_list_display_combined',
+  },
+  icon: Icons.view_list,
+  section: 'home_list',
+  order: 0,
+);
+
+/// Sort for unpinned items: created_at, updated_at, or custom (drag order).
+final homeListSortSettingDef = const EnumSetting(
+  'home_list_sort',
+  defaultValue: 'updated_at',
+  titleKey: 'home_list_sort',
+  options: ['created_at', 'updated_at', 'custom'],
+  optionLabels: {
+    'created_at': 'home_list_sort_created',
+    'updated_at': 'home_list_sort_updated',
+    'custom': 'home_list_sort_custom',
+  },
+  icon: Icons.sort,
+  section: 'home_list',
+  order: 1,
+);
+
+/// Comma-separated group IDs; order when sort is custom; also order among pinned when sort not applied to pinned.
+final homeListCustomOrderSettingDef = const StringSetting(
+  'home_list_custom_order',
+  defaultValue: '',
+  titleKey: 'home_list_custom_order',
+  icon: Icons.drag_indicator,
+  section: 'home_list',
+  order: 2,
+);
+
+/// Comma-separated group IDs that stay at top (unless apply sort to pinned is on).
+final homeListPinnedIdsSettingDef = const StringSetting(
+  'home_list_pinned_ids',
+  defaultValue: '',
+  titleKey: 'home_list_pinned_ids',
+  icon: Icons.push_pin,
+  section: 'home_list',
+  order: 3,
+);
+
+/// When true, show creation date on the left of each group/personal card.
+final homeListShowCreatedAtSettingDef = const BoolSetting(
+  'home_list_show_created_at',
+  defaultValue: false,
+  titleKey: 'home_list_show_created_at',
+  icon: Icons.calendar_today,
+  section: 'home_list',
+  order: 4,
+);
+
 final allSections = [
   accountSection,
   appearanceSection,
   functionalSection,
+  homeListSection,
   dataBackupSection,
   receiptAiSection,
   privacySection,
@@ -344,6 +416,11 @@ final allSettings = <SettingDefinition>[
   openaiApiKeySettingDef,
   telemetryEnabledSettingDef,
   notificationsEnabledSettingDef,
+  homeListDisplaySettingDef,
+  homeListSortSettingDef,
+  homeListCustomOrderSettingDef,
+  homeListPinnedIdsSettingDef,
+  homeListShowCreatedAtSettingDef,
 ];
 
 SettingsRegistry createHisabSettingsRegistry() {

@@ -1454,7 +1454,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       final tagRepo = ref.read(tagRepositoryProvider);
       final idMap = <String, String>{};
       for (final g in backup.groups) {
-        final newId = await groupRepo.create(g.name, g.currencyCode);
+        final newId = await groupRepo.create(
+          g.name,
+          g.currencyCode,
+          icon: g.icon,
+          color: g.color,
+          isPersonal: g.isPersonal,
+          budgetAmountCents: g.budgetAmountCents,
+        );
         idMap[g.id] = newId;
       }
       final participantIds = <String, String>{};
@@ -1526,7 +1533,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   static void _showLicenses(BuildContext context) {
-    showLicensePage(context: context, applicationName: 'Hisab');
+    showLicensePage(context: context, applicationName: 'app_name'.tr());
   }
 
   static Future<void> _openDonateLink(BuildContext context) async {
@@ -1624,7 +1631,7 @@ class _AboutMeDialogContentState extends State<_AboutMeDialogContent> {
               fit: BoxFit.cover,
               width: 80,
               height: 80,
-              errorBuilder: (_, __, ___) => Container(
+              errorBuilder: (_, _, _) => Container(
                 width: 80,
                 height: 80,
                 color: Theme.of(context).colorScheme.surfaceContainerHighest,

@@ -892,3 +892,210 @@ final class ExpenseFormExpandBillBreakdownProvider
 
 String _$expenseFormExpandBillBreakdownHash() =>
     r'12c230c9d0faf5db26acd8755c0efca568efd468';
+
+@ProviderFor(homeListDisplay)
+final homeListDisplayProvider = HomeListDisplayProvider._();
+
+final class HomeListDisplayProvider
+    extends $FunctionalProvider<String, String, String>
+    with $Provider<String> {
+  HomeListDisplayProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'homeListDisplayProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$homeListDisplayHash();
+
+  @$internal
+  @override
+  $ProviderElement<String> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  String create(Ref ref) {
+    return homeListDisplay(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String>(value),
+    );
+  }
+}
+
+String _$homeListDisplayHash() => r'a84613e1fb88e9876d9b403e0059f3a178c7de21';
+
+@ProviderFor(homeListSort)
+final homeListSortProvider = HomeListSortProvider._();
+
+final class HomeListSortProvider
+    extends $FunctionalProvider<String, String, String>
+    with $Provider<String> {
+  HomeListSortProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'homeListSortProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$homeListSortHash();
+
+  @$internal
+  @override
+  $ProviderElement<String> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  String create(Ref ref) {
+    return homeListSort(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String>(value),
+    );
+  }
+}
+
+String _$homeListSortHash() => r'5f43b3f4e516bdaa6615c0278f535f95304d614e';
+
+@ProviderFor(homeListCustomOrder)
+final homeListCustomOrderProvider = HomeListCustomOrderProvider._();
+
+final class HomeListCustomOrderProvider
+    extends $FunctionalProvider<String, String, String>
+    with $Provider<String> {
+  HomeListCustomOrderProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'homeListCustomOrderProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$homeListCustomOrderHash();
+
+  @$internal
+  @override
+  $ProviderElement<String> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  String create(Ref ref) {
+    return homeListCustomOrder(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String>(value),
+    );
+  }
+}
+
+String _$homeListCustomOrderHash() =>
+    r'd7294b740c19c116d6f8402525e79b77eb0d9be4';
+
+@ProviderFor(homeListPinnedIds)
+final homeListPinnedIdsProvider = HomeListPinnedIdsProvider._();
+
+final class HomeListPinnedIdsProvider
+    extends $FunctionalProvider<String, String, String>
+    with $Provider<String> {
+  HomeListPinnedIdsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'homeListPinnedIdsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$homeListPinnedIdsHash();
+
+  @$internal
+  @override
+  $ProviderElement<String> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  String create(Ref ref) {
+    return homeListPinnedIds(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String>(value),
+    );
+  }
+}
+
+String _$homeListPinnedIdsHash() => r'16de68f4055ca31dc873a4b9befc6f301feda32e';
+
+@ProviderFor(homeListShowCreatedAt)
+final homeListShowCreatedAtProvider = HomeListShowCreatedAtProvider._();
+
+final class HomeListShowCreatedAtProvider
+    extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  HomeListShowCreatedAtProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'homeListShowCreatedAtProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$homeListShowCreatedAtHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return homeListShowCreatedAt(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$homeListShowCreatedAtHash() =>
+    r'355c15be3fe08f08c129173cebbe293bced20ba2';
