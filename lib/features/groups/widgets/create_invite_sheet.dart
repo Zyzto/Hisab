@@ -110,7 +110,7 @@ class _CreateInviteSheetState extends ConsumerState<_CreateInviteSheet> {
       Log.warning('Create invite failed', error: e, stackTrace: st);
       setState(() => _creating = false);
       if (mounted) {
-        context.showError('$e');
+        context.showError('generic_error'.tr());
       }
     }
   }
@@ -383,18 +383,11 @@ class _InviteResultViewState extends State<_InviteResultView> {
   Future<void> _share(BuildContext context, String url) async {
     final boundary =
         _qrKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-    try {
-      await shareInviteLink(
-        url: url,
-        shareMessage: 'share_invite_message'.tr(),
-        boundary: boundary,
-      );
-      if (!context.mounted) return;
-      context.showSuccess('invite_shared'.tr());
-    } catch (_) {
-      await Clipboard.setData(ClipboardData(text: url));
-      if (!context.mounted) return;
-      context.showSuccess('invite_link_copied'.tr());
-    }
+    await shareInviteLinkWithFallback(
+      context,
+      url: url,
+      shareMessage: 'share_invite_message'.tr(),
+      boundary: boundary,
+    );
   }
 }

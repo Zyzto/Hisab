@@ -1,8 +1,12 @@
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+
+import '../../../core/widgets/toast.dart';
 
 /// Captures the [RepaintBoundary]'s content to PNG bytes.
 /// Returns null if capture or encode fails.
@@ -59,4 +63,28 @@ Future<void> shareInviteLink({
   }
 
   await Share.share(text);
+}
+
+/// Shares the invite [url] (and optionally QR from [boundary]); on failure
+/// copies [url] to clipboard and shows toasts. Call from invite management
+/// and create-invite sheet.
+Future<void> shareInviteLinkWithFallback(
+  BuildContext context, {
+  required String url,
+  String? shareMessage,
+  RenderRepaintBoundary? boundary,
+}) async {
+  try {
+    await shareInviteLink(
+      url: url,
+      shareMessage: shareMessage ?? 'share_invite_message'.tr(),
+      boundary: boundary,
+    );
+    if (!context.mounted) return;
+    context.showSuccess('invite_shared'.tr());
+  } catch (_) {
+    await Clipboard.setData(ClipboardData(text: url));
+    if (!context.mounted) return;
+    context.showSuccess('invite_link_copied'.tr());
+  }
 }

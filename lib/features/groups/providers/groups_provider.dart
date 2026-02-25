@@ -82,6 +82,19 @@ Stream<List<Participant>> participantsByGroup(Ref ref, String groupId) {
   return ref.watch(participantRepositoryProvider).watchByGroupId(groupId);
 }
 
+/// Active participants only (left_at == null). Use for new expenses and balance
+/// so left/archived members do not count towards splits or settlements.
+@riverpod
+Stream<List<Participant>> activeParticipantsByGroup(Ref ref, String groupId) {
+  return ref
+      .watch(participantRepositoryProvider)
+      .watchByGroupId(groupId)
+      .map(
+        (participants) =>
+            participants.where((p) => p.leftAt == null).toList(),
+      );
+}
+
 @riverpod
 Stream<List<ExpenseTag>> tagsByGroup(Ref ref, String groupId) {
   return ref.watch(tagRepositoryProvider).watchByGroupId(groupId);

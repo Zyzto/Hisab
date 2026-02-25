@@ -284,7 +284,7 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
     } catch (e, st) {
       Log.warning('Toggle invite failed', error: e, stackTrace: st);
       if (mounted) {
-        context.showError('$e');
+        context.showError('generic_error'.tr());
       }
     }
     if (mounted) setState(() => _actionLoading = false);
@@ -315,7 +315,7 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
     } catch (e, st) {
       Log.warning('Revoke invite failed', error: e, stackTrace: st);
       if (mounted) {
-        context.showError('$e');
+        context.showError('generic_error'.tr());
       }
     }
     if (mounted) setState(() => _actionLoading = false);
@@ -728,18 +728,11 @@ class _InviteQrSheetContentState extends State<_InviteQrSheetContent> {
   Future<void> _share(BuildContext context, String url) async {
     final boundary =
         _qrKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-    try {
-      await shareInviteLink(
-        url: url,
-        shareMessage: 'share_invite_message'.tr(),
-        boundary: boundary,
-      );
-      if (!context.mounted) return;
-      context.showSuccess('invite_shared'.tr());
-    } catch (_) {
-      await Clipboard.setData(ClipboardData(text: url));
-      if (!context.mounted) return;
-      context.showSuccess('invite_link_copied'.tr());
-    }
+    await shareInviteLinkWithFallback(
+      context,
+      url: url,
+      shareMessage: 'share_invite_message'.tr(),
+      boundary: boundary,
+    );
   }
 }

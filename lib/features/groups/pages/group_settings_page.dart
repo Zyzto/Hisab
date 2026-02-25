@@ -17,6 +17,7 @@ import '../../../core/repository/repository_providers.dart';
 import '../../../core/services/settle_up_service.dart';
 import '../../../core/telemetry/telemetry_service.dart';
 import '../../../core/theme/theme_config.dart';
+import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/currency_helpers.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/toast.dart';
@@ -35,11 +36,21 @@ class GroupSettingsPage extends ConsumerStatefulWidget {
 class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
   bool _saving = false;
 
+  /// Runs [fn] with _saving true; sets _saving false in finally when mounted.
+  Future<void> _withSaving(Future<void> Function() fn) async {
+    setState(() => _saving = true);
+    try {
+      await fn();
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final groupAsync = ref.watch(futureGroupProvider(widget.groupId));
     final participantsAsync = ref.watch(
-      participantsByGroupProvider(widget.groupId),
+      activeParticipantsByGroupProvider(widget.groupId),
     );
     final expensesAsync = ref.watch(expensesByGroupProvider(widget.groupId));
     final localOnly = ref.watch(effectiveLocalOnlyProvider);
@@ -66,7 +77,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
         }
         return Scaffold(
           appBar: AppBar(
-            title: Text('group_settings'.tr()),
+            title: Text((group.isPersonal ? 'list_settings' : 'group_settings').tr()),
             leading: IconButton(
               icon: const Icon(Icons.arrow_back),
               onPressed: () {
@@ -91,34 +102,48 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
               // ── Currency Section ──
               _buildSection(
                 context,
-                title: 'group_currency'.tr(),
+                title: (group.isPersonal ? 'currency' : 'group_currency').tr(),
                 children: [
                   _buildCurrencyRow(context, group, expensesAsync, ref),
                 ],
               ),
               const SizedBox(height: ThemeConfig.spacingL),
 
-              // ── Settlement Section ──
-              _buildSection(
-                context,
-                title: 'settlement_method'.tr(),
-                children: [
-                  _buildSettlementMethodContent(context, group, ref),
-                  if (group.settlementMethod == SettlementMethod.treasurer)
-                    _buildTreasurerContent(
-                        context, group, participantsAsync, ref),
-                  _buildFreezeContent(
-                    context,
-                    group,
-                    participantsAsync,
-                    expensesAsync,
-                    ref,
-                  ),
-                ],
-              ),
+              // ── My budget (personal only) ──
+              if (group.isPersonal) ...[
+                _buildSection(
+                  context,
+                  title: 'my_budget'.tr(),
+                  children: [
+                    _buildMyBudgetRow(context, group, ref),
+                  ],
+                ),
+                const SizedBox(height: ThemeConfig.spacingL),
+              ],
 
-              // ── Permissions Section (online only) ──
-              if (!localOnly)
+              // ── Settlement Section (group only) ──
+              if (!group.isPersonal)
+                _buildSection(
+                  context,
+                  title: 'settlement_method'.tr(),
+                  children: [
+                    _buildSettlementMethodContent(context, group, ref),
+                    if (group.settlementMethod == SettlementMethod.treasurer)
+                      _buildTreasurerContent(
+                          context, group, participantsAsync, ref),
+                    _buildFreezeContent(
+                      context,
+                      group,
+                      participantsAsync,
+                      expensesAsync,
+                      ref,
+                    ),
+                  ],
+                ),
+              if (!group.isPersonal) const SizedBox(height: ThemeConfig.spacingL),
+
+              // ── Permissions Section (online only, group only) ──
+              if (!localOnly && !group.isPersonal)
                 myRoleAsync.when(
                   data: (myRole) {
                     final isOwnerOrAdmin = myRole == GroupRole.owner ||
@@ -179,8 +204,8 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                   error: (_, _) => const SizedBox.shrink(),
                 ),
 
-              // ── Invite Section (online only, owner/admin) ──
-              if (!localOnly)
+              // ── Invite Section (online only, owner/admin, group only) ──
+              if (!localOnly && !group.isPersonal)
                 myRoleAsync.when(
                   data: (myRole) {
                     final isOwnerOrAdmin = myRole == GroupRole.owner ||
@@ -206,6 +231,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                   group,
                   localOnly,
                   myRoleAsync,
+                  participantsAsync,
                   ref,
                   isLocallyArchived: ids.contains(widget.groupId),
                 ),
@@ -214,6 +240,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                   group,
                   localOnly,
                   myRoleAsync,
+                  participantsAsync,
                   ref,
                   isLocallyArchived: false,
                 ),
@@ -222,6 +249,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                   group,
                   localOnly,
                   myRoleAsync,
+                  participantsAsync,
                   ref,
                   isLocallyArchived: false,
                 ),
@@ -234,7 +262,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => Scaffold(
-        appBar: AppBar(title: Text('group_settings'.tr())),
+        appBar: AppBar(title: Text('list_settings'.tr())),
         body: Center(
           child: ErrorContentWidget(
             message: e.toString(),
@@ -396,6 +424,137 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // My budget (personal only)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  Widget _buildMyBudgetRow(
+    BuildContext context,
+    Group group,
+    WidgetRef ref,
+  ) {
+    final theme = Theme.of(context);
+    final currencyCode = group.currencyCode;
+    final budgetCents = group.budgetAmountCents;
+    final display = budgetCents != null && budgetCents > 0
+        ? CurrencyFormatter.formatCents(budgetCents, currencyCode)
+        : '—';
+
+    return InkWell(
+      onTap: _saving
+          ? null
+          : () => _showMyBudgetDialog(context, group, ref),
+      borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          border: Border.all(color: theme.colorScheme.outline),
+          borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                display,
+                style: theme.textTheme.bodyLarge,
+              ),
+            ),
+            Icon(
+              Icons.edit_outlined,
+              size: 20,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showMyBudgetDialog(
+    BuildContext context,
+    Group group,
+    WidgetRef ref,
+  ) async {
+    final controller = TextEditingController();
+    final budgetCents = group.budgetAmountCents;
+    if (budgetCents != null && budgetCents > 0) {
+      final currency = CurrencyHelpers.fromCode(group.currencyCode);
+      final decimals = currency?.decimalDigits ?? 2;
+      final divisor = decimals == 0 ? 1.0 : (decimals == 1 ? 10.0 : 100.0);
+      controller.text = (budgetCents / divisor).toStringAsFixed(decimals);
+    }
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('my_budget'.tr()),
+        content: TextField(
+          controller: controller,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(
+            labelText: 'budget_amount'.tr(),
+            hintText: CurrencyHelpers.fromCode(group.currencyCode)?.symbol ??
+                group.currencyCode,
+            border: const OutlineInputBorder(),
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('cancel'.tr()),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, ''),
+            child: Text('clear'.tr()),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: Text('done'.tr()),
+          ),
+        ],
+      ),
+    );
+
+    if (result == null || !mounted) return;
+
+    int? newBudgetCents;
+    if (result.isNotEmpty) {
+      final value = double.tryParse(result.replaceAll(',', '.'));
+      if (value != null && value >= 0) {
+        final currency = CurrencyHelpers.fromCode(group.currencyCode);
+        final decimals = currency?.decimalDigits ?? 2;
+        final divisor = decimals == 0 ? 1 : (decimals == 1 ? 10 : 100);
+        newBudgetCents = (value * divisor).round();
+      }
+    }
+
+    if (newBudgetCents == group.budgetAmountCents) return;
+
+    try {
+      await _withSaving(() async {
+        await ref.read(groupRepositoryProvider).update(
+              newBudgetCents == null
+                  ? group.copyWith(
+                      clearBudgetAmountCents: true,
+                      updatedAt: DateTime.now(),
+                    )
+                  : group.copyWith(
+                      budgetAmountCents: newBudgetCents,
+                      updatedAt: DateTime.now(),
+                    ),
+            );
+        ref.invalidate(futureGroupProvider(widget.groupId));
+        if (context.mounted) {
+          context.showSuccess('budget_updated'.tr());
+        }
+      });
+    } catch (e, st) {
+      Log.warning('Budget update failed', error: e, stackTrace: st);
+      if (context.mounted) context.showError('generic_error'.tr());
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // Currency
   // ═══════════════════════════════════════════════════════════════════════════
 
@@ -485,26 +644,25 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
           if (ok != true || !mounted) return;
         }
 
-        setState(() => _saving = true);
         try {
-          await ref
-              .read(groupRepositoryProvider)
-              .update(
-                group.copyWith(
-                  currencyCode: currency.code,
-                  updatedAt: DateTime.now(),
-                ),
-              );
-          Log.info(
-            'Currency changed: groupId=${widget.groupId} currency=${currency.code}',
-          );
-          ref.invalidate(futureGroupProvider(widget.groupId));
-          if (mounted) context.showSuccess('group_currency_updated'.tr());
+          await _withSaving(() async {
+            await ref
+                .read(groupRepositoryProvider)
+                .update(
+                  group.copyWith(
+                    currencyCode: currency.code,
+                    updatedAt: DateTime.now(),
+                  ),
+                );
+            Log.info(
+              'Currency changed: groupId=${widget.groupId} currency=${currency.code}',
+            );
+            ref.invalidate(futureGroupProvider(widget.groupId));
+            if (mounted) context.showSuccess('group_currency_updated'.tr());
+          });
         } catch (e, st) {
           Log.warning('Currency change failed', error: e, stackTrace: st);
-          if (mounted) context.showError('$e');
-        } finally {
-          if (mounted) setState(() => _saving = false);
+          if (mounted) context.showError('generic_error'.tr());
         }
       },
     );
@@ -688,7 +846,10 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
         );
       },
       loading: () => const CircularProgressIndicator(),
-      error: (e, _) => Text('Error: $e'),
+      error: (e, st) {
+        Log.warning('Group settings load error', error: e, stackTrace: st);
+        return const ErrorContentWidget(titleKey: 'generic_error');
+      },
     );
   }
 
@@ -831,6 +992,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     Group group,
     bool localOnly,
     AsyncValue<GroupRole?> myRoleAsync,
+    AsyncValue<List<Participant>> participantsAsync,
     WidgetRef ref, {
     required bool isLocallyArchived,
   }) {
@@ -838,93 +1000,173 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     final colorScheme = theme.colorScheme;
     final errorColor = colorScheme.error;
 
-    // For local-only mode, show just delete. For online, show based on role.
     final List<Widget> actions = [];
 
-    if (localOnly) {
+    if (group.isPersonal) {
+      // Personal: Archive (if online), Delete, Share as group only
+      if (!localOnly) {
+        myRoleAsync.whenData((myRole) {
+          if (myRole == GroupRole.owner) {
+            if (group.isArchived) {
+              actions.add(_dangerButton(
+                icon: Icons.unarchive_outlined,
+                label: 'unarchive_list'.tr(),
+                color: errorColor,
+                onTap: _saving ? null : () => _showUnarchiveGroup(context, ref),
+              ));
+            } else {
+              actions.add(_dangerButton(
+                icon: Icons.archive_outlined,
+                label: 'archive_list'.tr(),
+                color: errorColor,
+                onTap: _saving ? null : () => _showArchiveGroup(context, ref),
+              ));
+            }
+          }
+        });
+      }
       actions.add(_dangerButton(
         icon: Icons.delete_outline,
-        label: 'delete_group'.tr(),
+        label: 'delete_list'.tr(),
         color: errorColor,
         onTap: _saving ? null : () => _showDeleteGroup(context, ref),
       ));
+      actions.add(_dangerButton(
+        icon: Icons.share_outlined,
+        label: 'share_as_group'.tr(),
+        color: errorColor,
+        onTap: _saving ? null : () => _showShareAsGroup(context, group, ref),
+      ));
     } else {
-      myRoleAsync.whenData((myRole) {
-        if (myRole == GroupRole.owner) {
-          if (group.isArchived) {
+      // Group: existing logic, plus "Use as personal" when member count == 1
+      final participantCount = participantsAsync.maybeWhen(
+        data: (list) => list.length,
+        orElse: () => 0,
+      );
+      if (participantCount == 1) {
+        actions.add(_dangerButton(
+          icon: Icons.person_outline,
+          label: 'use_as_personal'.tr(),
+          color: errorColor,
+          onTap: _saving ? null : () => _showUseAsPersonal(context, group, ref),
+        ));
+      }
+      if (localOnly) {
+        actions.add(_dangerButton(
+          icon: Icons.delete_outline,
+          label: 'delete_group'.tr(),
+          color: errorColor,
+          onTap: _saving ? null : () => _showDeleteGroup(context, ref),
+        ));
+      } else {
+        myRoleAsync.whenData((myRole) {
+          if (myRole == GroupRole.owner) {
+            if (group.isArchived) {
+              actions.add(_dangerButton(
+                icon: Icons.unarchive_outlined,
+                label: 'unarchive_group'.tr(),
+                color: errorColor,
+                onTap: _saving ? null : () => _showUnarchiveGroup(context, ref),
+              ));
+            } else {
+              actions.add(_dangerButton(
+                icon: Icons.archive_outlined,
+                label: 'archive_group'.tr(),
+                color: errorColor,
+                onTap: _saving ? null : () => _showArchiveGroup(context, ref),
+              ));
+            }
             actions.add(_dangerButton(
-              icon: Icons.unarchive_outlined,
-              label: 'unarchive_group'.tr(),
+              icon: Icons.swap_horiz,
+              label: 'transfer_ownership'.tr(),
               color: errorColor,
-              onTap: _saving ? null : () => _showUnarchiveGroup(context, ref),
+              onTap: _saving
+                  ? null
+                  : () => _showTransferOwnership(context, ref),
             ));
-          } else {
             actions.add(_dangerButton(
-              icon: Icons.archive_outlined,
-              label: 'archive_group'.tr(),
+              icon: Icons.delete_outline,
+              label: 'delete_group'.tr(),
               color: errorColor,
-              onTap: _saving ? null : () => _showArchiveGroup(context, ref),
+              onTap: _saving ? null : () => _showDeleteGroup(context, ref),
+            ));
+          } else if (myRole != null) {
+            if (isLocallyArchived) {
+              actions.add(_dangerButton(
+                icon: Icons.visibility_outlined,
+                label: 'unhide_from_my_list'.tr(),
+                color: errorColor,
+                onTap: _saving ? null : () => _showUnhideFromMyList(context, ref),
+              ));
+            } else {
+              actions.add(_dangerButton(
+                icon: Icons.archive_outlined,
+                label: 'hide_from_my_list'.tr(),
+                color: errorColor,
+                onTap: _saving ? null : () => _showHideFromMyList(context, ref),
+              ));
+            }
+          }
+          if (myRole != null) {
+            actions.add(_dangerButton(
+              icon: Icons.exit_to_app,
+              label: 'leave_group'.tr(),
+              color: errorColor,
+              onTap: _saving ? null : () => _showLeaveGroup(context, ref),
             ));
           }
-          actions.add(_dangerButton(
-            icon: Icons.swap_horiz,
-            label: 'transfer_ownership'.tr(),
-            color: errorColor,
-            onTap: _saving
-                ? null
-                : () => _showTransferOwnership(context, ref),
-          ));
-          actions.add(_dangerButton(
-            icon: Icons.delete_outline,
-            label: 'delete_group'.tr(),
-            color: errorColor,
-            onTap: _saving ? null : () => _showDeleteGroup(context, ref),
-          ));
-        } else if (myRole != null) {
-          // Non-owner: Hide from my list / Unhide from my list (local-only archive)
-          if (isLocallyArchived) {
-            actions.add(_dangerButton(
-              icon: Icons.visibility_outlined,
-              label: 'unhide_from_my_list'.tr(),
-              color: errorColor,
-              onTap: _saving ? null : () => _showUnhideFromMyList(context, ref),
-            ));
-          } else {
-            actions.add(_dangerButton(
-              icon: Icons.archive_outlined,
-              label: 'hide_from_my_list'.tr(),
-              color: errorColor,
-              onTap: _saving ? null : () => _showHideFromMyList(context, ref),
-            ));
-          }
-        }
-        if (myRole != null) {
-          actions.add(_dangerButton(
-            icon: Icons.exit_to_app,
-            label: 'leave_group'.tr(),
-            color: errorColor,
-            onTap: _saving ? null : () => _showLeaveGroup(context, ref),
-          ));
-        }
-      });
+        });
+      }
     }
 
     if (actions.isEmpty) return const SizedBox.shrink();
+
+    // Matrix of 3 columns: chunk actions into rows of 3
+    const int columns = 3;
+    final rows = <List<Widget>>[];
+    for (var i = 0; i < actions.length; i += columns) {
+      rows.add(
+        actions.sublist(i, i + columns > actions.length ? actions.length : i + columns),
+      );
+    }
 
     return _buildSection(
       context,
       title: 'danger_zone'.tr(),
       titleColor: errorColor,
       children: [
-        Row(
-          children: actions
-              .map((btn) => Expanded(child: btn))
-              .expand((w) sync* {
-                yield w;
-                yield const SizedBox(width: ThemeConfig.spacingS);
-              })
-              .toList()
-            ..removeLast(),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: rows.asMap().entries.map((entry) {
+            final rowActions = entry.value;
+            final isLast = entry.key == rows.length - 1;
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: isLast ? 0 : ThemeConfig.spacingS,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: rowActions.isNotEmpty
+                        ? rowActions[0]
+                        : const SizedBox.shrink(),
+                  ),
+                  const SizedBox(width: ThemeConfig.spacingS),
+                  Expanded(
+                    child: rowActions.length > 1
+                        ? rowActions[1]
+                        : const SizedBox.shrink(),
+                  ),
+                  const SizedBox(width: ThemeConfig.spacingS),
+                  Expanded(
+                    child: rowActions.length > 2
+                        ? rowActions[2]
+                        : const SizedBox.shrink(),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
         ),
       ],
     );
@@ -961,15 +1203,16 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
   Future<void> _showEditNameDialog(BuildContext context, Group group) async {
     final controller = TextEditingController(text: group.name);
 
+    final isPersonal = group.isPersonal;
     final newName = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('edit_group_name'.tr()),
+        title: Text((isPersonal ? 'edit_list_name' : 'edit_group_name').tr()),
         content: TextField(
           controller: controller,
           autofocus: true,
           decoration: InputDecoration(
-            labelText: 'group_name'.tr(),
+            labelText: (isPersonal ? 'list_name' : 'group_name').tr(),
             border: const OutlineInputBorder(),
           ),
           textInputAction: TextInputAction.done,
@@ -990,24 +1233,23 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
 
     if (newName == null || newName.isEmpty || newName == group.name) {
       if (newName != null && newName.isEmpty && context.mounted) {
-        context.showToast('group_name_empty'.tr());
+        context.showToast((group.isPersonal ? 'list_name_empty' : 'group_name_empty').tr());
       }
       return;
     }
 
-    setState(() => _saving = true);
     try {
-      await ref.read(groupRepositoryProvider).update(
-            group.copyWith(name: newName, updatedAt: DateTime.now()),
-          );
-      ref.invalidate(futureGroupProvider(widget.groupId));
-      if (context.mounted) {
-        context.showSuccess('group_name_updated'.tr());
-      }
+      await _withSaving(() async {
+        await ref.read(groupRepositoryProvider).update(
+              group.copyWith(name: newName, updatedAt: DateTime.now()),
+            );
+        ref.invalidate(futureGroupProvider(widget.groupId));
+        if (context.mounted) {
+          context.showSuccess((group.isPersonal ? 'list_name_updated' : 'group_name_updated').tr());
+        }
+      });
     } catch (e, st) {
       Log.warning('Name change failed', error: e, stackTrace: st);
-    } finally {
-      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -1210,23 +1452,22 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     // Only save if something changed
     if (newIcon == group.icon && newColor == group.color) return;
 
-    setState(() => _saving = true);
     try {
-      await ref.read(groupRepositoryProvider).update(
-            group.copyWith(
-              icon: newIcon,
-              color: newColor,
-              updatedAt: DateTime.now(),
-            ),
-          );
-      ref.invalidate(futureGroupProvider(widget.groupId));
-      if (context.mounted) {
-        context.showSuccess('group_icon_color_updated'.tr());
-      }
+      await _withSaving(() async {
+        await ref.read(groupRepositoryProvider).update(
+              group.copyWith(
+                icon: newIcon,
+                color: newColor,
+                updatedAt: DateTime.now(),
+              ),
+            );
+        ref.invalidate(futureGroupProvider(widget.groupId));
+        if (context.mounted) {
+          context.showSuccess('group_icon_color_updated'.tr());
+        }
+      });
     } catch (e, st) {
       Log.warning('Icon/color change failed', error: e, stackTrace: st);
-    } finally {
-      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -1266,21 +1507,20 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     SettlementMethod? method,
   ) async {
     if (method == null) return;
-    setState(() => _saving = true);
     try {
-      await ref
-          .read(groupRepositoryProvider)
-          .update(
-            group.copyWith(settlementMethod: method, updatedAt: DateTime.now()),
-          );
-      Log.info(
-        'Settlement method changed: groupId=${widget.groupId} method=$method',
-      );
-      ref.invalidate(futureGroupProvider(widget.groupId));
+      await _withSaving(() async {
+        await ref
+            .read(groupRepositoryProvider)
+            .update(
+              group.copyWith(settlementMethod: method, updatedAt: DateTime.now()),
+            );
+        Log.info(
+          'Settlement method changed: groupId=${widget.groupId} method=$method',
+        );
+        ref.invalidate(futureGroupProvider(widget.groupId));
+      });
     } catch (e, st) {
       Log.warning('Settlement method change failed', error: e, stackTrace: st);
-    } finally {
-      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -1290,24 +1530,23 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     String? treasurerId,
   ) async {
     if (treasurerId == null) return;
-    setState(() => _saving = true);
     try {
-      await ref
-          .read(groupRepositoryProvider)
-          .update(
-            group.copyWith(
-              treasurerParticipantId: treasurerId,
-              updatedAt: DateTime.now(),
-            ),
-          );
-      Log.info(
-        'Treasurer changed: groupId=${widget.groupId} treasurerId=$treasurerId',
-      );
-      ref.invalidate(futureGroupProvider(widget.groupId));
+      await _withSaving(() async {
+        await ref
+            .read(groupRepositoryProvider)
+            .update(
+              group.copyWith(
+                treasurerParticipantId: treasurerId,
+                updatedAt: DateTime.now(),
+              ),
+            );
+        Log.info(
+          'Treasurer changed: groupId=${widget.groupId} treasurerId=$treasurerId',
+        );
+        ref.invalidate(futureGroupProvider(widget.groupId));
+      });
     } catch (e, st) {
       Log.warning('Treasurer change failed', error: e, stackTrace: st);
-    } finally {
-      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -1320,33 +1559,31 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     final participants = participantsAsync.value;
     final expenses = expensesAsync.value;
     if (participants == null || expenses == null) return;
-    setState(() => _saving = true);
     try {
-      final snapshot = createSnapshot(participants, expenses, group);
-      await ref
-          .read(groupRepositoryProvider)
-          .freezeSettlement(widget.groupId, snapshot);
-      Log.info('Settlement frozen: groupId=${widget.groupId}');
-      ref.invalidate(futureGroupProvider(widget.groupId));
+      await _withSaving(() async {
+        final snapshot = createSnapshot(participants, expenses, group);
+        await ref
+            .read(groupRepositoryProvider)
+            .freezeSettlement(widget.groupId, snapshot);
+        Log.info('Settlement frozen: groupId=${widget.groupId}');
+        ref.invalidate(futureGroupProvider(widget.groupId));
+      });
     } catch (e, st) {
       Log.warning('Settlement freeze failed', error: e, stackTrace: st);
-    } finally {
-      if (mounted) setState(() => _saving = false);
     }
   }
 
   Future<void> _onUnfreeze(WidgetRef ref) async {
-    setState(() => _saving = true);
     try {
-      await ref
-          .read(groupRepositoryProvider)
-          .unfreezeSettlement(widget.groupId);
-      Log.info('Settlement unfrozen: groupId=${widget.groupId}');
-      ref.invalidate(futureGroupProvider(widget.groupId));
+      await _withSaving(() async {
+        await ref
+            .read(groupRepositoryProvider)
+            .unfreezeSettlement(widget.groupId);
+        Log.info('Settlement unfrozen: groupId=${widget.groupId}');
+        ref.invalidate(futureGroupProvider(widget.groupId));
+      });
     } catch (e, st) {
       Log.warning('Settlement unfreeze failed', error: e, stackTrace: st);
-    } finally {
-      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -1357,27 +1594,112 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     bool? allowMemberChangeSettings,
     bool? allowExpenseAsOtherParticipant,
   }) async {
-    setState(() => _saving = true);
     try {
-      await ref
-          .read(groupRepositoryProvider)
-          .update(
-            group.copyWith(
-              allowMemberAddExpense:
-                  allowMemberAddExpense ?? group.allowMemberAddExpense,
-              allowMemberChangeSettings:
-                  allowMemberChangeSettings ?? group.allowMemberChangeSettings,
-              allowExpenseAsOtherParticipant:
-                  allowExpenseAsOtherParticipant ??
-                      group.allowExpenseAsOtherParticipant,
-              updatedAt: DateTime.now(),
-            ),
-          );
-      ref.invalidate(futureGroupProvider(widget.groupId));
+      await _withSaving(() async {
+        await ref
+            .read(groupRepositoryProvider)
+            .update(
+              group.copyWith(
+                allowMemberAddExpense:
+                    allowMemberAddExpense ?? group.allowMemberAddExpense,
+                allowMemberChangeSettings:
+                    allowMemberChangeSettings ?? group.allowMemberChangeSettings,
+                allowExpenseAsOtherParticipant:
+                    allowExpenseAsOtherParticipant ??
+                        group.allowExpenseAsOtherParticipant,
+                updatedAt: DateTime.now(),
+              ),
+            );
+        ref.invalidate(futureGroupProvider(widget.groupId));
+      });
     } catch (e, st) {
       Log.warning('Permission change failed', error: e, stackTrace: st);
-    } finally {
-      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _showShareAsGroup(
+    BuildContext context,
+    Group group,
+    WidgetRef ref,
+  ) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('share_as_group'.tr()),
+        content: Text('share_as_group_confirm'.tr()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('cancel'.tr()),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('share_as_group'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    try {
+      await _withSaving(() async {
+        await ref.read(groupRepositoryProvider).update(
+              group.copyWith(isPersonal: false, updatedAt: DateTime.now()),
+            );
+        ref.invalidate(futureGroupProvider(widget.groupId));
+        if (context.mounted) {
+          context.showSuccess('share_as_group_done'.tr());
+        }
+      });
+    } catch (e, st) {
+      Log.warning('Share as group failed', error: e, stackTrace: st);
+      if (context.mounted) context.showError('generic_error'.tr());
+    }
+  }
+
+  Future<void> _showUseAsPersonal(
+    BuildContext context,
+    Group group,
+    WidgetRef ref,
+  ) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('use_as_personal'.tr()),
+        content: Text('use_as_personal_confirm'.tr()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('cancel'.tr()),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('use_as_personal'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    try {
+      await _withSaving(() async {
+        final invites = await ref
+            .read(groupInviteRepositoryProvider)
+            .listByGroup(widget.groupId);
+        for (final invite in invites) {
+          if (invite.status == InviteStatus.active) {
+            await ref.read(groupInviteRepositoryProvider).revoke(invite.id);
+          }
+        }
+        await ref.read(groupRepositoryProvider).update(
+              group.copyWith(isPersonal: true, updatedAt: DateTime.now()),
+            );
+        ref.invalidate(futureGroupProvider(widget.groupId));
+        if (context.mounted) {
+          context.showSuccess('use_as_personal_done'.tr());
+        }
+      });
+    } catch (e, st) {
+      Log.warning('Use as personal failed', error: e, stackTrace: st);
+      if (context.mounted) context.showError('generic_error'.tr());
     }
   }
 
@@ -1422,35 +1744,35 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
       ),
     );
     if (chosen == null || !context.mounted) return;
-    setState(() => _saving = true);
     try {
-      await ref
-          .read(groupMemberRepositoryProvider)
-          .transferOwnership(widget.groupId, chosen);
-      TelemetryService.sendEvent('ownership_transferred', {
-        'groupId': widget.groupId,
-      }, enabled: ref.read(telemetryEnabledProvider));
-      ref.invalidate(futureGroupProvider(widget.groupId));
-      ref.invalidate(myRoleInGroupProvider(widget.groupId));
-      if (context.mounted) {
-        context.showSuccess('ownership_transferred'.tr());
-      }
+      await _withSaving(() async {
+        await ref
+            .read(groupMemberRepositoryProvider)
+            .transferOwnership(widget.groupId, chosen);
+        TelemetryService.sendEvent('ownership_transferred', {
+          'groupId': widget.groupId,
+        }, enabled: ref.read(telemetryEnabledProvider));
+        ref.invalidate(futureGroupProvider(widget.groupId));
+        ref.invalidate(myRoleInGroupProvider(widget.groupId));
+        if (context.mounted) {
+          context.showSuccess('ownership_transferred'.tr());
+        }
+      });
     } catch (e, st) {
       Log.warning('Transfer failed', error: e, stackTrace: st);
       if (context.mounted) {
-        context.showError('$e');
+        context.showError('generic_error'.tr());
       }
-    } finally {
-      if (mounted) setState(() => _saving = false);
     }
   }
 
   Future<void> _showArchiveGroup(BuildContext context, WidgetRef ref) async {
+    final isPersonal = ref.read(futureGroupProvider(widget.groupId)).whenOrNull(data: (g) => g?.isPersonal) ?? false;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('archive_group'.tr()),
-        content: Text('archive_group_confirm'.tr()),
+        title: Text((isPersonal ? 'archive_list' : 'archive_group').tr()),
+        content: Text((isPersonal ? 'archive_list_confirm' : 'archive_group_confirm').tr()),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -1458,43 +1780,42 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text('archive_group'.tr()),
+            child: Text((isPersonal ? 'archive_list' : 'archive_group').tr()),
           ),
         ],
       ),
     );
     if (ok != true || !context.mounted) return;
-    setState(() => _saving = true);
     try {
-      await ref.read(groupRepositoryProvider).archive(widget.groupId);
-      if (context.mounted) {
-        context.showSuccess('group_archived'.tr());
-        context.pop();
-      }
+      await _withSaving(() async {
+        await ref.read(groupRepositoryProvider).archive(widget.groupId);
+        if (context.mounted) {
+          context.showSuccess((isPersonal ? 'list_archived' : 'group_archived').tr());
+          context.pop();
+        }
+      });
     } catch (e, st) {
       Log.warning('Archive group failed', error: e, stackTrace: st);
       if (context.mounted) {
-        context.showError('$e');
+        context.showError('generic_error'.tr());
       }
-    } finally {
-      if (mounted) setState(() => _saving = false);
     }
   }
 
   Future<void> _showUnarchiveGroup(BuildContext context, WidgetRef ref) async {
-    setState(() => _saving = true);
+    final isPersonal = ref.read(futureGroupProvider(widget.groupId)).whenOrNull(data: (g) => g?.isPersonal) ?? false;
     try {
-      await ref.read(groupRepositoryProvider).unarchive(widget.groupId);
-      if (context.mounted) {
-        context.showSuccess('group_unarchived'.tr());
-      }
+      await _withSaving(() async {
+        await ref.read(groupRepositoryProvider).unarchive(widget.groupId);
+        if (context.mounted) {
+          context.showSuccess((isPersonal ? 'list_unarchived' : 'group_unarchived').tr());
+        }
+      });
     } catch (e, st) {
       Log.warning('Unarchive group failed', error: e, stackTrace: st);
       if (context.mounted) {
-        context.showError('$e');
+        context.showError('generic_error'.tr());
       }
-    } finally {
-      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -1517,62 +1838,60 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
       ),
     );
     if (ok != true || !context.mounted) return;
-    setState(() => _saving = true);
     try {
-      await ref.read(groupRepositoryProvider).setLocalArchived(widget.groupId);
-      if (context.mounted) {
-        context.showSuccess('group_hidden_from_list'.tr());
-        context.pop();
-      }
+      await _withSaving(() async {
+        await ref.read(groupRepositoryProvider).setLocalArchived(widget.groupId);
+        if (context.mounted) {
+          context.showSuccess('group_hidden_from_list'.tr());
+          context.pop();
+        }
+      });
     } catch (e, st) {
       Log.warning('Hide from list failed', error: e, stackTrace: st);
       if (context.mounted) {
-        context.showError('$e');
+        context.showError('generic_error'.tr());
       }
-    } finally {
-      if (mounted) setState(() => _saving = false);
     }
   }
 
   Future<void> _showUnhideFromMyList(BuildContext context, WidgetRef ref) async {
-    setState(() => _saving = true);
     try {
-      await ref.read(groupRepositoryProvider).clearLocalArchived(widget.groupId);
-      if (context.mounted) {
-        context.showSuccess('group_unhidden_from_list'.tr());
-      }
+      await _withSaving(() async {
+        await ref.read(groupRepositoryProvider).clearLocalArchived(widget.groupId);
+        if (context.mounted) {
+          context.showSuccess('group_unhidden_from_list'.tr());
+        }
+      });
     } catch (e, st) {
       Log.warning('Unhide from list failed', error: e, stackTrace: st);
       if (context.mounted) {
-        context.showError('$e');
+        context.showError('generic_error'.tr());
       }
-    } finally {
-      if (mounted) setState(() => _saving = false);
     }
   }
 
   Future<void> _showDeleteGroup(BuildContext context, WidgetRef ref) async {
+    final isPersonal = ref.read(futureGroupProvider(widget.groupId)).whenOrNull(data: (g) => g?.isPersonal) ?? false;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => _TimedConfirmDialog(
-        title: 'delete_group'.tr(),
-        content: 'delete_group_confirm'.tr(),
-        confirmLabel: 'delete_group'.tr(),
+        title: (isPersonal ? 'delete_list' : 'delete_group').tr(),
+        content: (isPersonal ? 'delete_list_confirm' : 'delete_group_confirm').tr(),
+        confirmLabel: (isPersonal ? 'delete_list' : 'delete_group').tr(),
         seconds: 10,
       ),
     );
     if (ok != true || !context.mounted) return;
-    setState(() => _saving = true);
     try {
-      await ref.read(groupRepositoryProvider).delete(widget.groupId);
-      if (context.mounted) context.go(RoutePaths.home);
+      await _withSaving(() async {
+        await ref.read(groupRepositoryProvider).delete(widget.groupId);
+        if (context.mounted) context.go(RoutePaths.home);
+      });
     } catch (e, st) {
       Log.warning('Delete group failed', error: e, stackTrace: st);
       if (context.mounted) {
-        context.showError('$e');
+        context.showError('generic_error'.tr());
       }
-    } finally {
-      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -1587,24 +1906,23 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
       ),
     );
     if (ok != true || !context.mounted) return;
-    setState(() => _saving = true);
     try {
-      await ref.read(groupMemberRepositoryProvider).leave(widget.groupId);
-      TelemetryService.sendEvent('member_left', {
-        'groupId': widget.groupId,
-      }, enabled: ref.read(telemetryEnabledProvider));
-      // Trigger immediate sync so the groups list reflects the change
-      ref
-          .read(dataSyncServiceProvider.notifier)
-          .syncNow();
-      if (context.mounted) context.go(RoutePaths.home);
+      await _withSaving(() async {
+        await ref.read(groupMemberRepositoryProvider).leave(widget.groupId);
+        TelemetryService.sendEvent('member_left', {
+          'groupId': widget.groupId,
+        }, enabled: ref.read(telemetryEnabledProvider));
+        // Trigger immediate sync so the groups list reflects the change
+        ref
+            .read(dataSyncServiceProvider.notifier)
+            .syncNow();
+        if (context.mounted) context.go(RoutePaths.home);
+      });
     } catch (e, st) {
       Log.warning('Leave failed', error: e, stackTrace: st);
       if (context.mounted) {
-        context.showError('$e');
+        context.showError('generic_error'.tr());
       }
-    } finally {
-      if (mounted) setState(() => _saving = false);
     }
   }
 }
