@@ -8,17 +8,17 @@ part of 'theme_providers.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Theme data provider. Rebuilds only when themeMode, themeColor, or fontSizeScale change.
+/// Theme data provider. Rebuilds when themeMode, themeColor, fontSizeScale, or experiment style index change.
 
 @ProviderFor(appThemes)
 final appThemesProvider = AppThemesProvider._();
 
-/// Theme data provider. Rebuilds only when themeMode, themeColor, or fontSizeScale change.
+/// Theme data provider. Rebuilds when themeMode, themeColor, fontSizeScale, or experiment style index change.
 
 final class AppThemesProvider
     extends $FunctionalProvider<AppThemes, AppThemes, AppThemes>
     with $Provider<AppThemes> {
-  /// Theme data provider. Rebuilds only when themeMode, themeColor, or fontSizeScale change.
+  /// Theme data provider. Rebuilds when themeMode, themeColor, fontSizeScale, or experiment style index change.
   AppThemesProvider._()
     : super(
         from: null,
@@ -52,7 +52,7 @@ final class AppThemesProvider
   }
 }
 
-String _$appThemesHash() => r'992c8a25b528a72636ab86fb7451cfc9821a2f73';
+String _$appThemesHash() => r'ee1bc0104d51b958b0f6294d8efbaadbfb6c1f8f';
 
 /// ThemeMode for MaterialApp. Separate so locale changes don't trigger theme rebuild.
 

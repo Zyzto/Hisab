@@ -1,10 +1,13 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/theme/theme_config.dart';
+import '../../../core/theme/theme_providers.dart';
 import '../../../domain/domain.dart';
 import '../utils/group_icon_utils.dart';
 
-class GroupCard extends StatelessWidget {
+class GroupCard extends ConsumerWidget {
   final Group group;
   final VoidCallback? onTap;
 
@@ -35,11 +38,21 @@ class GroupCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final styleIndex = ref.watch(experimentStyleIndexProvider);
     final groupColor =
         group.color != null ? Color(group.color!) : theme.colorScheme.primary;
     final iconData = groupIconFromKey(group.icon);
+
+    final leadingWidget = _buildLeadingForStyle(
+      context: context,
+      styleIndex: styleIndex,
+      theme: theme,
+      groupColor: groupColor,
+      iconData: iconData,
+      groupName: group.name,
+    );
 
     return Semantics(
       label: group.name,
@@ -51,7 +64,7 @@ class GroupCard extends StatelessWidget {
             ? theme.colorScheme.primaryContainer.withValues(alpha: 0.4)
             : null,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
           side: isSelected
               ? BorderSide(
                   color: theme.colorScheme.primary,
@@ -62,7 +75,10 @@ class GroupCard extends StatelessWidget {
                       color: theme.colorScheme.primary.withValues(alpha: 0.5),
                       width: 1,
                     )
-                  : BorderSide.none,
+                  : BorderSide(
+                      color: theme.colorScheme.outlineVariant,
+                      width: 1,
+                    ),
         ),
         child: InkWell(
           onTap: () {
@@ -75,9 +91,9 @@ class GroupCard extends StatelessWidget {
                   onLongPress!();
                 }
               : null,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             child: Row(
               children: [
                 if (createdDateLabel != null) ...[
@@ -95,40 +111,33 @@ class GroupCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                 ],
-                CircleAvatar(
-                  radius: 22,
-                  backgroundColor: groupColor,
-                  child: iconData != null
-                      ? Icon(iconData, color: Colors.white, size: 22)
-                      : Text(
-                          group.name.isNotEmpty
-                              ? group.name[0].toUpperCase()
-                              : '?',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                ),
+                leadingWidget,
                 const SizedBox(width: 14),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        group.name,
-                        style: theme.textTheme.titleMedium,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        group.currencyCode,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          group.name,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            fontSize: (theme.textTheme.titleMedium?.fontSize ?? 16) * (18 / 16),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 4),
+                        Text(
+                          group.currencyCode,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 if (onPinToggle != null)
@@ -152,5 +161,105 @@ class GroupCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Per-experiment-style leading widget: icon or avatar.
+  static Widget _buildLeadingForStyle({
+    required BuildContext context,
+    required int styleIndex,
+    required ThemeData theme,
+    required Color groupColor,
+    required IconData? iconData,
+    required String groupName,
+  }) {
+    final defaultAvatar = CircleAvatar(
+      radius: 22,
+      backgroundColor: groupColor,
+      child: iconData != null
+          ? Icon(iconData, color: Colors.white, size: 22)
+          : Text(
+              groupName.isNotEmpty ? groupName[0].toUpperCase() : '?',
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+    );
+
+    switch (styleIndex) {
+      case 0:
+        return defaultAvatar;
+      case 1:
+        // Finance Professional: filled icon in rounded square container
+        return Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: groupColor,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: iconData != null
+              ? Icon(iconData, color: Colors.white, size: 22)
+              : Center(
+                  child: Text(
+                    groupName.isNotEmpty ? groupName[0].toUpperCase() : '?',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+        );
+      case 2:
+        // Playful Bubble: large two-tone icon, no container; initials match with large colored letter
+        return iconData != null
+            ? Icon(iconData, color: groupColor, size: 28)
+            : Text(
+                groupName.isNotEmpty ? groupName[0].toUpperCase() : '?',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  color: groupColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 28,
+                ),
+              );
+      case 3:
+        // Elevated Surface: circle avatar (pastel-ish from theme)
+        return defaultAvatar;
+      case 4:
+        // Tech Utility: outlined icon, no container; initials match with onSurface text, no circle
+        return iconData != null
+            ? Icon(
+                iconData,
+                color: theme.colorScheme.onSurface,
+                size: 22,
+              )
+            : Text(
+                groupName.isNotEmpty ? groupName[0].toUpperCase() : '?',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 22,
+                ),
+              );
+      case 5:
+        // Editorial List: very large icon (48–56px)
+        return iconData != null
+            ? Icon(iconData, color: groupColor, size: 48)
+            : SizedBox(
+                width: 48,
+                height: 48,
+                child: Center(
+                  child: Text(
+                    groupName.isNotEmpty ? groupName[0].toUpperCase() : '?',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      color: groupColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              );
+      default:
+        return defaultAvatar;
+    }
   }
 }

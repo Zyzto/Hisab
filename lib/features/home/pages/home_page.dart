@@ -5,8 +5,10 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/theme/theme_providers.dart';
 import '../../../core/widgets/async_value_builder.dart';
 import '../../../core/widgets/sync_status_icon.dart';
+import '../../../core/widgets/toast.dart';
 import '../../groups/providers/groups_provider.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 import '../../settings/settings_definitions.dart';
@@ -260,7 +262,7 @@ class HomePage extends ConsumerWidget {
               )
             : AppBar(
                 leading: const SyncStatusChip(),
-                title: Text('app_name'.tr()),
+                title: _ExperimentTitle(),
                 actions: [
                   Semantics(
                     label: 'home_list_options'.tr(),
@@ -597,6 +599,34 @@ class HomePage extends ConsumerWidget {
                 ),
               ],
             ),
+      ),
+    );
+  }
+}
+
+/// Tappable app title with current experiment style name below (smaller font). Cycles through 6 styles on tap.
+class _ExperimentTitle extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final index = ref.watch(experimentStyleIndexProvider);
+    final theme = Theme.of(context);
+
+    return GestureDetector(
+      onTap: () {
+        final nextIndex = (index + 1) % 6;
+        ref.read(experimentStyleIndexProvider.notifier).state = nextIndex;
+        context.showToast(experimentStyleNameAt(nextIndex));
+      },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text('app_name'.tr()),
+          Text(
+            experimentStyleNameAt(index),
+            style: theme.textTheme.bodySmall,
+          ),
+        ],
       ),
     );
   }
