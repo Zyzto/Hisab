@@ -451,14 +451,6 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                     ),
                     _buildPermissionRow(
                       context,
-                      icon: Icons.photo_library_outlined,
-                      title: 'onboarding_permission_photos'.tr(),
-                      subtitle: 'onboarding_permission_photos_desc'.tr(),
-                      onAllow: () =>
-                          PermissionService.requestPhotosPermission(context),
-                    ),
-                    _buildPermissionRow(
-                      context,
                       icon: Icons.notifications_outlined,
                       title: 'onboarding_permission_notifications'.tr(),
                       subtitle:
