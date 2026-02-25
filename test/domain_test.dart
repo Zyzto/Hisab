@@ -111,5 +111,71 @@ void main() {
       );
       expect(group.isSettlementFrozen, false);
     });
+
+    test('isArchived is true when archivedAt is not null', () {
+      final group = Group(
+        id: 'g1',
+        name: 'Trip',
+        currencyCode: 'USD',
+        createdAt: DateTime(2025, 1, 1),
+        updatedAt: DateTime(2025, 1, 1),
+        archivedAt: DateTime(2025, 2, 1),
+      );
+      expect(group.isArchived, true);
+    });
+
+    test('isArchived is false when archivedAt is null', () {
+      final group = Group(
+        id: 'g1',
+        name: 'Trip',
+        currencyCode: 'USD',
+        createdAt: DateTime(2025, 1, 1),
+        updatedAt: DateTime(2025, 1, 1),
+      );
+      expect(group.isArchived, false);
+    });
+
+    test('isPersonal and budgetAmountCents in constructor', () {
+      final group = Group(
+        id: 'g1',
+        name: 'My list',
+        currencyCode: 'USD',
+        createdAt: DateTime(2025, 1, 1),
+        updatedAt: DateTime(2025, 1, 1),
+        isPersonal: true,
+        budgetAmountCents: 10000,
+      );
+      expect(group.isPersonal, true);
+      expect(group.budgetAmountCents, 10000);
+    });
+
+    test('copyWith isPersonal and budgetAmountCents', () {
+      final group = Group(
+        id: 'g1',
+        name: 'Trip',
+        currencyCode: 'USD',
+        createdAt: DateTime(2025, 1, 1),
+        updatedAt: DateTime(2025, 1, 1),
+      );
+      final updated = group.copyWith(isPersonal: true, budgetAmountCents: 5000);
+      expect(updated.isPersonal, true);
+      expect(updated.budgetAmountCents, 5000);
+      expect(updated.id, group.id);
+    });
+
+    test('copyWith clearBudgetAmountCents clears budget', () {
+      final group = Group(
+        id: 'g1',
+        name: 'My list',
+        currencyCode: 'USD',
+        createdAt: DateTime(2025, 1, 1),
+        updatedAt: DateTime(2025, 1, 1),
+        isPersonal: true,
+        budgetAmountCents: 10000,
+      );
+      final cleared = group.copyWith(clearBudgetAmountCents: true);
+      expect(cleared.budgetAmountCents, isNull);
+      expect(cleared.isPersonal, true);
+    });
   });
 }
