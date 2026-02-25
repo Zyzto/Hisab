@@ -191,6 +191,7 @@ jobs:
       - name: Copy static pages and PowerSync web assets for Firebase Hosting
         run: |
           cp -r web/privacy build/web/
+          cp -r web/delete-account build/web/
           cp web/redirect.html build/web/
           cp web/og-invite.png build/web/
           sed "s|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g" web/invite-redirect-template.html > build/web/invite-redirect.html
