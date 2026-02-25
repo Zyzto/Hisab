@@ -8,10 +8,11 @@ Use this when filling the **App content** and related declaration forms for Hisa
 
 - **What to do:** Add a **privacy policy URL** (required for apps that use sensitive permissions such as Camera).
 - **URL:** Use a **public** URL where your policy is hosted:
-  - **Firebase Hosting (recommended):** `https://hisab-c8eb1.web.app/privacy` — the static page is built from `web/privacy/index.html` and deployed with the web app (see release workflow; local deploy: after `flutter build web`, run `cp -r web/privacy build/web/` then `firebase deploy --only hosting`).
+  - **Firebase Hosting (custom domain):** `https://hisab.shenepoy.com/privacy` — the static page is built from `web/privacy/index.html` and deployed with the web app via Firebase Hosting (see release workflow; local deploy: after `flutter build web`, run `cp -r web/privacy build/web/` and `cp -r web/delete-account build/web/` then `firebase deploy --only hosting`).
+  - **Firebase Hosting (default URL):** `https://hisab-c8eb1.web.app/privacy` if not using the custom domain
   - GitHub Pages: `https://<your-org-or-username>.github.io/Hisab/privacy` (if you add a `privacy` page there)
-  - Your own domain: `https://yourdomain.com/privacy`
 - **Content:** The policy text in `web/privacy/index.html` matches the in-app policy (Settings → Privacy Policy) and `assets/translations/en.json` keys `privacy_policy_*`, including the **App Permissions** section (Camera, Photos, Notifications). When updating the policy, change both the app strings and `web/privacy/index.html`.
+- **Account and data deletion:** Options (delete local data, delete cloud data, request full account deletion) are described in `docs/DELETE_ACCOUNT.md`. The privacy policy’s Your Rights section matches the in-app options and points users to the account deletion page or GitHub/About for full account deletion. If the Play Console form asks for an account deletion URL, use `https://hisab.shenepoy.com/delete-account` (the static page at `web/delete-account/index.html` is deployed with the web app; same release workflow copies it to `build/web/`).
 
 ---
 
@@ -102,7 +103,7 @@ Fill the Data safety form step-by-step; the above table maps to the questions yo
 
 ## Checklist
 
-- [ ] Privacy policy: URL set and publicly reachable; text matches in-app policy (including permissions).
+- [ ] Privacy policy: URL set and publicly reachable (e.g. https://hisab.shenepoy.com/privacy); text matches in-app policy (including permissions). Account deletion URL set if required (e.g. https://hisab.shenepoy.com/delete-account).
 - [ ] Ads: Declared as “No”.
 - [ ] App access: Instructions provided for restricted (online) parts.
 - [ ] Content ratings: Questionnaire completed; certificate received.

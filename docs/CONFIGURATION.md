@@ -202,18 +202,19 @@ flutter build web \
   --dart-define=SITE_URL=https://hisab.shenepoy.com
 ```
 
-If you use the default Firebase URL instead of a custom domain, use that for `SITE_URL` (e.g. `https://YOUR_PROJECT.web.app`) and add it to Supabase redirect URLs.
+If you use the default Firebase URL instead of the custom domain, use that for `SITE_URL` (e.g. `https://hisab-c8eb1.web.app`) and add it to Supabase redirect URLs.
 
 ### 2. Deploy
 
-Include the static privacy policy page so `https://YOUR_PROJECT.web.app/privacy` is available (e.g. for Play Console):
+Include the static privacy and account-deletion pages in the Firebase Hosting deploy so `https://hisab.shenepoy.com/privacy` and `https://hisab.shenepoy.com/delete-account` are available (e.g. for Play Console):
 
 ```bash
 cp -r web/privacy build/web/
+cp -r web/delete-account build/web/
 firebase deploy --only hosting
 ```
 
-Your `firebase.json` already points `hosting.public` to `build/web`, so the built output (including `privacy/index.html`) is deployed as-is.
+Your `firebase.json` already points `hosting.public` to `build/web`, so the built output (including `privacy/index.html` and `delete-account/index.html`) is deployed as-is.
 
 ### 3. Keeping secrets out of your shell history
 
@@ -226,7 +227,7 @@ Your `firebase.json` already points `hosting.public` to `build/web`, so the buil
 - **Option C – One-off**  
   Run the `flutter build web --dart-define=...` command once locally and then deploy. Keys will be in your shell history unless your shell is configured not to persist it.
 
-After the first deploy, get your live URL from the Firebase console (e.g. `https://YOUR_PROJECT.web.app`) and add it to Supabase redirect URLs if you didn't use `SITE_URL` in the initial build.
+After the first deploy, get your live URL from the Firebase console (e.g. `https://hisab.shenepoy.com` or `https://hisab-c8eb1.web.app`) and add it to Supabase redirect URLs if you didn't use `SITE_URL` in the initial build.
 
 ---
 
