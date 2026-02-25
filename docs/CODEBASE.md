@@ -138,7 +138,7 @@ Push notifications are sent when expenses are added/edited or members join a gro
   - telemetry + notifications toggles
   - logs viewer/clear/report flow
   - feedback capture integration
-  - About: version row tappable to check for updates manually
+  - About: version row tappable to check for updates manually; About me shows developer info from GitHub (avatar, name, bio, profile link)
 - `features/onboarding`: two-page onboarding with mode selection and auth gate for online mode
 
 ## Settings Framework
@@ -161,6 +161,7 @@ Major persisted keys include:
   - desktop -> web invite route
   - mobile -> attempts app deep link with timed web fallback
 - Public privacy page: `web/privacy/index.html`
+- Account deletion is described in `docs/DELETE_ACCOUNT.md`; the in-app options are Delete local data and Delete cloud data under Settings > Advanced (and a public page at `web/delete-account/index.html` when deployed).
 
 ## Supabase Backend Contract
 
@@ -329,3 +330,4 @@ The following improvements are reflected in the codebase and docs:
 - `docs/SUPABASE_SETUP.md` - complete backend bootstrap and SQL/RPC policy setup
 - `docs/CONFIGURATION.md` - runtime configuration quick reference
 - `docs/RELEASE_SETUP.md` and `docs/PLAY_CONSOLE_DECLARATIONS.md` - release/distribution notes
+- `docs/DELETE_ACCOUNT.md` - user-facing guide for deleting data and requesting account deletion
