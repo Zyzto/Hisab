@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Hisab — how to delete your data and request account deletion.">
+  <title>Delete your account and data — Hisab</title>
+  <style>
+    :root { --bg: #fafafa; --surface: #fff; --text: #1a1a1a; --muted: #5f6368; --border: #e0e0e0; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #1a1a1a; --surface: #2d2d2d; --text: #e8e8e8; --muted: #9aa0a6; --border: #3c4043; } }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; line-height: 1.6; color: var(--text); background: var(--bg); margin: 0; padding: 1rem; }
+    .container { max-width: 720px; margin: 0 auto; background: var(--surface); padding: 2rem; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    h1 { font-size: 1.5rem; margin: 0 0 0.25rem 0; }
+    h2 { font-size: 1.15rem; margin: 1.75rem 0 0.5rem 0; }
+    p { margin: 0 0 0.75rem 0; white-space: pre-line; }
+    p:last-child { margin-bottom: 0; }
+    ul { margin: 0 0 0.75rem 0; padding-left: 1.5rem; }
+    a { color: #1a73e8; }
+    .nav { margin-top: 1.5rem; font-size: 0.9rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Delete your Hisab account and data</h1>
+    <p>You can remove your data in three ways:</p>
+
+    <h2>1. Delete local data (this device only)</h2>
+    <p>In the app: Settings → Advanced → Delete local data.</p>
+    <p>This removes all app data from this device and returns you to onboarding. You are not signed out. Server data is not removed.</p>
+
+    <h2>2. Delete your data from the server</h2>
+    <p>When signed in: Settings → Advanced → Delete cloud data.</p>
+    <p>This removes your group memberships, device tokens, and invite records from our servers and signs you out. You can optionally also delete local data on the device. Your auth account (login) is not deleted.</p>
+
+    <h2>3. Request full account deletion</h2>
+    <p>To delete your account and all data stored on our servers:</p>
+    <ul>
+      <li>Open an issue on our GitHub repository with the subject “Account deletion request” and the email address (or identifier) you used to sign in, or</li>
+      <li>Contact the developer through the app’s About section.</li>
+    </ul>
+    <p>Once we process your request, we delete your account and associated data. We do not retain backups of deleted user data.</p>
+
+    <p class="nav"><a href="/privacy/">Privacy Policy</a></p>
+  </div>
+</body>
+</html>
