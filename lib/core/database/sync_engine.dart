@@ -107,12 +107,14 @@ class SyncEngine {
       await tx.execute('DELETE FROM groups');
 
       for (final g in groups) {
+        final isPersonal = (g['is_personal'] ?? false) == true;
+        final budgetCents = (g['budget_amount_cents'] as num?)?.toInt();
         await tx.execute(
           '''INSERT INTO groups (id, name, currency_code, owner_id, settlement_method,
             treasurer_participant_id, settlement_freeze_at, settlement_snapshot_json,
             allow_member_add_expense, allow_member_add_participant, allow_member_change_settings,
-            require_participant_assignment, allow_expense_as_other_participant, icon, color, archived_at, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            require_participant_assignment, allow_expense_as_other_participant, icon, color, archived_at, is_personal, budget_amount_cents, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
           [
             g['id'],
             g['name'],
@@ -130,6 +132,8 @@ class SyncEngine {
             g['icon'],
             g['color'],
             g['archived_at'],
+            isPersonal ? 1 : 0,
+            budgetCents,
             g['created_at'],
             g['updated_at'],
           ],
