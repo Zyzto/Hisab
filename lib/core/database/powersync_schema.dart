@@ -20,6 +20,8 @@ const schema = Schema([
     Column.text('icon'),
     Column.integer('color'),
     Column.text('archived_at'),
+    Column.integer('is_personal'),
+    Column.integer('budget_amount_cents'),
     Column.text('created_at'),
     Column.text('updated_at'),
   ]),

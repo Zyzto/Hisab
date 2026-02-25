@@ -146,6 +146,8 @@ Group _groupFromRow(Map<String, dynamic> row) => Group(
   icon: row['icon'] as String?,
   color: _colorToUnsigned((row['color'] as num?)?.toInt()),
   archivedAt: _parseDateTimeNullable(row['archived_at']),
+  isPersonal: (row['is_personal'] as num?)?.toInt() == 1,
+  budgetAmountCents: (row['budget_amount_cents'] as num?)?.toInt(),
 );
 
 Participant _participantFromRow(Map<String, dynamic> row) => Participant(
@@ -317,7 +319,7 @@ class PowerSyncGroupRepository implements IGroupRepository {
   }
 
   @override
-  Future<String> create(String name, String currencyCode, {String? icon, int? color, List<String> initialParticipants = const []}) async {
+  Future<String> create(String name, String currencyCode, {String? icon, int? color, List<String> initialParticipants = const [], bool isPersonal = false, int? budgetAmountCents}) async {
     final id = _uuid.v4();
     final now = _nowIso();
     String? ownerId;
@@ -341,9 +343,23 @@ class PowerSyncGroupRepository implements IGroupRepository {
       'owner_id': ownerId,
       'icon': icon,
       'color': _colorToSigned(color),
+      'is_personal': isPersonal,
+      'budget_amount_cents': budgetAmountCents,
       'created_at': now,
       'updated_at': now,
     };
+
+    // Pre-generate participant IDs for additional participants so Supabase and local use the same IDs
+    final additionalParticipantIds = <({String id, String name, int sortOrder})>[];
+    for (int i = 0; i < initialParticipants.length; i++) {
+      final pName = initialParticipants[i].trim();
+      if (pName.isEmpty) continue;
+      additionalParticipantIds.add((
+        id: _uuid.v4(),
+        name: pName,
+        sortOrder: i + 1,
+      ));
+    }
 
     // Auto-create a participant for the owner
     final participantId = _uuid.v4();
@@ -383,26 +399,25 @@ class PowerSyncGroupRepository implements IGroupRepository {
             .update({'participant_id': participantId})
             .eq('id', memberId);
       }
-      // Create additional participants from the wizard
-      for (int i = 0; i < initialParticipants.length; i++) {
-        final pName = initialParticipants[i].trim();
-        if (pName.isEmpty) continue;
-        final pId = _uuid.v4();
+      // Create additional participants from the wizard (use same IDs as local loop below)
+      for (int i = 0; i < additionalParticipantIds.length; i++) {
+        final entry = additionalParticipantIds[i];
         await _client.from('participants').insert({
-          'id': pId,
+          'id': entry.id,
           'group_id': id,
-          'name': pName,
-          'sort_order': i + 1,
+          'name': entry.name,
+          'sort_order': entry.sortOrder,
           'created_at': now,
           'updated_at': now,
         });
       }
     }
 
-    // Always write to local DB
+    // Always write to local DB (use signed color for consistency with Supabase and reader)
+    final colorStored = _colorToSigned(color);
     await _db.execute(
-      'INSERT INTO groups (id, name, currency_code, owner_id, icon, color, archived_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, name, currencyCode, ownerId, icon, color, null, now, now],
+      'INSERT INTO groups (id, name, currency_code, owner_id, icon, color, archived_at, is_personal, budget_amount_cents, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, name, currencyCode, ownerId, icon, colorStored, null, isPersonal ? 1 : 0, budgetAmountCents, now, now],
     );
     // Local participant for owner
     await _db.execute(
@@ -416,14 +431,11 @@ class PowerSyncGroupRepository implements IGroupRepository {
         [memberId, id, ownerId, 'owner', participantId, now],
       );
     }
-    // Create additional participants from the wizard in local DB
-    for (int i = 0; i < initialParticipants.length; i++) {
-      final pName = initialParticipants[i].trim();
-      if (pName.isEmpty) continue;
-      final pId = _uuid.v4();
+    // Create additional participants from the wizard in local DB (same IDs as Supabase)
+    for (final entry in additionalParticipantIds) {
       await _db.execute(
         'INSERT INTO participants (id, group_id, name, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [pId, id, pName, i + 1, now, now],
+        [entry.id, id, entry.name, entry.sortOrder, now, now],
       );
     }
 
@@ -450,6 +462,8 @@ class PowerSyncGroupRepository implements IGroupRepository {
       'icon': group.icon,
       'color': _colorToSigned(group.color),
       'archived_at': group.archivedAt?.toUtc().toIso8601String(),
+      'is_personal': group.isPersonal,
+      'budget_amount_cents': group.budgetAmountCents,
       'updated_at': now,
     };
 
@@ -468,7 +482,7 @@ class PowerSyncGroupRepository implements IGroupRepository {
         treasurer_participant_id = ?, settlement_freeze_at = ?,
         settlement_snapshot_json = ?, allow_member_add_expense = ?,
         allow_member_change_settings = ?, allow_expense_as_other_participant = ?,
-        icon = ?, color = ?, archived_at = ?, updated_at = ?
+        icon = ?, color = ?, archived_at = ?, is_personal = ?, budget_amount_cents = ?, updated_at = ?
       WHERE id = ?''',
       [
         group.name,
@@ -483,6 +497,8 @@ class PowerSyncGroupRepository implements IGroupRepository {
         group.icon,
         _colorToSigned(group.color),
         group.archivedAt?.toUtc().toIso8601String(),
+        group.isPersonal ? 1 : 0,
+        group.budgetAmountCents,
         now,
         group.id,
       ],
@@ -790,10 +806,13 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
 
   @override
   Future<void> delete(String id) async {
+    Log.info('ParticipantRepository.delete: participantId=$id localOnly=$_isLocalOnly online=$_isOnline');
     if (!_isLocalOnly && _isOnline && _client != null) {
       await _client.from('participants').delete().eq('id', id);
+      Log.info('ParticipantRepository.delete: deleted on server');
     }
     await _db.execute('DELETE FROM participants WHERE id = ?', [id]);
+    Log.info('ParticipantRepository.delete: deleted from local DB');
   }
 }
 
@@ -1283,6 +1302,7 @@ class PowerSyncGroupInviteRepository implements IGroupInviteRepository {
     if (result == null || (result is List && result.isEmpty)) return null;
     final row = result is List ? result.first : result;
 
+    // RPC returns invite + group columns; createdBy, label, maxUses, useCount, isActive may be absent (defaults used)
     final invite = GroupInvite(
       id: row['invite_id'] as String,
       groupId: row['group_id'] as String,
@@ -1296,8 +1316,8 @@ class PowerSyncGroupInviteRepository implements IGroupInviteRepository {
       id: row['group_id'] as String,
       name: row['group_name'] as String? ?? '',
       currencyCode: row['group_currency_code'] as String? ?? 'USD',
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
+      createdAt: _parseDateTime(row['group_created_at']),
+      updatedAt: _parseDateTime(row['group_updated_at']),
     );
     return (invite: invite, group: group);
   }
