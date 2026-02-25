@@ -42,5 +42,35 @@ void main() {
       expect(result.data!.participants, isEmpty);
       expect(result.data!.expenses, isEmpty);
     });
+
+    test('returns data for valid backup with personal group and budget', () {
+      const json = '''
+      {
+        "version": 1,
+        "groups": [
+          {
+            "id": "g1",
+            "name": "My list",
+            "currencyCode": "USD",
+            "createdAt": "2025-01-01T00:00:00Z",
+            "updatedAt": "2025-01-01T00:00:00Z",
+            "isPersonal": true,
+            "budgetAmountCents": 10000
+          }
+        ],
+        "participants": [],
+        "expenses": [],
+        "expense_tags": [],
+        "localArchivedGroupIds": []
+      }
+      ''';
+      final result = parseBackupJson(json);
+      expect(result.errorMessageKey, isNull);
+      expect(result.data, isNotNull);
+      expect(result.data!.groups.length, 1);
+      expect(result.data!.groups.first.isPersonal, true);
+      expect(result.data!.groups.first.budgetAmountCents, 10000);
+      expect(result.data!.groups.first.name, 'My list');
+    });
   });
 }
