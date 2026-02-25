@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:upgrader/upgrader.dart';
 import 'core/auth/auth_providers.dart';
 import 'core/database/database_providers.dart';
@@ -20,6 +21,7 @@ import 'package:toastification/toastification.dart';
 import 'core/navigation/app_router.dart';
 import 'core/navigation/invite_link_handler.dart';
 import 'core/services/connectivity_service.dart';
+import 'core/widgets/back_button_keyboard_dismiss.dart';
 import 'core/widgets/toast.dart';
 
 class App extends ConsumerStatefulWidget {
@@ -43,8 +45,13 @@ class _AppState extends ConsumerState<App> {
     super.initState();
     _upgrader = Upgrader(
       durationUntilAlertAgain: const Duration(days: 3),
-      debugLogging: kDebugMode,
+      debugLogging: false, // use app-level aggregated log instead of package prints
       messages: HisabUpgraderMessages(context: context),
+      willDisplayUpgrade: ({required bool display, String? installedVersion, UpgraderVersionInfo? versionInfo}) {
+        Log.debug(
+          'Upgrader (auto): store=${versionInfo?.appStoreVersion}, installed=$installedVersion, showDialog=$display',
+        );
+      },
     );
     if (!kDebugMode) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -67,6 +74,10 @@ class _AppState extends ConsumerState<App> {
         await Future.delayed(const Duration(milliseconds: 400));
         if (!mounted) return;
         final shouldShow = _upgrader.shouldDisplayUpgrade();
+        final vi = _upgrader.versionInfo;
+        Log.debug(
+          'Upgrader (manual): store=${vi?.appStoreVersion}, installed=${vi?.installedVersion}, showDialog=$shouldShow',
+        );
         if (!shouldShow && context.mounted) {
           final msg = _upgrader.versionInfo == null
               ? 'could_not_check_for_updates'.tr()
@@ -126,7 +137,7 @@ class _AppState extends ConsumerState<App> {
         child: ToastificationWrapper(
           config: const ToastificationConfig(alignment: Alignment.bottomCenter),
           child: MaterialApp.router(
-        title: 'Hisab',
+        title: 'app_name'.tr(),
         debugShowCheckedModeBanner: false,
         scrollBehavior: AppScrollBehavior(),
         localizationsDelegates: context.localizationDelegates,
@@ -136,13 +147,15 @@ class _AppState extends ConsumerState<App> {
           final isRtl = context.locale.languageCode == 'ar';
           final isDebug =
               ref.watch(isDebugBuildProvider).asData?.value == true;
-          final innerContent = GestureDetector(
-            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-            behavior: HitTestBehavior.deferToChild,
-            child: Directionality(
-              textDirection:
-                  isRtl ? ui.TextDirection.rtl : ui.TextDirection.ltr,
-              child: child ?? const SizedBox.shrink(),
+          final innerContent = BackButtonKeyboardDismiss(
+            child: GestureDetector(
+              onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+              behavior: HitTestBehavior.deferToChild,
+              child: Directionality(
+                textDirection:
+                    isRtl ? ui.TextDirection.rtl : ui.TextDirection.ltr,
+                child: child ?? const SizedBox.shrink(),
+              ),
             ),
           );
           final contentWithSyncIndicator = Stack(
