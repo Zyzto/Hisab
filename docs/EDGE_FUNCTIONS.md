@@ -28,6 +28,8 @@ Set Edge Function secrets in the dashboard (e.g. `FCM_PROJECT_ID`, `FCM_SERVICE_
 
 The path `/functions/v1/invite-redirect` is served by a **Firebase Cloud Function** (`inviteRedirectPage`) so that crawlers receive HTML with dynamic `og:image` and `twitter:image` pointing to the Supabase `og-invite-image` Edge Function for the token. See `functions/` and `firebase.json` (hosting rewrites). Deploy with `firebase deploy --only functions`; set `SUPABASE_URL` and `SITE_URL` via `functions/.env` or params (see `functions/.env.example`).
 
+**Note (Spark plan):** The CI workflow deploys only Firebase Hosting and does not deploy this Cloud Function, so the project can stay on the free Spark plan. Invite redirect for crawlers (OG meta) is therefore not available unless you upgrade to Blaze and run `firebase deploy --only functions` manually.
+
 ## Syncing from Supabase
 
 To pull the currently deployed code for a function (e.g. to compare or restore):

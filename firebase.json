@@ -1,35 +1,40 @@
 {
-  "functions": [
-    {
-      "source": "functions",
-      "codebase": "default",
-      "ignore": [
-        "node_modules",
-        ".git",
-        "firebase-debug.log",
-        "firebase-debug.*.log",
-        "*.local"
-      ]
-    }
-  ],
-  "hosting": {
-    "public": "build/web",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-    "rewrites": [
-      {
-        "source": "/functions/v1/invite-redirect",
-        "function": {
-          "functionId": "inviteRedirectPage",
-          "region": "us-central1"
+    "functions": [
+        {
+            "source": "functions",
+            "codebase": "default",
+            "ignore": [
+                "node_modules",
+                ".git",
+                "firebase-debug.log",
+                "firebase-debug.*.log",
+                "*.local"
+            ]
         }
-      },
-      {"source": "**", "destination": "/index.html"}
     ],
-    "headers": [
-      {
-        "source": "**/*.wasm",
-        "headers": [{"key": "Content-Type", "value": "application/wasm"}]
-      }
-    ]
-  }
+    "hosting": {
+        "public": "build/web",
+        "ignore": [
+            "firebase.json",
+            "**/.*",
+            "**/node_modules/**"
+        ],
+        "rewrites": [
+            {
+                "source": "**",
+                "destination": "/index.html"
+            }
+        ],
+        "headers": [
+            {
+                "source": "**/*.wasm",
+                "headers": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/wasm"
+                    }
+                ]
+            }
+        ]
+    }
 }
