@@ -19,6 +19,7 @@ import 'core/theme/theme_providers.dart';
 import 'package:toastification/toastification.dart';
 import 'core/navigation/app_router.dart';
 import 'core/navigation/invite_link_handler.dart';
+import 'core/services/connectivity_service.dart';
 import 'core/widgets/toast.dart';
 
 class App extends ConsumerStatefulWidget {
@@ -85,6 +86,7 @@ class _AppState extends ConsumerState<App> {
 
     // Watch DataSyncService to reactively fetch/push data
     ref.watch(dataSyncServiceProvider);
+    final syncStatus = ref.watch(syncStatusForDisplayProvider);
 
     // Initialize push notifications when user authenticates and setting is enabled.
     // listen handles sign-in/sign-out transitions; watch handles initial state.
@@ -143,12 +145,34 @@ class _AppState extends ConsumerState<App> {
               child: child ?? const SizedBox.shrink(),
             ),
           );
+          final contentWithSyncIndicator = Stack(
+            children: [
+              innerContent,
+              if (syncStatus == SyncStatus.syncing)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: SafeArea(
+                    bottom: false,
+                    child: SizedBox(
+                      height: 3,
+                      child: LinearProgressIndicator(
+                        backgroundColor: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          );
           // In release, first frame paints without UpgradeAlert to avoid
           // any upgrader init blocking splash removal.
           if (!_showUpgradeAlert) {
             return Stack(
               children: [
-                innerContent,
+                contentWithSyncIndicator,
                 if (isDebug && _debugFabVisible)
                   Positioned(
                     bottom: 96,
@@ -181,7 +205,7 @@ class _AppState extends ConsumerState<App> {
                   }
                   return true;
                 },
-                child: innerContent,
+                child: contentWithSyncIndicator,
               ),
               if (isDebug && _debugFabVisible)
                 Positioned(
