@@ -2,6 +2,10 @@ import 'settlement_method.dart';
 
 /// Domain entity: a group (trip/event) with participants and expenses.
 /// [id] is a UUID string.
+///
+/// When [isPersonal] is true, the group is "my expenses only": single participant,
+/// minimized UI (no People/Balance tabs, no split in expense form, no invites).
+/// [budgetAmountCents] is optional and used for personal "My budget" display.
 class Group {
   final String id;
   final String name;
@@ -19,6 +23,10 @@ class Group {
   final String? icon;
   final int? color;
   final DateTime? archivedAt;
+  /// True for personal (my-expenses-only) groups; minimal UI, no invites.
+  final bool isPersonal;
+  /// Optional budget in group currency (cents); used when [isPersonal].
+  final int? budgetAmountCents;
 
   const Group({
     required this.id,
@@ -37,6 +45,8 @@ class Group {
     this.icon,
     this.color,
     this.archivedAt,
+    this.isPersonal = false,
+    this.budgetAmountCents,
   });
 
   bool get isSettlementFrozen => settlementFreezeAt != null;
@@ -59,6 +69,9 @@ class Group {
     String? icon,
     int? color,
     DateTime? archivedAt,
+    bool? isPersonal,
+    int? budgetAmountCents,
+    bool clearBudgetAmountCents = false,
   }) {
     return Group(
       id: id ?? this.id,
@@ -82,6 +95,10 @@ class Group {
       icon: icon ?? this.icon,
       color: color ?? this.color,
       archivedAt: archivedAt ?? this.archivedAt,
+      isPersonal: isPersonal ?? this.isPersonal,
+      budgetAmountCents: clearBudgetAmountCents
+          ? null
+          : (budgetAmountCents ?? this.budgetAmountCents),
     );
   }
 
@@ -103,5 +120,7 @@ class Group {
     icon: icon,
     color: color,
     archivedAt: archivedAt,
+    isPersonal: isPersonal,
+    budgetAmountCents: budgetAmountCents,
   );
 }
