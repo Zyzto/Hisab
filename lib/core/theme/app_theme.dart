@@ -6,6 +6,82 @@ import 'theme_extensions.dart';
 class AppTheme {
   AppTheme._();
 
+  static ThemeData _buildThemeData<T extends ThemeExtension<T>>({
+    required ColorScheme colorScheme,
+    required TextTheme textTheme,
+    required Color dividerColor,
+    required Color outlineColor,
+    required Color errorColor,
+    required Color iconColor,
+    required T extension,
+    required Color primarySeed,
+  }) {
+    return ThemeData(
+      useMaterial3: true,
+      textTheme: textTheme,
+      colorScheme: colorScheme,
+      appBarTheme: AppBarTheme(
+        centerTitle: ThemeConfig.appBarCenterTitle,
+        elevation: ThemeConfig.appBarElevation,
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
+        iconTheme: IconThemeData(color: colorScheme.onSurface),
+      ),
+      cardTheme: CardThemeData(
+        elevation: ThemeConfig.cardElevation,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(ThemeConfig.cardBorderRadius),
+        ),
+        color: colorScheme.surface,
+      ),
+      dividerTheme: DividerThemeData(
+        color: dividerColor,
+        thickness: ThemeConfig.dividerThickness,
+        space: ThemeConfig.dividerSpacing,
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(ThemeConfig.inputBorderRadius),
+          borderSide: BorderSide(
+            color: outlineColor,
+            width: ThemeConfig.inputDefaultBorderWidth,
+          ),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(ThemeConfig.inputBorderRadius),
+          borderSide: BorderSide(
+            color: outlineColor,
+            width: ThemeConfig.inputDefaultBorderWidth,
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(ThemeConfig.inputBorderRadius),
+          borderSide: BorderSide(
+            color: primarySeed,
+            width: ThemeConfig.inputFocusedBorderWidth,
+          ),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(ThemeConfig.inputBorderRadius),
+          borderSide: BorderSide(
+            color: errorColor,
+            width: ThemeConfig.inputDefaultBorderWidth,
+          ),
+        ),
+      ),
+      iconTheme: IconThemeData(color: iconColor),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: colorScheme.surfaceContainerHighest,
+        contentTextStyle: TextStyle(color: colorScheme.onSurface),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(ThemeConfig.radiusM),
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+      extensions: [extension],
+    );
+  }
+
   static TextTheme _scaleTextTheme(
     TextTheme baseTextTheme,
     double scaleFactor,
@@ -64,89 +140,34 @@ class AppTheme {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: baseSeedColor,
       brightness: Brightness.light,
+    ).copyWith(
+      surface: ThemeConfig.lightSurface,
+      surfaceContainerHighest: ThemeConfig.lightSurfaceContainerHighest,
+      onSurface: ThemeConfig.lightOnSurface,
+      onSurfaceVariant: ThemeConfig.lightOnSurfaceVariant,
+      outline: ThemeConfig.lightOutline,
+      outlineVariant: ThemeConfig.lightOutlineVariant,
+      primary: baseSeedColor,
+      onPrimary: Colors.white,
+      secondary: baseSeedColor.withValues(alpha: 0.8),
+      onSecondary: Colors.white,
+      error: ThemeConfig.lightError,
+      onError: Colors.white,
     );
     final textScaleFactor = ThemeConfig.getTextScaleFactor(fontSizeScale);
     final textTheme = _scaleTextTheme(
       ThemeData.light().textTheme,
       textScaleFactor,
     );
-
-    return ThemeData(
-      useMaterial3: true,
+    return _buildThemeData(
+      colorScheme: colorScheme,
       textTheme: textTheme,
-      colorScheme: colorScheme.copyWith(
-        surface: ThemeConfig.lightSurface,
-        surfaceContainerHighest: ThemeConfig.lightSurfaceContainerHighest,
-        onSurface: ThemeConfig.lightOnSurface,
-        onSurfaceVariant: ThemeConfig.lightOnSurfaceVariant,
-        outline: ThemeConfig.lightOutline,
-        outlineVariant: ThemeConfig.lightOutlineVariant,
-        primary: baseSeedColor,
-        onPrimary: Colors.white,
-        secondary: baseSeedColor.withValues(alpha: 0.8),
-        onSecondary: Colors.white,
-        error: ThemeConfig.lightError,
-        onError: Colors.white,
-      ),
-      appBarTheme: AppBarTheme(
-        centerTitle: ThemeConfig.appBarCenterTitle,
-        elevation: ThemeConfig.appBarElevation,
-        backgroundColor: colorScheme.surface,
-        foregroundColor: colorScheme.onSurface,
-        iconTheme: IconThemeData(color: colorScheme.onSurface),
-      ),
-      cardTheme: CardThemeData(
-        elevation: ThemeConfig.cardElevation,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(ThemeConfig.cardBorderRadius),
-        ),
-        color: colorScheme.surface,
-      ),
-      dividerTheme: const DividerThemeData(
-        color: ThemeConfig.lightDivider,
-        thickness: ThemeConfig.dividerThickness,
-        space: ThemeConfig.dividerSpacing,
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(ThemeConfig.inputBorderRadius),
-          borderSide: const BorderSide(
-            color: ThemeConfig.lightOutline,
-            width: ThemeConfig.inputDefaultBorderWidth,
-          ),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(ThemeConfig.inputBorderRadius),
-          borderSide: const BorderSide(
-            color: ThemeConfig.lightOutline,
-            width: ThemeConfig.inputDefaultBorderWidth,
-          ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(ThemeConfig.inputBorderRadius),
-          borderSide: BorderSide(
-            color: baseSeedColor,
-            width: ThemeConfig.inputFocusedBorderWidth,
-          ),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(ThemeConfig.inputBorderRadius),
-          borderSide: const BorderSide(
-            color: ThemeConfig.lightError,
-            width: ThemeConfig.inputDefaultBorderWidth,
-          ),
-        ),
-      ),
-      iconTheme: const IconThemeData(color: ThemeConfig.lightIcon),
-      snackBarTheme: SnackBarThemeData(
-        backgroundColor: colorScheme.surfaceContainerHighest,
-        contentTextStyle: TextStyle(color: colorScheme.onSurface),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(ThemeConfig.radiusM),
-        ),
-        behavior: SnackBarBehavior.floating,
-      ),
-      extensions: const <ThemeExtension<dynamic>>[AppThemeExtension.light],
+      dividerColor: ThemeConfig.lightDivider,
+      outlineColor: ThemeConfig.lightOutline,
+      errorColor: ThemeConfig.lightError,
+      iconColor: ThemeConfig.lightIcon,
+      extension: AppThemeExtension.light,
+      primarySeed: baseSeedColor,
     );
   }
 
@@ -155,89 +176,34 @@ class AppTheme {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: baseSeedColor,
       brightness: Brightness.dark,
+    ).copyWith(
+      surface: ThemeConfig.darkSurface,
+      surfaceContainerHighest: ThemeConfig.darkSurfaceContainerHighest,
+      onSurface: ThemeConfig.darkOnSurface,
+      onSurfaceVariant: ThemeConfig.darkOnSurfaceVariant,
+      outline: ThemeConfig.darkOutline,
+      outlineVariant: ThemeConfig.darkOutlineVariant,
+      primary: baseSeedColor,
+      onPrimary: Colors.white,
+      secondary: baseSeedColor.withValues(alpha: 0.8),
+      onSecondary: Colors.white,
+      error: ThemeConfig.darkError,
+      onError: Colors.white,
     );
     final textScaleFactor = ThemeConfig.getTextScaleFactor(fontSizeScale);
     final textTheme = _scaleTextTheme(
       ThemeData.dark().textTheme,
       textScaleFactor,
     );
-
-    return ThemeData(
-      useMaterial3: true,
+    return _buildThemeData(
+      colorScheme: colorScheme,
       textTheme: textTheme,
-      colorScheme: colorScheme.copyWith(
-        surface: ThemeConfig.darkSurface,
-        surfaceContainerHighest: ThemeConfig.darkSurfaceContainerHighest,
-        onSurface: ThemeConfig.darkOnSurface,
-        onSurfaceVariant: ThemeConfig.darkOnSurfaceVariant,
-        outline: ThemeConfig.darkOutline,
-        outlineVariant: ThemeConfig.darkOutlineVariant,
-        primary: baseSeedColor,
-        onPrimary: Colors.white,
-        secondary: baseSeedColor.withValues(alpha: 0.8),
-        onSecondary: Colors.white,
-        error: ThemeConfig.darkError,
-        onError: Colors.white,
-      ),
-      appBarTheme: AppBarTheme(
-        centerTitle: ThemeConfig.appBarCenterTitle,
-        elevation: ThemeConfig.appBarElevation,
-        backgroundColor: colorScheme.surface,
-        foregroundColor: colorScheme.onSurface,
-        iconTheme: IconThemeData(color: colorScheme.onSurface),
-      ),
-      cardTheme: CardThemeData(
-        elevation: ThemeConfig.cardElevation,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(ThemeConfig.cardBorderRadius),
-        ),
-        color: colorScheme.surface,
-      ),
-      dividerTheme: const DividerThemeData(
-        color: ThemeConfig.darkDivider,
-        thickness: ThemeConfig.dividerThickness,
-        space: ThemeConfig.dividerSpacing,
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(ThemeConfig.inputBorderRadius),
-          borderSide: const BorderSide(
-            color: ThemeConfig.darkOutline,
-            width: ThemeConfig.inputDefaultBorderWidth,
-          ),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(ThemeConfig.inputBorderRadius),
-          borderSide: const BorderSide(
-            color: ThemeConfig.darkOutline,
-            width: ThemeConfig.inputDefaultBorderWidth,
-          ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(ThemeConfig.inputBorderRadius),
-          borderSide: BorderSide(
-            color: baseSeedColor,
-            width: ThemeConfig.inputFocusedBorderWidth,
-          ),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(ThemeConfig.inputBorderRadius),
-          borderSide: const BorderSide(
-            color: ThemeConfig.darkError,
-            width: ThemeConfig.inputDefaultBorderWidth,
-          ),
-        ),
-      ),
-      iconTheme: const IconThemeData(color: ThemeConfig.darkIcon),
-      snackBarTheme: SnackBarThemeData(
-        backgroundColor: colorScheme.surfaceContainerHighest,
-        contentTextStyle: TextStyle(color: colorScheme.onSurface),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(ThemeConfig.radiusM),
-        ),
-        behavior: SnackBarBehavior.floating,
-      ),
-      extensions: const <ThemeExtension<dynamic>>[AppThemeExtension.dark],
+      dividerColor: ThemeConfig.darkDivider,
+      outlineColor: ThemeConfig.darkOutline,
+      errorColor: ThemeConfig.darkError,
+      iconColor: ThemeConfig.darkIcon,
+      extension: AppThemeExtension.dark,
+      primarySeed: baseSeedColor,
     );
   }
 
@@ -246,89 +212,34 @@ class AppTheme {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: baseSeedColor,
       brightness: Brightness.dark,
+    ).copyWith(
+      surface: ThemeConfig.amoledSurface,
+      surfaceContainerHighest: ThemeConfig.amoledSurfaceContainerHighest,
+      onSurface: ThemeConfig.amoledOnSurface,
+      onSurfaceVariant: ThemeConfig.amoledOnSurfaceVariant,
+      outline: ThemeConfig.amoledOutline,
+      outlineVariant: ThemeConfig.amoledOutlineVariant,
+      primary: baseSeedColor,
+      onPrimary: Colors.white,
+      secondary: baseSeedColor.withValues(alpha: 0.8),
+      onSecondary: Colors.white,
+      error: ThemeConfig.amoledError,
+      onError: Colors.white,
     );
     final textScaleFactor = ThemeConfig.getTextScaleFactor(fontSizeScale);
     final textTheme = _scaleTextTheme(
       ThemeData.dark().textTheme,
       textScaleFactor,
     );
-
-    return ThemeData(
-      useMaterial3: true,
+    return _buildThemeData(
+      colorScheme: colorScheme,
       textTheme: textTheme,
-      colorScheme: colorScheme.copyWith(
-        surface: ThemeConfig.amoledSurface,
-        surfaceContainerHighest: ThemeConfig.amoledSurfaceContainerHighest,
-        onSurface: ThemeConfig.amoledOnSurface,
-        onSurfaceVariant: ThemeConfig.amoledOnSurfaceVariant,
-        outline: ThemeConfig.amoledOutline,
-        outlineVariant: ThemeConfig.amoledOutlineVariant,
-        primary: baseSeedColor,
-        onPrimary: Colors.white,
-        secondary: baseSeedColor.withValues(alpha: 0.8),
-        onSecondary: Colors.white,
-        error: ThemeConfig.amoledError,
-        onError: Colors.white,
-      ),
-      appBarTheme: AppBarTheme(
-        centerTitle: ThemeConfig.appBarCenterTitle,
-        elevation: ThemeConfig.appBarElevation,
-        backgroundColor: colorScheme.surface,
-        foregroundColor: colorScheme.onSurface,
-        iconTheme: IconThemeData(color: colorScheme.onSurface),
-      ),
-      cardTheme: CardThemeData(
-        elevation: ThemeConfig.cardElevation,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(ThemeConfig.cardBorderRadius),
-        ),
-        color: colorScheme.surface,
-      ),
-      dividerTheme: const DividerThemeData(
-        color: ThemeConfig.amoledDivider,
-        thickness: ThemeConfig.dividerThickness,
-        space: ThemeConfig.dividerSpacing,
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(ThemeConfig.inputBorderRadius),
-          borderSide: const BorderSide(
-            color: ThemeConfig.amoledOutline,
-            width: ThemeConfig.inputDefaultBorderWidth,
-          ),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(ThemeConfig.inputBorderRadius),
-          borderSide: const BorderSide(
-            color: ThemeConfig.amoledOutline,
-            width: ThemeConfig.inputDefaultBorderWidth,
-          ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(ThemeConfig.inputBorderRadius),
-          borderSide: BorderSide(
-            color: baseSeedColor,
-            width: ThemeConfig.inputFocusedBorderWidth,
-          ),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(ThemeConfig.inputBorderRadius),
-          borderSide: const BorderSide(
-            color: ThemeConfig.amoledError,
-            width: ThemeConfig.inputDefaultBorderWidth,
-          ),
-        ),
-      ),
-      iconTheme: const IconThemeData(color: ThemeConfig.amoledIcon),
-      snackBarTheme: SnackBarThemeData(
-        backgroundColor: colorScheme.surfaceContainerHighest,
-        contentTextStyle: TextStyle(color: colorScheme.onSurface),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(ThemeConfig.radiusM),
-        ),
-        behavior: SnackBarBehavior.floating,
-      ),
-      extensions: const <ThemeExtension<dynamic>>[AppThemeExtension.dark],
+      dividerColor: ThemeConfig.amoledDivider,
+      outlineColor: ThemeConfig.amoledOutline,
+      errorColor: ThemeConfig.amoledError,
+      iconColor: ThemeConfig.amoledIcon,
+      extension: AppThemeExtension.dark,
+      primarySeed: baseSeedColor,
     );
   }
 }
