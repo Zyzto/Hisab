@@ -1,7 +1,6 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
+import 'http_fetch_helper.dart';
 
 /// Result of fetching Firebase status (from incidents.json).
 sealed class FirebaseStatusResult {}
@@ -45,16 +44,14 @@ const _recentHours = 6;
 /// Fetches Firebase status from the public incidents.json. Returns active
 /// and recent incidents (last [_recentHours] hours). No API key required.
 Future<FirebaseStatusResult> fetchFirebaseStatus() async {
+  final result = await fetchUrlWithTimeout(
+    Uri.parse(_firebaseIncidentsUrl),
+    timeout: _timeout,
+  );
+  if (result.error != null) return FirebaseStatusFailure(result.error);
+
   try {
-    final response = await http
-        .get(Uri.parse(_firebaseIncidentsUrl))
-        .timeout(_timeout);
-
-    if (response.statusCode != 200) {
-      return FirebaseStatusFailure('HTTP ${response.statusCode}');
-    }
-
-    final list = jsonDecode(response.body);
+    final list = jsonDecode(result.body!);
     if (list is! List) return FirebaseStatusFailure('Invalid response');
 
     final now = DateTime.now().toUtc();
@@ -94,11 +91,7 @@ Future<FirebaseStatusResult> fetchFirebaseStatus() async {
       operational: !hasActive,
       recentIncidents: recent.take(10).toList(),
     );
-  } catch (e, st) {
-    if (kDebugMode) {
-      // ignore: avoid_print
-      print('Firebase status fetch error: $e\n$st');
-    }
+  } catch (e) {
     return FirebaseStatusFailure(e.toString());
   }
 }

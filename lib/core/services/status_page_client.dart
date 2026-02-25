@@ -1,7 +1,6 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
+import 'http_fetch_helper.dart';
 
 /// Result of fetching a Statuspage.io summary.
 sealed class StatusPageResult {}
@@ -56,16 +55,14 @@ const _timeout = Duration(seconds: 8);
 /// Fetches Supabase status page summary. Returns [StatusPageSummary] on
 /// success or [StatusPageFailure] on network/parse error.
 Future<StatusPageResult> fetchSupabaseStatus() async {
+  final result = await fetchUrlWithTimeout(
+    Uri.parse(_supabaseSummaryUrl),
+    timeout: _timeout,
+  );
+  if (result.error != null) return StatusPageFailure(result.error);
+
   try {
-    final response = await http
-        .get(Uri.parse(_supabaseSummaryUrl))
-        .timeout(_timeout);
-
-    if (response.statusCode != 200) {
-      return StatusPageFailure('HTTP ${response.statusCode}');
-    }
-
-    final json = jsonDecode(response.body) as Map<String, dynamic>?;
+    final json = jsonDecode(result.body!) as Map<String, dynamic>?;
     if (json == null) return StatusPageFailure('Invalid response');
 
     final statusObj = json['status'] as Map<String, dynamic>?;
@@ -100,11 +97,7 @@ Future<StatusPageResult> fetchSupabaseStatus() async {
       incidents: incidents,
       statusPageUrl: statusPageUrl,
     );
-  } catch (e, st) {
-    if (kDebugMode) {
-      // ignore: avoid_print
-      print('StatusPage fetch error: $e\n$st');
-    }
+  } catch (e) {
     return StatusPageFailure(e.toString());
   }
 }
