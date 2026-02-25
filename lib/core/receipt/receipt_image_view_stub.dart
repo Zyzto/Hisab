@@ -8,7 +8,7 @@ void showReceiptImageFullScreen(BuildContext context, String imagePath) {
   if (isReceiptImageUrl(imagePath)) {
     showDialog(
       context: context,
-      barrierColor: Colors.black87,
+      barrierColor: Theme.of(context).colorScheme.scrim,
       barrierDismissible: true,
       builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
@@ -52,11 +52,14 @@ void showReceiptImageFullScreen(BuildContext context, String imagePath) {
 
 /// When dart:io is not available (e.g. web): show Image.network for URLs, else a chip that receipt is attached.
 Widget buildReceiptImageView(
+  BuildContext context,
   String? imagePath, {
   double? maxHeight,
   BoxFit fit = BoxFit.cover,
 }) {
   if (imagePath == null || imagePath.isEmpty) return const SizedBox.shrink();
+  final theme = Theme.of(context);
+  final colorScheme = theme.colorScheme;
   if (isReceiptImageUrl(imagePath)) {
     final effectiveMaxHeight = maxHeight ?? 200;
     return Padding(
@@ -80,15 +83,24 @@ Widget buildReceiptImageView(
               );
             },
             errorBuilder: (_, _, _) => Material(
-              color: Colors.grey.shade200,
+              color: colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(12),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
-                    const Icon(Icons.broken_image_outlined, size: 40, color: Colors.grey),
+                    Icon(
+                      Icons.broken_image_outlined,
+                      size: 40,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                     const SizedBox(width: 12),
-                    Text('receipt_image_unavailable'.tr()),
+                    Text(
+                      'receipt_image_unavailable'.tr(),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -101,18 +113,24 @@ Widget buildReceiptImageView(
   return Padding(
     padding: const EdgeInsets.only(top: 8),
     child: Material(
-      color: Colors.grey.shade200,
+      color: colorScheme.surfaceContainerHighest,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            Icon(Icons.receipt_long, size: 40, color: Colors.grey.shade600),
+            Icon(
+              Icons.receipt_long,
+              size: 40,
+              color: colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 'receipt_attached'.tr(),
-                style: TextStyle(color: Colors.grey.shade700),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
           ],

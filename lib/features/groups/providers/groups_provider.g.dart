@@ -526,7 +526,7 @@ final class ActiveParticipantsByGroupProvider
 }
 
 String _$activeParticipantsByGroupHash() =>
-    r'0e8ecf6d01b95254d4add850b9a2068059306547';
+    r'fdd8c73d12cc5fe5f00f753d0a22d5d7900b5bc0';
 
 /// Active participants only (left_at == null). Use for new expenses and balance
 /// so left/archived members do not count towards splits or settlements.

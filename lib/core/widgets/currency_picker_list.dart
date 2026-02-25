@@ -112,6 +112,7 @@ class _AppCurrencyPickerListState extends State<AppCurrencyPickerList> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final query = _searchController.text.trim();
     final isSearching = query.isNotEmpty;
     final searchList = isSearching ? _searchResults(query) : <Currency>[];
@@ -130,7 +131,7 @@ class _AppCurrencyPickerListState extends State<AppCurrencyPickerList> {
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
                   borderSide: BorderSide(
-                    color: const Color(0xFF8C98A8).withValues(alpha: 0.2),
+                    color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
                   ),
                 ),
               ),
@@ -161,9 +162,11 @@ class _AppCurrencyPickerListState extends State<AppCurrencyPickerList> {
 
   Widget _listRow(BuildContext context, Currency currency) {
     final theme = Theme.of(context);
-    const titleStyle = TextStyle(fontSize: 17);
-    final subtitleStyle = TextStyle(fontSize: 15, color: theme.hintColor);
-    const signStyle = TextStyle(fontSize: 18);
+    final titleStyle = theme.textTheme.titleMedium;
+    final subtitleStyle = theme.textTheme.bodyMedium?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+    final signStyle = theme.textTheme.titleMedium;
 
     return Material(
       color: Colors.transparent,
@@ -182,7 +185,7 @@ class _AppCurrencyPickerListState extends State<AppCurrencyPickerList> {
                   children: [
                     const SizedBox(width: 15),
                     if (widget.showFlag) ...[
-                      _flagWidget(currency),
+                      _flagWidget(context, currency),
                       const SizedBox(width: 15),
                     ],
                     Expanded(
@@ -190,12 +193,12 @@ class _AppCurrencyPickerListState extends State<AppCurrencyPickerList> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           if (widget.showCurrencyCode)
-                            Text(currency.code, style: titleStyle),
+                            Text(currency.code, style: titleStyle!),
                           if (widget.showCurrencyName)
                             Text(
                               currency.name,
                               style: widget.showCurrencyCode
-                                  ? subtitleStyle
+                                  ? (subtitleStyle ?? titleStyle)
                                   : titleStyle,
                             ),
                         ],
@@ -206,7 +209,7 @@ class _AppCurrencyPickerListState extends State<AppCurrencyPickerList> {
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: Text(currency.symbol, style: signStyle),
+                child: Text(currency.symbol, style: signStyle!),
               ),
             ],
           ),
@@ -215,11 +218,11 @@ class _AppCurrencyPickerListState extends State<AppCurrencyPickerList> {
     );
   }
 
-  Widget _flagWidget(Currency currency) {
+  Widget _flagWidget(BuildContext context, Currency currency) {
     if (currency.flag != null && !currency.isFlagImage) {
       return Text(
         CurrencyUtils.currencyToEmoji(currency),
-        style: const TextStyle(fontSize: 25),
+        style: Theme.of(context).textTheme.headlineSmall,
       );
     }
     return const SizedBox(width: 27, height: 27);
