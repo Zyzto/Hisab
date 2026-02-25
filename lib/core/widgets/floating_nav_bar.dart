@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../theme/theme_providers.dart';
 
-class FloatingNavBar extends StatelessWidget {
+class FloatingNavBar extends ConsumerWidget {
   final int selectedIndex;
   final ValueChanged<int> onDestinationSelected;
   final List<FloatingNavDestination> destinations;
@@ -20,24 +22,39 @@ class FloatingNavBar extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final styleIndex = ref.watch(experimentStyleIndexProvider);
     final colorScheme = theme.colorScheme;
     final active = activeColor ?? colorScheme.primary;
     final inactive = inactiveColor ?? colorScheme.onSurfaceVariant;
     final background = backgroundColor ?? colorScheme.surfaceContainerHighest;
+
+    // Per-experiment-style bar shape: 0/1/3/4 default; 2 Playful = more rounded; 5 Editorial = rectangular
+    final barRadius = styleIndex == 2
+        ? 28.0
+        : styleIndex == 5
+            ? 4.0
+            : 24.0;
+    final iconSize = styleIndex == 2 ? 28.0 : 24.0;
 
     return SafeArea(
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
           color: background,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(barRadius),
           boxShadow: [
             BoxShadow(
-              color: colorScheme.shadow.withValues(alpha: 0.15),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
+              color: colorScheme.shadow.withValues(alpha: 0.25),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
+              spreadRadius: 0,
+            ),
+            BoxShadow(
+              color: colorScheme.shadow.withValues(alpha: 0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
               spreadRadius: 0,
             ),
           ],
@@ -75,15 +92,14 @@ class FloatingNavBar extends StatelessWidget {
                                 ? destination.selectedIcon
                                 : destination.icon,
                             color: color,
-                            size: 24,
+                            size: iconSize,
                           ),
                           if (destination.label != null) ...[
                             const SizedBox(height: 4),
                             AnimatedDefaultTextStyle(
                               duration: const Duration(milliseconds: 200),
-                              style: TextStyle(
+                              style: theme.textTheme.labelSmall!.copyWith(
                                 color: color,
-                                fontSize: 12,
                                 fontWeight: isSelected
                                     ? FontWeight.w600
                                     : FontWeight.normal,
