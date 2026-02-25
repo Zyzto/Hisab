@@ -1149,6 +1149,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                             _receiptImagePath!,
                           ),
                           child: buildReceiptImageView(
+                            context,
                             _receiptImagePath,
                             maxHeight: 180,
                           ),

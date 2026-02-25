@@ -24,7 +24,7 @@ class ThemeConfig {
   static const double elevationHigh = 4.0;
   static const double elevationVeryHigh = 8.0;
 
-  static const double cardElevation = elevationMedium;
+  static const double cardElevation = elevationNone;
   static const double cardBorderRadius = radiusL;
 
   static const double inputBorderRadius = radiusL;

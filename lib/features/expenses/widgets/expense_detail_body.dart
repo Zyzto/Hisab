@@ -66,6 +66,7 @@ class ExpenseDetailBody extends ConsumerWidget {
                       expense.receiptImagePath!,
                     ),
                     child: buildReceiptImageView(
+                      context,
                       expense.receiptImagePath,
                       maxHeight: 280,
                     ),

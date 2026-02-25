@@ -100,9 +100,8 @@ class _SyncStatusChipState extends ConsumerState<SyncStatusChip> {
                     const SizedBox(width: 6),
                     Text(
                       data.label,
-                      style: TextStyle(
+                      style: Theme.of(context).textTheme.labelSmall!.copyWith(
                         color: data.foregroundColor,
-                        fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
                     ),

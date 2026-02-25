@@ -10,7 +10,7 @@ void showReceiptImageFullScreen(BuildContext context, String imagePath) {
   if (isReceiptImageUrl(imagePath)) {
     showDialog(
       context: context,
-      barrierColor: Colors.black87,
+      barrierColor: Theme.of(context).colorScheme.scrim,
       barrierDismissible: true,
       builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
@@ -41,7 +41,7 @@ void showReceiptImageFullScreen(BuildContext context, String imagePath) {
   if (!file.existsSync()) return;
   showDialog(
     context: context,
-    barrierColor: Colors.black87,
+    barrierColor: Theme.of(context).colorScheme.scrim,
     barrierDismissible: true,
     builder: (ctx) => Dialog(
       backgroundColor: Colors.transparent,
@@ -66,6 +66,7 @@ void showReceiptImageFullScreen(BuildContext context, String imagePath) {
 
 /// Shows the receipt image from a URL or local file path. Use when dart:io is available.
 Widget buildReceiptImageView(
+  BuildContext context,
   String? imagePath, {
   double? maxHeight,
   BoxFit fit = BoxFit.cover,
@@ -94,7 +95,7 @@ Widget buildReceiptImageView(
                 ),
               );
             },
-            errorBuilder: (context, _, _) => _buildUnavailablePlaceholder(),
+            errorBuilder: (context, _, _) => _buildUnavailablePlaceholder(context),
           ),
         ),
       ),
@@ -105,7 +106,7 @@ Widget buildReceiptImageView(
   if (!file.existsSync()) {
     return Padding(
       padding: const EdgeInsets.only(top: 8),
-      child: _buildUnavailablePlaceholder(),
+      child: _buildUnavailablePlaceholder(context),
     );
   }
   return Padding(
@@ -117,24 +118,35 @@ Widget buildReceiptImageView(
         child: Image.file(
           file,
           fit: fit,
-          errorBuilder: (context, error, stackTrace) => _buildUnavailablePlaceholder(),
+          errorBuilder: (context, error, stackTrace) => _buildUnavailablePlaceholder(context),
         ),
       ),
     ),
   );
 }
 
-Widget _buildUnavailablePlaceholder() {
+Widget _buildUnavailablePlaceholder(BuildContext context) {
+  final theme = Theme.of(context);
+  final colorScheme = theme.colorScheme;
   return Material(
-    color: Colors.grey.shade200,
+    color: colorScheme.surfaceContainerHighest,
     borderRadius: BorderRadius.circular(12),
     child: Padding(
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          const Icon(Icons.broken_image_outlined, size: 40, color: Colors.grey),
+          Icon(
+            Icons.broken_image_outlined,
+            size: 40,
+            color: colorScheme.onSurfaceVariant,
+          ),
           const SizedBox(width: 12),
-          Text('receipt_image_unavailable'.tr()),
+          Text(
+            'receipt_image_unavailable'.tr(),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
         ],
       ),
     ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'theme_config.dart';
 import 'theme_extensions.dart';
 
@@ -28,11 +29,19 @@ class AppTheme {
         iconTheme: IconThemeData(color: colorScheme.onSurface),
       ),
       cardTheme: CardThemeData(
-        elevation: ThemeConfig.cardElevation,
+        elevation: ThemeConfig.elevationNone,
+        shadowColor: colorScheme.brightness == Brightness.dark
+            ? Colors.black.withValues(alpha: 0.45)
+            : colorScheme.shadow,
+        surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(ThemeConfig.cardBorderRadius),
+          side: BorderSide(
+            color: colorScheme.outlineVariant,
+            width: 1,
+          ),
         ),
-        color: colorScheme.surface,
+        color: colorScheme.surfaceContainerHighest,
       ),
       dividerTheme: DividerThemeData(
         color: dividerColor,
@@ -156,7 +165,7 @@ class AppTheme {
     );
     final textScaleFactor = ThemeConfig.getTextScaleFactor(fontSizeScale);
     final textTheme = _scaleTextTheme(
-      ThemeData.light().textTheme,
+      GoogleFonts.cairoTextTheme(ThemeData.light().textTheme),
       textScaleFactor,
     );
     return _buildThemeData(
@@ -192,7 +201,7 @@ class AppTheme {
     );
     final textScaleFactor = ThemeConfig.getTextScaleFactor(fontSizeScale);
     final textTheme = _scaleTextTheme(
-      ThemeData.dark().textTheme,
+      GoogleFonts.cairoTextTheme(ThemeData.dark().textTheme),
       textScaleFactor,
     );
     return _buildThemeData(
@@ -228,7 +237,7 @@ class AppTheme {
     );
     final textScaleFactor = ThemeConfig.getTextScaleFactor(fontSizeScale);
     final textTheme = _scaleTextTheme(
-      ThemeData.dark().textTheme,
+      GoogleFonts.cairoTextTheme(ThemeData.dark().textTheme),
       textScaleFactor,
     );
     return _buildThemeData(

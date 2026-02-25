@@ -53,8 +53,9 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     if (info.ifRouteChanged(context)) return false;
     // Use the actual top route from GoRouter so we only intercept when the user
     // is really on home/settings, not when they are on group/expense (pushed on top).
-    final currentPath =
-        GoRouter.of(context).routerDelegate.currentConfiguration.uri.path;
+    final currentPath = GoRouter.of(
+      context,
+    ).routerDelegate.currentConfiguration.uri.path;
     final isAtSettings =
         currentPath == RoutePaths.settings ||
         currentPath.startsWith('${RoutePaths.settings}/');
@@ -134,15 +135,12 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) return const SizedBox.shrink();
+                  final theme = Theme.of(context);
                   return Text(
                     'v${snapshot.data!.version}',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.15),
+                    style: theme.textTheme.bodyMedium!.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.15),
                       fontWeight: FontWeight.w500,
                       letterSpacing: 0.5,
                     ),
