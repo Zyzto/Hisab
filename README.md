@@ -34,7 +34,7 @@ When in Online mode and temporarily offline, you can still add expenses (queued 
 
 ### 🌐 Web / PWA
 
-The app is deployed as a **Progressive Web App (PWA)**. It works locally and offline.
+The app is deployed as a **Progressive Web App (PWA)** and is hosted on Firebase Hosting. New versions are deployed via the [Release workflow](.github/workflows/release.yml) (on version tags `v*` or manual run). It works locally and offline.
 <h3>
   <a href="https://hisab.shenepoy.com">
     👉 Visit Hisab Web App
