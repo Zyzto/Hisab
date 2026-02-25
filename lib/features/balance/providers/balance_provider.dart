@@ -11,7 +11,7 @@ part 'balance_provider.g.dart';
 @riverpod
 AsyncValue<GroupBalanceResult?> groupBalance(Ref ref, String groupId) {
   final groupAsync = ref.watch(futureGroupProvider(groupId));
-  final participantsAsync = ref.watch(participantsByGroupProvider(groupId));
+  final participantsAsync = ref.watch(activeParticipantsByGroupProvider(groupId));
   final expensesAsync = ref.watch(expensesByGroupProvider(groupId));
 
   return groupAsync.when(
