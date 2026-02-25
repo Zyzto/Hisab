@@ -11,7 +11,12 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
+/supabase/*
 /supabase/.temp/
+/supabase/.branches/
+/supabase/.migrations/
+/supabase/.migrations/**
+/supabase/migrations/
 
 # IDEs
 *.iml
@@ -28,6 +33,9 @@ pubspec_overrides.yaml
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
+# Linter / analyzer cache
+.dart_tool/analyzer/
+.dart_tool/lint/
 .flutter-plugins
 .flutter-plugins-dependencies
 .pub-cache/
@@ -71,6 +79,9 @@ functions/lib/
 
 # Private / personal notes (not for other developers or users)
 docs/_private/
+
+# Plan docs (local; not committed)
+plans/
 
 # Supabase database backups (never commit)
 supabase_backups/

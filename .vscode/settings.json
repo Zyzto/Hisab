@@ -3,12 +3,10 @@
     ".github/workflows/*.yml": "yaml"
   },
   "files.exclude": {
-    ".github/workflows/**": true,
-    ".supabase/functions/**": true,
+    ".supabase/functions/**": true
   },
   "files.watcherExclude": {
-    ".github/workflows/**": true,
-    ".supabase/functions/**": true,
+    ".supabase/functions/**": true
   },
   "eslint.ignore": [
     "**/supabase/**",
