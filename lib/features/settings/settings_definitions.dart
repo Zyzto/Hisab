@@ -190,6 +190,17 @@ final localOnlySettingDef = const BoolSetting(
   order: 0,
 );
 
+/// When non-empty, stores the user id at the time the user switched to local-only from online.
+/// Used to skip migration when switching back to online with the same user (data already on server).
+final localDataFromOnlineUserIdSettingDef = const StringSetting(
+  'local_data_from_online_user_id',
+  defaultValue: '',
+  titleKey: 'local_data_from_online_user_id',
+  icon: Icons.storage,
+  section: 'data_backup',
+  order: -1, // Internal, not shown in settings UI
+);
+
 /// When true, run OCR on receipt images (and optionally AI). When false, only attach the picture.
 final receiptOcrEnabledSettingDef = const BoolSetting(
   'receipt_ocr_enabled',
@@ -325,6 +336,7 @@ final allSettings = <SettingDefinition>[
   expenseFormExpandDescriptionSettingDef,
   expenseFormExpandBillBreakdownSettingDef,
   localOnlySettingDef,
+  localDataFromOnlineUserIdSettingDef,
   receiptOcrEnabledSettingDef,
   receiptAiEnabledSettingDef,
   receiptAiProviderSettingDef,
