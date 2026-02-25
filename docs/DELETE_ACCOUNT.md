@@ -33,7 +33,7 @@ Once we process your request, we will delete your account and associated data fr
 
 - **Delete local data:** All data on this device (local groups, expenses, participants, invites) is deleted. Server-side data is not deleted. You are not signed out.
 - **Delete cloud data:** Your presence on the server is removed: you leave all groups (ownership is transferred where applicable; groups where you are the only member are deleted), your device tokens and invite-usage records are deleted, and you are signed out. Optionally you can also delete local data on the device. Your auth account (login) is not deleted by this action.
-- **When you request account deletion:** Your auth account and all associated data stored on our servers (e.g. in Supabase) are deleted. We do not retain deleted user data.
+- **When you request account deletion:** Your auth account and all associated data stored on our servers (e.g. in Supabase) are deleted. When your account is deleted, your display name in any group (in expense history) is replaced with a neutral placeholder so past expenses remain meaningful without showing your name. We do not retain deleted user data.
 
 ## Retention
 

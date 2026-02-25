@@ -27,6 +27,9 @@ This guide walks you through setting up the Supabase backend for Hisab from scra
    - [Migration 13: merge_participant_with_member (merge manual participant with user)](#migration-13-merge_participant_with_member-merge-manual-participant-with-user)
    - [Migration 14: Participants left/archived (left_at) and re-join reuse](#migration-14-participants-leftarchived-left_at-and-re-join-reuse)
    - [Migration 15: Receipt images Storage bucket](#migration-15-receipt-images-storage-bucket)
+   - [Migration 16: Groups personal and budget (is_personal, budget_amount_cents)](#migration-16-groups-personal-and-budget-is_personal-budget_amount_cents)
+   - [Migration 17: Anonymize participant name on leave/remove](#migration-17-anonymize-participant-name-on-leaveremove)
+   - [Migration 18: Anonymize only on account delete](#migration-18-anonymize-only-on-account-delete)
 4. [Configure Authentication](#4-configure-authentication)
 5. [Deploy Edge Functions](#5-deploy-edge-functions)
    - [Push notifications: end-to-end flow and verification](#push-notifications-end-to-end-flow-and-verification)
@@ -1563,6 +1566,32 @@ Expense receipt images are uploaded to Supabase Storage so all group members can
 
 Path format in the bucket: `{group_id}/{expense_id}/{uuid}.{ext}`.
 
+### Migration 16: Groups personal and budget (is_personal, budget_amount_cents)
+
+Adds support for "personal" (my-expenses-only) groups and an optional budget in group currency. Run after Migration 15.
+
+```sql
+ALTER TABLE public.groups
+  ADD COLUMN IF NOT EXISTS is_personal BOOLEAN DEFAULT false NOT NULL;
+
+ALTER TABLE public.groups
+  ADD COLUMN IF NOT EXISTS budget_amount_cents INT;
+```
+
+No new RPC or RLS change: existing `groups_update_owner_admin` allows owner/admin to update any column.
+
+### Migration 17: Anonymize participant name on leave/remove
+
+When a user leaves a group, is kicked, or is archived (removed from the people list), their participant display name in that group is replaced with a neutral placeholder (e.g. "Former member a3f2b1") and `avatar_id` is cleared. Re-joining via invite restores name and avatar from the auth profile. **Migration 18** below reverts this so anonymization happens only on account deletion; apply Migration 18 to get that behaviour.
+
+Apply the migration file `supabase/migrations/20250225200000_anonymize_participant_name_on_leave.sql`. It replaces `leave_group`, `kick_member`, and `archive_participant` with versions that set the placeholder name and clear avatar when setting `participants.left_at`.
+
+### Migration 18: Anonymize only on account delete
+
+Reverts anonymization from leave/kick/archive. Names are anonymized **only when the auth user is deleted** (account deletion), via a trigger on `auth.users` BEFORE DELETE that updates all `public.participants` rows for that `user_id` with a placeholder name and clears `avatar_id`.
+
+Apply the migration file `supabase/migrations/20250226000000_anonymize_only_on_account_delete.sql`. It restores `leave_group`, `kick_member`, and `archive_participant` to only set `left_at` (no name/avatar change), and adds `public.anonymize_participants_on_user_delete()` plus trigger `trigger_anonymize_participants_on_user_delete` on `auth.users`.
+
 ---
 
 ## 4. Configure Authentication
@@ -1893,7 +1922,7 @@ After completing all steps:
    - `handle_updated_at`, `get_user_role`, `is_group_member`, `get_my_participant_id`
    - `get_invite_by_token`, `accept_invite`, `create_invite`, `revoke_invite`, `toggle_invite_active`
    - `transfer_ownership`, `leave_group`, `kick_member`, `update_member_role`, `assign_participant`, `merge_participant_with_member`
-   - `get_delete_my_data_preview`, `delete_my_data` (for Settings > Delete cloud data; see migration `20250222100000_delete_my_data_and_leave_group_updates.sql`. `leave_group` is updated in that migration to clear treasurer when the leaving member is treasurer and to delete the group when the leaving member is the only member.)
+   - `get_delete_my_data_preview`, `delete_my_data` (for Settings > Delete cloud data; see migration `20250222100000_delete_my_data_and_leave_group_updates.sql`. `leave_group` is updated in that migration to clear treasurer when the leaving member is treasurer and to delete the group when the leaving member is the only member.) Migration `20250226000000_anonymize_only_on_account_delete.sql` configures anonymization only when the auth user is deleted (trigger on auth.users); leave/kick/archive do not change names.)
 
 4. **Edge Functions**: Go to **Edge Functions** and verify `invite-redirect`, `telemetry`, and `send-notification` are deployed and active (for push notifications, also set `FCM_PROJECT_ID` and `FCM_SERVICE_ACCOUNT_KEY` secrets; see Section 5).
 
