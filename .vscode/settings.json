@@ -1,7 +1,4 @@
 {
-  "files.associations": {
-    ".github/workflows/*.yml": "yaml"
-  },
   "files.exclude": {
     ".supabase/functions/**": true
   },
