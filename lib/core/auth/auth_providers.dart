@@ -29,9 +29,3 @@ User? currentUser(Ref ref) {
   ref.watch(authStateChangesProvider);
   return ref.watch(authServiceProvider).currentUser;
 }
-
-/// Whether Supabase is configured and online mode can be used.
-@riverpod
-bool supabaseConfigAvailableProvider(Ref ref) {
-  return supabaseConfigAvailable;
-}
