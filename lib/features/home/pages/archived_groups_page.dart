@@ -39,7 +39,7 @@ class ArchivedGroupsPage extends ConsumerWidget {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'no_archived_groups'.tr(),
+                        'no_archived_items'.tr(),
                         style: Theme.of(context).textTheme.titleMedium,
                         textAlign: TextAlign.center,
                       ),
