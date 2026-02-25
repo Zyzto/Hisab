@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 
 import '../services/connectivity_service.dart';
-import 'toast.dart';
+import 'services_status_sheet.dart';
 
 /// Animated chip that shows the current sync status.
 /// Icon-only: circle. With label: rounded rectangle. Transitions are animated.
@@ -61,7 +61,7 @@ class _SyncStatusChipState extends ConsumerState<SyncStatusChip> {
       label: data.label,
       button: true,
       child: GestureDetector(
-        onTap: () => _showStatusSnackBar(context, status),
+        onTap: () => showServicesStatusSheet(context, ref),
         child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: LayoutBuilder(
@@ -181,18 +181,6 @@ class _SyncStatusChipState extends ConsumerState<SyncStatusChip> {
     };
   }
 
-  void _showStatusSnackBar(BuildContext context, SyncStatus status) {
-    final message = switch (status) {
-      SyncStatus.connected => 'sync_data_auto'.tr(),
-      SyncStatus.syncing => 'sync_data_uploading'.tr(),
-      SyncStatus.offline => 'sync_offline_banner'.tr(),
-      SyncStatus.syncFailed => 'sync_failed_banner'.tr(),
-      SyncStatus.localOnly => '',
-    };
-    if (message.isEmpty) return;
-    context.dismissAllToasts();
-    context.showToast(message, duration: const Duration(seconds: 2));
-  }
 }
 
 class _ChipData {
