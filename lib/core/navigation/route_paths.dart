@@ -17,6 +17,7 @@ class RoutePaths {
       '/groups/$groupId/participants/$participantId/edit';
 
   static const String groupCreate = '/groups/create';
+  static const String groupCreatePersonal = '/groups/create-personal';
   static const String archivedGroups = '/archived';
   static String groupEdit(String groupId) => '/groups/$groupId/edit';
   static String groupSettings(String groupId) => '/groups/$groupId/settings';
@@ -24,19 +25,4 @@ class RoutePaths {
 
   static String inviteAccept(String token) => '/invite/$token';
   static const String scanInvite = '/scan-invite';
-
-  static String? extractGroupId(String path) {
-    final match = RegExp(r'/groups/([^/]+)').firstMatch(path);
-    return match?.group(1);
-  }
-
-  static String? extractExpenseId(String path) {
-    final match = RegExp(r'/expenses/([^/]+)').firstMatch(path);
-    return match?.group(1);
-  }
-
-  static String? extractInviteToken(String path) {
-    final match = RegExp(r'/invite/([^/]+)').firstMatch(path);
-    return match?.group(1);
-  }
 }
