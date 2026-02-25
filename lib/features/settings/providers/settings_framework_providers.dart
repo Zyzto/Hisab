@@ -337,3 +337,84 @@ bool expenseFormExpandBillBreakdown(Ref ref) {
   }
 }
 
+// --- Home list (home page) ---
+
+@riverpod
+String homeListDisplay(Ref ref) {
+  try {
+    final settings = ref.watch(hisabSettingsProvidersProvider);
+    if (settings == null) return 'separate';
+    return ref.watch(settings.provider(homeListDisplaySettingDef));
+  } catch (e, stackTrace) {
+    Log.warning(
+      'homeListDisplay read failed, defaulting to separate',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return 'separate';
+  }
+}
+
+@riverpod
+String homeListSort(Ref ref) {
+  try {
+    final settings = ref.watch(hisabSettingsProvidersProvider);
+    if (settings == null) return 'updated_at';
+    return ref.watch(settings.provider(homeListSortSettingDef));
+  } catch (e, stackTrace) {
+    Log.warning(
+      'homeListSort read failed, defaulting to updated_at',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return 'updated_at';
+  }
+}
+
+@riverpod
+String homeListCustomOrder(Ref ref) {
+  try {
+    final settings = ref.watch(hisabSettingsProvidersProvider);
+    if (settings == null) return '';
+    return ref.watch(settings.provider(homeListCustomOrderSettingDef));
+  } catch (e, stackTrace) {
+    Log.warning(
+      'homeListCustomOrder read failed, defaulting to empty',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return '';
+  }
+}
+
+@riverpod
+String homeListPinnedIds(Ref ref) {
+  try {
+    final settings = ref.watch(hisabSettingsProvidersProvider);
+    if (settings == null) return '';
+    return ref.watch(settings.provider(homeListPinnedIdsSettingDef));
+  } catch (e, stackTrace) {
+    Log.warning(
+      'homeListPinnedIds read failed, defaulting to empty',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return '';
+  }
+}
+
+@riverpod
+bool homeListShowCreatedAt(Ref ref) {
+  try {
+    final settings = ref.watch(hisabSettingsProvidersProvider);
+    if (settings == null) return false;
+    return ref.watch(settings.provider(homeListShowCreatedAtSettingDef));
+  } catch (e, stackTrace) {
+    Log.warning(
+      'homeListShowCreatedAt read failed, defaulting to false',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return false;
+  }
+}

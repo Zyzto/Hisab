@@ -61,6 +61,8 @@ Map<String, dynamic> _groupToMap(Group g) => {
   'icon': g.icon,
   'color': g.color,
   'archivedAt': g.archivedAt?.toIso8601String(),
+  'isPersonal': g.isPersonal,
+  'budgetAmountCents': g.budgetAmountCents,
 };
 
 Map<String, dynamic> _participantToMap(Participant p) => {
@@ -186,6 +188,8 @@ Group _mapToGroup(Map<String, dynamic> m) {
     }
   }
   final archivedAt = m['archivedAt'];
+  final isPersonal = m['isPersonal'] == true;
+  final budgetAmountCents = (m['budgetAmountCents'] as num?)?.toInt();
   return Group(
     id: m['id'] as String,
     name: m['name'] as String,
@@ -201,6 +205,8 @@ Group _mapToGroup(Map<String, dynamic> m) {
     icon: m['icon'] as String?,
     color: (m['color'] as num?)?.toInt(),
     archivedAt: archivedAt != null ? DateTime.tryParse(archivedAt as String) : null,
+    isPersonal: isPersonal,
+    budgetAmountCents: budgetAmountCents,
   );
 }
 
