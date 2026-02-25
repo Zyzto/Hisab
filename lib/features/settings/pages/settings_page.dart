@@ -25,6 +25,7 @@ import '../../../core/update/update_check_providers.dart';
 import '../../../core/services/migration_service.dart';
 import '../../../core/services/connectivity_service.dart';
 import '../../../core/services/delete_my_data_service.dart';
+import '../../../core/services/github_user_client.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/utils/currency_helpers.dart';
 import '../settings_definitions.dart';
@@ -618,6 +619,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ),
     );
     if (confirmed != true || !context.mounted) return;
+    // Record current user so we can skip migration when they sign back in (same flow as online→local→online)
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser != null) {
+      ref
+          .read(
+            settings.provider(localDataFromOnlineUserIdSettingDef).notifier,
+          )
+          .set(currentUser.id);
+    }
     ref.read(settings.provider(localOnlySettingDef).notifier).set(true);
     try {
       await ref.read(authServiceProvider).signOut();
@@ -864,6 +874,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ref
           .read(settings.provider(settingsOnlinePendingSettingDef).notifier)
           .set(false);
+      // Record that local data was from online so we can skip migration when switching back with same user
+      final currentUser = ref.read(currentUserProvider);
+      if (currentUser != null) {
+        ref
+            .read(
+              settings.provider(localDataFromOnlineUserIdSettingDef).notifier,
+            )
+            .set(currentUser.id);
+      }
       return;
     }
 
@@ -874,6 +893,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final authService = ref.read(authServiceProvider);
     if (authService.isAuthenticated) {
       ref.read(settings.provider(localOnlySettingDef).notifier).set(false);
+      ref
+          .read(
+            settings.provider(localDataFromOnlineUserIdSettingDef).notifier,
+          )
+          .set('');
       return;
     }
 
@@ -883,6 +907,27 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     switch (result) {
       case SignInResult.success:
         if (!context.mounted) return;
+        // Skip migration if local data was from server (online → local → online, same user)
+        final fromOnlineUserId =
+            ref.read(settings.provider(localDataFromOnlineUserIdSettingDef));
+        final currentUser = ref.read(currentUserProvider);
+        if (fromOnlineUserId.isNotEmpty &&
+            currentUser != null &&
+            fromOnlineUserId == currentUser.id) {
+          ref.read(settings.provider(localOnlySettingDef).notifier).set(false);
+          ref
+              .read(
+                settings.provider(localDataFromOnlineUserIdSettingDef).notifier,
+              )
+              .set('');
+          Log.info(
+            'Switched to online (data was from server, skipping migration)',
+          );
+          if (context.mounted) {
+            context.showSuccess('switched_to_online_syncing'.tr());
+          }
+          return;
+        }
         // Migrate local data to Supabase before switching
         await _runMigration(context, ref, settings);
       case SignInResult.pendingRedirect:
@@ -910,6 +955,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (!hasData) {
       // No data — just switch to online
       ref.read(settings.provider(localOnlySettingDef).notifier).set(false);
+      ref
+          .read(
+            settings.provider(localDataFromOnlineUserIdSettingDef).notifier,
+          )
+          .set('');
       Log.info('Switched to online mode (no data to migrate)');
       return;
     }
@@ -929,6 +979,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       case MigrationResult.success:
       case MigrationResult.noData:
         ref.read(settings.provider(localOnlySettingDef).notifier).set(false);
+        ref
+            .read(
+              settings.provider(localDataFromOnlineUserIdSettingDef).notifier,
+            )
+            .set('');
         Log.info('Switched to online mode after migration');
         context.showSuccess('migration_success'.tr());
       case MigrationResult.failed:
@@ -1145,6 +1200,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         NavigationSettingsTile(
           leading: const Icon(Icons.person_outline),
           title: Text('about_me'.tr()),
+          subtitle: Text('about_me_description'.tr()),
           onTap: () => _showAboutMe(context),
         ),
         NavigationSettingsTile(
@@ -1473,10 +1529,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     showLicensePage(context: context, applicationName: 'Hisab');
   }
 
-  static const String _donateUrl = 'https://github.com/Zyzto';
-
   static Future<void> _openDonateLink(BuildContext context) async {
-    final uri = Uri.parse(_donateUrl);
+    final uri = Uri.parse(githubDonateUrl);
     try {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (e) {
@@ -1491,10 +1545,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('about_me'.tr()),
-        content: const SingleChildScrollView(
-          child: Text(
-            'Hisab is a group expense splitting app. '
-            'Settle up with friends and family.',
+        content: SingleChildScrollView(
+          child: _AboutMeDialogContent(
+            profileUrl: githubDeveloperProfileUrl,
+            username: githubDeveloperUsername,
           ),
         ),
         actions: [
@@ -1504,6 +1558,143 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// =============================================================================
+// About me dialog content (developer info from GitHub)
+// =============================================================================
+
+class _AboutMeDialogContent extends StatefulWidget {
+  const _AboutMeDialogContent({
+    required this.profileUrl,
+    required this.username,
+  });
+
+  final String profileUrl;
+  final String username;
+
+  @override
+  State<_AboutMeDialogContent> createState() => _AboutMeDialogContentState();
+}
+
+class _AboutMeDialogContentState extends State<_AboutMeDialogContent> {
+  GitHubUserProfile? _profile;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() async {
+      final p = await fetchGitHubUser(widget.username);
+      if (mounted) {
+        setState(() {
+          _profile = p;
+          _loading = false;
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    final profile = _profile;
+    final displayName = profile?.displayName ?? widget.username;
+    final avatarUrl = profile?.avatarUrl;
+    final bio = profile?.bio;
+    final location = profile?.location;
+    final blog = profile?.blog;
+    final linkUrl = profile?.htmlUrl ?? widget.profileUrl;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        if (avatarUrl != null && avatarUrl.isNotEmpty)
+          ClipOval(
+            child: Image.network(
+              avatarUrl,
+              fit: BoxFit.cover,
+              width: 80,
+              height: 80,
+              errorBuilder: (_, __, ___) => Container(
+                width: 80,
+                height: 80,
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                child: Icon(
+                  Icons.person,
+                  size: 40,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          )
+        else
+          CircleAvatar(
+            radius: 40,
+            child: Icon(
+              Icons.person,
+              size: 40,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        const SizedBox(height: 16),
+        Text(
+          displayName,
+          style: Theme.of(context).textTheme.titleMedium,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'about_me_summary'.tr(),
+          style: Theme.of(context).textTheme.bodyMedium,
+          textAlign: TextAlign.center,
+        ),
+        if (bio != null && bio.trim().isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            bio.trim(),
+            style: Theme.of(context).textTheme.bodyMedium,
+            textAlign: TextAlign.center,
+          ),
+        ],
+        if (location != null && location.trim().isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            location.trim(),
+            style: Theme.of(context).textTheme.bodySmall,
+            textAlign: TextAlign.center,
+          ),
+        ],
+        if (blog != null && blog.trim().isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            blog.trim(),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+        const SizedBox(height: 16),
+        TextButton.icon(
+          onPressed: () async {
+            final uri = Uri.parse(linkUrl);
+            try {
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            } catch (_) {}
+          },
+          icon: const Icon(Icons.open_in_new, size: 18),
+          label: Text('view_profile'.tr()),
+        ),
+      ],
     );
   }
 }
