@@ -114,7 +114,11 @@ GoRouter router(Ref ref) {
       ),
       GoRoute(
         path: '/groups/create',
-        builder: (context, state) => const GroupCreatePage(),
+        builder: (context, state) => const GroupCreatePage(isPersonal: false),
+      ),
+      GoRoute(
+        path: '/groups/create-personal',
+        builder: (context, state) => const GroupCreatePage(isPersonal: true),
       ),
       GoRoute(
         path: '/groups/:id',
