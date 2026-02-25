@@ -1,7 +1,6 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
+import 'http_fetch_helper.dart';
 
 /// Public profile of a GitHub user (from GET /users/:username).
 class GitHubUserProfile {
@@ -33,11 +32,13 @@ const _baseUrl = 'https://api.github.com/users';
 /// Returns null on network error, non-200, or parse failure.
 Future<GitHubUserProfile?> fetchGitHubUser(String username) async {
   if (username.isEmpty) return null;
+  final result = await fetchUrlWithTimeout(
+    Uri.parse('$_baseUrl/$username'),
+    timeout: _timeout,
+  );
+  if (result.error != null || result.body == null) return null;
   try {
-    final uri = Uri.parse('$_baseUrl/$username');
-    final response = await http.get(uri).timeout(_timeout);
-    if (response.statusCode != 200) return null;
-    final map = jsonDecode(response.body);
+    final map = jsonDecode(result.body!);
     if (map is! Map<String, dynamic>) return null;
     return GitHubUserProfile(
       avatarUrl: map['avatar_url'] as String? ?? '',
@@ -48,11 +49,7 @@ Future<GitHubUserProfile?> fetchGitHubUser(String username) async {
       location: map['location'] as String?,
       blog: map['blog'] as String?,
     );
-  } catch (e, st) {
-    if (kDebugMode) {
-      // ignore: avoid_print
-      print('GitHub user fetch error: $e\n$st');
-    }
+  } catch (_) {
     return null;
   }
 }
