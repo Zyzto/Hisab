@@ -39,7 +39,7 @@ Future<bool> showRecordSettlementSheet(
         payerParticipantId: settlement.fromParticipantId,
         amountCents: settlement.amountCents,
         currencyCode: currencyCode,
-        title: 'Settlement: $fromName \u2192 $toName',
+        title: 'settlement_expense_title'.tr(namedArgs: {'from': fromName, 'to': toName}),
         date: DateTime.now(),
         splitType: SplitType.amounts,
         splitShares: {settlement.toParticipantId: settlement.amountCents},
