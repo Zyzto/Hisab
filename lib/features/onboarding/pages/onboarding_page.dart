@@ -337,6 +337,13 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                       title: 'onboarding_settle_up'.tr(),
                       subtitle: 'onboarding_settle_up_desc'.tr(),
                     ),
+                    _buildFeatureCard(
+                      context,
+                      icon: Icons.person_outline,
+                      title: 'onboarding_personal'.tr(),
+                      subtitle: 'onboarding_personal_desc'.tr(),
+                      optional: true,
+                    ),
                   ],
                 ),
               ),
@@ -352,14 +359,23 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     required IconData icon,
     required String title,
     required String subtitle,
+    bool optional = false,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
+    final isOptional = optional;
     return Card(
       margin: const EdgeInsets.only(bottom: ThemeConfig.spacingS),
       elevation: 0,
+      color: isOptional
+          ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.4)
+          : null,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
-        side: BorderSide(color: colorScheme.outline.withValues(alpha: 0.2)),
+        side: BorderSide(
+          color: isOptional
+              ? colorScheme.outline.withValues(alpha: 0.15)
+              : colorScheme.outline.withValues(alpha: 0.2),
+        ),
       ),
       child: Padding(
         padding: const EdgeInsets.all(ThemeConfig.spacingM),
@@ -369,13 +385,17 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: colorScheme.primaryContainer.withValues(alpha: 0.5),
+                color: isOptional
+                    ? colorScheme.surfaceContainerHighest
+                    : colorScheme.primaryContainer.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(ThemeConfig.radiusM),
               ),
               child: Icon(
                 icon,
                 size: 24,
-                color: colorScheme.onPrimaryContainer,
+                color: isOptional
+                    ? colorScheme.onSurfaceVariant
+                    : colorScheme.onPrimaryContainer,
               ),
             ),
             const SizedBox(width: ThemeConfig.spacingM),
@@ -387,13 +407,18 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                     title,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
+                      color: isOptional
+                          ? colorScheme.onSurfaceVariant
+                          : null,
                     ),
                   ),
                   const SizedBox(height: ThemeConfig.spacingXS),
                   Text(
                     subtitle,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
+                      color: isOptional
+                          ? colorScheme.onSurfaceVariant.withValues(alpha: 0.85)
+                          : colorScheme.onSurfaceVariant,
                       height: 1.3,
                     ),
                   ),
