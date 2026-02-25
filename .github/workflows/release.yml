@@ -198,31 +198,6 @@ jobs:
           cp web/sqlite3.wasm build/web/ 2>/dev/null || true
           for f in web/*.worker.js; do [ -f "$f" ] && cp "$f" build/web/; done
 
-      - name: Set up Node.js for Firebase Functions
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: functions/package-lock.json
-
-      - name: Install and build Firebase Cloud Functions
-        working-directory: functions
-        run: |
-          npm ci
-          npm run build
-
-      - name: Set Firebase Functions env for deploy
-        working-directory: functions
-        run: |
-          printf 'SUPABASE_URL=%s\nSITE_URL=%s\n' \
-            "${{ secrets.SUPABASE_URL }}" "${{ secrets.SITE_URL }}" > .env
-
-      - name: Deploy Firebase Cloud Functions
-        run: |
-          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$RUNNER_TEMP/firebase-sa.json"
-          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-sa.json"
-          npx firebase-tools deploy --only functions --non-interactive
-
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:

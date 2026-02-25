@@ -179,6 +179,10 @@ https://hisab-c8eb1.web.app
 
 (or a custom domain if you configure one). Use this URL as the `SITE_URL` secret so auth redirects land on the live site. Also add it to **Supabase Dashboard > Authentication > URL Configuration > Redirect URLs**.
 
+### 6d. CI deploys only Hosting (Spark plan)
+
+The release workflow deploys **only Firebase Hosting** (no Cloud Functions). That keeps the project on the **Spark (free)** plan. The Firebase Cloud Function `inviteRedirectPage` (invite redirect with OG meta for crawlers) is **not** deployed by CI; invite links still work via the Flutter web app. To deploy that function you would need to upgrade to Blaze and run `firebase deploy --only functions` manually.
+
 ---
 
 ## 7. Add All Secrets to GitHub
