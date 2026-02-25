@@ -300,7 +300,7 @@ class ExpenseSplitSection extends StatelessWidget {
                                             MainAxisAlignment.center,
                                         children: [
                                           Semantics(
-                                            label: 'Decrease part',
+                                            label: 'decrease_part'.tr(),
                                             button: true,
                                             child: IconButton(
                                               icon: const Icon(
@@ -335,11 +335,11 @@ class ExpenseSplitSection extends StatelessWidget {
                                                 visualDensity:
                                                     VisualDensity.compact,
                                               ),
-                                              tooltip: 'Decrease part',
+                                              tooltip: 'decrease_part'.tr(),
                                             ),
                                           ),
                                           Semantics(
-                                            label: 'Increase part',
+                                            label: 'increase_part'.tr(),
                                             button: true,
                                             child: IconButton(
                                               icon: const Icon(
@@ -374,7 +374,7 @@ class ExpenseSplitSection extends StatelessWidget {
                                               visualDensity:
                                                   VisualDensity.compact,
                                             ),
-                                            tooltip: 'Increase part',
+                                            tooltip: 'increase_part'.tr(),
                                           ),
                                         ),
                                       ],

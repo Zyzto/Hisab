@@ -123,6 +123,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     if (!mounted || expense == null || expense.groupId != widget.groupId) {
       return;
     }
+    final group = await ref.read(groupRepositoryProvider).getById(widget.groupId);
     final participants = await ref
         .read(participantRepositoryProvider)
         .getByGroupId(widget.groupId);
@@ -144,8 +145,11 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       _amountController.text = (expense.amountCents / 100).toStringAsFixed(2);
       _date = expense.date.toLocal();
       _payerParticipantId = expense.payerParticipantId;
-      _transactionType = expense.transactionType;
-      _transactionTypeSegmentController.value = expense.transactionType;
+      _transactionType = (group?.isPersonal == true &&
+              expense.transactionType == TransactionType.transfer)
+          ? TransactionType.expense
+          : expense.transactionType;
+      _transactionTypeSegmentController.value = _transactionType;
       _splitType = expense.splitType;
       _toParticipantId = expense.toParticipantId;
       _includedInSplitIds.addAll(expense.splitShares.keys);
@@ -328,7 +332,11 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     final payerId = restrictPayerToSelf
         ? (myParticipantId ?? participants.first.id)
         : (_payerParticipantId ?? participants.first.id);
-    final isTransfer = _transactionType == TransactionType.transfer;
+    final effectiveTransactionType = group.isPersonal &&
+            _transactionType == TransactionType.transfer
+        ? TransactionType.expense
+        : _transactionType;
+    final isTransfer = effectiveTransactionType == TransactionType.transfer;
     if (isTransfer) {
       if (_toParticipantId == null || _toParticipantId == payerId) {
         if (!mounted) return;
@@ -418,7 +426,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     setState(() => _saving = true);
     var didPop = false;
     try {
-      final title = isTransfer ? 'Transfer' : _titleController.text.trim();
+      final title = isTransfer ? 'transfer'.tr() : _titleController.text.trim();
       final desc = _descriptionController.text.trim();
 
       // Compute base amount in group currency when currencies differ
@@ -469,7 +477,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         splitShares: splitShares,
         createdAt: _initialExpense?.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
-        transactionType: _transactionType,
+        transactionType: effectiveTransactionType,
         toParticipantId: isTransfer ? _toParticipantId : null,
         tag: _selectedTag,
         lineItems: _effectiveLineItemsForSave(),
@@ -587,8 +595,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     final v = double.tryParse(value.trim());
     if (v != null && v > 0) return;
     final participants = ref
-            .read(participantsByGroupProvider(widget.groupId))
-            .value ?? [];
+            .read(activeParticipantsByGroupProvider(widget.groupId))
+            .when(data: (d) => d, loading: () => <Participant>[], error: (_, _) => <Participant>[]);
     final includedList = participants
         .where((x) => _includedInSplitIds.contains(x.id))
         .toList();
@@ -756,8 +764,12 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final groupAsync = ref.watch(futureGroupProvider(widget.groupId));
+    // New expense: only active participants (left/archived do not count).
+    // Edit: all participants so existing payer/to/split names resolve.
     final participantsAsync = ref.watch(
-      participantsByGroupProvider(widget.groupId),
+      widget.expenseId == null
+          ? activeParticipantsByGroupProvider(widget.groupId)
+          : participantsByGroupProvider(widget.groupId),
     );
 
     return groupAsync.when(
@@ -843,9 +855,10 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
             final payerId = _payerParticipantId ?? participants.first.id;
             final localOnly = ref.watch(effectiveLocalOnlyProvider);
             final myRole = ref.watch(myRoleInGroupProvider(widget.groupId)).value;
-            final restrictPayerToSelf = !group.allowExpenseAsOtherParticipant &&
-                (localOnly ||
-                    (myRole != GroupRole.owner && myRole != GroupRole.admin));
+            final restrictPayerToSelf = group.isPersonal ||
+                (!group.allowExpenseAsOtherParticipant &&
+                    (localOnly ||
+                        (myRole != GroupRole.owner && myRole != GroupRole.admin)));
             final currentUserId =
                 ref.read(authServiceProvider).currentUser?.id;
             // Resolve "my" participant: by userId on participant, or by group_members.participant_id (more reliable when joined via invite)
@@ -941,11 +954,14 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                 actions: showSimpleForm
                     ? [
                         Tooltip(
-                          message: 'expense_form_full_features_tooltip'.tr(),
+                          message: (group.isPersonal
+                                  ? 'expense_form_full_features_tooltip_personal'
+                                  : 'expense_form_full_features_tooltip')
+                              .tr(),
                           child: IconButton(
                             icon: const Icon(Icons.info_outline),
                             onPressed: () =>
-                                _showExpenseFormInfoDialog(context),
+                                _showExpenseFormInfoDialog(context, group),
                           ),
                         ),
                       ]
@@ -973,62 +989,82 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                           borderRadius: BorderRadius.circular(12),
                           child: Builder(
                             builder: (context) {
+                              if (group.isPersonal &&
+                                  _transactionType ==
+                                      TransactionType.transfer) {
+                                WidgetsBinding.instance.addPostFrameCallback(
+                                    (_) {
+                                  if (mounted) {
+                                    setState(() {
+                                      _transactionType =
+                                          TransactionType.expense;
+                                      _transactionTypeSegmentController
+                                          .value = TransactionType.expense;
+                                    });
+                                  }
+                                });
+                                return const SizedBox(height: 52);
+                              }
                               final theme = Theme.of(context);
                               final colorScheme = theme.colorScheme;
+                              final segmentChildren = <TransactionType, Widget>{
+                                TransactionType.expense: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 4,
+                                  ),
+                                  child: Text(
+                                    'expenses'.tr(),
+                                    style: theme.textTheme.titleSmall
+                                        ?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: _transactionType ==
+                                              TransactionType.expense
+                                          ? colorScheme.primary
+                                          : colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                                TransactionType.income: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 4,
+                                  ),
+                                  child: Text(
+                                    'income'.tr(),
+                                    style: theme.textTheme.titleSmall
+                                        ?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: _transactionType ==
+                                              TransactionType.income
+                                          ? colorScheme.primary
+                                          : colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                              };
+                              if (!group.isPersonal) {
+                                segmentChildren[TransactionType.transfer] =
+                                    Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 4,
+                                  ),
+                                  child: Text(
+                                    'transfer'.tr(),
+                                    style: theme.textTheme.titleSmall
+                                        ?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: _transactionType ==
+                                              TransactionType.transfer
+                                          ? colorScheme.primary
+                                          : colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                );
+                              }
                               return CustomSlidingSegmentedControl<
                                   TransactionType>(
                                 controller:
                                     _transactionTypeSegmentController,
-                                children: {
-                                  TransactionType.expense: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 4,
-                                    ),
-                                    child: Text(
-                                      'expenses'.tr(),
-                                      style: theme.textTheme.titleSmall
-                                          ?.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                        color: _transactionType ==
-                                                TransactionType.expense
-                                            ? colorScheme.primary
-                                            : colorScheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ),
-                                  TransactionType.income: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 4,
-                                    ),
-                                    child: Text(
-                                      'income'.tr(),
-                                      style: theme.textTheme.titleSmall
-                                          ?.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                        color: _transactionType ==
-                                                TransactionType.income
-                                            ? colorScheme.primary
-                                            : colorScheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ),
-                                  TransactionType.transfer: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 4,
-                                    ),
-                                    child: Text(
-                                      'transfer'.tr(),
-                                      style: theme.textTheme.titleSmall
-                                          ?.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                        color: _transactionType ==
-                                                TransactionType.transfer
-                                            ? colorScheme.primary
-                                            : colorScheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ),
-                                },
+                                children: segmentChildren,
                                 height: 52,
                                 padding: 16,
                                 innerPadding: const EdgeInsets.symmetric(
@@ -1060,15 +1096,17 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                     _transactionType = type;
                                     if (type == TransactionType.transfer &&
                                         _toParticipantId == null) {
-                                      final participants =
-                                          ref
-                                              .read(
-                                                participantsByGroupProvider(
-                                                  widget.groupId,
-                                                ),
-                                              )
-                                              .value ??
-                                          [];
+                                      final participants = ref
+                                          .read(
+                                            activeParticipantsByGroupProvider(
+                                              widget.groupId,
+                                            ),
+                                          )
+                                          .when(
+                                            data: (d) => d,
+                                            loading: () => <Participant>[],
+                                            error: (_, _) => <Participant>[],
+                                          );
                                       final payerId =
                                           _payerParticipantId ??
                                           (participants.isNotEmpty
@@ -1168,12 +1206,14 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       const SizedBox(height: 20),
                       _buildWhenSection(context),
                     ] else
-                      _buildPaidByAndWhenRow(
-                        context,
-                        participants,
-                        effectivePayerId,
-                        payerReadOnly: restrictPayerToSelf,
-                      ),
+                      group.isPersonal
+                          ? _buildWhenSection(context)
+                          : _buildPaidByAndWhenRow(
+                              context,
+                              participants,
+                              effectivePayerId,
+                              payerReadOnly: restrictPayerToSelf,
+                            ),
                     if (!isTransfer) ...[
                       const SizedBox(height: 20),
                       ExpandableSection(
@@ -1221,50 +1261,51 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                           },
                         ),
                       ),
-                      const SizedBox(height: 24),
-                      ListenableBuilder(
-                        listenable: _amountController,
-                        builder: (context, _) {
-                          final amountCents =
-                              (double.tryParse(_amountController.text.trim()) ??
-                                  0) *
-                              100;
-                          final amountCentsInt = amountCents.toInt();
-                          if (_splitType == SplitType.parts ||
-                              _splitType == SplitType.amounts) {
-                            _ensureCustomSplitValues(
-                              amountCentsInt,
-                              participants,
-                            );
-                          }
-                          final shares = amountCentsInt > 0
-                              ? (_splitType == SplitType.equal
-                                    ? _splitSharesPreview(
-                                        amountCentsInt,
-                                        participants,
-                                      )
-                                    : _customSharesPreview(
-                                        amountCentsInt,
-                                        participants,
-                                      ))
-                              : <int>[];
-                          final participantIds = participants
-                              .map((e) => e.id)
-                              .toSet();
-                          for (final id in List.from(
-                            _splitEditControllers.keys,
-                          )) {
-                            if (!participantIds.contains(id)) {
-                              _splitEditControllers[id]?.dispose();
-                              _splitEditControllers.remove(id);
-                              _splitFocusNodes[id]?.dispose();
-                              _splitFocusNodes.remove(id);
+                      if (!group.isPersonal) ...[
+                        const SizedBox(height: 24),
+                        ListenableBuilder(
+                          listenable: _amountController,
+                          builder: (context, _) {
+                            final amountCents =
+                                (double.tryParse(_amountController.text.trim()) ??
+                                    0) *
+                                100;
+                            final amountCentsInt = amountCents.toInt();
+                            if (_splitType == SplitType.parts ||
+                                _splitType == SplitType.amounts) {
+                              _ensureCustomSplitValues(
+                                amountCentsInt,
+                                participants,
+                              );
                             }
-                          }
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              ExpenseSplitSection(
+                            final shares = amountCentsInt > 0
+                                ? (_splitType == SplitType.equal
+                                      ? _splitSharesPreview(
+                                          amountCentsInt,
+                                          participants,
+                                        )
+                                      : _customSharesPreview(
+                                          amountCentsInt,
+                                          participants,
+                                        ))
+                                : <int>[];
+                            final participantIds = participants
+                                .map((e) => e.id)
+                                .toSet();
+                            for (final id in List.from(
+                              _splitEditControllers.keys,
+                            )) {
+                              if (!participantIds.contains(id)) {
+                                _splitEditControllers[id]?.dispose();
+                                _splitEditControllers.remove(id);
+                                _splitFocusNodes[id]?.dispose();
+                                _splitFocusNodes.remove(id);
+                              }
+                            }
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                ExpenseSplitSection(
                                 participants: participants,
                                 sharesCents: shares,
                                 amountCents: amountCentsInt,
@@ -1335,6 +1376,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                           );
                         },
                       ),
+                      ],
                     ],
                   ],
                 ),
@@ -1405,12 +1447,15 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     );
   }
 
-  void _showExpenseFormInfoDialog(BuildContext context) {
+  void _showExpenseFormInfoDialog(BuildContext context, Group group) {
+    final tooltipKey = group.isPersonal
+        ? 'expense_form_full_features_tooltip_personal'
+        : 'expense_form_full_features_tooltip';
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('expense_form_full_features_tooltip_title'.tr()),
-        content: Text('expense_form_full_features_tooltip'.tr()),
+        content: Text(tooltipKey.tr()),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
@@ -1491,7 +1536,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              preset.label,
+                              'category_${preset.id}'.tr(),
                               style: theme.textTheme.labelLarge?.copyWith(
                                 color: selected
                                     ? theme.colorScheme.onPrimaryContainer
@@ -1775,7 +1820,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         case ReceiptScanFallback():
           setState(() {
             if (_titleController.text.trim().isEmpty) {
-              _titleController.text = 'Receipt';
+              _titleController.text = 'receipt'.tr();
             }
             _descriptionController.text = result.ocrText;
             _receiptImagePath = result.receiptImagePath;
