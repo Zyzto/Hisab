@@ -459,6 +459,99 @@ final class ParticipantsByGroupFamily extends $Family
   String toString() => r'participantsByGroupProvider';
 }
 
+/// Active participants only (left_at == null). Use for new expenses and balance
+/// so left/archived members do not count towards splits or settlements.
+
+@ProviderFor(activeParticipantsByGroup)
+final activeParticipantsByGroupProvider = ActiveParticipantsByGroupFamily._();
+
+/// Active participants only (left_at == null). Use for new expenses and balance
+/// so left/archived members do not count towards splits or settlements.
+
+final class ActiveParticipantsByGroupProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<Participant>>,
+          List<Participant>,
+          Stream<List<Participant>>
+        >
+    with
+        $FutureModifier<List<Participant>>,
+        $StreamProvider<List<Participant>> {
+  /// Active participants only (left_at == null). Use for new expenses and balance
+  /// so left/archived members do not count towards splits or settlements.
+  ActiveParticipantsByGroupProvider._({
+    required ActiveParticipantsByGroupFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'activeParticipantsByGroupProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$activeParticipantsByGroupHash();
+
+  @override
+  String toString() {
+    return r'activeParticipantsByGroupProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $StreamProviderElement<List<Participant>> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<List<Participant>> create(Ref ref) {
+    final argument = this.argument as String;
+    return activeParticipantsByGroup(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ActiveParticipantsByGroupProvider &&
+        other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$activeParticipantsByGroupHash() =>
+    r'0e8ecf6d01b95254d4add850b9a2068059306547';
+
+/// Active participants only (left_at == null). Use for new expenses and balance
+/// so left/archived members do not count towards splits or settlements.
+
+final class ActiveParticipantsByGroupFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<List<Participant>>, String> {
+  ActiveParticipantsByGroupFamily._()
+    : super(
+        retry: null,
+        name: r'activeParticipantsByGroupProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Active participants only (left_at == null). Use for new expenses and balance
+  /// so left/archived members do not count towards splits or settlements.
+
+  ActiveParticipantsByGroupProvider call(String groupId) =>
+      ActiveParticipantsByGroupProvider._(argument: groupId, from: this);
+
+  @override
+  String toString() => r'activeParticipantsByGroupProvider';
+}
+
 @ProviderFor(tagsByGroup)
 final tagsByGroupProvider = TagsByGroupFamily._();
 

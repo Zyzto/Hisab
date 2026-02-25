@@ -18,14 +18,16 @@ import '../utils/group_icon_utils.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 class GroupCreatePage extends ConsumerStatefulWidget {
-  const GroupCreatePage({super.key});
+  final bool isPersonal;
+
+  const GroupCreatePage({super.key, this.isPersonal = false});
 
   @override
   ConsumerState<GroupCreatePage> createState() => _GroupCreatePageState();
 }
 
 class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
-  static const _pageCount = 4;
+  int get _pageCount => widget.isPersonal ? 3 : 4;
 
   late final PageController _pageController;
   int _currentPage = 0;
@@ -117,7 +119,8 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
         currencyCode,
         icon: _selectedIcon,
         color: _selectedColor.toARGB32(),
-        initialParticipants: _participants,
+        initialParticipants: widget.isPersonal ? [] : _participants,
+        isPersonal: widget.isPersonal,
       );
       Log.info(
         'Group created via wizard: id=$id name="$name" currency=$currencyCode participants=${_participants.length}',
@@ -149,7 +152,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('create_group'.tr()),
+        title: Text(widget.isPersonal ? 'create_personal'.tr() : 'create_group'.tr()),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: _goBack,
@@ -163,12 +166,18 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                 controller: _pageController,
                 physics: const NeverScrollableScrollPhysics(),
                 onPageChanged: (i) => setState(() => _currentPage = i),
-                children: [
-                  _buildStep1NameCurrency(context),
-                  _buildStep2Participants(context),
-                  _buildStep3IconColor(context),
-                  _buildStep4Summary(context),
-                ],
+                children: widget.isPersonal
+                    ? [
+                        _buildStep1NameCurrency(context),
+                        _buildStep3IconColor(context),
+                        _buildStep4Summary(context),
+                      ]
+                    : [
+                        _buildStep1NameCurrency(context),
+                        _buildStep2Participants(context),
+                        _buildStep3IconColor(context),
+                        _buildStep4Summary(context),
+                      ],
               ),
             ),
             _buildPageIndicator(context),
@@ -248,7 +257,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
           Expanded(
             child: Align(
               alignment: AlignmentDirectional.centerEnd,
-              child: isLastPage
+                  child: isLastPage
                   ? FilledButton.icon(
                       onPressed: _saving ? null : _createGroup,
                       icon: _saving
@@ -261,12 +270,12 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                               ),
                             )
                           : const Icon(Icons.check),
-                      label: Text('create_group'.tr()),
+                      label: Text(widget.isPersonal ? 'create_personal'.tr() : 'create_group'.tr()),
                     )
                   : FilledButton.icon(
                       onPressed: _goNext,
                       icon: const Icon(Icons.arrow_forward),
-                      label: Text(_currentPage == 1
+                      label: Text(_currentPage == 1 && !widget.isPersonal
                           ? (_participants.isEmpty
                               ? 'wizard_skip'.tr()
                               : 'wizard_next'.tr())
@@ -309,7 +318,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
             controller: _nameController,
             autofocus: true,
             decoration: InputDecoration(
-              labelText: 'group_name'.tr(),
+              labelText: (widget.isPersonal ? 'list_name' : 'group_name').tr(),
               hintText: 'wizard_name_hint'.tr(),
               border: const OutlineInputBorder(),
               prefixIcon: const Icon(Icons.group_outlined),
@@ -720,14 +729,14 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                 ),
                 const SizedBox(height: ThemeConfig.spacingM),
 
-                // Participants row
+                // Participants row (when personal, only "1"; edit goes to step 0)
                 _SummaryRow(
                   icon: Icons.people_outline,
                   label: 'participants'.tr(),
-                  value: '$totalParticipants',
-                  onEdit: () => _goToPage(1),
+                  value: widget.isPersonal ? '1' : '$totalParticipants',
+                  onEdit: () => _goToPage(widget.isPersonal ? 0 : 1),
                 ),
-                if (_participants.isNotEmpty) ...[
+                if (!widget.isPersonal && _participants.isNotEmpty) ...[
                   const SizedBox(height: ThemeConfig.spacingS),
                   Wrap(
                     spacing: 6,
@@ -742,18 +751,18 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                 ],
                 const SizedBox(height: ThemeConfig.spacingM),
 
-                // Icon row
+                // Icon row (when personal, icon step is page 1)
                 if (_selectedIcon != null) ...[
                   _SummaryRow(
                     icon: iconDef?.icon ?? Icons.grid_view_rounded,
                     label: 'wizard_icon_label'.tr(),
                     value: iconDef?.labelKey.tr() ?? '',
-                    onEdit: () => _goToPage(2),
+                    onEdit: () => _goToPage(widget.isPersonal ? 1 : 2),
                   ),
                   const SizedBox(height: ThemeConfig.spacingM),
                 ],
 
-                // Color row
+                // Color row (when personal, icon step is page 1)
                 Row(
                   children: [
                     Container(
@@ -772,7 +781,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                     const Spacer(),
                     IconButton(
                       icon: const Icon(Icons.edit_outlined, size: 18),
-                      onPressed: () => _goToPage(2),
+                      onPressed: () => _goToPage(widget.isPersonal ? 1 : 2),
                       visualDensity: VisualDensity.compact,
                     ),
                   ],

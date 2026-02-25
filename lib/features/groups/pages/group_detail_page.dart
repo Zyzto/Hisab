@@ -10,6 +10,7 @@ import '../widgets/create_invite_sheet.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/widgets/async_value_builder.dart';
 import '../../../core/widgets/error_content.dart';
@@ -184,7 +185,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'group_archived'.tr(),
+                (widget.group.isPersonal ? 'list_archived' : 'group_archived').tr(),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -217,7 +218,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
       );
     }
     if (index == 2) {
-      if (!isOwnerOrAdmin) return null;
+      if (widget.group.isPersonal || !isOwnerOrAdmin) return null;
       return _FABWithLabel(
         icon: Icons.person_add,
         label: 'add_participant'.tr(),
@@ -261,7 +262,8 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
         title: _buildAppBarTitle(context),
         actions: [
           if (!localOnly &&
-              (myRole == GroupRole.owner || myRole == GroupRole.admin))
+              (myRole == GroupRole.owner || myRole == GroupRole.admin) &&
+              !widget.group.isPersonal)
             IconButton(
               icon: const Icon(Icons.person_add),
               tooltip: 'invite_people'.tr(),
@@ -278,146 +280,266 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
       body: Column(
         children: [
           if (widget.group.isArchived) _buildArchivedBanner(context),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Theme(
-              data: Theme.of(context).copyWith(
-                splashFactory: NoSplash.splashFactory,
-                highlightColor: Colors.transparent,
+          if (widget.group.isPersonal) ...[
+            _PersonalBudgetHeader(
+              group: widget.group,
+              onRefresh: _onRefresh,
+            ),
+            Expanded(
+              child: _ExpensesTab(
+                groupId: widget.group.id,
+                group: widget.group,
+                onRefresh: _onRefresh,
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Builder(
-                  builder: (context) {
-                    final theme = Theme.of(context);
-                    final colorScheme = theme.colorScheme;
-                    return CustomSlidingSegmentedControl<int>(
-                      controller: _segmentController,
-                      children: {
-                        0: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Text(
-                            'expenses'.tr(),
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: _selectedTabIndex == 0
-                                  ? colorScheme.primary
-                                  : colorScheme.onSurfaceVariant,
+            ),
+          ] else ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Theme(
+                data: Theme.of(context).copyWith(
+                  splashFactory: NoSplash.splashFactory,
+                  highlightColor: Colors.transparent,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Builder(
+                    builder: (context) {
+                      final theme = Theme.of(context);
+                      final colorScheme = theme.colorScheme;
+                      return CustomSlidingSegmentedControl<int>(
+                        controller: _segmentController,
+                        children: {
+                          0: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Text(
+                              'expenses'.tr(),
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: _selectedTabIndex == 0
+                                    ? colorScheme.primary
+                                    : colorScheme.onSurfaceVariant,
+                              ),
                             ),
                           ),
-                        ),
-                        1: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Text(
-                            'balance'.tr(),
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: _selectedTabIndex == 1
-                                  ? colorScheme.primary
-                                  : colorScheme.onSurfaceVariant,
+                          1: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Text(
+                              'balance'.tr(),
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: _selectedTabIndex == 1
+                                    ? colorScheme.primary
+                                    : colorScheme.onSurfaceVariant,
+                              ),
                             ),
                           ),
-                        ),
-                        2: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Text(
-                            'people'.tr(),
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: _selectedTabIndex == 2
-                                  ? colorScheme.primary
-                                  : colorScheme.onSurfaceVariant,
+                          2: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Text(
+                              'people'.tr(),
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: _selectedTabIndex == 2
+                                    ? colorScheme.primary
+                                    : colorScheme.onSurfaceVariant,
+                              ),
                             ),
                           ),
+                        },
+                        height: 52,
+                        padding: 16,
+                        innerPadding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 6,
                         ),
-                      },
-                      height: 52,
-                      padding: 16,
-                      innerPadding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHighest
-                            .withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      thumbDecoration: BoxDecoration(
-                        color: colorScheme.surface,
-                        borderRadius: BorderRadius.circular(10),
-                        boxShadow: [
-                          BoxShadow(
-                            color: colorScheme.shadow.withValues(alpha: 0.1),
-                            blurRadius: 3,
-                            offset: const Offset(0, 1),
-                          ),
-                        ],
-                      ),
-                      isStretch: true,
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeInOut,
-                      onValueChanged: (v) {
-                        setState(() {
-                          _selectedTabIndex = v;
-                          _programmaticTargetPage = v;
-                        });
-                        _tabIndexNotifier.value = v;
-                        _pageController.animateToPage(
-                          v,
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                        ).whenComplete(() {
-                          if (mounted) {
-                            setState(() => _programmaticTargetPage = null);
-                          }
-                        });
-                      },
-                    );
-                  },
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        thumbDecoration: BoxDecoration(
+                          color: colorScheme.surface,
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: [
+                            BoxShadow(
+                              color: colorScheme.shadow.withValues(alpha: 0.1),
+                              blurRadius: 3,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        isStretch: true,
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeInOut,
+                        onValueChanged: (v) {
+                          setState(() {
+                            _selectedTabIndex = v;
+                            _programmaticTargetPage = v;
+                          });
+                          _tabIndexNotifier.value = v;
+                          _pageController.animateToPage(
+                            v,
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeInOut,
+                          ).whenComplete(() {
+                            if (mounted) {
+                              setState(() => _programmaticTargetPage = null);
+                            }
+                          });
+                        },
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
-          ),
-          Expanded(
-            child: PageView(
-              controller: _pageController,
-              onPageChanged: (i) {
-                if (_programmaticTargetPage != null && i != _programmaticTargetPage) {
-                  return;
-                }
-                if (_programmaticTargetPage != null) {
-                  setState(() => _programmaticTargetPage = null);
-                }
-                setState(() => _selectedTabIndex = i);
-                _tabIndexNotifier.value = i;
-                _segmentController.value = i;
-              },
-              children: [
-                _ExpensesTab(
-                  groupId: widget.group.id,
-                  group: widget.group,
-                  onRefresh: _onRefresh,
-                ),
-                _BalanceTab(
-                  groupId: widget.group.id,
-                  onRefresh: _onRefresh,
-                ),
-                _PeopleTab(
-                  groupId: widget.group.id,
-                  group: widget.group,
-                  onRefresh: _onRefresh,
-                ),
-              ],
+            Expanded(
+              child: PageView(
+                controller: _pageController,
+                onPageChanged: (i) {
+                  if (_programmaticTargetPage != null && i != _programmaticTargetPage) {
+                    return;
+                  }
+                  if (_programmaticTargetPage != null) {
+                    setState(() => _programmaticTargetPage = null);
+                  }
+                  setState(() => _selectedTabIndex = i);
+                  _tabIndexNotifier.value = i;
+                  _segmentController.value = i;
+                },
+                children: [
+                  _ExpensesTab(
+                    groupId: widget.group.id,
+                    group: widget.group,
+                    onRefresh: _onRefresh,
+                  ),
+                  _BalanceTab(
+                    groupId: widget.group.id,
+                    onRefresh: _onRefresh,
+                  ),
+                  _PeopleTab(
+                    groupId: widget.group.id,
+                    group: widget.group,
+                    onRefresh: _onRefresh,
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
         ],
       ),
       floatingActionButton: ValueListenableBuilder<int>(
         valueListenable: _tabIndexNotifier,
         builder: (context, index, _) =>
-            _buildFAB(context, index, myRole, localOnly) ??
+            _buildFAB(
+              context,
+              widget.group.isPersonal ? 0 : index,
+              myRole,
+              localOnly,
+            ) ??
             const SizedBox.shrink(),
       ),
+    );
+  }
+}
+
+/// Budget summary for personal groups: My budget + total spent; theme-aware color when near/over budget.
+class _PersonalBudgetHeader extends ConsumerWidget {
+  const _PersonalBudgetHeader({
+    required this.group,
+    required this.onRefresh,
+  });
+
+  final Group group;
+  final Future<void> Function() onRefresh;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final expensesAsync = ref.watch(expensesByGroupProvider(group.id));
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final currencyCode = group.currencyCode;
+    final budgetCents = group.budgetAmountCents;
+
+    return expensesAsync.when(
+      data: (expenses) {
+        final totalSpentCents =
+            expenses.fold<int>(0, (s, e) => s + e.effectiveBaseAmountCents);
+        final hasBudget = budgetCents != null && budgetCents > 0;
+        final overBudget = hasBudget && totalSpentCents >= budgetCents;
+        final nearBudget =
+            hasBudget && !overBudget && totalSpentCents >= (budgetCents * 0.8).round();
+        final attentionColor =
+            overBudget ? colorScheme.error : (nearBudget ? colorScheme.tertiary : null);
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
+              side: BorderSide(
+                color: attentionColor ?? colorScheme.outline.withValues(alpha: 0.2),
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'my_budget'.tr(),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          hasBudget
+                              ? CurrencyFormatter.formatCompactCents(
+                                  budgetCents,
+                                  currencyCode,
+                                )
+                              : '—',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: attentionColor ?? colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '${'my_expenses'.tr()}: ',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      Text(
+                        '${CurrencyFormatter.formatCompactCents(totalSpentCents)} $currencyCode',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: attentionColor ?? colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+      loading: () => const Padding(
+        padding: EdgeInsets.all(16),
+        child: SizedBox(
+          height: 56,
+          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        ),
+      ),
+      error: (_, _) => const SizedBox.shrink(),
     );
   }
 }
@@ -434,6 +556,17 @@ class _ExpensesTab extends ConsumerWidget {
   });
 
   static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  static Widget _buildError(WidgetRef ref, String groupId, Object error) =>
+      Center(
+        child: ErrorContentWidget(
+          message: error.toString(),
+          onRetry: () {
+            ref.invalidate(expensesByGroupProvider(groupId));
+            ref.invalidate(participantsByGroupProvider(groupId));
+          },
+        ),
+      );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -483,11 +616,13 @@ class _ExpensesTab extends ConsumerWidget {
             final theme = Theme.of(context);
 
             // Flatten for ListView.builder: [summary] + for each date [header, ...expenses]
+            // Personal: skip summary in list (budget header above already shows total).
             final flattenedItems = <_ExpenseListItem>[
-              _ExpenseListSummaryItem(
-                myExpensesCents: myExpensesCents,
-                totalCents: totalCents,
-              ),
+              if (!group.isPersonal)
+                _ExpenseListSummaryItem(
+                  myExpensesCents: myExpensesCents,
+                  totalCents: totalCents,
+                ),
             ];
             for (final dateKey in dateKeys) {
               flattenedItems.add(_ExpenseListDateHeaderItem(dateKey));
@@ -510,27 +645,34 @@ class _ExpensesTab extends ConsumerWidget {
                         horizontal: 16,
                         vertical: 8,
                       ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _ExpenseSummaryCard(
+                      child: group.isPersonal
+                          ? _ExpenseSummaryCard(
                               label: 'my_expenses'.tr(),
-                              value:
-                                  '${CurrencyFormatter.formatCompactCents(item.myExpensesCents)} $currencyCode',
-                              theme: theme,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _ExpenseSummaryCard(
-                              label: 'total_expenses'.tr(),
                               value:
                                   '${CurrencyFormatter.formatCompactCents(item.totalCents)} $currencyCode',
                               theme: theme,
+                            )
+                          : Row(
+                              children: [
+                                Expanded(
+                                  child: _ExpenseSummaryCard(
+                                    label: 'my_expenses'.tr(),
+                                    value:
+                                        '${CurrencyFormatter.formatCompactCents(item.myExpensesCents)} $currencyCode',
+                                    theme: theme,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _ExpenseSummaryCard(
+                                    label: 'total_expenses'.tr(),
+                                    value:
+                                        '${CurrencyFormatter.formatCompactCents(item.totalCents)} $currencyCode',
+                                    theme: theme,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
-                      ),
                     );
                   case _ExpenseListDateHeaderItem():
                     return Padding(
@@ -555,6 +697,7 @@ class _ExpensesTab extends ConsumerWidget {
                             nameOf[expense.payerParticipantId] ??
                             expense.payerParticipantId,
                         icon: iconForExpenseTag(expense.tag, customTags),
+                        showPaidBy: !group.isPersonal,
                       ),
                     );
                 }
@@ -563,27 +706,11 @@ class _ExpensesTab extends ConsumerWidget {
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, st) => Center(
-            child: ErrorContentWidget(
-              message: e.toString(),
-              onRetry: () {
-                ref.invalidate(expensesByGroupProvider(groupId));
-                ref.invalidate(participantsByGroupProvider(groupId));
-              },
-            ),
-          ),
+          error: (e, st) => _ExpensesTab._buildError(ref, groupId, e),
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, st) => Center(
-        child: ErrorContentWidget(
-          message: e.toString(),
-          onRetry: () {
-            ref.invalidate(expensesByGroupProvider(groupId));
-            ref.invalidate(participantsByGroupProvider(groupId));
-          },
-        ),
-      ),
+      error: (e, st) => _ExpensesTab._buildError(ref, groupId, e),
     );
   }
 }
@@ -653,8 +780,10 @@ class _PeopleTab extends ConsumerWidget {
             final activeParticipants = participants
                 .where((p) => p.leftAt == null)
                 .toList();
+            // Past members: only show participants who had a user account (left/kicked).
+            // Manually added participants that were removed stay in expenses but are hidden from this tab.
             final pastParticipants = participants
-                .where((p) => p.leftAt != null)
+                .where((p) => p.leftAt != null && p.userId != null)
                 .toList();
 
             if (activeParticipants.isEmpty && pastParticipants.isEmpty) {
@@ -840,7 +969,7 @@ class _PeopleTab extends ConsumerWidget {
           if (v == 'edit') {
             _showEditParticipant(context, ref, participant);
           } else if (v == 'delete') {
-            _showDeleteParticipant(context, ref, participant);
+            _showDeleteParticipant(context, ref, groupId, participant);
           } else {
             _onMemberAction(context, ref, v, linkedMember);
           }
@@ -892,7 +1021,7 @@ class _PeopleTab extends ConsumerWidget {
           if (v == 'edit') {
             _showEditParticipant(context, ref, participant);
           } else if (v == 'delete') {
-            _showDeleteParticipant(context, ref, participant);
+            _showDeleteParticipant(context, ref, groupId, participant);
           } else if (v == 'merge') {
             _showMergeWithUser(
               context,
@@ -963,7 +1092,7 @@ class _PeopleTab extends ConsumerWidget {
       } catch (e, st) {
         Log.warning('Archive participant failed', error: e, stackTrace: st);
         if (context.mounted) {
-          context.showError('$e');
+          context.showError('generic_error'.tr());
         }
       }
     }
@@ -1013,9 +1142,19 @@ class _PeopleTab extends ConsumerWidget {
     }
   }
 
+  static bool _participantUsedInExpenses(String participantId, List<Expense> expenses) {
+    for (final e in expenses) {
+      if (e.payerParticipantId == participantId) return true;
+      if (e.splitShares.containsKey(participantId)) return true;
+      if (e.toParticipantId == participantId) return true;
+    }
+    return false;
+  }
+
   Future<void> _showDeleteParticipant(
     BuildContext context,
     WidgetRef ref,
+    String groupId,
     Participant participant,
   ) async {
     final ok = await showDialog<bool>(
@@ -1039,12 +1178,50 @@ class _PeopleTab extends ConsumerWidget {
     );
     if (ok == true && context.mounted) {
       try {
-        await ref.read(participantRepositoryProvider).delete(participant.id);
-        ref.invalidate(participantsByGroupProvider(groupId));
+        // Load expenses from DB so we know if this participant is used (archive vs delete).
+        List<Expense> expenses;
+        try {
+          expenses = await ref.read(expenseRepositoryProvider).getByGroupId(groupId);
+          Log.info('Remove participant: expenses loaded count=${expenses.length}');
+        } catch (e, st) {
+          Log.warning('Remove participant: failed to load expenses', error: e, stackTrace: st);
+          expenses = <Expense>[];
+        }
+        if (!context.mounted) return;
+        Log.info(
+          'Remove participant: groupId=$groupId participantId=${participant.id} name="${participant.name}" userId=${participant.userId} '
+          'expensesCount=${expenses.length}',
+        );
+        for (final e in expenses) {
+          final asPayer = e.payerParticipantId == participant.id;
+          final inSplit = e.splitShares.containsKey(participant.id);
+          final asTo = e.toParticipantId == participant.id;
+          if (asPayer || inSplit || asTo) {
+            Log.info(
+              '  expense ${e.id}: payer=${e.payerParticipantId} toParticipantId=${e.toParticipantId} '
+              'splitKeys=${e.splitShares.keys.toList()} -> asPayer=$asPayer inSplit=$inSplit asTo=$asTo',
+            );
+          }
+        }
+        final usedInExpenses = _participantUsedInExpenses(participant.id, expenses);
+        Log.info('Remove participant: usedInExpenses=$usedInExpenses -> ${usedInExpenses ? "archive" : "delete"}');
+        if (usedInExpenses) {
+          await ref.read(participantRepositoryProvider).archive(groupId, participant.id);
+          ref.invalidate(participantsByGroupProvider(groupId));
+          if (!ref.read(effectiveLocalOnlyProvider)) {
+            await ref.read(dataSyncServiceProvider.notifier).syncNow();
+          }
+          if (context.mounted) {
+            context.showSuccess('archive_participant'.tr());
+          }
+        } else {
+          await ref.read(participantRepositoryProvider).delete(participant.id);
+          ref.invalidate(participantsByGroupProvider(groupId));
+        }
       } catch (e, st) {
         Log.warning('Delete participant failed', error: e, stackTrace: st);
         if (context.mounted) {
-          context.showError('$e');
+          context.showError('generic_error'.tr());
         }
       }
     }
@@ -1121,7 +1298,7 @@ class _PeopleTab extends ConsumerWidget {
       }
     } catch (e, st) {
       Log.warning('Merge participant failed', error: e, stackTrace: st);
-      if (context.mounted) context.showError('$e');
+      if (context.mounted) context.showError('generic_error'.tr());
     }
   }
 
@@ -1177,7 +1354,7 @@ class _PeopleTab extends ConsumerWidget {
       } catch (e, st) {
         Log.warning('Change role failed', error: e, stackTrace: st);
         if (context.mounted) {
-          context.showError('$e');
+          context.showError('generic_error'.tr());
         }
       }
     }
@@ -1201,7 +1378,7 @@ class _PeopleTab extends ConsumerWidget {
     } catch (e, st) {
       Log.warning('Transfer failed', error: e, stackTrace: st);
       if (context.mounted) {
-        context.showError('$e');
+        context.showError('generic_error'.tr());
       }
     }
   }
@@ -1233,12 +1410,19 @@ class _PeopleTab extends ConsumerWidget {
         await ref
             .read(groupMemberRepositoryProvider)
             .kickMember(groupId, member.id);
+        // Sync so local DB gets updated (RPC only changes server); then invalidate so UI refreshes.
+        if (!ref.read(effectiveLocalOnlyProvider)) {
+          await ref.read(dataSyncServiceProvider.notifier).syncNow();
+        }
+        if (!context.mounted) return;
         ref.invalidate(membersByGroupProvider(groupId));
         ref.invalidate(participantsByGroupProvider(groupId));
+        ref.invalidate(activeParticipantsByGroupProvider(groupId));
+        context.showSuccess('kick_member'.tr());
       } catch (e, st) {
         Log.warning('Kick failed', error: e, stackTrace: st);
         if (context.mounted) {
-          context.showError('$e');
+          context.showError('generic_error'.tr());
         }
       }
     }
