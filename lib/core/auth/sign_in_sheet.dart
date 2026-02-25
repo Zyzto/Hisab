@@ -550,7 +550,7 @@ class _SignInSheetState extends State<_SignInSheet> {
                         ? null
                         : () => _signInWithOAuth(OAuthProvider.google),
                     icon: const Icon(Icons.g_mobiledata, size: 22),
-                    label: const Text('Google'),
+                    label: Text('auth_provider_google'.tr()),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
@@ -563,7 +563,7 @@ class _SignInSheetState extends State<_SignInSheet> {
                         ? null
                         : () => _signInWithOAuth(OAuthProvider.github),
                     icon: const Icon(Icons.code, size: 20),
-                    label: const Text('GitHub'),
+                    label: Text('auth_provider_github'.tr()),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
