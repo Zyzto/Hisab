@@ -11,11 +11,15 @@ class ExpenseListTile extends StatelessWidget {
   /// Icon for the expense (e.g. from [iconForExpenseTag]). When null, uses [defaultExpenseIcon].
   final IconData? icon;
 
+  /// When false (e.g. personal group), the "Paid by" line is hidden.
+  final bool showPaidBy;
+
   const ExpenseListTile({
     super.key,
     required this.expense,
     required this.payerName,
     this.icon,
+    this.showPaidBy = true,
   });
 
   @override
@@ -46,13 +50,15 @@ class ExpenseListTile extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'paid_by'.tr(namedArgs: {'name': payerName}),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                  if (showPaidBy) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      'paid_by'.tr(namedArgs: {'name': payerName}),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),

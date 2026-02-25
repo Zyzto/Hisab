@@ -33,7 +33,7 @@ class ExpenseTitleSection extends StatelessWidget {
         ? customTags.where((t) => t.id == selectedTag).firstOrNull
         : null;
     final tagLabel = preset != null
-        ? preset.label
+        ? 'category_${preset.id}'.tr()
         : (customTag != null ? customTag.label : selectedTag);
     final tagIcon = preset != null
         ? preset.icon
