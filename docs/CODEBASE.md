@@ -172,7 +172,7 @@ Major persisted keys include:
 - PWA manifest: `web/manifest.json`
 - PowerSync workers: `web/powersync_db.worker.js`, `web/powersync_sync.worker.js`
 - Install prompt integration: `pwa_install` package + `PwaInstallBanner` widget
-- Invite links use the web app domain (e.g. hisab.shenepoy.com) when `INVITE_BASE_URL` is set. The route `/functions/v1/invite-redirect` is handled by the Flutter web app, which redirects to the Supabase Edge Function so the token is validated and the user is sent to `redirect.html`.
+- Invite links use the web app domain (e.g. hisab.shenepoy.com) when `INVITE_BASE_URL` is set. On deploy, the route `/functions/v1/invite-redirect` is served by **Firebase Hosting** via a rewrite to static `invite-redirect.html` (built from `web/invite-redirect-template.html`); that page redirects to the Supabase Edge Function, which validates the token and redirects the user to `redirect.html`. This works on the Firebase free (Spark) plan with no Cloud Function. When the user is already inside the web app, the same path is handled by the Flutter app (GoRouter), which redirects to the Supabase Edge Function.
 - Invite redirect static page: `web/redirect.html`
   - desktop -> web invite route
   - mobile -> attempts app deep link with timed web fallback
@@ -189,7 +189,7 @@ This repo is the **source of truth** for all Supabase Edge Functions. See [EDGE_
 - `supabase/functions/send-notification/index.ts` — sends FCM push notifications (expenses, member_joined; excludes joinee)
 - `supabase/functions/telemetry/index.ts` — accepts anonymous usage telemetry events
 
-The invite redirect page with OG meta can be served by a **Firebase Cloud Function** (see [EDGE_FUNCTIONS.md](EDGE_FUNCTIONS.md) for `functions/` and hosting rewrites).
+On the free plan, invite redirect uses only static Hosting files (`invite-redirect.html` + `redirect.html`). A **Firebase Cloud Function** can optionally serve the same path with dynamic OG meta for crawlers (see [EDGE_FUNCTIONS.md](EDGE_FUNCTIONS.md) for `functions/` and hosting rewrites).
 
 The app also depends on Supabase-side schema, RLS, and RPCs documented in `docs/SUPABASE_SETUP.md`, including:
 
