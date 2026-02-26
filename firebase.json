@@ -21,6 +21,10 @@
         ],
         "rewrites": [
             {
+                "source": "/functions/v1/invite-redirect",
+                "destination": "/invite-redirect.html"
+            },
+            {
                 "source": "**",
                 "destination": "/index.html"
             }
