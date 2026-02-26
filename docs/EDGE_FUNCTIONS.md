@@ -24,11 +24,15 @@ supabase functions deploy telemetry --no-verify-jwt
 
 Set Edge Function secrets in the dashboard (e.g. `FCM_PROJECT_ID`, `FCM_SERVICE_ACCOUNT_KEY` for send-notification; `SITE_URL` for invite-redirect and og-invite-image if different from default).
 
-## Firebase Cloud Function (invite redirect page with OG meta)
+## Invite redirect on Firebase Hosting (Spark / free plan)
 
-The path `/functions/v1/invite-redirect` is served by a **Firebase Cloud Function** (`inviteRedirectPage`) so that crawlers receive HTML with dynamic `og:image` and `twitter:image` pointing to the Supabase `og-invite-image` Edge Function for the token. See `functions/` and `firebase.json` (hosting rewrites). Deploy with `firebase deploy --only functions`; set `SUPABASE_URL` and `SITE_URL` via `functions/.env` or params (see `functions/.env.example`).
+On the free Spark plan, the path `/functions/v1/invite-redirect` is served by **static** `invite-redirect.html` (see `firebase.json` hosting rewrites). CI builds this file from `web/invite-redirect-template.html` (substituting `SUPABASE_URL`) and copies `web/redirect.html` to the Hosting output. That static page redirects the browser to the Supabase `invite-redirect` Edge Function, which validates the token and redirects to `redirect.html`. No Firebase Cloud Function is required; invite links work on the free plan.
 
-**Note (Spark plan):** The CI workflow deploys only Firebase Hosting and does not deploy this Cloud Function, so the project can stay on the free Spark plan. Invite redirect for crawlers (OG meta) is therefore not available unless you upgrade to Blaze and run `firebase deploy --only functions` manually.
+## Firebase Cloud Function (optional; invite redirect page with OG meta)
+
+The same path can optionally be served by a **Firebase Cloud Function** (`inviteRedirectPage`) so that crawlers receive HTML with dynamic `og:image` and `twitter:image` pointing to the Supabase `og-invite-image` Edge Function for the token. See `functions/` and `firebase.json` (hosting rewrites). Deploy with `firebase deploy --only functions`; set `SUPABASE_URL` and `SITE_URL` via `functions/.env` or params (see `functions/.env.example`).
+
+**Note (Spark plan):** The CI workflow deploys only Firebase Hosting and does not deploy this Cloud Function, so the project can stay on the free Spark plan. Invite redirect (token validation and `redirect.html`) works via the static flow above. Dynamic OG meta for crawlers is only available if you upgrade to Blaze and run `firebase deploy --only functions` manually.
 
 ## Syncing from Supabase
 
