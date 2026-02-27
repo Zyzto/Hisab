@@ -11,6 +11,8 @@
 /// ```
 library;
 
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 const supabaseUrl = String.fromEnvironment('SUPABASE_URL', defaultValue: '');
 const supabaseAnonKey = String.fromEnvironment(
   'SUPABASE_ANON_KEY',
@@ -20,6 +22,18 @@ const supabaseAnonKey = String.fromEnvironment(
 /// Whether Supabase is configured and online mode can be used.
 bool get supabaseConfigAvailable =>
     supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
+
+/// Returns the Supabase client only when Supabase is configured (and thus
+/// initialized in main). Returns null in local-only mode or when config is
+/// missing, so callers avoid throwing when Supabase is not used.
+SupabaseClient? get supabaseClientIfConfigured {
+  if (!supabaseConfigAvailable) return null;
+  try {
+    return Supabase.instance.client;
+  } catch (_) {
+    return null;
+  }
+}
 
 /// Optional custom base URL for invite links (e.g. custom domain).
 /// When set via `--dart-define=INVITE_BASE_URL=https://invite.example.com`,
