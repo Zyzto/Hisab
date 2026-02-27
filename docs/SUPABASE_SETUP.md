@@ -30,6 +30,7 @@ This guide walks you through setting up the Supabase backend for Hisab from scra
    - [Migration 16: Groups personal and budget (is_personal, budget_amount_cents)](#migration-16-groups-personal-and-budget-is_personal-budget_amount_cents)
    - [Migration 17: Anonymize participant name on leave/remove](#migration-17-anonymize-participant-name-on-leaveremove)
    - [Migration 18: Anonymize only on account delete](#migration-18-anonymize-only-on-account-delete)
+   - [Migration 19: Receipt image paths (multiple photos)](#migration-19-receipt-image-paths-multiple-photos)
 4. [Configure Authentication](#4-configure-authentication)
 5. [Deploy Edge Functions](#5-deploy-edge-functions)
    - [Push notifications: end-to-end flow and verification](#push-notifications-end-to-end-flow-and-verification)
@@ -891,6 +892,95 @@ ALTER TABLE public.device_tokens
   ADD COLUMN IF NOT EXISTS locale TEXT;
 ```
 
+### Migration 6c: Skip notifications for personal groups
+
+Prevents push notifications for expenses or member joins in **personal** groups (`groups.is_personal = true`). The trigger function checks the group’s `is_personal` flag and returns without calling the Edge Function when true. Requires Migration 16 (groups `is_personal` column). Re-run the function definition below; no trigger changes needed.
+
+**Before running:** Replace `YOUR_SUPABASE_URL` with your actual project URL if you have not already done so in Migration 6.
+
+```sql
+CREATE OR REPLACE FUNCTION notify_group_activity()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+  v_group_id UUID;
+  v_actor_id UUID;
+  v_action TEXT;
+  v_expense_title TEXT;
+  v_amount_cents INTEGER;
+  v_currency_code TEXT;
+  v_supabase_url TEXT := 'YOUR_SUPABASE_URL';
+  v_service_role_key TEXT;
+  v_is_personal BOOLEAN;
+BEGIN
+  -- Get the service role key from vault
+  SELECT decrypted_secret INTO v_service_role_key
+  FROM vault.decrypted_secrets
+  WHERE name = 'service_role_key'
+  LIMIT 1;
+
+  -- If no service role key in vault, skip gracefully
+  IF v_service_role_key IS NULL THEN
+    RAISE LOG 'notify_group_activity: service_role_key not found in vault, skipping';
+    RETURN NEW;
+  END IF;
+
+  -- Determine action and extract fields based on trigger source
+  IF TG_TABLE_NAME = 'expenses' THEN
+    v_group_id := NEW.group_id;
+    v_actor_id := auth.uid();
+    v_expense_title := NEW.title;
+    v_amount_cents := NEW.amount_cents;
+    v_currency_code := NEW.currency_code;
+
+    IF TG_OP = 'INSERT' THEN
+      v_action := 'expense_created';
+    ELSIF TG_OP = 'UPDATE' THEN
+      v_action := 'expense_updated';
+    END IF;
+
+  ELSIF TG_TABLE_NAME = 'group_members' THEN
+    v_group_id := NEW.group_id;
+    v_actor_id := NEW.user_id;
+    v_action := 'member_joined';
+  END IF;
+
+  -- Skip if we couldn't determine the action or actor
+  IF v_action IS NULL OR v_actor_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  -- Skip notifications for personal (my-expenses-only) groups
+  SELECT is_personal INTO v_is_personal FROM public.groups WHERE id = v_group_id;
+  IF v_is_personal THEN
+    RETURN NEW;
+  END IF;
+
+  -- Fire-and-forget HTTP POST to the edge function via pg_net
+  PERFORM net.http_post(
+    url := v_supabase_url || '/functions/v1/send-notification',
+    body := jsonb_build_object(
+      'group_id', v_group_id,
+      'actor_user_id', v_actor_id,
+      'action', v_action,
+      'expense_title', v_expense_title,
+      'amount_cents', v_amount_cents,
+      'currency_code', v_currency_code
+    ),
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || v_service_role_key
+    )
+  );
+
+  RETURN NEW;
+END;
+$$;
+```
+
 ### Migration 7: Schema Additions (drift fix)
 
 Run this migration after Migrations 1–6 to add columns and the `invite_usages` table so the schema matches what the app expects. Safe for existing projects (uses `ALTER TABLE` / `CREATE TABLE`); new projects run 1–6 then 7 for a full schema.
@@ -1592,6 +1682,16 @@ Reverts anonymization from leave/kick/archive. Names are anonymized **only when 
 
 Apply the migration file `supabase/migrations/20250226000000_anonymize_only_on_account_delete.sql`. It restores `leave_group`, `kick_member`, and `archive_participant` to only set `left_at` (no name/avatar change), and adds `public.anonymize_participants_on_user_delete()` plus trigger `trigger_anonymize_participants_on_user_delete` on `auth.users`.
 
+### Migration 19: Receipt image paths (multiple photos)
+
+Adds `receipt_image_paths` (TEXT, JSON array of URLs) to `expenses` for up to 5 photos per expense. `receipt_image_path` remains for backward compatibility (first image).
+
+**Apply:**
+
+- **SQL Editor:** Run the contents of `supabase/migrations/20250227100000_receipt_image_paths.sql`.
+- **Supabase MCP:** `apply_migration` with `project_id`, `name`: `receipt_image_paths`, and `query` from that file (or the one-liner: `ALTER TABLE public.expenses ADD COLUMN IF NOT EXISTS receipt_image_paths TEXT;`).
+- **CLI:** From repo root, `supabase db push` (or link project and run migrations).
+
 ---
 
 ## 4. Configure Authentication
@@ -1939,7 +2039,7 @@ The following matches the live schema when Migrations 1–8 (or equivalent) are 
 | **groups** | id, name, currency_code, owner_id, settlement_method, treasurer_participant_id, settlement_freeze_at, settlement_snapshot_json, allow_member_add_expense, allow_member_add_participant, allow_member_change_settings, require_participant_assignment, allow_expense_as_other_participant, icon, color, created_at, updated_at |
 | **participants** | id, group_id, name, sort_order, user_id, avatar_id, left_at, created_at, updated_at |
 | **group_members** | id, group_id, user_id, role, participant_id, joined_at |
-| **expenses** | id, group_id, payer_participant_id, amount_cents, currency_code, exchange_rate, base_amount_cents, title, description, date, split_type, split_shares_json, type, to_participant_id, tag, line_items_json, receipt_image_path, created_at, updated_at |
+| **expenses** | id, group_id, payer_participant_id, amount_cents, currency_code, exchange_rate, base_amount_cents, title, description, date, split_type, split_shares_json, type, to_participant_id, tag, line_items_json, receipt_image_path, receipt_image_paths, created_at, updated_at |
 | **expense_tags** | id, group_id, label, icon_name, created_at, updated_at |
 | **group_invites** | id, group_id, token, invitee_email, role, created_at, expires_at, created_by, label, max_uses, use_count, is_active |
 | **invite_usages** | id, invite_id, user_id, accepted_at |

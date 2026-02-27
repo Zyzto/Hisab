@@ -149,7 +149,7 @@ The workflow uses a GCP service account to authenticate with the Google Play Dev
 ### 6a. Create / confirm your Firebase project
 
 1. Go to [Firebase Console](https://console.firebase.google.com/).
-2. You should already have project **hisab-c8eb1** (per `.firebaserc`). If not, create one.
+2. Create a Firebase project or use an existing one. The repo’s `.firebaserc` uses a placeholder (`your-firebase-project-id`); run `firebase use your-project-id` locally, or rely on CI which uses the `FIREBASE_PROJECT_ID` secret.
 3. Navigate to **Build > Hosting** and click **Get started** if Hosting is not yet enabled.
 
 ### 6b. Generate a Firebase service account for CI
@@ -174,7 +174,7 @@ Alternatively, if you prefer a scoped service account:
 After the first deploy, your site will be live at:
 
 ```
-https://hisab-c8eb1.web.app
+https://your-project-id.web.app
 ```
 
 (or a custom domain if you configure one). Use this URL as the `SITE_URL` secret so auth redirects land on the live site. Also add it to **Supabase Dashboard > Authentication > URL Configuration > Redirect URLs**.
@@ -195,15 +195,22 @@ Add each secret listed below:
 |-------------|-------|
 | `SUPABASE_URL` | Your Supabase project URL, e.g. `https://xxxxx.supabase.co` |
 | `SUPABASE_ANON_KEY` | Your Supabase anon/public key (starts with `eyJ...`) |
-| `SITE_URL` | Your Firebase Hosting URL, e.g. `https://hisab-c8eb1.web.app` |
+| `INVITE_BASE_URL` | Your web app base URL for invite links, e.g. `https://yourdomain.com` |
+| `SITE_URL` | Your Firebase Hosting URL, e.g. `https://your-project-id.web.app` |
+| `FCM_VAPID_KEY` | Web Push certificate VAPID key from Firebase Console → Project Settings → Cloud Messaging → Web Push certificates (needed for web and optionally for Android FCM) |
+| `FIREBASE_API_KEY` | Firebase web API key (Project Settings → Your apps → Web app) |
+| `FIREBASE_AUTH_DOMAIN` | e.g. `your-project-id.firebaseapp.com` |
+| `FIREBASE_PROJECT_ID` | Firebase project ID |
+| `FIREBASE_STORAGE_BUCKET` | e.g. `your-project-id.firebasestorage.app` |
+| `FIREBASE_MESSAGING_SENDER_ID` | From your Firebase web app config |
+| `FIREBASE_APP_ID` | From your Firebase web app config (e.g. `1:123456789:web:abcdef`) |
+| `FIREBASE_SERVICE_ACCOUNT` | The full JSON contents from [step 6b](#6b-generate-a-firebase-service-account-for-ci) |
 | `KEYSTORE_BASE64` | The base64-encoded keystore from [step 3](#3-base64-encode-the-keystore) |
 | `KEYSTORE_PASSWORD` | The store password you chose in [step 2](#2-generate-an-android-release-keystore) |
 | `KEY_ALIAS` | The key alias, e.g. `hisab-release` |
 | `KEY_PASSWORD` | The key password from [step 2](#2-generate-an-android-release-keystore) |
 | `PLAY_STORE_SERVICE_ACCOUNT_JSON` | The full JSON contents from [step 5a](#5a-create-the-service-account-in-google-cloud) |
-| `FIREBASE_SERVICE_ACCOUNT` | The full JSON contents from [step 6b](#6b-generate-a-firebase-service-account-for-ci) |
 | `GOOGLE_SERVICES_JSON` | Base64-encoded contents of `android/app/google-services.json` (Firebase Console → Project settings → your Android app → download `google-services.json`, then `base64 -w 0 android/app/google-services.json` or equivalent) |
-| `FCM_VAPID_KEY` | Web Push certificate VAPID key from Firebase Console → Project Settings → Cloud Messaging → Web Push certificates (needed for web and optionally for Android FCM) |
 
 ---
 
