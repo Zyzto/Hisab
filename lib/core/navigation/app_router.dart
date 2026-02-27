@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:go_router/go_router.dart';
@@ -21,6 +22,87 @@ import '../../features/settings/widgets/privacy_policy_page.dart';
 import 'main_scaffold.dart';
 
 part 'app_router.g.dart';
+
+// --- Keyboard shortcut intents (desktop/web) ---
+
+class GoHomeIntent extends Intent {
+  const GoHomeIntent();
+}
+
+class GoSettingsIntent extends Intent {
+  const GoSettingsIntent();
+}
+
+/// Wraps [MainScaffold] in [Shortcuts], [Actions], and [Focus] so the shell
+/// can receive keyboard shortcuts (e.g. Alt+1 = home, Alt+2 = settings).
+/// FocusNode is owned in State because the ShellRoute builder is stateless.
+class _ShellWithShortcuts extends StatefulWidget {
+  const _ShellWithShortcuts({
+    required this.selectedIndex,
+    required this.location,
+    required this.child,
+  });
+
+  final int selectedIndex;
+  final String location;
+  final Widget child;
+
+  @override
+  State<_ShellWithShortcuts> createState() => _ShellWithShortcutsState();
+}
+
+class _ShellWithShortcutsState extends State<_ShellWithShortcuts> {
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode();
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Shortcuts(
+      shortcuts: const <ShortcutActivator, Intent>{
+        SingleActivator(LogicalKeyboardKey.digit1, alt: true):
+            GoHomeIntent(),
+        SingleActivator(LogicalKeyboardKey.digit2, alt: true):
+            GoSettingsIntent(),
+      },
+      child: Actions(
+        actions: <Type, Action<Intent>>{
+          GoHomeIntent: CallbackAction<GoHomeIntent>(
+            onInvoke: (_) {
+              context.go(RoutePaths.home);
+              return null;
+            },
+          ),
+          GoSettingsIntent: CallbackAction<GoSettingsIntent>(
+            onInvoke: (_) {
+              context.go(RoutePaths.settings);
+              return null;
+            },
+          ),
+        },
+        child: Focus(
+          focusNode: _focusNode,
+          autofocus: true,
+          child: MainScaffold(
+            selectedIndex: widget.selectedIndex,
+            location: widget.location,
+            child: widget.child,
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 /// Notifier that triggers GoRouter refresh when locale changes.
 /// Ensures navigation labels and all visible content update in realtime.
@@ -77,7 +159,7 @@ GoRouter router(Ref ref) {
           if (location.startsWith(RoutePaths.settings)) {
             selectedIndex = 1;
           }
-          return MainScaffold(
+          return _ShellWithShortcuts(
             selectedIndex: selectedIndex,
             location: location,
             child: child,

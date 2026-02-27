@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 
+import '../../../core/layout/layout_breakpoints.dart';
+
 /// A full-screen logs viewer dialog with terminal-style layout,
 /// color-coded log levels, and scrollable content.
 class LogsViewerDialog extends StatefulWidget {
@@ -49,112 +51,108 @@ class _LogsViewerDialogState extends State<LogsViewerDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final showTitleInBody = !LayoutBreakpoints.isTabletOrWider(context);
 
-    return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.terminal,
-                    color: theme.colorScheme.primary,
-                    size: 24,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (showTitleInBody) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.terminal,
+                  color: theme.colorScheme.primary,
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'view_logs'.tr(),
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'view_logs'.tr(),
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: widget.onClose,
+                  tooltip: 'done'.tr(),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+        ],
+        // Log content
+        Expanded(
+          child: Container(
+            margin: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? const Color(0xFF0D1117)
+                  : const Color(0xFFF6F8FA),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: theme.colorScheme.outline.withValues(alpha: 0.3),
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(12),
+                    scrollDirection: Axis.vertical,
+                    child: SelectionArea(
+                      child: _LogContent(
+                        content: widget.content,
+                        theme: theme,
+                        isDark: isDark,
                       ),
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: widget.onClose,
-                    tooltip: 'done'.tr(),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            // Log content
-            Expanded(
-              child: Container(
-                margin: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF0D1117)
-                      : const Color(0xFFF6F8FA),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: theme.colorScheme.outline.withValues(alpha: 0.3),
-                  ),
                 ),
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: SingleChildScrollView(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.all(12),
-                        scrollDirection: Axis.vertical,
-                        child: SelectionArea(
-                          child: _LogContent(
-                            content: widget.content,
-                            theme: theme,
-                            isDark: isDark,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              ],
             ),
-            const Divider(height: 1),
-            // Actions
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Wrap(
-                alignment: WrapAlignment.end,
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  TextButton.icon(
-                    onPressed: () => widget.onCopy(),
-                    icon: const Icon(Icons.copy, size: 18),
-                    label: Text('copy_logs'.tr()),
-                  ),
-                  TextButton.icon(
-                    onPressed: () => widget.onClear(),
-                    icon: const Icon(Icons.delete_outline, size: 18),
-                    label: Text('clear_logs'.tr()),
-                  ),
-                  TextButton.icon(
-                    onPressed: () => widget.onReportIssue(),
-                    icon: const Icon(Icons.bug_report_outlined, size: 18),
-                    label: Text('report_issue'.tr()),
-                  ),
-                  FilledButton(
-                    onPressed: widget.onClose,
-                    child: Text('done'.tr()),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
-      ),
+        const Divider(height: 1),
+        // Actions
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              TextButton.icon(
+                onPressed: () => widget.onCopy(),
+                icon: const Icon(Icons.copy, size: 18),
+                label: Text('copy_logs'.tr()),
+              ),
+              TextButton.icon(
+                onPressed: () => widget.onClear(),
+                icon: const Icon(Icons.delete_outline, size: 18),
+                label: Text('clear_logs'.tr()),
+              ),
+              TextButton.icon(
+                onPressed: () => widget.onReportIssue(),
+                icon: const Icon(Icons.bug_report_outlined, size: 18),
+                label: Text('report_issue'.tr()),
+              ),
+              FilledButton(
+                onPressed: widget.onClose,
+                child: Text('done'.tr()),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

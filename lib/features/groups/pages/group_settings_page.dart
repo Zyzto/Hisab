@@ -12,6 +12,10 @@ import '../providers/group_invite_provider.dart';
 import '../widgets/create_invite_sheet.dart';
 import '../utils/group_icon_utils.dart';
 import '../../../core/database/database_providers.dart';
+import '../../../core/layout/content_aligned_app_bar.dart';
+import '../../../core/layout/constrained_content.dart';
+import '../../../core/layout/layout_breakpoints.dart';
+import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/services/settle_up_service.dart';
@@ -20,6 +24,7 @@ import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/currency_helpers.dart';
 import '../../../core/widgets/error_content.dart';
+import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../domain/domain.dart';
 import '../../settings/providers/settings_framework_providers.dart';
@@ -75,200 +80,226 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
             body: Center(child: CircularProgressIndicator()),
           );
         }
-        return Scaffold(
-          appBar: AppBar(
-            title: Text((group.isPersonal ? 'list_settings' : 'group_settings').tr()),
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () {
-                if (context.canPop()) {
-                  context.pop();
-                } else {
-                  context.go('/');
-                }
-              },
-            ),
-          ),
-          body: ListView(
-            padding: const EdgeInsets.symmetric(
-              horizontal: ThemeConfig.spacingM,
-              vertical: ThemeConfig.spacingS,
-            ),
-            children: [
-              // ── Group Profile Header ──
-              _buildProfileHeader(context, group),
-              const SizedBox(height: ThemeConfig.spacingL),
-
-              // ── Currency Section ──
-              _buildSection(
-                context,
-                title: (group.isPersonal ? 'currency' : 'group_currency').tr(),
-                children: [
-                  _buildCurrencyRow(context, group, expensesAsync, ref),
-                ],
+        return LayoutBuilder(
+          builder: (context, layoutConstraints) {
+            return Scaffold(
+              appBar: ContentAlignedAppBar(
+                contentAreaWidth: layoutConstraints.maxWidth,
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go('/');
+                    }
+                  },
+                ),
+                title: Text(
+                  (group.isPersonal ? 'list_settings' : 'group_settings').tr(),
+                ),
               ),
-              const SizedBox(height: ThemeConfig.spacingL),
+              body: ConstrainedContent(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(
+                horizontal: ThemeConfig.spacingM,
+                vertical: ThemeConfig.spacingS,
+              ),
+              children: [
+                // ── Group Profile Header ──
+                _buildProfileHeader(context, group),
+                const SizedBox(height: ThemeConfig.spacingL),
 
-              // ── My budget (personal only) ──
-              if (group.isPersonal) ...[
+                // ── Currency Section ──
                 _buildSection(
                   context,
-                  title: 'my_budget'.tr(),
+                  title: (group.isPersonal ? 'currency' : 'group_currency')
+                      .tr(),
                   children: [
-                    _buildMyBudgetRow(context, group, ref),
+                    _buildCurrencyRow(context, group, expensesAsync, ref),
                   ],
                 ),
                 const SizedBox(height: ThemeConfig.spacingL),
-              ],
 
-              // ── Settlement Section (group only) ──
-              if (!group.isPersonal)
-                _buildSection(
-                  context,
-                  title: 'settlement_method'.tr(),
-                  children: [
-                    _buildSettlementMethodContent(context, group, ref),
-                    if (group.settlementMethod == SettlementMethod.treasurer)
-                      _buildTreasurerContent(
-                          context, group, participantsAsync, ref),
-                    _buildFreezeContent(
-                      context,
-                      group,
-                      participantsAsync,
-                      expensesAsync,
-                      ref,
-                    ),
-                  ],
-                ),
-              if (!group.isPersonal) const SizedBox(height: ThemeConfig.spacingL),
+                // ── My budget (personal only) ──
+                if (group.isPersonal) ...[
+                  _buildSection(
+                    context,
+                    title: 'my_budget'.tr(),
+                    children: [_buildMyBudgetRow(context, group, ref)],
+                  ),
+                  const SizedBox(height: ThemeConfig.spacingL),
+                ],
 
-              // ── Permissions Section (online only, group only) ──
-              if (!localOnly && !group.isPersonal)
-                myRoleAsync.when(
-                  data: (myRole) {
-                    final isOwnerOrAdmin = myRole == GroupRole.owner ||
-                        myRole == GroupRole.admin;
-                    if (!isOwnerOrAdmin || group.ownerId == null) {
-                      return const SizedBox.shrink();
-                    }
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: ThemeConfig.spacingL),
-                        _buildSection(
+                // ── Settlement Section (group only) ──
+                if (!group.isPersonal)
+                  _buildSection(
+                    context,
+                    title: 'settlement_method'.tr(),
+                    children: [
+                      _buildSettlementMethodContent(context, group, ref),
+                      if (group.settlementMethod == SettlementMethod.treasurer)
+                        _buildTreasurerContent(
                           context,
-                          title: 'group_permissions'.tr(),
-                          children: [
-                            SwitchListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title: Text('allow_add_expense'.tr()),
-                              value: group.allowMemberAddExpense,
-                              onChanged: _saving
-                                  ? null
-                                  : (v) => _onPermissionChanged(
+                          group,
+                          participantsAsync,
+                          ref,
+                        ),
+                      _buildFreezeContent(
+                        context,
+                        group,
+                        participantsAsync,
+                        expensesAsync,
+                        ref,
+                      ),
+                    ],
+                  ),
+                if (!group.isPersonal)
+                  const SizedBox(height: ThemeConfig.spacingL),
+
+                // ── Permissions Section (online only, group only) ──
+                if (!localOnly && !group.isPersonal)
+                  myRoleAsync.when(
+                    data: (myRole) {
+                      final isOwnerOrAdmin =
+                          myRole == GroupRole.owner ||
+                          myRole == GroupRole.admin;
+                      if (!isOwnerOrAdmin || group.ownerId == null) {
+                        return const SizedBox.shrink();
+                      }
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: ThemeConfig.spacingL),
+                          _buildSection(
+                            context,
+                            title: 'group_permissions'.tr(),
+                            children: [
+                              SwitchListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: Text('allow_add_expense'.tr()),
+                                value: group.allowMemberAddExpense,
+                                onChanged: _saving
+                                    ? null
+                                    : (v) => _onPermissionChanged(
                                         ref,
                                         group,
                                         allowMemberAddExpense: v,
                                       ),
-                            ),
-                            SwitchListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title: Text('allow_change_settings'.tr()),
-                              value: group.allowMemberChangeSettings,
-                              onChanged: _saving
-                                  ? null
-                                  : (v) => _onPermissionChanged(
+                              ),
+                              SwitchListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: Text('allow_change_settings'.tr()),
+                                value: group.allowMemberChangeSettings,
+                                onChanged: _saving
+                                    ? null
+                                    : (v) => _onPermissionChanged(
                                         ref,
                                         group,
                                         allowMemberChangeSettings: v,
                                       ),
-                            ),
-                            SwitchListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title: Text('allow_expense_as_other'.tr()),
-                              value: group.allowExpenseAsOtherParticipant,
-                              onChanged: _saving
-                                  ? null
-                                  : (v) => _onPermissionChanged(
+                              ),
+                              SwitchListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: Text('allow_expense_as_other'.tr()),
+                                value: group.allowExpenseAsOtherParticipant,
+                                onChanged: _saving
+                                    ? null
+                                    : (v) => _onPermissionChanged(
                                         ref,
                                         group,
                                         allowExpenseAsOtherParticipant: v,
                                       ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    );
-                  },
-                  loading: () => const SizedBox.shrink(),
-                  error: (_, _) => const SizedBox.shrink(),
-                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      );
+                    },
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, _) => const SizedBox.shrink(),
+                  ),
 
-              // ── Invite Section (online only, owner/admin, group only) ──
-              if (!localOnly && !group.isPersonal)
-                myRoleAsync.when(
-                  data: (myRole) {
-                    final isOwnerOrAdmin = myRole == GroupRole.owner ||
-                        myRole == GroupRole.admin;
-                    if (!isOwnerOrAdmin) return const SizedBox.shrink();
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: ThemeConfig.spacingL),
-                        _buildInviteSection(context, ref),
-                      ],
-                    );
-                  },
-                  loading: () => const SizedBox.shrink(),
-                  error: (_, _) => const SizedBox.shrink(),
-                ),
+                // ── Invite Section (online only, owner/admin, group only) ──
+                if (!localOnly && !group.isPersonal)
+                  myRoleAsync.when(
+                    data: (myRole) {
+                      final isOwnerOrAdmin =
+                          myRole == GroupRole.owner ||
+                          myRole == GroupRole.admin;
+                      if (!isOwnerOrAdmin) return const SizedBox.shrink();
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: ThemeConfig.spacingL),
+                          _buildInviteSection(context, ref),
+                        ],
+                      );
+                    },
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, _) => const SizedBox.shrink(),
+                  ),
 
-              // ── Danger Zone ──
-              const SizedBox(height: ThemeConfig.spacingXL),
-              localArchivedIdsAsync.when(
-                data: (ids) => _buildDangerZone(
-                  context,
-                  group,
-                  localOnly,
-                  myRoleAsync,
-                  participantsAsync,
-                  ref,
-                  isLocallyArchived: ids.contains(widget.groupId),
+                // ── Danger Zone ──
+                const SizedBox(height: ThemeConfig.spacingXL),
+                localArchivedIdsAsync.when(
+                  data: (ids) => _buildDangerZone(
+                    context,
+                    group,
+                    localOnly,
+                    myRoleAsync,
+                    participantsAsync,
+                    ref,
+                    isLocallyArchived: ids.contains(widget.groupId),
+                  ),
+                  loading: () => _buildDangerZone(
+                    context,
+                    group,
+                    localOnly,
+                    myRoleAsync,
+                    participantsAsync,
+                    ref,
+                    isLocallyArchived: false,
+                  ),
+                  error: (_, _) => _buildDangerZone(
+                    context,
+                    group,
+                    localOnly,
+                    myRoleAsync,
+                    participantsAsync,
+                    ref,
+                    isLocallyArchived: false,
+                  ),
                 ),
-                loading: () => _buildDangerZone(
-                  context,
-                  group,
-                  localOnly,
-                  myRoleAsync,
-                  participantsAsync,
-                  ref,
-                  isLocallyArchived: false,
-                ),
-                error: (_, _) => _buildDangerZone(
-                  context,
-                  group,
-                  localOnly,
-                  myRoleAsync,
-                  participantsAsync,
-                  ref,
-                  isLocallyArchived: false,
-                ),
-              ),
-              const SizedBox(height: ThemeConfig.spacingXL),
-            ],
+                const SizedBox(height: ThemeConfig.spacingXL),
+              ],
+            ),
           ),
+        );
+          },
         );
       },
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (e, _) => Scaffold(
-        appBar: AppBar(title: Text('list_settings'.tr())),
-        body: Center(
+      error: (e, _) => LayoutBuilder(
+        builder: (context, layoutConstraints) {
+          return Scaffold(
+            appBar: ContentAlignedAppBar(
+              contentAreaWidth: layoutConstraints.maxWidth,
+              title: Text('list_settings'.tr()),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => context.pop(),
+              ),
+            ),
+            body: Center(
           child: ErrorContentWidget(
             message: e.toString(),
             onRetry: () => ref.invalidate(futureGroupProvider(widget.groupId)),
           ),
         ),
+          );
+        },
       ),
     );
   }
@@ -280,17 +311,16 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
   Widget _buildProfileHeader(BuildContext context, Group group) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final avatarColor =
-        group.color != null ? Color(group.color!) : colorScheme.primary;
+    final avatarColor = group.color != null
+        ? Color(group.color!)
+        : colorScheme.primary;
     final iconData = groupIconFromKey(group.icon);
 
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(ThemeConfig.radiusXL),
-        side: BorderSide(
-          color: colorScheme.outline.withValues(alpha: 0.2),
-        ),
+        side: BorderSide(color: colorScheme.outline.withValues(alpha: 0.2)),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(
@@ -370,9 +400,11 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                   const SizedBox(height: ThemeConfig.spacingXS),
                   // Created date
                   Text(
-                    'created_on'.tr(namedArgs: {
-                      'date': DateFormat.yMMMd().format(group.createdAt),
-                    }),
+                    'created_on'.tr(
+                      namedArgs: {
+                        'date': DateFormat.yMMMd().format(group.createdAt),
+                      },
+                    ),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
@@ -427,11 +459,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
   // My budget (personal only)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  Widget _buildMyBudgetRow(
-    BuildContext context,
-    Group group,
-    WidgetRef ref,
-  ) {
+  Widget _buildMyBudgetRow(BuildContext context, Group group, WidgetRef ref) {
     final theme = Theme.of(context);
     final currencyCode = group.currencyCode;
     final budgetCents = group.budgetAmountCents;
@@ -440,9 +468,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
         : '—';
 
     return InkWell(
-      onTap: _saving
-          ? null
-          : () => _showMyBudgetDialog(context, group, ref),
+      onTap: _saving ? null : () => _showMyBudgetDialog(context, group, ref),
       borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -452,12 +478,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
         ),
         child: Row(
           children: [
-            Expanded(
-              child: Text(
-                display,
-                style: theme.textTheme.bodyLarge,
-              ),
-            ),
+            Expanded(child: Text(display, style: theme.textTheme.bodyLarge)),
             Icon(
               Icons.edit_outlined,
               size: 20,
@@ -482,39 +503,49 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
       final divisor = decimals == 0 ? 1.0 : (decimals == 1 ? 10.0 : 100.0);
       controller.text = (budgetCents / divisor).toStringAsFixed(decimals);
     }
-
-    final result = await showDialog<String>(
+    final hint =
+        CurrencyHelpers.fromCode(group.currencyCode)?.symbol ??
+        group.currencyCode;
+    final result = await showResponsiveSheet<String?>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('my_budget'.tr()),
-        content: TextField(
-          controller: controller,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: InputDecoration(
-            labelText: 'budget_amount'.tr(),
-            hintText: CurrencyHelpers.fromCode(group.currencyCode)?.symbol ??
-                group.currencyCode,
-            border: const OutlineInputBorder(),
+      title: 'my_budget'.tr(),
+      maxHeight: MediaQuery.of(context).size.height * 0.5,
+      isScrollControlled: true,
+      centerInFullViewport: true,
+      child: Builder(
+        builder: (ctx) => buildSheetShell(
+          ctx,
+          title: 'my_budget'.tr(),
+          showTitleInBody: !LayoutBreakpoints.isTabletOrWider(context),
+          body: TextField(
+            controller: controller,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: 'budget_amount'.tr(),
+              hintText: hint,
+              border: const OutlineInputBorder(),
+            ),
+            autofocus: true,
           ),
-          autofocus: true,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, ''),
+              child: Text('clear'.tr()),
+            ),
+            if (!LayoutBreakpoints.isTabletOrWider(context))
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, null),
+                child: Text('cancel'.tr()),
+              ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+              child: Text('done'.tr()),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('cancel'.tr()),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, ''),
-            child: Text('clear'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: Text('done'.tr()),
-          ),
-        ],
       ),
     );
-
+    controller.dispose();
     if (result == null || !mounted) return;
 
     int? newBudgetCents;
@@ -532,7 +563,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
 
     try {
       await _withSaving(() async {
-        await ref.read(groupRepositoryProvider).update(
+        await ref
+            .read(groupRepositoryProvider)
+            .update(
               newBudgetCents == null
                   ? group.copyWith(
                       clearBudgetAmountCents: true,
@@ -618,28 +651,19 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     CurrencyHelpers.showPicker(
       context: context,
       favorite: favorites,
+      centerInFullViewport: true,
       onSelect: (Currency currency) async {
         if (currency.code == group.currencyCode) return;
 
         // Warn if expenses exist
         final expenses = expensesAsync.value;
         if (expenses != null && expenses.isNotEmpty) {
-          final ok = await showDialog<bool>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: Text('change_currency'.tr()),
-              content: Text('currency_change_warning'.tr()),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: Text('cancel'.tr()),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  child: Text('change_currency'.tr()),
-                ),
-              ],
-            ),
+          final ok = await showConfirmSheet(
+            context,
+            title: 'change_currency'.tr(),
+            content: 'currency_change_warning'.tr(),
+            confirmLabel: 'change_currency'.tr(),
+            centerInFullViewport: true,
           );
           if (ok != true || !mounted) return;
         }
@@ -713,10 +737,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                 ],
               ),
             ),
-            Icon(
-              Icons.arrow_drop_down,
-              color: colorScheme.onSurfaceVariant,
-            ),
+            Icon(Icons.arrow_drop_down, color: colorScheme.onSurfaceVariant),
           ],
         ),
       ),
@@ -731,72 +752,75 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    final chosen = await showModalBottomSheet<SettlementMethod>(
+    final chosen = await showResponsiveSheet<SettlementMethod>(
       context: context,
+      title: 'settlement_method'.tr(),
+      maxHeight: MediaQuery.of(context).size.height * 0.75,
       isScrollControlled: true,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
+      centerInFullViewport: true,
+      sheetShape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.75,
-      ),
-      builder: (ctx) {
-        return SafeArea(
+      child: Builder(
+        builder: (ctx) => SafeArea(
           child: SingleChildScrollView(
             child: Padding(
               padding: EdgeInsets.only(
-                bottom: MediaQuery.of(ctx).padding.bottom + ThemeConfig.spacingM,
+                bottom:
+                    MediaQuery.of(ctx).padding.bottom + ThemeConfig.spacingM,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: ThemeConfig.spacingM),
-                    child: Text(
-                      'settlement_method'.tr(),
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                ...SettlementMethod.values.map((method) {
-                  final isSelected = method == group.settlementMethod;
-                  return ListTile(
-                    selected: isSelected,
-                    selectedTileColor:
-                        colorScheme.primaryContainer.withValues(alpha: 0.3),
-                    leading: Icon(
-                      isSelected
-                          ? Icons.radio_button_checked
-                          : Icons.radio_button_unchecked,
-                      color: isSelected
-                          ? colorScheme.primary
-                          : colorScheme.onSurfaceVariant,
-                    ),
-                    title: Text(
-                      _methodLabel(method),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: isSelected ? FontWeight.w600 : null,
-                        color: isSelected ? colorScheme.primary : null,
+                  if (!LayoutBreakpoints.isTabletOrWider(context))
+                    Padding(
+                      padding: const EdgeInsets.only(
+                        bottom: ThemeConfig.spacingM,
+                      ),
+                      child: Text(
+                        'settlement_method'.tr(),
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                    subtitle: Text(
-                      _methodDescription(method),
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
+                  ...SettlementMethod.values.map((method) {
+                    final isSelected = method == group.settlementMethod;
+                    return ListTile(
+                      selected: isSelected,
+                      selectedTileColor: colorScheme.primaryContainer
+                          .withValues(alpha: 0.3),
+                      leading: Icon(
+                        isSelected
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_unchecked,
+                        color: isSelected
+                            ? colorScheme.primary
+                            : colorScheme.onSurfaceVariant,
                       ),
-                    ),
-                    onTap: () => Navigator.pop(ctx, method),
-                  );
-                }),
-                const SizedBox(height: ThemeConfig.spacingM),
-              ],
-            ),
+                      title: Text(
+                        _methodLabel(method),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: isSelected ? FontWeight.w600 : null,
+                          color: isSelected ? colorScheme.primary : null,
+                        ),
+                      ),
+                      subtitle: Text(
+                        _methodDescription(method),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      onTap: () => Navigator.pop(ctx, method),
+                    );
+                  }),
+                  const SizedBox(height: ThemeConfig.spacingM),
+                ],
+              ),
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
 
     if (chosen != null && chosen != group.settlementMethod) {
@@ -864,11 +888,11 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
 
     final subtitle = isFrozen
         ? 'settlement_frozen_since'.tr().replaceAll(
-              '{date}',
-              group.settlementFreezeAt != null
-                  ? DateFormat.yMMMd().format(group.settlementFreezeAt!)
-                  : '',
-            )
+            '{date}',
+            group.settlementFreezeAt != null
+                ? DateFormat.yMMMd().format(group.settlementFreezeAt!)
+                : '',
+          )
         : 'settlement_freeze_description'.tr();
 
     return SwitchListTile(
@@ -920,8 +944,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
           data: (invites) {
             if (invites.isEmpty) {
               return Padding(
-                padding:
-                    const EdgeInsets.symmetric(vertical: ThemeConfig.spacingS),
+                padding: const EdgeInsets.symmetric(
+                  vertical: ThemeConfig.spacingS,
+                ),
                 child: Text(
                   'invite_empty'.tr(),
                   style: theme.textTheme.bodySmall?.copyWith(
@@ -948,8 +973,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                   Padding(
                     padding: const EdgeInsets.only(top: ThemeConfig.spacingXS),
                     child: Text(
-                      'invite_and_more'
-                          .tr(args: ['${invites.length - 3}']),
+                      'invite_and_more'.tr(args: ['${invites.length - 3}']),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -974,9 +998,8 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
-            onPressed: () => context.push(
-              RoutePaths.groupInvites(widget.groupId),
-            ),
+            onPressed: () =>
+                context.push(RoutePaths.groupInvites(widget.groupId)),
             icon: const Icon(Icons.open_in_new, size: 16),
             label: Text('invite_manage_all'.tr()),
           ),
@@ -1008,35 +1031,45 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
         myRoleAsync.whenData((myRole) {
           if (myRole == GroupRole.owner) {
             if (group.isArchived) {
-              actions.add(_dangerButton(
-                icon: Icons.unarchive_outlined,
-                label: 'unarchive_list'.tr(),
-                color: errorColor,
-                onTap: _saving ? null : () => _showUnarchiveGroup(context, ref),
-              ));
+              actions.add(
+                _dangerButton(
+                  icon: Icons.unarchive_outlined,
+                  label: 'unarchive_list'.tr(),
+                  color: errorColor,
+                  onTap: _saving
+                      ? null
+                      : () => _showUnarchiveGroup(context, ref),
+                ),
+              );
             } else {
-              actions.add(_dangerButton(
-                icon: Icons.archive_outlined,
-                label: 'archive_list'.tr(),
-                color: errorColor,
-                onTap: _saving ? null : () => _showArchiveGroup(context, ref),
-              ));
+              actions.add(
+                _dangerButton(
+                  icon: Icons.archive_outlined,
+                  label: 'archive_list'.tr(),
+                  color: errorColor,
+                  onTap: _saving ? null : () => _showArchiveGroup(context, ref),
+                ),
+              );
             }
           }
         });
       }
-      actions.add(_dangerButton(
-        icon: Icons.delete_outline,
-        label: 'delete_list'.tr(),
-        color: errorColor,
-        onTap: _saving ? null : () => _showDeleteGroup(context, ref),
-      ));
-      actions.add(_dangerButton(
-        icon: Icons.share_outlined,
-        label: 'share_as_group'.tr(),
-        color: errorColor,
-        onTap: _saving ? null : () => _showShareAsGroup(context, group, ref),
-      ));
+      actions.add(
+        _dangerButton(
+          icon: Icons.delete_outline,
+          label: 'delete_list'.tr(),
+          color: errorColor,
+          onTap: _saving ? null : () => _showDeleteGroup(context, ref),
+        ),
+      );
+      actions.add(
+        _dangerButton(
+          icon: Icons.share_outlined,
+          label: 'share_as_group'.tr(),
+          color: errorColor,
+          onTap: _saving ? null : () => _showShareAsGroup(context, group, ref),
+        ),
+      );
     } else {
       // Group: existing logic, plus "Use as personal" when member count == 1
       final participantCount = participantsAsync.maybeWhen(
@@ -1044,76 +1077,102 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
         orElse: () => 0,
       );
       if (participantCount == 1) {
-        actions.add(_dangerButton(
-          icon: Icons.person_outline,
-          label: 'use_as_personal'.tr(),
-          color: errorColor,
-          onTap: _saving ? null : () => _showUseAsPersonal(context, group, ref),
-        ));
+        actions.add(
+          _dangerButton(
+            icon: Icons.person_outline,
+            label: 'use_as_personal'.tr(),
+            color: errorColor,
+            onTap: _saving
+                ? null
+                : () => _showUseAsPersonal(context, group, ref),
+          ),
+        );
       }
       if (localOnly) {
-        actions.add(_dangerButton(
-          icon: Icons.delete_outline,
-          label: 'delete_group'.tr(),
-          color: errorColor,
-          onTap: _saving ? null : () => _showDeleteGroup(context, ref),
-        ));
+        actions.add(
+          _dangerButton(
+            icon: Icons.delete_outline,
+            label: 'delete_group'.tr(),
+            color: errorColor,
+            onTap: _saving ? null : () => _showDeleteGroup(context, ref),
+          ),
+        );
       } else {
         myRoleAsync.whenData((myRole) {
           if (myRole == GroupRole.owner) {
             if (group.isArchived) {
-              actions.add(_dangerButton(
-                icon: Icons.unarchive_outlined,
-                label: 'unarchive_group'.tr(),
-                color: errorColor,
-                onTap: _saving ? null : () => _showUnarchiveGroup(context, ref),
-              ));
+              actions.add(
+                _dangerButton(
+                  icon: Icons.unarchive_outlined,
+                  label: 'unarchive_group'.tr(),
+                  color: errorColor,
+                  onTap: _saving
+                      ? null
+                      : () => _showUnarchiveGroup(context, ref),
+                ),
+              );
             } else {
-              actions.add(_dangerButton(
-                icon: Icons.archive_outlined,
-                label: 'archive_group'.tr(),
-                color: errorColor,
-                onTap: _saving ? null : () => _showArchiveGroup(context, ref),
-              ));
+              actions.add(
+                _dangerButton(
+                  icon: Icons.archive_outlined,
+                  label: 'archive_group'.tr(),
+                  color: errorColor,
+                  onTap: _saving ? null : () => _showArchiveGroup(context, ref),
+                ),
+              );
             }
-            actions.add(_dangerButton(
-              icon: Icons.swap_horiz,
-              label: 'transfer_ownership'.tr(),
-              color: errorColor,
-              onTap: _saving
-                  ? null
-                  : () => _showTransferOwnership(context, ref),
-            ));
-            actions.add(_dangerButton(
-              icon: Icons.delete_outline,
-              label: 'delete_group'.tr(),
-              color: errorColor,
-              onTap: _saving ? null : () => _showDeleteGroup(context, ref),
-            ));
+            actions.add(
+              _dangerButton(
+                icon: Icons.swap_horiz,
+                label: 'transfer_ownership'.tr(),
+                color: errorColor,
+                onTap: _saving
+                    ? null
+                    : () => _showTransferOwnership(context, ref),
+              ),
+            );
+            actions.add(
+              _dangerButton(
+                icon: Icons.delete_outline,
+                label: 'delete_group'.tr(),
+                color: errorColor,
+                onTap: _saving ? null : () => _showDeleteGroup(context, ref),
+              ),
+            );
           } else if (myRole != null) {
             if (isLocallyArchived) {
-              actions.add(_dangerButton(
-                icon: Icons.visibility_outlined,
-                label: 'unhide_from_my_list'.tr(),
-                color: errorColor,
-                onTap: _saving ? null : () => _showUnhideFromMyList(context, ref),
-              ));
+              actions.add(
+                _dangerButton(
+                  icon: Icons.visibility_outlined,
+                  label: 'unhide_from_my_list'.tr(),
+                  color: errorColor,
+                  onTap: _saving
+                      ? null
+                      : () => _showUnhideFromMyList(context, ref),
+                ),
+              );
             } else {
-              actions.add(_dangerButton(
-                icon: Icons.archive_outlined,
-                label: 'hide_from_my_list'.tr(),
-                color: errorColor,
-                onTap: _saving ? null : () => _showHideFromMyList(context, ref),
-              ));
+              actions.add(
+                _dangerButton(
+                  icon: Icons.archive_outlined,
+                  label: 'hide_from_my_list'.tr(),
+                  color: errorColor,
+                  onTap: _saving
+                      ? null
+                      : () => _showHideFromMyList(context, ref),
+                ),
+              );
             }
           }
           if (myRole != null) {
-            actions.add(_dangerButton(
-              icon: Icons.exit_to_app,
-              label: 'leave_group'.tr(),
-              color: errorColor,
-              onTap: _saving ? null : () => _showLeaveGroup(context, ref),
-            ));
+            actions.add(
+              _dangerButton(
+                icon: Icons.exit_to_app,
+                label: 'leave_group'.tr(),
+                color: errorColor,
+                onTap: _saving ? null : () => _showLeaveGroup(context, ref),
+              ),
+            );
           }
         });
       }
@@ -1126,7 +1185,10 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     final rows = <List<Widget>>[];
     for (var i = 0; i < actions.length; i += columns) {
       rows.add(
-        actions.sublist(i, i + columns > actions.length ? actions.length : i + columns),
+        actions.sublist(
+          i,
+          i + columns > actions.length ? actions.length : i + columns,
+        ),
       );
     }
 
@@ -1201,51 +1263,35 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
   // ═══════════════════════════════════════════════════════════════════════════
 
   Future<void> _showEditNameDialog(BuildContext context, Group group) async {
-    final controller = TextEditingController(text: group.name);
-
     final isPersonal = group.isPersonal;
-    final newName = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text((isPersonal ? 'edit_list_name' : 'edit_group_name').tr()),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: InputDecoration(
-            labelText: (isPersonal ? 'list_name' : 'group_name').tr(),
-            border: const OutlineInputBorder(),
-          ),
-          textInputAction: TextInputAction.done,
-          onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: Text('done'.tr()),
-          ),
-        ],
-      ),
+    final newName = await showTextInputSheet(
+      context,
+      title: (isPersonal ? 'edit_list_name' : 'edit_group_name').tr(),
+      hint: (isPersonal ? 'list_name' : 'group_name').tr(),
+      initialValue: group.name,
+      centerInFullViewport: true,
     );
 
     if (newName == null || newName.isEmpty || newName == group.name) {
       if (newName != null && newName.isEmpty && context.mounted) {
-        context.showToast((group.isPersonal ? 'list_name_empty' : 'group_name_empty').tr());
+        context.showToast(
+          (group.isPersonal ? 'list_name_empty' : 'group_name_empty').tr(),
+        );
       }
       return;
     }
 
     try {
       await _withSaving(() async {
-        await ref.read(groupRepositoryProvider).update(
-              group.copyWith(name: newName, updatedAt: DateTime.now()),
-            );
+        await ref
+            .read(groupRepositoryProvider)
+            .update(group.copyWith(name: newName, updatedAt: DateTime.now()));
         ref.invalidate(futureGroupProvider(widget.groupId));
         if (context.mounted) {
-          context.showSuccess((group.isPersonal ? 'list_name_updated' : 'group_name_updated').tr());
+          context.showSuccess(
+            (group.isPersonal ? 'list_name_updated' : 'group_name_updated')
+                .tr(),
+          );
         }
       });
     } catch (e, st) {
@@ -1266,181 +1312,189 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
         ? Color(group.color!)
         : groupColors.first;
 
-    final result = await showModalBottomSheet<Map<String, dynamic>>(
+    final result = await showResponsiveSheet<Map<String, dynamic>>(
       context: context,
+      title: 'change_icon_color'.tr(),
+      maxHeight: MediaQuery.of(context).size.height * 0.75,
       isScrollControlled: true,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
+      centerInFullViewport: true,
+      sheetShape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.75,
-      ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) {
-          return SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                ThemeConfig.spacingM,
-                0,
-                ThemeConfig.spacingM,
-                ThemeConfig.spacingM + MediaQuery.of(ctx).padding.bottom,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'change_icon_color'.tr(),
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
+      child: Builder(
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return SingleChildScrollView(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  ThemeConfig.spacingM,
+                  0,
+                  ThemeConfig.spacingM,
+                  ThemeConfig.spacingM + MediaQuery.of(ctx).padding.bottom,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!LayoutBreakpoints.isTabletOrWider(context)) ...[
+                      Text(
+                        'change_icon_color'.tr(),
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: ThemeConfig.spacingL),
+                    ],
+                    // Icon grid
+                    Text(
+                      'wizard_icon_label'.tr(),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: ThemeConfig.spacingL),
-
-                  // Icon grid
-                  Text(
-                    'wizard_icon_label'.tr(),
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: ThemeConfig.spacingM),
-                  GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate:
-                      const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 4,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 1,
-                  ),
-                  itemCount: groupIcons.length,
-                  itemBuilder: (context, index) {
-                    final opt = groupIcons[index];
-                    final isSelected = selectedIcon == opt.key;
-                    return Material(
-                      color: isSelected
-                          ? selectedColor.withValues(alpha: 0.15)
-                          : colorScheme.surfaceContainerHighest,
-                      borderRadius:
-                          BorderRadius.circular(ThemeConfig.radiusL),
-                      child: InkWell(
-                        borderRadius:
-                            BorderRadius.circular(ThemeConfig.radiusL),
-                        onTap: () =>
-                            setSheetState(() => selectedIcon = opt.key),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          decoration: BoxDecoration(
-                            borderRadius:
-                                BorderRadius.circular(ThemeConfig.radiusL),
-                            border: Border.all(
-                              color: isSelected
-                                  ? selectedColor
-                                  : colorScheme.outline
-                                      .withValues(alpha: 0.2),
-                              width: isSelected ? 2 : 1,
-                            ),
+                    const SizedBox(height: ThemeConfig.spacingM),
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 4,
+                            mainAxisSpacing: 12,
+                            crossAxisSpacing: 12,
+                            childAspectRatio: 1,
                           ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                opt.icon,
-                                size: 28,
-                                color: isSelected
-                                    ? selectedColor
-                                    : colorScheme.onSurfaceVariant,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                opt.labelKey.tr(),
-                                style:
-                                    theme.textTheme.labelSmall?.copyWith(
+                      itemCount: groupIcons.length,
+                      itemBuilder: (context, index) {
+                        final opt = groupIcons[index];
+                        final isSelected = selectedIcon == opt.key;
+                        return Material(
+                          color: isSelected
+                              ? selectedColor.withValues(alpha: 0.15)
+                              : colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(
+                            ThemeConfig.radiusL,
+                          ),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(
+                              ThemeConfig.radiusL,
+                            ),
+                            onTap: () =>
+                                setSheetState(() => selectedIcon = opt.key),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(
+                                  ThemeConfig.radiusL,
+                                ),
+                                border: Border.all(
                                   color: isSelected
                                       ? selectedColor
-                                      : colorScheme.onSurfaceVariant,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w600
-                                      : FontWeight.normal,
+                                      : colorScheme.outline.withValues(
+                                          alpha: 0.2,
+                                        ),
+                                  width: isSelected ? 2 : 1,
                                 ),
-                                textAlign: TextAlign.center,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                               ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: ThemeConfig.spacingXL),
-
-                // Color palette
-                Text(
-                  'wizard_color_label'.tr(),
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: ThemeConfig.spacingM),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: groupColors.map((color) {
-                    final isSelected = selectedColor == color;
-                    return GestureDetector(
-                      onTap: () =>
-                          setSheetState(() => selectedColor = color),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: color,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: isSelected
-                                ? colorScheme.onSurface
-                                : Colors.transparent,
-                            width: 3,
-                          ),
-                          boxShadow: isSelected
-                              ? [
-                                  BoxShadow(
-                                    color: color.withValues(alpha: 0.4),
-                                    blurRadius: 8,
-                                    spreadRadius: 1,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    opt.icon,
+                                    size: 28,
+                                    color: isSelected
+                                        ? selectedColor
+                                        : colorScheme.onSurfaceVariant,
                                   ),
-                                ]
-                              : null,
-                        ),
-                        child: isSelected
-                            ? const Icon(Icons.check,
-                                color: Colors.white, size: 22)
-                            : null,
-                      ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: ThemeConfig.spacingXL),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    opt.labelKey.tr(),
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: isSelected
+                                          ? selectedColor
+                                          : colorScheme.onSurfaceVariant,
+                                      fontWeight: isSelected
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: ThemeConfig.spacingXL),
 
-                // Confirm button
-                FilledButton(
-                  onPressed: () => Navigator.pop(ctx, {
-                    'icon': selectedIcon,
-                    'color': selectedColor.toARGB32(),
-                  }),
-                  child: Text('done'.tr()),
+                    // Color palette
+                    Text(
+                      'wizard_color_label'.tr(),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: ThemeConfig.spacingM),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: groupColors.map((color) {
+                        final isSelected = selectedColor == color;
+                        return GestureDetector(
+                          onTap: () =>
+                              setSheetState(() => selectedColor = color),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: color,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isSelected
+                                    ? colorScheme.onSurface
+                                    : Colors.transparent,
+                                width: 3,
+                              ),
+                              boxShadow: isSelected
+                                  ? [
+                                      BoxShadow(
+                                        color: color.withValues(alpha: 0.4),
+                                        blurRadius: 8,
+                                        spreadRadius: 1,
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: isSelected
+                                ? const Icon(
+                                    Icons.check,
+                                    color: Colors.white,
+                                    size: 22,
+                                  )
+                                : null,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: ThemeConfig.spacingXL),
+
+                    // Confirm button
+                    FilledButton(
+                      onPressed: () => Navigator.pop(ctx, {
+                        'icon': selectedIcon,
+                        'color': selectedColor.toARGB32(),
+                      }),
+                      child: Text('done'.tr()),
+                    ),
+                  ],
                 ),
-                ],
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
 
@@ -1454,7 +1508,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
 
     try {
       await _withSaving(() async {
-        await ref.read(groupRepositoryProvider).update(
+        await ref
+            .read(groupRepositoryProvider)
+            .update(
               group.copyWith(
                 icon: newIcon,
                 color: newColor,
@@ -1512,7 +1568,10 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
         await ref
             .read(groupRepositoryProvider)
             .update(
-              group.copyWith(settlementMethod: method, updatedAt: DateTime.now()),
+              group.copyWith(
+                settlementMethod: method,
+                updatedAt: DateTime.now(),
+              ),
             );
         Log.info(
           'Settlement method changed: groupId=${widget.groupId} method=$method',
@@ -1603,10 +1662,11 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                 allowMemberAddExpense:
                     allowMemberAddExpense ?? group.allowMemberAddExpense,
                 allowMemberChangeSettings:
-                    allowMemberChangeSettings ?? group.allowMemberChangeSettings,
+                    allowMemberChangeSettings ??
+                    group.allowMemberChangeSettings,
                 allowExpenseAsOtherParticipant:
                     allowExpenseAsOtherParticipant ??
-                        group.allowExpenseAsOtherParticipant,
+                    group.allowExpenseAsOtherParticipant,
                 updatedAt: DateTime.now(),
               ),
             );
@@ -1622,27 +1682,19 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     Group group,
     WidgetRef ref,
   ) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('share_as_group'.tr()),
-        content: Text('share_as_group_confirm'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('share_as_group'.tr()),
-          ),
-        ],
-      ),
+    final ok = await showConfirmSheet(
+      context,
+      title: 'share_as_group'.tr(),
+      content: 'share_as_group_confirm'.tr(),
+      confirmLabel: 'share_as_group'.tr(),
+      centerInFullViewport: true,
     );
     if (ok != true || !context.mounted) return;
     try {
       await _withSaving(() async {
-        await ref.read(groupRepositoryProvider).update(
+        await ref
+            .read(groupRepositoryProvider)
+            .update(
               group.copyWith(isPersonal: false, updatedAt: DateTime.now()),
             );
         ref.invalidate(futureGroupProvider(widget.groupId));
@@ -1661,22 +1713,12 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     Group group,
     WidgetRef ref,
   ) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('use_as_personal'.tr()),
-        content: Text('use_as_personal_confirm'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('use_as_personal'.tr()),
-          ),
-        ],
-      ),
+    final ok = await showConfirmSheet(
+      context,
+      title: 'use_as_personal'.tr(),
+      content: 'use_as_personal_confirm'.tr(),
+      confirmLabel: 'use_as_personal'.tr(),
+      centerInFullViewport: true,
     );
     if (ok != true || !context.mounted) return;
     try {
@@ -1689,7 +1731,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
             await ref.read(groupInviteRepositoryProvider).revoke(invite.id);
           }
         }
-        await ref.read(groupRepositoryProvider).update(
+        await ref
+            .read(groupRepositoryProvider)
+            .update(
               group.copyWith(isPersonal: true, updatedAt: DateTime.now()),
             );
         ref.invalidate(futureGroupProvider(widget.groupId));
@@ -1716,28 +1760,32 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
       context.showToast('no_other_members'.tr());
       return;
     }
-    final chosen = await showModalBottomSheet<String>(
+    final chosen = await showResponsiveSheet<String>(
       context: context,
+      title: 'transfer_ownership'.tr(),
+      maxHeight: MediaQuery.of(context).size.height * 0.75,
       isScrollControlled: true,
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.75,
-      ),
-      builder: (ctx) => SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(ctx).padding.bottom + 16,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: others
-                  .map(
-                    (m) => ListTile(
-                      title: Text('${m.userId.substring(0, 8)}... (${m.role})'),
-                      onTap: () => Navigator.pop(ctx, m.id),
-                    ),
-                  )
-                  .toList(),
+      centerInFullViewport: true,
+      child: Builder(
+        builder: (ctx) => SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).padding.bottom + 16,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: others
+                    .map(
+                      (m) => ListTile(
+                        title: Text(
+                          '${m.userId.substring(0, 8)}... (${m.role})',
+                        ),
+                        onTap: () => Navigator.pop(ctx, m.id),
+                      ),
+                    )
+                    .toList(),
+              ),
             ),
           ),
         ),
@@ -1767,30 +1815,27 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
   }
 
   Future<void> _showArchiveGroup(BuildContext context, WidgetRef ref) async {
-    final isPersonal = ref.read(futureGroupProvider(widget.groupId)).whenOrNull(data: (g) => g?.isPersonal) ?? false;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text((isPersonal ? 'archive_list' : 'archive_group').tr()),
-        content: Text((isPersonal ? 'archive_list_confirm' : 'archive_group_confirm').tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text((isPersonal ? 'archive_list' : 'archive_group').tr()),
-          ),
-        ],
-      ),
+    final isPersonal =
+        ref
+            .read(futureGroupProvider(widget.groupId))
+            .whenOrNull(data: (g) => g?.isPersonal) ??
+        false;
+    final ok = await showConfirmSheet(
+      context,
+      title: (isPersonal ? 'archive_list' : 'archive_group').tr(),
+      content: (isPersonal ? 'archive_list_confirm' : 'archive_group_confirm')
+          .tr(),
+      confirmLabel: (isPersonal ? 'archive_list' : 'archive_group').tr(),
+      centerInFullViewport: true,
     );
     if (ok != true || !context.mounted) return;
     try {
       await _withSaving(() async {
         await ref.read(groupRepositoryProvider).archive(widget.groupId);
         if (context.mounted) {
-          context.showSuccess((isPersonal ? 'list_archived' : 'group_archived').tr());
+          context.showSuccess(
+            (isPersonal ? 'list_archived' : 'group_archived').tr(),
+          );
           context.pop();
         }
       });
@@ -1803,12 +1848,18 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
   }
 
   Future<void> _showUnarchiveGroup(BuildContext context, WidgetRef ref) async {
-    final isPersonal = ref.read(futureGroupProvider(widget.groupId)).whenOrNull(data: (g) => g?.isPersonal) ?? false;
+    final isPersonal =
+        ref
+            .read(futureGroupProvider(widget.groupId))
+            .whenOrNull(data: (g) => g?.isPersonal) ??
+        false;
     try {
       await _withSaving(() async {
         await ref.read(groupRepositoryProvider).unarchive(widget.groupId);
         if (context.mounted) {
-          context.showSuccess((isPersonal ? 'list_unarchived' : 'group_unarchived').tr());
+          context.showSuccess(
+            (isPersonal ? 'list_unarchived' : 'group_unarchived').tr(),
+          );
         }
       });
     } catch (e, st) {
@@ -1820,27 +1871,19 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
   }
 
   Future<void> _showHideFromMyList(BuildContext context, WidgetRef ref) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('hide_from_my_list'.tr()),
-        content: Text('hide_from_my_list_confirm'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('hide_from_my_list'.tr()),
-          ),
-        ],
-      ),
+    final ok = await showConfirmSheet(
+      context,
+      title: 'hide_from_my_list'.tr(),
+      content: 'hide_from_my_list_confirm'.tr(),
+      confirmLabel: 'hide_from_my_list'.tr(),
+      centerInFullViewport: true,
     );
     if (ok != true || !context.mounted) return;
     try {
       await _withSaving(() async {
-        await ref.read(groupRepositoryProvider).setLocalArchived(widget.groupId);
+        await ref
+            .read(groupRepositoryProvider)
+            .setLocalArchived(widget.groupId);
         if (context.mounted) {
           context.showSuccess('group_hidden_from_list'.tr());
           context.pop();
@@ -1854,10 +1897,15 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     }
   }
 
-  Future<void> _showUnhideFromMyList(BuildContext context, WidgetRef ref) async {
+  Future<void> _showUnhideFromMyList(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
     try {
       await _withSaving(() async {
-        await ref.read(groupRepositoryProvider).clearLocalArchived(widget.groupId);
+        await ref
+            .read(groupRepositoryProvider)
+            .clearLocalArchived(widget.groupId);
         if (context.mounted) {
           context.showSuccess('group_unhidden_from_list'.tr());
         }
@@ -1871,14 +1919,27 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
   }
 
   Future<void> _showDeleteGroup(BuildContext context, WidgetRef ref) async {
-    final isPersonal = ref.read(futureGroupProvider(widget.groupId)).whenOrNull(data: (g) => g?.isPersonal) ?? false;
-    final ok = await showDialog<bool>(
+    final isPersonal =
+        ref
+            .read(futureGroupProvider(widget.groupId))
+            .whenOrNull(data: (g) => g?.isPersonal) ??
+        false;
+    final ok = await showResponsiveSheet<bool>(
       context: context,
-      builder: (ctx) => _TimedConfirmDialog(
-        title: (isPersonal ? 'delete_list' : 'delete_group').tr(),
-        content: (isPersonal ? 'delete_list_confirm' : 'delete_group_confirm').tr(),
-        confirmLabel: (isPersonal ? 'delete_list' : 'delete_group').tr(),
-        seconds: 10,
+      title: (isPersonal ? 'delete_list' : 'delete_group').tr(),
+      maxHeight: MediaQuery.of(context).size.height * 0.5,
+      isScrollControlled: true,
+      centerInFullViewport: true,
+      child: Builder(
+        builder: (ctx) => _TimedConfirmSheetContent(
+          sheetContext: ctx,
+          title: (isPersonal ? 'delete_list' : 'delete_group').tr(),
+          content: (isPersonal ? 'delete_list_confirm' : 'delete_group_confirm')
+              .tr(),
+          confirmLabel: (isPersonal ? 'delete_list' : 'delete_group').tr(),
+          seconds: 10,
+          isDestructive: true,
+        ),
       ),
     );
     if (ok != true || !context.mounted) return;
@@ -1896,13 +1957,21 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
   }
 
   Future<void> _showLeaveGroup(BuildContext context, WidgetRef ref) async {
-    final ok = await showDialog<bool>(
+    final ok = await showResponsiveSheet<bool>(
       context: context,
-      builder: (ctx) => _TimedConfirmDialog(
-        title: 'leave_group'.tr(),
-        content: 'leave_group_confirm'.tr(),
-        confirmLabel: 'leave_group'.tr(),
-        seconds: 10,
+      title: 'leave_group'.tr(),
+      maxHeight: MediaQuery.of(context).size.height * 0.5,
+      isScrollControlled: true,
+      centerInFullViewport: true,
+      child: Builder(
+        builder: (ctx) => _TimedConfirmSheetContent(
+          sheetContext: ctx,
+          title: 'leave_group'.tr(),
+          content: 'leave_group_confirm'.tr(),
+          confirmLabel: 'leave_group'.tr(),
+          seconds: 10,
+          isDestructive: true,
+        ),
       ),
     );
     if (ok != true || !context.mounted) return;
@@ -1913,9 +1982,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
           'groupId': widget.groupId,
         }, enabled: ref.read(telemetryEnabledProvider));
         // Trigger immediate sync so the groups list reflects the change
-        ref
-            .read(dataSyncServiceProvider.notifier)
-            .syncNow();
+        ref.read(dataSyncServiceProvider.notifier).syncNow();
         if (context.mounted) context.go(RoutePaths.home);
       });
     } catch (e, st) {
@@ -1993,8 +2060,11 @@ class _InvitePreviewTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Icon(Icons.people_outline,
-              size: 14, color: theme.colorScheme.onSurfaceVariant),
+          Icon(
+            Icons.people_outline,
+            size: 14,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
           const SizedBox(width: 2),
           Text(
             usageText,
@@ -2009,27 +2079,32 @@ class _InvitePreviewTile extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Timed confirmation dialog -- confirm button is disabled for [seconds] seconds
+// Timed confirmation sheet -- confirm button is disabled for [seconds] seconds
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _TimedConfirmDialog extends StatefulWidget {
+class _TimedConfirmSheetContent extends StatefulWidget {
+  final BuildContext sheetContext;
   final String title;
   final String content;
   final String confirmLabel;
   final int seconds;
+  final bool isDestructive;
 
-  const _TimedConfirmDialog({
+  const _TimedConfirmSheetContent({
+    required this.sheetContext,
     required this.title,
     required this.content,
     required this.confirmLabel,
     required this.seconds,
+    this.isDestructive = false,
   });
 
   @override
-  State<_TimedConfirmDialog> createState() => _TimedConfirmDialogState();
+  State<_TimedConfirmSheetContent> createState() =>
+      _TimedConfirmSheetContentState();
 }
 
-class _TimedConfirmDialogState extends State<_TimedConfirmDialog> {
+class _TimedConfirmSheetContentState extends State<_TimedConfirmSheetContent> {
   late int _remaining;
   Timer? _timer;
 
@@ -2054,23 +2129,32 @@ class _TimedConfirmDialogState extends State<_TimedConfirmDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final ctx = widget.sheetContext;
+    final colorScheme = Theme.of(ctx).colorScheme;
     final enabled = _remaining <= 0;
 
-    return AlertDialog(
-      title: Text(widget.title),
-      content: Text(widget.content),
+    return buildSheetShell(
+      ctx,
+      title: widget.title,
+      showTitleInBody: !LayoutBreakpoints.isTabletOrWider(ctx),
+      body: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Text(widget.content),
+      ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: Text('cancel'.tr()),
-        ),
+        if (!LayoutBreakpoints.isTabletOrWider(ctx))
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('cancel'.tr()),
+          ),
         FilledButton(
           style: FilledButton.styleFrom(
-            backgroundColor: colorScheme.error,
-            disabledBackgroundColor: colorScheme.error.withValues(alpha: 0.3),
+            backgroundColor: widget.isDestructive ? colorScheme.error : null,
+            disabledBackgroundColor: widget.isDestructive
+                ? colorScheme.error.withValues(alpha: 0.3)
+                : null,
           ),
-          onPressed: enabled ? () => Navigator.pop(context, true) : null,
+          onPressed: enabled ? () => Navigator.pop(ctx, true) : null,
           child: Text(
             enabled
                 ? widget.confirmLabel

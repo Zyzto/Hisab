@@ -7,6 +7,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../features/home/pages/home_page.dart';
 import '../../features/settings/pages/settings_page.dart';
+import '../layout/layout_breakpoints.dart';
 import '../widgets/connection_banner.dart';
 import '../widgets/floating_nav_bar.dart';
 import '../widgets/pwa_install_banner.dart';
@@ -103,22 +104,102 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     context.locale;
 
     final showNavBar = _shouldShowNavBar();
+    final useRail = LayoutBreakpoints.isTabletOrWider(context) && showNavBar;
 
-    final scaffold = Scaffold(
+    if (useRail) {
+      return Scaffold(
+        body: Row(
+          children: [
+            NavigationRail(
+              extended: LayoutBreakpoints.isDesktopOrWider(context),
+              minExtendedWidth: LayoutBreakpoints.navigationRailWidth,
+              destinations: [
+                NavigationRailDestination(
+                  icon: const Icon(Icons.group_outlined, size: 28),
+                  selectedIcon: const Icon(Icons.group, size: 28),
+                  label: Text('groups'.tr()),
+                ),
+                NavigationRailDestination(
+                  icon: const Icon(Icons.settings_outlined, size: 28),
+                  selectedIcon: const Icon(Icons.settings, size: 28),
+                  label: Text('settings'.tr()),
+                ),
+              ],
+              selectedIndex: widget.selectedIndex,
+              onDestinationSelected: (index) {
+                HapticFeedback.lightImpact();
+                switch (index) {
+                  case 0:
+                    context.go(RoutePaths.home);
+                    break;
+                  case 1:
+                    context.go(RoutePaths.settings);
+                    break;
+                }
+              },
+            ),
+            // Main body: content area to the right of the rail (not full screen).
+            // Any centering of content should be relative to this area.
+            Expanded(
+              child: Stack(
+                children: [
+                  _buildMainContent(),
+                  const Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: ConnectionBanner(),
+                  ),
+                  if (_currentIndex == 0)
+                    const Positioned(
+                      left: 16,
+                      right: 16,
+                      bottom: 24,
+                      child: PwaInstallBanner(),
+                    ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 16,
+                    child: FutureBuilder<PackageInfo>(
+                      future: PackageInfo.fromPlatform(),
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData) return const SizedBox.shrink();
+                        final theme = Theme.of(context);
+                        return Text(
+                          'v${snapshot.data!.version}',
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyMedium!.copyWith(
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: 0.15),
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 0.5,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Scaffold(
       body: Stack(
         children: [
           Padding(
             padding: EdgeInsets.only(bottom: showNavBar ? 100 : 0),
             child: _buildMainContent(),
           ),
-          // Connection banner — slides down when offline, auto-dismisses on reconnect
           const Positioned(
             top: 0,
             left: 0,
             right: 0,
             child: ConnectionBanner(),
           ),
-          // PWA install banner — only on home tab for mobile web users
           if (showNavBar && _currentIndex == 0)
             const Positioned(
               left: 16,
@@ -183,8 +264,6 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
         ],
       ),
     );
-
-    return scaffold;
   }
 
   Widget _buildMainContent() {

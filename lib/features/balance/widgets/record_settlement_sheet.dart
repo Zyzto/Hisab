@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 
+import '../../../core/layout/layout_breakpoints.dart';
+import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/widgets/toast.dart';
@@ -19,10 +21,12 @@ Future<bool> showRecordSettlementSheet(
   required String fromName,
   required String toName,
 }) async {
-  final result = await showModalBottomSheet<bool>(
+  final result = await showResponsiveSheet<bool>(
     context: context,
+    title: 'record_settlement'.tr(),
     useSafeArea: true,
-    builder: (ctx) => _RecordSettlementSheet(
+    centerInFullViewport: true,
+    child: _RecordSettlementSheet(
       groupId: groupId,
       currencyCode: currencyCode,
       settlement: settlement,
@@ -103,8 +107,10 @@ class _RecordSettlementSheet extends StatelessWidget {
             color: theme.colorScheme.primary,
           ),
           const SizedBox(height: 16),
-          Text('record_settlement'.tr(), style: theme.textTheme.titleLarge),
-          const SizedBox(height: 12),
+          if (!LayoutBreakpoints.isTabletOrWider(context)) ...[
+            Text('record_settlement'.tr(), style: theme.textTheme.titleLarge),
+            const SizedBox(height: 12),
+          ],
           Text(
             'record_settlement_confirm'.tr(
               namedArgs: {
@@ -120,11 +126,12 @@ class _RecordSettlementSheet extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: Text('cancel'.tr()),
-              ),
-              const SizedBox(width: 12),
+              if (!LayoutBreakpoints.isTabletOrWider(context))
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text('cancel'.tr()),
+                ),
+              if (!LayoutBreakpoints.isTabletOrWider(context)) const SizedBox(width: 12),
               FilledButton.icon(
                 onPressed: () => Navigator.of(context).pop(true),
                 icon: const Icon(Icons.check),

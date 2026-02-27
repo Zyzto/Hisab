@@ -47,8 +47,11 @@ class Expense {
   /// Optional detailed breakdown of the cost (bill/receipt line items).
   final List<ReceiptLineItem>? lineItems;
 
-  /// Optional path to attached receipt image (local file path).
+  /// Optional path or URL to the first receipt image (backward compatibility).
   final String? receiptImagePath;
+
+  /// Optional ordered list of receipt image URLs (or paths). When non-null, [receiptImagePath] is the first element.
+  final List<String>? receiptImagePaths;
 
   const Expense({
     required this.id,
@@ -70,7 +73,16 @@ class Expense {
     this.tag,
     this.lineItems,
     this.receiptImagePath,
+    this.receiptImagePaths,
   });
+
+  /// Effective list of receipt image URLs: [receiptImagePaths] if non-empty, else single [receiptImagePath] if set.
+  List<String> get effectiveReceiptImageUrls =>
+      (receiptImagePaths != null && receiptImagePaths!.isNotEmpty)
+          ? receiptImagePaths!
+          : (receiptImagePath != null && receiptImagePath!.isNotEmpty)
+              ? [receiptImagePath!]
+              : [];
 
   /// Returns the effective amount in the group's base currency (in cents).
   /// Uses [baseAmountCents] if available, otherwise falls back to [amountCents].
@@ -96,6 +108,7 @@ class Expense {
     String? tag,
     List<ReceiptLineItem>? lineItems,
     String? receiptImagePath,
+    List<String>? receiptImagePaths,
   }) {
     return Expense(
       id: id ?? this.id,
@@ -117,6 +130,7 @@ class Expense {
       tag: tag ?? this.tag,
       lineItems: lineItems ?? this.lineItems,
       receiptImagePath: receiptImagePath ?? this.receiptImagePath,
+      receiptImagePaths: receiptImagePaths ?? this.receiptImagePaths,
     );
   }
 }

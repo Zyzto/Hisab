@@ -4,6 +4,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/widgets/toast.dart';
@@ -57,7 +58,8 @@ Future<void> shareInviteLink({
         text: text,
       );
       return;
-    } catch (_) {
+    } catch (e, st) {
+      Log.warning('Share invite link failed', error: e, stackTrace: st);
       // Fall through to text-only share
     }
   }
@@ -82,7 +84,8 @@ Future<void> shareInviteLinkWithFallback(
     );
     if (!context.mounted) return;
     context.showSuccess('invite_shared'.tr());
-  } catch (_) {
+  } catch (e, st) {
+    Log.warning('Share invite link with fallback failed', error: e, stackTrace: st);
     await Clipboard.setData(ClipboardData(text: url));
     if (!context.mounted) return;
     context.showSuccess('invite_link_copied'.tr());

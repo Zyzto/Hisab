@@ -7,19 +7,20 @@
 importScripts("https://www.gstatic.com/firebasejs/11.4.0/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/11.4.0/firebase-messaging-compat.js");
 
-// Firebase config — must match index.html
+// Firebase config — placeholders replaced at build time (CI). Must match index.html.
+// Do not commit real values. See CONFIGURATION.md.
 const firebaseConfig = {
-  apiKey: "AIzaSyAHqu53pQGNME24l4XvsZZ3YvT1u--rfxk",
-  authDomain: "hisab-c8eb1.firebaseapp.com",
-  projectId: "hisab-c8eb1",
-  storageBucket: "hisab-c8eb1.firebasestorage.app",
-  messagingSenderId: "981938007704",
-  appId: "1:981938007704:web:9a607f674d6cdae0b1aaed",
+  apiKey: "__FIREBASE_API_KEY__",
+  authDomain: "__FIREBASE_AUTH_DOMAIN__",
+  projectId: "__FIREBASE_PROJECT_ID__",
+  storageBucket: "__FIREBASE_STORAGE_BUCKET__",
+  messagingSenderId: "__FIREBASE_MESSAGING_SENDER_ID__",
+  appId: "__FIREBASE_APP_ID__",
 };
 
 function hasPlaceholderFirebaseConfig(config) {
   return Object.values(config).some(
-    (v) => typeof v === "string" && v.includes("YOUR_")
+    (v) => typeof v === "string" && (v.includes("YOUR_") || v.includes("__FIREBASE_"))
   );
 }
 

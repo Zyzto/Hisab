@@ -45,8 +45,7 @@ class ExpenseDetailBody extends ConsumerWidget {
                   expense: expense,
                   use24HourFormat: ref.watch(use24HourFormatProvider),
                 ),
-                if (expense.receiptImagePath != null &&
-                    expense.receiptImagePath!.isNotEmpty) ...[
+                if (expense.effectiveReceiptImageUrls.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
@@ -60,15 +59,31 @@ class ExpenseDetailBody extends ConsumerWidget {
                           ),
                     ),
                   ),
-                  GestureDetector(
-                    onTap: () => showReceiptImageFullScreen(
-                      context,
-                      expense.receiptImagePath!,
-                    ),
-                    child: buildReceiptImageView(
-                      context,
-                      expense.receiptImagePath,
-                      maxHeight: 280,
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: expense.effectiveReceiptImageUrls
+                          .map(
+                            (url) => Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: SizedBox(
+                                width: 200,
+                                child: GestureDetector(
+                                  onTap: () => showReceiptImageFullScreen(
+                                    context,
+                                    url,
+                                  ),
+                                  child: buildReceiptImageView(
+                                    context,
+                                    url,
+                                    maxHeight: 280,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
                     ),
                   ),
                 ],

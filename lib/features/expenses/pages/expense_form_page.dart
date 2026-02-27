@@ -1,5 +1,6 @@
+import 'dart:typed_data';
+
 import 'package:currency_picker/currency_picker.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,21 +8,28 @@ import 'package:go_router/go_router.dart';
 import 'package:custom_sliding_segmented_control/custom_sliding_segmented_control.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+
+import '../../../core/receipt/receipt_image_compress.dart';
 import '../../../core/receipt/receipt_image_view.dart';
-import '../../../core/receipt/receipt_storage_upload.dart';
-import '../../../core/receipt/receipt_utils.dart';
-import '../../../core/platform_utils.dart';
 import '../../../core/receipt/receipt_scan_service.dart';
+import '../../../core/receipt/receipt_storage_upload.dart';
+import '../../../core/platform_utils.dart';
 import '../../../core/services/connectivity_service.dart';
 import '../../../core/services/permission_service.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/services/exchange_rate_service.dart';
 import '../../../core/telemetry/telemetry_service.dart';
+import '../../../core/layout/content_aligned_app_bar.dart';
+import '../../../core/layout/constrained_content.dart';
+import '../../../core/layout/layout_breakpoints.dart';
+import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/utils/currency_helpers.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/expandable_section.dart';
+import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../features/settings/providers/settings_framework_providers.dart';
 import '../../groups/providers/group_member_provider.dart';
@@ -36,6 +44,12 @@ import '../../../domain/domain.dart';
 
 /// Height of the floating submit bar (button + padding) for ListView bottom padding.
 const double _kSubmitBarHeight = 76.0;
+
+/// Max number of photos per expense.
+const int _kMaxReceiptPhotos = 5;
+
+/// One photo in the form: either pending bytes or stored URL.
+typedef _ReceiptPhotoItem = ({Uint8List? bytes, String? url});
 
 class ExpenseFormPage extends ConsumerStatefulWidget {
   final String groupId;
@@ -103,8 +117,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   final List<({TextEditingController desc, TextEditingController amount})>
   _lineItemControllers = [];
 
-  /// Path to attached receipt image (when AI not configured or LLM failed).
-  String? _receiptImagePath;
+  /// Photos: pending bytes (before upload) or stored URL. Max [_kMaxReceiptPhotos].
+  final List<_ReceiptPhotoItem> _receiptPhotos = [];
 
   @override
   void initState() {
@@ -185,7 +199,10 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           ),
         ));
       }
-      _receiptImagePath = expense.receiptImagePath;
+      _receiptPhotos.clear();
+      for (final url in expense.effectiveReceiptImageUrls) {
+        _receiptPhotos.add((bytes: null, url: url));
+      }
       _editLoaded = true;
     });
   }
@@ -444,26 +461,31 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         }
       }
 
-      var receiptPath = _receiptImagePath;
+      final existingExpenseId = _initialExpense?.id ?? '';
       final localOnly = ref.read(effectiveLocalOnlyProvider);
       final isOnline = ref.read(connectivityProvider);
-      final shouldUploadReceipt = receiptPath != null &&
-          receiptPath.isNotEmpty &&
-          !isReceiptImageUrl(receiptPath) &&
-          !localOnly &&
-          isOnline;
+      final shouldUploadPhotos = !localOnly && isOnline;
 
-      if (_initialExpense != null && shouldUploadReceipt) {
-        final url = await uploadReceiptToStorage(
-          receiptPath,
-          widget.groupId,
-          _initialExpense!.id,
-        );
-        if (url != null) receiptPath = url;
+      final List<String> receiptUrls = [];
+      for (final item in _receiptPhotos) {
+        if (item.url != null && item.url!.isNotEmpty) {
+          receiptUrls.add(item.url!);
+        } else if (item.bytes != null && shouldUploadPhotos) {
+          final uploadId = existingExpenseId.isNotEmpty ? existingExpenseId : '';
+          if (uploadId.isEmpty) continue;
+          final url = await uploadReceiptBytesToStorage(
+            item.bytes!,
+            widget.groupId,
+            uploadId,
+          );
+          if (url != null) receiptUrls.add(url);
+        }
       }
+      final receiptImagePaths = receiptUrls.isEmpty ? null : receiptUrls;
+      final receiptPath = receiptUrls.isNotEmpty ? receiptUrls.first : null;
 
       final expense = Expense(
-        id: _initialExpense?.id ?? '',
+        id: existingExpenseId,
         groupId: widget.groupId,
         payerParticipantId: payerId,
         amountCents: amount.toInt(),
@@ -482,6 +504,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         tag: _selectedTag,
         lineItems: _effectiveLineItemsForSave(),
         receiptImagePath: receiptPath,
+        receiptImagePaths: receiptImagePaths,
       );
       if (_initialExpense != null) {
         await ref.read(expenseRepositoryProvider).update(expense);
@@ -490,13 +513,27 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         );
       } else {
         final id = await ref.read(expenseRepositoryProvider).create(expense);
-        if (shouldUploadReceipt && receiptPath != null && !isReceiptImageUrl(receiptPath)) {
-          final url = await uploadReceiptToStorage(receiptPath, widget.groupId, id);
-          if (url != null) {
-            await ref.read(expenseRepositoryProvider).update(
-                  expense.copyWith(id: id, receiptImagePath: url),
-                );
+        final createdUrls = <String>[];
+        for (final item in _receiptPhotos) {
+          if (item.url != null && item.url!.isNotEmpty) {
+            createdUrls.add(item.url!);
+          } else if (item.bytes != null && shouldUploadPhotos) {
+            final url = await uploadReceiptBytesToStorage(
+              item.bytes!,
+              widget.groupId,
+              id,
+            );
+            if (url != null) createdUrls.add(url);
           }
+        }
+        if (createdUrls.isNotEmpty) {
+          await ref.read(expenseRepositoryProvider).update(
+                expense.copyWith(
+                  id: id,
+                  receiptImagePath: createdUrls.first,
+                  receiptImagePaths: createdUrls,
+                ),
+              );
         }
         Log.info(
           'Expense created: id=$id groupId=${expense.groupId} title="${expense.title}" amountCents=${expense.amountCents} currencyCode=${expense.currencyCode}',
@@ -781,15 +818,18 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           return const SizedBox.shrink();
         }
         if (group.isSettlementFrozen && widget.expenseId == null) {
-          return Scaffold(
-            appBar: AppBar(
-              title: Text('add_expense'.tr()),
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => context.pop(),
-              ),
-            ),
-            body: Center(
+          return LayoutBuilder(
+            builder: (context, layoutConstraints) {
+              return Scaffold(
+                appBar: ContentAlignedAppBar(
+                  contentAreaWidth: layoutConstraints.maxWidth,
+                  leading: IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () => context.pop(),
+                  ),
+                  title: Text('add_expense'.tr()),
+                ),
+                body: Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Column(
@@ -815,6 +855,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                 ),
               ),
             ),
+              );
+            },
           );
         }
         final currencyCode = group.currencyCode;
@@ -830,26 +872,40 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
               _groupCurrencyInitialized = true;
             }
             if (widget.expenseId != null && !_editLoaded) {
-              return Scaffold(
-                appBar: AppBar(
-                  title: Text('edit_expense'.tr()),
-                  leading: IconButton(
-                    icon: const Icon(Icons.arrow_back),
-                    onPressed: () => context.pop(),
-                  ),
-                ),
-                body: const Center(child: CircularProgressIndicator()),
+              return LayoutBuilder(
+                builder: (context, layoutConstraints) {
+                  return Scaffold(
+                    appBar: ContentAlignedAppBar(
+                      contentAreaWidth: layoutConstraints.maxWidth,
+                      leading: IconButton(
+                        icon: const Icon(Icons.arrow_back),
+                        onPressed: () => context.pop(),
+                      ),
+                      title: Text('edit_expense'.tr()),
+                    ),
+                    body: const Center(child: CircularProgressIndicator()),
+                  );
+                },
               );
             }
             if (participants.isEmpty) {
-              return Scaffold(
-                appBar: AppBar(
-                  title: Text(
-                    (widget.expenseId != null ? 'edit_expense' : 'add_expense')
-                        .tr(),
-                  ),
-                ),
-                body: Center(child: Text('add_participants_first'.tr())),
+              return LayoutBuilder(
+                builder: (context, layoutConstraints) {
+                  return Scaffold(
+                    appBar: ContentAlignedAppBar(
+                      contentAreaWidth: layoutConstraints.maxWidth,
+                      title: Text(
+                        (widget.expenseId != null ? 'edit_expense' : 'add_expense')
+                            .tr(),
+                      ),
+                      leading: IconButton(
+                        icon: const Icon(Icons.arrow_back),
+                        onPressed: () => context.pop(),
+                      ),
+                    ),
+                    body: Center(child: Text('add_participants_first'.tr())),
+                  );
+                },
               );
             }
             final payerId = _payerParticipantId ?? participants.first.id;
@@ -941,35 +997,40 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
             final expandBillBreakdown =
                 ref.watch(expenseFormExpandBillBreakdownProvider);
 
-            return Scaffold(
-              appBar: AppBar(
-                title: Text(
-                  (widget.expenseId != null ? 'edit_expense' : 'add_expense')
-                      .tr(),
-                ),
-                leading: IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () => context.pop(),
-                ),
-                actions: showSimpleForm
-                    ? [
-                        Tooltip(
-                          message: (group.isPersonal
-                                  ? 'expense_form_full_features_tooltip_personal'
-                                  : 'expense_form_full_features_tooltip')
-                              .tr(),
-                          child: IconButton(
-                            icon: const Icon(Icons.info_outline),
-                            onPressed: () =>
-                                _showExpenseFormInfoDialog(context, group),
-                          ),
-                        ),
-                      ]
-                    : null,
-              ),
-              body: Form(
+            return LayoutBuilder(
+              builder: (context, layoutConstraints) {
+                return Scaffold(
+                  appBar: ContentAlignedAppBar(
+                    contentAreaWidth: layoutConstraints.maxWidth,
+                    leading: IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: () => context.pop(),
+                    ),
+                    title: Text(
+                      (widget.expenseId != null ? 'edit_expense' : 'add_expense')
+                          .tr(),
+                    ),
+                    actions: showSimpleForm
+                        ? [
+                            Tooltip(
+                              message: (group.isPersonal
+                                      ? 'expense_form_full_features_tooltip_personal'
+                                      : 'expense_form_full_features_tooltip')
+                                  .tr(),
+                              child: IconButton(
+                                icon: const Icon(Icons.info_outline),
+                                onPressed: () =>
+                                    _showExpenseFormInfoDialog(context, group),
+                              ),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  body: ConstrainedContent(
+                child: Form(
                 key: _formKey,
-                child: ListView(
+                child: FocusTraversalGroup(
+                  child: ListView(
                   padding: EdgeInsets.only(
                     left: 16,
                     right: 16,
@@ -1138,23 +1199,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                         selectedTag: _selectedTag,
                         customTags: customTags,
                         onTagPicker: () => _showTagPicker(customTags),
-                        onPickReceipt: _pickReceiptImage,
+                        onPickReceipt: _receiptPhotos.isEmpty ? _addPhoto : null,
                       ),
-                      if (_receiptImagePath != null) ...[
-                        const SizedBox(height: 8),
-                        _buildReceiptAttachedChip(context),
-                        GestureDetector(
-                          onTap: () => showReceiptImageFullScreen(
-                            context,
-                            _receiptImagePath!,
-                          ),
-                          child: buildReceiptImageView(
-                            context,
-                            _receiptImagePath,
-                            maxHeight: 180,
-                          ),
-                        ),
-                      ],
+                      if (_receiptPhotos.isNotEmpty) _buildPhotosSection(context),
                       const SizedBox(height: 20),
                       ListenableBuilder(
                         listenable: _descriptionController,
@@ -1381,40 +1428,44 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                     ],
                   ],
                 ),
-              ),
-              bottomNavigationBar: SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: ListenableBuilder(
-                    listenable: _amountController,
-                    builder: (context, _) {
-                      final amountCentsInt =
-                          ((double.tryParse(_amountController.text.trim()) ?? 0) * 100).toInt();
-                      return SizedBox(
-                        height: 52,
-                        child: FilledButton(
-                          onPressed:
-                              (_saving ||
-                                  (_splitType == SplitType.amounts &&
-                                      _amountsSumCents(participants) != amountCentsInt))
-                                  ? null
-                                  : _save,
-                          child: _saving
-                              ? const SizedBox(
-                                  height: 24,
-                                  width: 24,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : Text(
-                                  (widget.expenseId != null ? 'submit' : 'add_expense').tr(),
-                                ),
-                        ),
-                      );
-                    },
-                  ),
                 ),
               ),
+            ),
+            bottomNavigationBar: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: ListenableBuilder(
+                  listenable: _amountController,
+                  builder: (context, _) {
+                    final amountCentsInt =
+                        ((double.tryParse(_amountController.text.trim()) ?? 0) * 100).toInt();
+                    return SizedBox(
+                      height: 52,
+                      child: FilledButton(
+                        onPressed:
+                            (_saving ||
+                                (_splitType == SplitType.amounts &&
+                                    _amountsSumCents(participants) != amountCentsInt))
+                                ? null
+                                : _save,
+                        child: _saving
+                            ? const SizedBox(
+                                height: 24,
+                                width: 24,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : Text(
+                                (widget.expenseId != null ? 'submit' : 'add_expense').tr(),
+                              ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            );
+              },
             );
           },
           loading: () =>
@@ -1452,37 +1503,50 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     final tooltipKey = group.isPersonal
         ? 'expense_form_full_features_tooltip_personal'
         : 'expense_form_full_features_tooltip';
-    showDialog<void>(
+    showResponsiveSheet<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('expense_form_full_features_tooltip_title'.tr()),
-        content: Text(tooltipKey.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('cancel'.tr()),
+      title: 'expense_form_full_features_tooltip_title'.tr(),
+      maxHeight: MediaQuery.of(context).size.height * 0.5,
+      isScrollControlled: true,
+      centerInFullViewport: true,
+      child: Builder(
+        builder: (ctx) => buildSheetShell(
+          ctx,
+          title: 'expense_form_full_features_tooltip_title'.tr(),
+          showTitleInBody: !LayoutBreakpoints.isTabletOrWider(context),
+          body: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(tooltipKey.tr()),
           ),
-          FilledButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              context.go(RoutePaths.settings);
-            },
-            child: Text('settings'.tr()),
-          ),
-        ],
+          actions: [
+            if (!LayoutBreakpoints.isTabletOrWider(context))
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('cancel'.tr()),
+              ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                context.go(RoutePaths.settings);
+              },
+              child: Text('settings'.tr()),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   void _showTagPicker(List<ExpenseTag> customTags) {
     final theme = Theme.of(context);
-    showModalBottomSheet<void>(
+    showResponsiveSheet<void>(
       context: context,
+      title: 'category'.tr(),
+      maxHeight: MediaQuery.of(context).size.height * 0.75,
       isScrollControlled: true,
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.75,
-      ),
-      builder: (ctx) => SafeArea(
+      centerInFullViewport: true,
+      child: Builder(
+        builder: (ctx) => SafeArea(
         child: SingleChildScrollView(
           child: Padding(
             padding: EdgeInsets.fromLTRB(
@@ -1495,13 +1559,15 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'category'.tr(),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
+                if (!LayoutBreakpoints.isTabletOrWider(context)) ...[
+                  Text(
+                    'category'.tr(),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
+                ],
               Wrap(
                 spacing: 10,
                 runSpacing: 10,
@@ -1642,139 +1708,59 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           ),
         ),
       ),
+        ),
     ),
     );
   }
 
   Future<ExpenseTag?> _showCreateTagDialog() async {
-    final nameController = TextEditingController();
-    String selectedIconName = selectableExpenseIcons.keys.first;
-    return showDialog<ExpenseTag>(
+    return showResponsiveSheet<ExpenseTag>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          return AlertDialog(
-            title: Text('create_new_tag'.tr()),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    controller: nameController,
-                    decoration: InputDecoration(
-                      labelText: 'tag_name'.tr(),
-                      border: const OutlineInputBorder(),
-                    ),
-                    autofocus: true,
-                    textCapitalization: TextCapitalization.sentences,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'choose_icon'.tr(),
-                    style: Theme.of(ctx).textTheme.labelLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: selectableExpenseIcons.entries.map((e) {
-                      final selected = selectedIconName == e.key;
-                      return InkWell(
-                        onTap: () =>
-                            setDialogState(() => selectedIconName = e.key),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: selected
-                                ? Theme.of(ctx).colorScheme.primaryContainer
-                                : Theme.of(
-                                    ctx,
-                                  ).colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            e.value,
-                            size: 28,
-                            color: selected
-                                ? Theme.of(ctx).colorScheme.onPrimaryContainer
-                                : Theme.of(ctx).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: Text('cancel'.tr()),
-              ),
-              FilledButton(
-                onPressed: () async {
-                  final label = nameController.text.trim();
-                  if (label.isEmpty) return;
-                  final id = await ref
-                      .read(tagRepositoryProvider)
-                      .create(widget.groupId, label, selectedIconName);
-                  if (!ctx.mounted) return;
-                  final tag = ExpenseTag(
-                    id: id,
-                    groupId: widget.groupId,
-                    label: label,
-                    iconName: selectedIconName,
-                    createdAt: DateTime.now(),
-                    updatedAt: DateTime.now(),
-                  );
-                  if (ctx.mounted) Navigator.of(ctx).pop(tag);
-                },
-                child: Text('done'.tr()),
-              ),
-            ],
-          );
-        },
+      title: 'create_new_tag'.tr(),
+      maxHeight: MediaQuery.of(context).size.height * 0.75,
+      isScrollControlled: true,
+      centerInFullViewport: true,
+      child: Builder(
+        builder: (ctx) => _CreateTagSheetContent(
+          sheetContext: ctx,
+          groupId: widget.groupId,
+          ref: ref,
+        ),
       ),
     );
   }
 
-  /// Pick image from camera or gallery, run OCR, then branch: heuristic parse, LLM extract, or attach image.
-  /// ML Kit text recognition is not available on web; only Android and iOS are supported.
-  Future<void> _pickReceiptImage() async {
-    if (kIsWeb) {
-      if (mounted) {
-        context.showToast('receipt_scan_web_unavailable'.tr());
-      }
-      return;
-    }
-    final source = await showModalBottomSheet<ImageSource>(
+  /// Add photo from camera or gallery (all platforms). Compresses and appends to [_receiptPhotos].
+  Future<void> _addPhoto() async {
+    if (_receiptPhotos.length >= _kMaxReceiptPhotos) return;
+    final source = await showResponsiveSheet<ImageSource>(
       context: context,
+      title: 'add_photo'.tr(),
+      maxHeight: MediaQuery.of(context).size.height * 0.75,
       isScrollControlled: true,
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.75,
-      ),
-      builder: (ctx) => SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(ctx).padding.bottom + 16,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.camera_alt),
-                  title: Text('camera'.tr()),
-                  onTap: () => Navigator.pop(ctx, ImageSource.camera),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.photo_library),
-                  title: Text('gallery'.tr()),
-                  onTap: () => Navigator.pop(ctx, ImageSource.gallery),
-                ),
-              ],
+      centerInFullViewport: true,
+      child: Builder(
+        builder: (ctx) => SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).padding.bottom + 16,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.camera_alt),
+                    title: Text('camera'.tr()),
+                    onTap: () => Navigator.pop(ctx, ImageSource.camera),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.photo_library),
+                    title: Text('gallery'.tr()),
+                    onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1783,28 +1769,203 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     if (source == null) return;
     if (!mounted) return;
 
-    // Pre-check permission before opening the picker.
-    // On Android we use the Photo Picker for gallery (no READ_MEDIA_IMAGES).
     final bool hasPermission;
     if (source == ImageSource.camera) {
       hasPermission = await PermissionService.requestCameraPermission(context);
     } else if (isAndroid) {
-      hasPermission = true; // Photo Picker does not require storage permission
+      hasPermission = true;
     } else {
       hasPermission = await PermissionService.requestPhotosPermission(context);
     }
     if (!hasPermission || !mounted) return;
 
-    const double maxDimension = 1920;
-    final XFile? file = await ImagePicker().pickImage(
-      source: source,
-      imageQuality: 100,
-      maxWidth: maxDimension,
-      maxHeight: maxDimension,
-    );
+    final XFile? file = await ImagePicker().pickImage(source: source);
     if (file == null || !mounted) return;
     try {
-      final result = await processReceiptFile(file, ref, _date);
+      final bytes = await file.readAsBytes();
+      final compressed = await compressReceiptImage(bytes);
+      if (!mounted) return;
+      final toAdd = compressed ?? bytes;
+      setState(() {
+        if (_receiptPhotos.length < _kMaxReceiptPhotos) {
+          _receiptPhotos.add((bytes: toAdd, url: null));
+        }
+      });
+    } catch (e, stack) {
+      if (mounted) {
+        debugPrint('Photo add error: $e');
+        debugPrintStack(stackTrace: stack);
+        context.showError('receipt_scan_error'.tr(args: [e.toString()]));
+      }
+    }
+  }
+
+  Widget _buildPhotosSection(BuildContext context) {
+    final theme = Theme.of(context);
+    final count = _receiptPhotos.length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Text(
+              'photos_section'.tr(),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'photos_count'.tr(args: ['$count', '$_kMaxReceiptPhotos']),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.primary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            ..._receiptPhotos.asMap().entries.map((entry) {
+              final i = entry.key;
+              final item = entry.value;
+              return _buildPhotoThumbnail(context, item, i);
+            }),
+            if (count < _kMaxReceiptPhotos)
+              _buildAddPhotoChip(context),
+          ],
+        ),
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  Widget _buildAddPhotoChip(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.colorScheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: _addPhoto,
+        borderRadius: BorderRadius.circular(12),
+        child: const SizedBox(
+          width: 80,
+          height: 80,
+          child: Icon(Icons.add_photo_alternate_outlined, size: 32),
+        ),
+      ),
+    );
+  }
+
+  void _showPhotoFullScreen(_ReceiptPhotoItem item) {
+    if (item.url != null && item.url!.isNotEmpty) {
+      showReceiptImageFullScreen(context, item.url!);
+      return;
+    }
+    if (item.bytes != null) {
+      showAppDialog<void>(
+        context: context,
+        barrierColor: Theme.of(context).colorScheme.scrim,
+        barrierDismissible: true,
+        centerInFullViewport: true,
+        builder: (ctx) => Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.zero,
+          child: InteractiveViewer(
+            minScale: 0.5,
+            maxScale: 4,
+            child: GestureDetector(
+              onTap: () => Navigator.of(ctx).pop(),
+              child: Center(
+                child: Image.memory(item.bytes!, fit: BoxFit.contain),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildPhotoThumbnail(BuildContext context, _ReceiptPhotoItem item, int index) {
+    final theme = Theme.of(context);
+    Widget image;
+    if (item.bytes != null) {
+      image = Image.memory(
+        item.bytes!,
+        fit: BoxFit.cover,
+        width: 80,
+        height: 80,
+      );
+    } else if (item.url != null && item.url!.isNotEmpty) {
+      image = Image.network(
+        item.url!,
+        fit: BoxFit.cover,
+        width: 80,
+        height: 80,
+        loadingBuilder: (_, child, progress) {
+          if (progress == null) return child;
+          return const SizedBox(
+            width: 80,
+            height: 80,
+            child: Center(child: SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )),
+          );
+        },
+        errorBuilder: (_, Object o, StackTrace? s) => const SizedBox(
+          width: 80,
+          height: 80,
+          child: Icon(Icons.broken_image_outlined),
+        ),
+      );
+    } else {
+      image = const SizedBox(width: 80, height: 80);
+    }
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Material(
+          borderRadius: BorderRadius.circular(12),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => _showPhotoFullScreen(item),
+            onLongPress: !kIsWeb && item.bytes != null
+                ? () => _onScanReceiptFromPhoto(item.bytes!)
+                : null,
+            child: SizedBox(
+              width: 80,
+              height: 80,
+              child: image,
+            ),
+          ),
+        ),
+        Positioned(
+          top: -4,
+          right: -4,
+          child: IconButton(
+            icon: Icon(Icons.close, size: 18, color: theme.colorScheme.onSurface),
+            style: IconButton.styleFrom(
+              backgroundColor: theme.colorScheme.surfaceContainerHighest,
+              padding: const EdgeInsets.all(4),
+              minimumSize: const Size(28, 28),
+            ),
+            onPressed: () => setState(() => _receiptPhotos.removeAt(index)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Optional: run OCR/LLM on a photo (mobile only). Pre-fills title/date/amount or description.
+  Future<void> _onScanReceiptFromPhoto(Uint8List bytes) async {
+    try {
+      final result = await processReceiptBytes(bytes, ref, _date);
       if (!mounted) return;
       if (result == null) {
         context.showToast('receipt_no_text'.tr());
@@ -1823,8 +1984,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
             if (_titleController.text.trim().isEmpty) {
               _titleController.text = 'receipt'.tr();
             }
-            _descriptionController.text = result.ocrText;
-            _receiptImagePath = result.receiptImagePath;
+            if (result.ocrText.isNotEmpty) {
+              _descriptionController.text = result.ocrText;
+            }
           });
           context.showSuccess('receipt_attached'.tr());
       }
@@ -1883,40 +2045,6 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           minLines: 2,
         ),
       ],
-    );
-  }
-
-  Widget _buildReceiptAttachedChip(BuildContext context) {
-    final theme = Theme.of(context);
-    return Material(
-      color: theme.colorScheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(20),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.receipt_long,
-              size: 18,
-              color: theme.colorScheme.primary,
-            ),
-            const SizedBox(width: 8),
-            Text('receipt_attached'.tr(), style: theme.textTheme.bodySmall),
-            const SizedBox(width: 4),
-            IconButton(
-              icon: Icon(
-                Icons.close,
-                size: 18,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              onPressed: () => setState(() => _receiptImagePath = null),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -2094,35 +2222,38 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
               InkWell(
                 onTap: () async {
                   if (others.isEmpty) return;
-                  final chosen = await showModalBottomSheet<String>(
+                  final chosen = await showResponsiveSheet<String>(
                     context: context,
+                    title: 'to'.tr(),
+                    maxHeight: MediaQuery.of(context).size.height * 0.75,
                     isScrollControlled: true,
-                    constraints: BoxConstraints(
-                      maxHeight: MediaQuery.of(context).size.height * 0.75,
-                    ),
-                    builder: (ctx) => SafeArea(
-                      child: SingleChildScrollView(
-                        child: Padding(
-                          padding: EdgeInsets.only(
-                            bottom: MediaQuery.of(ctx).padding.bottom + 16,
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Text(
-                                  'to'.tr(),
-                                  style: Theme.of(ctx).textTheme.titleMedium,
+                    centerInFullViewport: true,
+                    child: Builder(
+                      builder: (ctx) => SafeArea(
+                        child: SingleChildScrollView(
+                          child: Padding(
+                            padding: EdgeInsets.only(
+                              bottom: MediaQuery.of(ctx).padding.bottom + 16,
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (!LayoutBreakpoints.isTabletOrWider(context))
+                                  Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: Text(
+                                      'to'.tr(),
+                                      style: Theme.of(ctx).textTheme.titleMedium,
+                                    ),
+                                  ),
+                                ...others.map(
+                                  (p) => ListTile(
+                                    title: Text(p.name),
+                                    onTap: () => Navigator.of(ctx).pop(p.id),
+                                  ),
                                 ),
-                              ),
-                              ...others.map(
-                                (p) => ListTile(
-                                  title: Text(p.name),
-                                  onTap: () => Navigator.of(ctx).pop(p.id),
-                                ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -2230,35 +2361,38 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     BuildContext context,
     List<Participant> participants,
   ) async {
-    final chosen = await showModalBottomSheet<String>(
+    final chosen = await showResponsiveSheet<String>(
       context: context,
+      title: 'paid_by_label'.tr(),
+      maxHeight: MediaQuery.of(context).size.height * 0.75,
       isScrollControlled: true,
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.75,
-      ),
-      builder: (ctx) => SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(ctx).padding.bottom + 16,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    'paid_by_label'.tr(),
-                    style: Theme.of(ctx).textTheme.titleMedium,
+      centerInFullViewport: true,
+      child: Builder(
+        builder: (ctx) => SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).padding.bottom + 16,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (!LayoutBreakpoints.isTabletOrWider(context))
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        'paid_by_label'.tr(),
+                        style: Theme.of(ctx).textTheme.titleMedium,
+                      ),
+                    ),
+                  ...participants.map(
+                    (p) => ListTile(
+                      title: Text(p.name),
+                      onTap: () => Navigator.of(ctx).pop(p.id),
+                    ),
                   ),
-                ),
-                ...participants.map(
-                  (p) => ListTile(
-                    title: Text(p.name),
-                    onTap: () => Navigator.of(ctx).pop(p.id),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -2268,45 +2402,48 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   }
 
   Future<void> _showSplitTypePicker(BuildContext context) async {
-    final chosen = await showModalBottomSheet<SplitType>(
+    final chosen = await showResponsiveSheet<SplitType>(
       context: context,
+      title: 'split_type'.tr(),
+      maxHeight: MediaQuery.of(context).size.height * 0.75,
       isScrollControlled: true,
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.75,
-      ),
-      builder: (ctx) => SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(ctx).padding.bottom + 16,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    'split_type'.tr(),
-                    style: Theme.of(ctx).textTheme.titleMedium,
-                  ),
-                ),
-                ...SplitType.values.map(
-                (e) => ListTile(
-                  title: Text(
-                    e == SplitType.equal
-                        ? 'equal'.tr()
-                        : e == SplitType.parts
-                        ? 'parts'.tr()
-                        : 'amounts'.tr(),
-                  ),
-                  onTap: () => Navigator.of(ctx).pop(e),
-                ),
+      centerInFullViewport: true,
+      child: Builder(
+        builder: (ctx) => SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).padding.bottom + 16,
               ),
-            ],
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (!LayoutBreakpoints.isTabletOrWider(context))
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        'split_type'.tr(),
+                        style: Theme.of(ctx).textTheme.titleMedium,
+                      ),
+                    ),
+                  ...SplitType.values.map(
+                    (e) => ListTile(
+                      title: Text(
+                        e == SplitType.equal
+                            ? 'equal'.tr()
+                            : e == SplitType.parts
+                            ? 'parts'.tr()
+                            : 'amounts'.tr(),
+                      ),
+                      onTap: () => Navigator.of(ctx).pop(e),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
-      ),
+    ),
     );
     if (chosen != null) {
       setState(() {
@@ -2327,6 +2464,124 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         }
       });
     }
+  }
+}
+
+class _CreateTagSheetContent extends StatefulWidget {
+  const _CreateTagSheetContent({
+    required this.sheetContext,
+    required this.groupId,
+    required this.ref,
+  });
+
+  final BuildContext sheetContext;
+  final String groupId;
+  final WidgetRef ref;
+
+  @override
+  State<_CreateTagSheetContent> createState() => _CreateTagSheetContentState();
+}
+
+class _CreateTagSheetContentState extends State<_CreateTagSheetContent> {
+  late final TextEditingController _nameController;
+  late String _selectedIconName;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController();
+    _selectedIconName = selectableExpenseIcons.keys.first;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ctx = widget.sheetContext;
+    return buildSheetShell(
+      ctx,
+      title: 'create_new_tag'.tr(),
+      showTitleInBody: !LayoutBreakpoints.isTabletOrWider(context),
+      body: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+              controller: _nameController,
+              decoration: InputDecoration(
+                labelText: 'tag_name'.tr(),
+                border: const OutlineInputBorder(),
+              ),
+              autofocus: true,
+              textCapitalization: TextCapitalization.sentences,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'choose_icon'.tr(),
+              style: Theme.of(ctx).textTheme.labelLarge,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: selectableExpenseIcons.entries.map((e) {
+                final selected = _selectedIconName == e.key;
+                return InkWell(
+                  onTap: () => setState(() => _selectedIconName = e.key),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? Theme.of(ctx).colorScheme.primaryContainer
+                          : Theme.of(ctx).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      e.value,
+                      size: 28,
+                      color: selected
+                          ? Theme.of(ctx).colorScheme.onPrimaryContainer
+                          : Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+        ],
+      ),
+      actions: [
+        if (!LayoutBreakpoints.isTabletOrWider(context))
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('cancel'.tr()),
+          ),
+        FilledButton(
+          onPressed: () async {
+            final label = _nameController.text.trim();
+            if (label.isEmpty) return;
+            final id = await widget.ref
+                .read(tagRepositoryProvider)
+                .create(widget.groupId, label, _selectedIconName);
+            if (!ctx.mounted) return;
+            final tag = ExpenseTag(
+              id: id,
+              groupId: widget.groupId,
+              label: label,
+              iconName: _selectedIconName,
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            );
+            if (ctx.mounted) Navigator.of(ctx).pop(tag);
+          },
+          child: Text('done'.tr()),
+        ),
+      ],
+    );
   }
 }
 

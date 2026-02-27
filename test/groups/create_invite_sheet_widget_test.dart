@@ -4,6 +4,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:hisab/core/repository/group_invite_repository.dart';
 import 'package:hisab/core/repository/repository_providers.dart';
@@ -23,39 +24,50 @@ void main() {
     fakeInviteRepo = FakeGroupInviteRepository();
   });
 
-  /// Use a large viewport so the sheet content does not overflow (Column in sheet has no scroll).
-  Future<void> setLargeViewport(WidgetTester tester) async {
-    await tester.binding.setSurfaceSize(const Size(800, 1200));
+  /// Use a narrow viewport so the sheet is shown as bottom sheet (not dialog), avoiding dialog height constraint.
+  Future<void> setViewportForSheet(WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(400, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
   }
 
-  Future<void> openCreateInviteSheet(WidgetTester tester) async {
-    await setLargeViewport(tester);
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          groupInviteRepositoryProvider.overrideWithValue(fakeInviteRepo),
-        ],
-        child: EasyLocalization(
-          path: 'assets/translations',
-          supportedLocales: testSupportedLocales,
-          fallbackLocale: const Locale('en'),
-          startLocale: const Locale('en'),
-          child: MaterialApp(
-            home: Scaffold(
-              body: Consumer(
-                builder: (context, ref, _) => FilledButton(
-                  onPressed: () async {
-                    await showCreateInviteSheet(context, ref, 'test-group-id');
-                  },
-                  child: const Text('Open sheet'),
-                ),
+  Widget buildTestApp({Locale locale = const Locale('en')}) {
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => Scaffold(
+            body: Consumer(
+              builder: (context, ref, _) => FilledButton(
+                onPressed: () async {
+                  await showCreateInviteSheet(context, ref, 'test-group-id');
+                },
+                child: const Text('Open sheet'),
               ),
             ),
           ),
         ),
+      ],
+    );
+    return ProviderScope(
+      overrides: [
+        groupInviteRepositoryProvider.overrideWithValue(fakeInviteRepo),
+      ],
+      child: EasyLocalization(
+        path: 'assets/translations',
+        supportedLocales: testSupportedLocales,
+        fallbackLocale: const Locale('en'),
+        startLocale: locale,
+        child: MaterialApp.router(
+          routerConfig: router,
+        ),
       ),
     );
+  }
+
+  Future<void> openCreateInviteSheet(WidgetTester tester) async {
+    await setViewportForSheet(tester);
+    await tester.pumpWidget(buildTestApp());
     await tester.pumpAndSettle();
     await tester.tap(find.text('Open sheet'));
     await tester.pumpAndSettle();
@@ -75,32 +87,8 @@ void main() {
   });
 
   testWidgets('CreateInviteSheet in Arabic shows key content', (tester) async {
-    await setLargeViewport(tester);
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          groupInviteRepositoryProvider.overrideWithValue(fakeInviteRepo),
-        ],
-        child: EasyLocalization(
-          path: 'assets/translations',
-          supportedLocales: testSupportedLocales,
-          fallbackLocale: const Locale('en'),
-          startLocale: const Locale('ar'),
-          child: MaterialApp(
-            home: Scaffold(
-              body: Consumer(
-                builder: (context, ref, _) => FilledButton(
-                  onPressed: () async {
-                    await showCreateInviteSheet(context, ref, 'test-group-id');
-                  },
-                  child: const Text('Open sheet'),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+    await setViewportForSheet(tester);
+    await tester.pumpWidget(buildTestApp(locale: const Locale('ar')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Open sheet'));
     await tester.pumpAndSettle();

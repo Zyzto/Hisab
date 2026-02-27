@@ -14,6 +14,10 @@ void main() {
   });
 
   testWidgets('MainScaffold renders without error', (tester) async {
+    // Use narrow viewport so MainScaffold shows bottom nav (not rail).
+    tester.view.physicalSize = const Size(400, 800);
+    addTearDown(() => tester.view.resetPhysicalSize());
+
     final router = GoRouter(
       initialLocation: RoutePaths.home,
       routes: [

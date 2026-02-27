@@ -7,6 +7,8 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/auth/auth_user_profile.dart';
 import '../../../core/auth/predefined_avatars.dart';
+import '../../../core/layout/layout_breakpoints.dart';
+import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/repository/repository_providers.dart';
 
 /// Bottom sheet to edit display name and avatar. Updates Supabase user_metadata.
@@ -15,14 +17,12 @@ Future<void> showEditProfileSheet(
   WidgetRef ref,
   AuthUserProfile profile,
 ) async {
-  await showModalBottomSheet<void>(
+  await showResponsiveSheet<void>(
     context: context,
+    title: 'edit_profile'.tr(),
     isScrollControlled: true,
     useSafeArea: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
-    builder: (ctx) => _EditProfileSheet(
+    child: _EditProfileSheet(
       ref: ref,
       profile: profile,
     ),
@@ -123,25 +123,16 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: colorScheme.outline.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(2),
+            if (!LayoutBreakpoints.isTabletOrWider(context)) ...[
+              Text(
+                'profile_edit'.tr(),
+                style: textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
                 ),
+                textAlign: TextAlign.center,
               ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'profile_edit'.tr(),
-              style: textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
+            ],
             if (_error != null) ...[
               Container(
                 padding: const EdgeInsets.all(12),

@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
+import '../../../core/layout/content_aligned_app_bar.dart';
+import '../../../core/layout/constrained_content.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/telemetry/telemetry_service.dart';
@@ -150,41 +152,50 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.isPersonal ? 'create_personal'.tr() : 'create_group'.tr()),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: _goBack,
-        ),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: PageView(
-                controller: _pageController,
-                physics: const NeverScrollableScrollPhysics(),
-                onPageChanged: (i) => setState(() => _currentPage = i),
-                children: widget.isPersonal
-                    ? [
-                        _buildStep1NameCurrency(context),
-                        _buildStep3IconColor(context),
-                        _buildStep4Summary(context),
-                      ]
-                    : [
-                        _buildStep1NameCurrency(context),
-                        _buildStep2Participants(context),
-                        _buildStep3IconColor(context),
-                        _buildStep4Summary(context),
-                      ],
-              ),
+    return LayoutBuilder(
+      builder: (context, layoutConstraints) {
+        return Scaffold(
+          appBar: ContentAlignedAppBar(
+            contentAreaWidth: layoutConstraints.maxWidth,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: _goBack,
             ),
-            _buildPageIndicator(context),
-            _buildBottomBar(context, colorScheme),
-          ],
+            title: Text(
+              widget.isPersonal ? 'create_personal'.tr() : 'create_group'.tr(),
+            ),
+          ),
+          body: ConstrainedContent(
+        child: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: PageView(
+                  controller: _pageController,
+                  physics: const NeverScrollableScrollPhysics(),
+                  onPageChanged: (i) => setState(() => _currentPage = i),
+                  children: widget.isPersonal
+                      ? [
+                          _buildStep1NameCurrency(context),
+                          _buildStep3IconColor(context),
+                          _buildStep4Summary(context),
+                        ]
+                      : [
+                          _buildStep1NameCurrency(context),
+                          _buildStep2Participants(context),
+                          _buildStep3IconColor(context),
+                          _buildStep4Summary(context),
+                        ],
+                ),
+              ),
+              _buildPageIndicator(context),
+              _buildBottomBar(context, colorScheme),
+            ],
+          ),
         ),
       ),
+        );
+      },
     );
   }
 
@@ -257,7 +268,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
           Expanded(
             child: Align(
               alignment: AlignmentDirectional.centerEnd,
-                  child: isLastPage
+              child: isLastPage
                   ? FilledButton.icon(
                       onPressed: _saving ? null : _createGroup,
                       icon: _saving
@@ -270,16 +281,22 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                               ),
                             )
                           : const Icon(Icons.check),
-                      label: Text(widget.isPersonal ? 'create_personal'.tr() : 'create_group'.tr()),
+                      label: Text(
+                        widget.isPersonal
+                            ? 'create_personal'.tr()
+                            : 'create_group'.tr(),
+                      ),
                     )
                   : FilledButton.icon(
                       onPressed: _goNext,
                       icon: const Icon(Icons.arrow_forward),
-                      label: Text(_currentPage == 1 && !widget.isPersonal
-                          ? (_participants.isEmpty
-                              ? 'wizard_skip'.tr()
-                              : 'wizard_next'.tr())
-                          : 'wizard_next'.tr()),
+                      label: Text(
+                        _currentPage == 1 && !widget.isPersonal
+                            ? (_participants.isEmpty
+                                  ? 'wizard_skip'.tr()
+                                  : 'wizard_next'.tr())
+                            : 'wizard_next'.tr(),
+                      ),
                     ),
             ),
           ),
@@ -296,77 +313,83 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
     final theme = Theme.of(context);
     return Form(
       key: _nameFormKey,
-      child: ListView(
-        padding: const EdgeInsets.all(ThemeConfig.spacingM),
-        children: [
-          const SizedBox(height: ThemeConfig.spacingM),
-          Text(
-            'wizard_step1_title'.tr(),
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: ThemeConfig.spacingS),
-          Text(
-            'wizard_step1_subtitle'.tr(),
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: ThemeConfig.spacingXL),
-          TextFormField(
-            controller: _nameController,
-            autofocus: true,
-            decoration: InputDecoration(
-              labelText: (widget.isPersonal ? 'list_name' : 'group_name').tr(),
-              hintText: 'wizard_name_hint'.tr(),
-              border: const OutlineInputBorder(),
-              prefixIcon: const Icon(Icons.group_outlined),
-            ),
-            validator: (v) =>
-                v == null || v.trim().isEmpty ? 'required'.tr() : null,
-            textInputAction: TextInputAction.next,
-            onChanged: (_) => setState(() {}),
-          ),
-          const SizedBox(height: ThemeConfig.spacingL),
-          Text(
-            'currency'.tr(),
-            style: theme.textTheme.titleSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: ThemeConfig.spacingS),
-          InkWell(
-            onTap: _openCurrencyPicker,
-            borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                border: Border.all(color: theme.colorScheme.outline),
-                borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
+      child: FocusTraversalGroup(
+        child: ListView(
+          padding: const EdgeInsets.all(ThemeConfig.spacingM),
+          children: [
+            const SizedBox(height: ThemeConfig.spacingM),
+            Text(
+              'wizard_step1_title'.tr(),
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
               ),
-              child: Row(
-                children: [
-                  Text(
-                    CurrencyUtils.currencyToEmoji(_selectedCurrency),
-                    style: const TextStyle(fontSize: 24),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      CurrencyHelpers.displayLabel(_selectedCurrency),
-                      style: theme.textTheme.bodyLarge,
+            ),
+            const SizedBox(height: ThemeConfig.spacingS),
+            Text(
+              'wizard_step1_subtitle'.tr(),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: ThemeConfig.spacingXL),
+            TextFormField(
+              controller: _nameController,
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: (widget.isPersonal ? 'list_name' : 'group_name')
+                    .tr(),
+                hintText: 'wizard_name_hint'.tr(),
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.group_outlined),
+              ),
+              validator: (v) =>
+                  v == null || v.trim().isEmpty ? 'required'.tr() : null,
+              textInputAction: TextInputAction.next,
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: ThemeConfig.spacingL),
+            Text(
+              'currency'.tr(),
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: ThemeConfig.spacingS),
+            InkWell(
+              onTap: _openCurrencyPicker,
+              borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  border: Border.all(color: theme.colorScheme.outline),
+                  borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
+                ),
+                child: Row(
+                  children: [
+                    Text(
+                      CurrencyUtils.currencyToEmoji(_selectedCurrency),
+                      style: const TextStyle(fontSize: 24),
                     ),
-                  ),
-                  Icon(
-                    Icons.arrow_drop_down,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        CurrencyHelpers.displayLabel(_selectedCurrency),
+                        style: theme.textTheme.bodyLarge,
+                      ),
+                    ),
+                    Icon(
+                      Icons.arrow_drop_down,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -585,8 +608,9 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                           color: isSelected
                               ? _selectedColor
                               : colorScheme.onSurfaceVariant,
-                          fontWeight:
-                              isSelected ? FontWeight.w600 : FontWeight.normal,
+                          fontWeight: isSelected
+                              ? FontWeight.w600
+                              : FontWeight.normal,
                         ),
                         textAlign: TextAlign.center,
                         maxLines: 1,
@@ -625,7 +649,9 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                   color: color,
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: isSelected ? colorScheme.onSurface : Colors.transparent,
+                    color: isSelected
+                        ? colorScheme.onSurface
+                        : Colors.transparent,
                     width: 3,
                   ),
                   boxShadow: isSelected
@@ -683,9 +709,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(ThemeConfig.radiusXL),
-            side: BorderSide(
-              color: colorScheme.outline.withValues(alpha: 0.2),
-            ),
+            side: BorderSide(color: colorScheme.outline.withValues(alpha: 0.2)),
           ),
           child: Padding(
             padding: const EdgeInsets.all(ThemeConfig.spacingL),
@@ -742,10 +766,12 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                     spacing: 6,
                     runSpacing: 6,
                     children: _participants
-                        .map((p) => Chip(
-                              label: Text(p),
-                              visualDensity: VisualDensity.compact,
-                            ))
+                        .map(
+                          (p) => Chip(
+                            label: Text(p),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        )
                         .toList(),
                   ),
                 ],
