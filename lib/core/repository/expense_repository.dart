@@ -1,6 +1,7 @@
 import '../../domain/domain.dart';
 
 abstract class IExpenseRepository {
+  Future<List<Expense>> getAll();
   Future<List<Expense>> getByGroupId(String groupId);
   Stream<List<Expense>> watchByGroupId(String groupId);
   Future<Expense?> getById(String id);

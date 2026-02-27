@@ -1,13 +1,23 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+
+import '../constants/supabase_config.dart';
+import '../layout/layout_breakpoints.dart';
+import '../layout/responsive_sheet.dart';
+import '../widgets/sheet_helpers.dart';
+import 'request_notification_permission_stub.dart'
+    if (dart.library.html) 'request_notification_permission_web.dart'
+    as browser_notification;
 
 /// Centralized permission handling.
 ///
 /// All methods are static and take [BuildContext] so they can show a
 /// non-blocking dialog when a permission is permanently denied.
-/// On web, permission checks are skipped (browser handles prompts natively).
+/// On web, camera/photos are skipped; notification permission is requested via
+/// Firebase Messaging when Firebase is initialized.
 class PermissionService {
   PermissionService._();
 
@@ -40,15 +50,49 @@ class PermissionService {
   /// Request notification permission. Returns `true` when granted.
   ///
   /// Shows an explanatory dialog with "Open Settings" when permanently denied.
+  /// On web, triggers the browser's native notification permission prompt
+  /// so the user always sees a dialog when tapping Allow.
   static Future<bool> requestNotificationPermission(
     BuildContext context,
   ) async {
-    if (kIsWeb) return true;
+    if (kIsWeb) {
+      final granted =
+          await browser_notification.requestBrowserNotificationPermission();
+      if (!granted) return false;
+      if (!firebaseInitialized) return true;
+      try {
+        final messaging = FirebaseMessaging.instance;
+        final settings = await messaging.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+          provisional: false,
+        );
+        return settings.authorizationStatus == AuthorizationStatus.authorized ||
+            settings.authorizationStatus == AuthorizationStatus.provisional;
+      } catch (_) {
+        return true;
+      }
+    }
     return _requestPermission(
       context,
       Permission.notification,
       'permission_notification_message'.tr(),
     );
+  }
+
+  /// Whether notification permission is currently granted (no request).
+  static Future<bool> isNotificationPermissionGranted() async {
+    if (kIsWeb) return browser_notification.isBrowserNotificationPermissionGranted();
+    final status = await Permission.notification.status;
+    return status.isGranted || status.isLimited;
+  }
+
+  /// Whether camera permission is currently granted (no request).
+  static Future<bool> isCameraPermissionGranted() async {
+    if (kIsWeb) return true;
+    final status = await Permission.camera.status;
+    return status.isGranted || status.isLimited;
   }
 
   /// Show the "notifications are disabled" dialog without requesting again.
@@ -87,31 +131,43 @@ class PermissionService {
     return false;
   }
 
-  /// Non-blocking dialog explaining the denied permission with an
+  /// Non-blocking sheet explaining the denied permission with an
   /// "Open Settings" button. Never blocks app usage.
   static void _showPermissionDeniedDialog(
     BuildContext context,
     String message,
   ) {
     if (!context.mounted) return;
-    showDialog<void>(
+    showResponsiveSheet<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('permission_denied_title'.tr()),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('permission_cancel'.tr()),
+      title: 'permission_denied_title'.tr(),
+      maxHeight: MediaQuery.of(context).size.height * 0.4,
+      isScrollControlled: true,
+      centerInFullViewport: true,
+      child: Builder(
+        builder: (ctx) => buildSheetShell(
+          ctx,
+          title: 'permission_denied_title'.tr(),
+          showTitleInBody: !LayoutBreakpoints.isTabletOrWider(context),
+          body: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(message),
           ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              openAppSettings();
-            },
-            child: Text('permission_open_settings'.tr()),
-          ),
-        ],
+          actions: [
+            if (!LayoutBreakpoints.isTabletOrWider(context))
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text('permission_cancel'.tr()),
+              ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                openAppSettings();
+              },
+              child: Text('permission_open_settings'.tr()),
+            ),
+          ],
+        ),
       ),
     );
   }

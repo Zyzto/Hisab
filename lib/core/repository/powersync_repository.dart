@@ -7,6 +7,7 @@ import 'package:powersync/powersync.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+import '../constants/supabase_config.dart';
 import '../../domain/domain.dart';
 import 'group_repository.dart';
 import 'participant_repository.dart';
@@ -105,10 +106,16 @@ TransactionType _parseTransactionType(dynamic v) {
 
 Map<String, int> _parseSplitShares(dynamic v) {
   if (v == null || v.toString().isEmpty) return {};
+  if (v is Map) {
+    try {
+      return v.map((k, val) => MapEntry(k.toString(), (val as num).toInt()));
+    } catch (_) {}
+    return {};
+  }
   try {
     final decoded = jsonDecode(v.toString());
     if (decoded is Map) {
-      return decoded.map((k, v) => MapEntry(k.toString(), (v as num).toInt()));
+      return decoded.map((k, val) => MapEntry(k.toString(), (val as num).toInt()));
     }
   } catch (_) {}
   return {};
@@ -116,6 +123,14 @@ Map<String, int> _parseSplitShares(dynamic v) {
 
 List<ReceiptLineItem>? _parseLineItems(dynamic v) {
   if (v == null || v.toString().isEmpty) return null;
+  if (v is List) {
+    try {
+      return v
+          .map((e) => ReceiptLineItem.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (_) {}
+    return null;
+  }
   try {
     final decoded = jsonDecode(v.toString());
     if (decoded is List) {
@@ -124,6 +139,35 @@ List<ReceiptLineItem>? _parseLineItems(dynamic v) {
           .toList();
     }
   } catch (_) {}
+  return null;
+}
+
+List<String>? _parseReceiptImagePaths(dynamic v) {
+  if (v == null || v.toString().trim().isEmpty) return null;
+  try {
+    final decoded = jsonDecode(v.toString());
+    if (decoded is List) {
+      final list = decoded
+          .whereType<String>()
+          .where((s) => s.isNotEmpty)
+          .toList();
+      return list.isEmpty ? null : list;
+    }
+  } catch (_) {}
+  return null;
+}
+
+String? _effectiveReceiptImagePathFromRow(Map<String, dynamic> row) {
+  final paths = _parseReceiptImagePaths(row['receipt_image_paths']);
+  if (paths != null && paths.isNotEmpty) return paths.first;
+  return row['receipt_image_path'] as String?;
+}
+
+List<String>? _effectiveReceiptImagePathsFromRow(Map<String, dynamic> row) {
+  final paths = _parseReceiptImagePaths(row['receipt_image_paths']);
+  if (paths != null && paths.isNotEmpty) return paths;
+  final single = row['receipt_image_path'] as String?;
+  if (single != null && single.isNotEmpty) return [single];
   return null;
 }
 
@@ -181,7 +225,8 @@ Expense _expenseFromRow(Map<String, dynamic> row) => Expense(
   toParticipantId: row['to_participant_id'] as String?,
   tag: row['tag'] as String?,
   lineItems: _parseLineItems(row['line_items_json']),
-  receiptImagePath: row['receipt_image_path'] as String?,
+  receiptImagePath: _effectiveReceiptImagePathFromRow(row),
+  receiptImagePaths: _effectiveReceiptImagePathsFromRow(row),
 );
 
 ExpenseTag _tagFromRow(Map<String, dynamic> row) => ExpenseTag(
@@ -325,16 +370,16 @@ class PowerSyncGroupRepository implements IGroupRepository {
     String? ownerId;
     String? ownerDisplayName;
     String? ownerAvatarId;
-    try {
-      final user = Supabase.instance.client.auth.currentUser;
-      ownerId = user?.id;
+    final user = supabaseClientIfConfigured?.auth.currentUser;
+    if (user != null) {
+      ownerId = user.id;
       ownerDisplayName =
-          user?.userMetadata?['display_name'] as String? ??
-          user?.userMetadata?['full_name'] as String? ??
-          user?.email ??
+          user.userMetadata?['display_name'] as String? ??
+          user.userMetadata?['full_name'] as String? ??
+          user.email ??
           'Owner';
-      ownerAvatarId = user?.userMetadata?['avatar_id'] as String?;
-    } catch (_) {}
+      ownerAvatarId = user.userMetadata?['avatar_id'] as String?;
+    }
 
     final groupData = <String, dynamic>{
       'id': id,
@@ -679,6 +724,14 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
        _isLocalOnly = isLocalOnly;
 
   @override
+  Future<List<Participant>> getAll() async {
+    final rows = await _db.getAll(
+      'SELECT * FROM participants ORDER BY sort_order ASC',
+    );
+    return rows.map(_participantFromRow).toList();
+  }
+
+  @override
   Future<List<Participant>> getByGroupId(String groupId) async {
     final rows = await _db.getAll(
       'SELECT * FROM participants WHERE group_id = ? ORDER BY sort_order ASC',
@@ -836,6 +889,14 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
        _isLocalOnly = isLocalOnly;
 
   @override
+  Future<List<Expense>> getAll() async {
+    final rows = await _db.getAll(
+      'SELECT * FROM expenses ORDER BY date DESC',
+    );
+    return rows.map(_expenseFromRow).toList();
+  }
+
+  @override
   Future<List<Expense>> getByGroupId(String groupId) async {
     final rows = await _db.getAll(
       'SELECT * FROM expenses WHERE group_id = ? ORDER BY date DESC',
@@ -873,6 +934,13 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
         ? jsonEncode(expense.lineItems!.map((e) => e.toJson()).toList())
         : null;
 
+    final receiptPaths = expense.receiptImagePaths ??
+        (expense.receiptImagePath != null ? [expense.receiptImagePath!] : null);
+    final receiptPath = receiptPaths != null && receiptPaths.isNotEmpty
+        ? receiptPaths.first
+        : expense.receiptImagePath;
+    final receiptPathsJson =
+        receiptPaths != null ? jsonEncode(receiptPaths) : null;
     final data = <String, dynamic>{
       'id': id,
       'group_id': expense.groupId,
@@ -890,7 +958,8 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
       'to_participant_id': expense.toParticipantId,
       'tag': expense.tag,
       'line_items_json': lineItemsJson,
-      'receipt_image_path': expense.receiptImagePath,
+      'receipt_image_path': receiptPath,
+      'receipt_image_paths': receiptPathsJson,
       'created_at': now,
       'updated_at': now,
     };
@@ -914,9 +983,9 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
       '''INSERT INTO expenses (id, group_id, payer_participant_id, amount_cents,
         currency_code, exchange_rate, base_amount_cents,
         title, description, date, split_type, split_shares_json,
-        type, to_participant_id, tag, line_items_json, receipt_image_path,
+        type, to_participant_id, tag, line_items_json, receipt_image_path, receipt_image_paths,
         created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
       [
         id,
         expense.groupId,
@@ -934,7 +1003,8 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
         expense.toParticipantId,
         expense.tag,
         lineItemsJson,
-        expense.receiptImagePath,
+        receiptPath,
+        receiptPathsJson,
         now,
         now,
       ],
@@ -949,6 +1019,13 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
     final lineItemsJson = expense.lineItems != null
         ? jsonEncode(expense.lineItems!.map((e) => e.toJson()).toList())
         : null;
+    final receiptPaths = expense.receiptImagePaths ??
+        (expense.receiptImagePath != null ? [expense.receiptImagePath!] : null);
+    final receiptPath = receiptPaths != null && receiptPaths.isNotEmpty
+        ? receiptPaths.first
+        : expense.receiptImagePath;
+    final receiptPathsJson =
+        receiptPaths != null ? jsonEncode(receiptPaths) : null;
 
     if (!_isLocalOnly && _isOnline && _client != null) {
       await _client
@@ -968,7 +1045,8 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
             'to_participant_id': expense.toParticipantId,
             'tag': expense.tag,
             'line_items_json': lineItemsJson,
-            'receipt_image_path': expense.receiptImagePath,
+            'receipt_image_path': receiptPath,
+            'receipt_image_paths': receiptPathsJson,
             'updated_at': now,
           })
           .eq('id', expense.id);
@@ -981,7 +1059,7 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
         payer_participant_id = ?,
         description = ?, date = ?, split_type = ?, split_shares_json = ?,
         type = ?, to_participant_id = ?, tag = ?,
-        line_items_json = ?, receipt_image_path = ?, updated_at = ?
+        line_items_json = ?, receipt_image_path = ?, receipt_image_paths = ?, updated_at = ?
       WHERE id = ?''',
       [
         expense.title,
@@ -998,7 +1076,8 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
         expense.toParticipantId,
         expense.tag,
         lineItemsJson,
-        expense.receiptImagePath,
+        receiptPath,
+        receiptPathsJson,
         now,
         expense.id,
       ],
@@ -1032,6 +1111,14 @@ class PowerSyncTagRepository implements ITagRepository {
   }) : _client = client,
        _isOnline = isOnline,
        _isLocalOnly = isLocalOnly;
+
+  @override
+  Future<List<ExpenseTag>> getAll() async {
+    final rows = await _db.getAll(
+      'SELECT * FROM expense_tags ORDER BY label ASC',
+    );
+    return rows.map(_tagFromRow).toList();
+  }
 
   @override
   Future<List<ExpenseTag>> getByGroupId(String groupId) async {
@@ -1127,22 +1214,11 @@ class PowerSyncGroupMemberRepository implements IGroupMemberRepository {
   final bool isLocalOnly;
   PowerSyncGroupMemberRepository(this._db, {this.isLocalOnly = false});
 
-  String? get _currentUserId {
-    try {
-      return Supabase.instance.client.auth.currentUser?.id;
-    } catch (_) {
-      return null;
-    }
-  }
+  String? get _currentUserId =>
+      supabaseClientIfConfigured?.auth.currentUser?.id;
 
-  SupabaseClient? get _supabase {
-    if (isLocalOnly) return null;
-    try {
-      return Supabase.instance.client;
-    } catch (_) {
-      return null;
-    }
-  }
+  SupabaseClient? get _supabase =>
+      isLocalOnly ? null : supabaseClientIfConfigured;
 
   @override
   Future<GroupRole?> getMyRole(String groupId) async {

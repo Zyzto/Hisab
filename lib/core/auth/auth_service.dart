@@ -7,8 +7,14 @@ import 'auth_user_profile.dart';
 
 /// Unified Supabase auth service. Works on all platforms — `supabase_flutter`
 /// handles web/native differences internally.
+/// When Supabase is not configured (local-only), [currentUser] and related getters
+/// return null/false and must not throw.
 class AuthService {
-  SupabaseClient get _client => Supabase.instance.client;
+  /// Supabase client when configured and initialized; null in local-only mode.
+  SupabaseClient? get _client => supabaseClientIfConfigured;
+
+  SupabaseClient get _clientOrThrow =>
+      supabaseClientIfConfigured ?? (throw StateError('Supabase not configured'));
 
   /// Redirect URL for OAuth: on web use [authRedirectUrl] (SITE_URL); on native use deep link so the app reopens.
   String? get _oauthRedirectUrl {
@@ -25,7 +31,7 @@ class AuthService {
   Future<AuthResponse> signInWithEmail(String email, String password) async {
     Log.debug('Signing in with email');
     try {
-      final response = await _client.auth.signInWithPassword(
+      final response = await _clientOrThrow.auth.signInWithPassword(
         email: email,
         password: password,
       );
@@ -52,7 +58,7 @@ class AuthService {
       if (avatarId != null && avatarId.isNotEmpty) {
         data['avatar_id'] = avatarId;
       }
-      final response = await _client.auth.signUp(
+      final response = await _clientOrThrow.auth.signUp(
         email: email,
         password: password,
         emailRedirectTo: authRedirectUrl.trim().isNotEmpty
@@ -79,15 +85,28 @@ class AuthService {
     if (avatarId != null) {
       existing['avatar_id'] = avatarId.isEmpty ? null : avatarId;
     }
-    await _client.auth.updateUser(UserAttributes(data: existing));
+    await _clientOrThrow.auth.updateUser(UserAttributes(data: existing));
     Log.info('Profile updated');
+  }
+
+  /// Update the current user's password. Caller must verify identity (e.g. via
+  /// signInWithEmail with current password) before calling.
+  Future<void> updatePassword(String newPassword) async {
+    Log.debug('Updating password');
+    try {
+      await _clientOrThrow.auth.updateUser(UserAttributes(password: newPassword));
+      Log.info('Password updated');
+    } catch (e, st) {
+      Log.error('Password update failed', error: e, stackTrace: st);
+      rethrow;
+    }
   }
 
   /// Resend the confirmation email for an unconfirmed account.
   Future<void> resendConfirmation(String email) async {
     Log.debug('Resending confirmation email');
     try {
-      await _client.auth.resend(
+      await _clientOrThrow.auth.resend(
         type: OtpType.signup,
         email: email,
         emailRedirectTo: authRedirectUrl.trim().isNotEmpty
@@ -104,7 +123,7 @@ class AuthService {
   Future<void> signInWithMagicLink(String email) async {
     Log.debug('Sending magic link');
     try {
-      await _client.auth.signInWithOtp(
+      await _clientOrThrow.auth.signInWithOtp(
         email: email,
         emailRedirectTo: authRedirectUrl.trim().isNotEmpty
             ? authRedirectUrl.trim()
@@ -121,7 +140,7 @@ class AuthService {
     Log.debug('Signing in with Google OAuth');
     try {
       final redirectTo = _oauthRedirectUrl;
-      final ok = await _client.auth.signInWithOAuth(
+      final ok = await _clientOrThrow.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: redirectTo,
       );
@@ -136,7 +155,7 @@ class AuthService {
     Log.debug('Signing in with GitHub OAuth');
     try {
       final redirectTo = _oauthRedirectUrl;
-      final ok = await _client.auth.signInWithOAuth(
+      final ok = await _clientOrThrow.auth.signInWithOAuth(
         OAuthProvider.github,
         redirectTo: redirectTo,
       );
@@ -154,7 +173,7 @@ class AuthService {
   Future<void> signOut() async {
     Log.info('User signing out');
     try {
-      await _client.auth.signOut();
+      await _clientOrThrow.auth.signOut();
       Log.info('User signed out');
     } catch (e, st) {
       Log.error('Sign-out failed', error: e, stackTrace: st);
@@ -163,15 +182,17 @@ class AuthService {
   }
 
   // ---------------------------------------------------------------------------
-  // Session & user getters
+  // Session & user getters (safe when Supabase not configured — return null/false/empty)
   // ---------------------------------------------------------------------------
 
-  Session? get currentSession => _client.auth.currentSession;
-  User? get currentUser => _client.auth.currentUser;
+  Session? get currentSession => _client?.auth.currentSession;
 
-  bool get isAuthenticated => _client.auth.currentSession != null;
+  User? get currentUser => _client?.auth.currentUser;
 
-  Stream<AuthState> get onAuthStateChange => _client.auth.onAuthStateChange;
+  bool get isAuthenticated => _client?.auth.currentSession != null;
+
+  Stream<AuthState> get onAuthStateChange =>
+      _client?.auth.onAuthStateChange ?? const Stream.empty();
 
   // ---------------------------------------------------------------------------
   // Profile helper (mirrors old AuthUserProfile)

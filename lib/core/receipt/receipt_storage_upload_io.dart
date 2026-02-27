@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:path/path.dart' as path;
@@ -23,11 +24,24 @@ Future<String?> uploadReceiptToStorage(
     Log.warning('Receipt upload: file not found: $localPath');
     return null;
   }
+  final bytes = await file.readAsBytes();
   final ext = path.extension(localPath).isEmpty ? 'jpg' : path.extension(localPath).replaceFirst('.', '');
+  return uploadReceiptBytesToStorage(bytes, groupId, expenseId, fileExt: ext);
+}
+
+/// Uploads receipt image [bytes] to Supabase Storage under
+/// [groupId]/[expenseId]/{uuid}.{ext}. Returns the public URL, or null on failure.
+Future<String?> uploadReceiptBytesToStorage(
+  Uint8List bytes,
+  String groupId,
+  String expenseId, {
+  String? fileExt,
+}) async {
+  final client = supabaseClientIfConfigured;
+  if (client == null) return null;
+  final ext = fileExt ?? 'jpg';
   final bucketKey = '$groupId/$expenseId/${const Uuid().v4()}.$ext';
   try {
-    final bytes = await file.readAsBytes();
-    final client = Supabase.instance.client;
     await client.storage.from(_bucket).uploadBinary(
           bucketKey,
           bytes,

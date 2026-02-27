@@ -7,43 +7,20 @@ import 'currency_helpers.dart';
 class CurrencyFormatter {
   /// Format with symbol: "$12.34" or "12.34 ﷼" depending on currency.
   static String formatCents(int amountCents, String currencyCode) {
-    final currency = CurrencyHelpers.fromCode(currencyCode);
-    final decimalDigits = currency?.decimalDigits ?? 2;
-    final symbol = currency?.symbol ?? currencyCode;
-    final onLeft = currency?.symbolOnLeft ?? true;
-    final divisor = _divisor(decimalDigits);
-    final amount = amountCents / divisor;
-    final formatter = NumberFormat.currency(
-      symbol: '',
-      decimalDigits: decimalDigits,
-    );
-    final formatted = formatter.format(amount);
-
-    if (onLeft) {
-      return '$symbol $formatted';
-    } else {
-      return '$formatted $symbol';
-    }
+    final p = _currencyParams(currencyCode);
+    final formatted = _formatNumber(amountCents, p.$1);
+    return p.$3 ? '${p.$2} $formatted' : '$formatted ${p.$2}';
   }
 
   /// Format with both symbol and code: "$12.34 USD" or "12.34 ﷼ SAR".
   static String formatWithCode(int amountCents, String currencyCode) {
-    final currency = CurrencyHelpers.fromCode(currencyCode);
-    final decimalDigits = currency?.decimalDigits ?? 2;
-    final symbol = currency?.symbol ?? currencyCode;
-    final onLeft = currency?.symbolOnLeft ?? true;
-    final divisor = _divisor(decimalDigits);
-    final amount = amountCents / divisor;
-    final formatter = NumberFormat.currency(
-      symbol: '',
-      decimalDigits: decimalDigits,
-    );
-    final formatted = formatter.format(amount);
-
-    if (symbol.isNotEmpty && onLeft) {
-      return '$symbol $formatted $currencyCode';
-    } else if (symbol.isNotEmpty) {
-      return '$formatted $symbol $currencyCode';
+    final p = _currencyParams(currencyCode);
+    final formatted = _formatNumber(amountCents, p.$1);
+    if (p.$2.isNotEmpty && p.$3) {
+      return '${p.$2} $formatted $currencyCode';
+    }
+    if (p.$2.isNotEmpty) {
+      return '$formatted ${p.$2} $currencyCode';
     }
     return '$formatted $currencyCode';
   }
@@ -51,8 +28,21 @@ class CurrencyFormatter {
   /// Format number only, no symbol or code: "12.34"
   static String formatCompactCents(int amountCents, [String? currencyCode]) {
     final decimalDigits = currencyCode != null
-        ? (CurrencyHelpers.fromCode(currencyCode)?.decimalDigits ?? 2)
+        ? _currencyParams(currencyCode).$1
         : 2;
+    return _formatNumber(amountCents, decimalDigits);
+  }
+
+  /// (decimalDigits, symbol, onLeft) from one fromCode lookup.
+  static (int, String, bool) _currencyParams(String currencyCode) {
+    final currency = CurrencyHelpers.fromCode(currencyCode);
+    final decimalDigits = currency?.decimalDigits ?? 2;
+    final symbol = currency?.symbol ?? currencyCode;
+    final onLeft = currency?.symbolOnLeft ?? true;
+    return (decimalDigits, symbol, onLeft);
+  }
+
+  static String _formatNumber(int amountCents, int decimalDigits) {
     final divisor = _divisor(decimalDigits);
     final amount = amountCents / divisor;
     final formatter = NumberFormat.currency(

@@ -1,6 +1,8 @@
 import 'package:currency_picker/currency_picker.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
+import '../layout/responsive_sheet.dart';
 import '../widgets/currency_picker_list.dart';
 
 /// Thin wrapper around [currency_picker] package for app-wide currency utilities.
@@ -53,38 +55,47 @@ class CurrencyHelpers {
     return '$flag ${c.code}';
   }
 
-  /// Show a currency picker bottom sheet with a drag handle and 75% max height.
+  /// Show a currency picker bottom sheet with 75% max height.
   /// Drop-in replacement for [showCurrencyPicker] with consistent UX.
+  ///
+  /// [centerInFullViewport]: when true (e.g. from group settings), the dialog
+  /// is centered in the full viewport on tablet+; when false (e.g. from app
+  /// settings), it is centered in the content area to the right of the nav rail.
   static void showPicker({
     required BuildContext context,
     required ValueChanged<Currency> onSelect,
     List<String>? favorite,
     List<String>? currencyFilter,
+    bool centerInFullViewport = true,
   }) {
     final maxHeight = MediaQuery.of(context).size.height * 0.75;
-    showModalBottomSheet(
+    showResponsiveSheet<void>(
       context: context,
+      title: 'select_currency'.tr(),
+      maxHeight: maxHeight,
       isScrollControlled: true,
       useSafeArea: true,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
+      centerInFullViewport: centerInFullViewport,
+      sheetShape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      constraints: BoxConstraints(maxHeight: maxHeight),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(ctx).padding.bottom + 24,
-        ),
-        child: AppCurrencyPickerList(
-          onSelect: (currency) {
-            onSelect(currency);
-          },
-          favorite: favorite,
-          currencyFilter: currencyFilter,
-          showFlag: true,
-          showSearchField: true,
-          showCurrencyName: true,
-          showCurrencyCode: true,
+      child: Builder(
+        builder: (ctx) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).padding.bottom + 24,
+          ),
+          child: AppCurrencyPickerList(
+            onSelect: (currency) {
+              onSelect(currency);
+              Navigator.pop(ctx);
+            },
+            favorite: favorite,
+            currencyFilter: currencyFilter,
+            showFlag: true,
+            showSearchField: true,
+            showCurrencyName: true,
+            showCurrencyCode: true,
+          ),
         ),
       ),
     );

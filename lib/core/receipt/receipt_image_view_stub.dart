@@ -1,15 +1,19 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
+import '../layout/layout_breakpoints.dart';
+import '../layout/responsive_sheet.dart';
+import '../widgets/sheet_helpers.dart';
 import 'receipt_utils.dart';
 
 /// Full-screen view: URLs open in dialog with Image.network; local paths show message (web has no file access).
 void showReceiptImageFullScreen(BuildContext context, String imagePath) {
   if (isReceiptImageUrl(imagePath)) {
-    showDialog(
+    showAppDialog<void>(
       context: context,
       barrierColor: Theme.of(context).colorScheme.scrim,
       barrierDismissible: true,
+      centerInFullViewport: true,
       builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
         insetPadding: EdgeInsets.zero,
@@ -35,17 +39,30 @@ void showReceiptImageFullScreen(BuildContext context, String imagePath) {
     );
     return;
   }
-  showDialog(
+  showResponsiveSheet<void>(
     context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text('receipt'.tr()),
-      content: Text('receipt_preview_web'.tr()),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: Text('ok'.tr()),
+    title: 'receipt'.tr(),
+    maxHeight: MediaQuery.of(context).size.height * 0.35,
+    isScrollControlled: true,
+    centerInFullViewport: true,
+    child: Builder(
+      builder: (ctx) => buildSheetShell(
+        ctx,
+        title: 'receipt'.tr(),
+        showTitleInBody: !LayoutBreakpoints.isTabletOrWider(context),
+        body: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text('receipt_preview_web'.tr()),
         ),
-      ],
+        actions: LayoutBreakpoints.isTabletOrWider(context)
+            ? []
+            : [
+                FilledButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text('ok'.tr()),
+                ),
+              ],
+      ),
     ),
   );
 }

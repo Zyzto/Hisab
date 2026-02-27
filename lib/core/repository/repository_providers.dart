@@ -19,11 +19,7 @@ part 'repository_providers.g.dart';
 /// Helper: get SupabaseClient if available and not local-only.
 SupabaseClient? _clientIfOnline(bool localOnly) {
   if (localOnly || !supabaseConfigAvailable) return null;
-  try {
-    return Supabase.instance.client;
-  } catch (_) {
-    return null;
-  }
+  return supabaseClientIfConfigured;
 }
 
 @riverpod

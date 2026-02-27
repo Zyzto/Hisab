@@ -6,7 +6,9 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:upgrader/upgrader.dart';
 
 import '../database/database_providers.dart';
+import '../layout/responsive_sheet.dart';
 import '../navigation/route_paths.dart';
+import '../widgets/sheet_helpers.dart';
 import '../services/connectivity_service.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
 import '../../features/settings/settings_definitions.dart';
@@ -71,10 +73,11 @@ class DebugMenuFab extends ConsumerWidget {
             locContext != null &&
             locContext.mounted) {
           onBeforeOpen?.call();
-          showModalBottomSheet<void>(
+          showResponsiveSheet<void>(
             context: navContext,
+            title: 'Debug',
             isScrollControlled: true,
-            builder: (_) => EasyLocalization(
+            child: EasyLocalization(
               supportedLocales: const [Locale('en'), Locale('ar')],
               path: 'assets/translations',
               fallbackLocale: const Locale('en'),
@@ -135,48 +138,15 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
     _setStatus('Onboarding reset — restart the app');
   }
 
-  void _openInviteByToken() {
-    final controller = TextEditingController();
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Open invite by token'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            hintText: 'Paste invite token',
-            border: OutlineInputBorder(),
-          ),
-          autofocus: true,
-          textInputAction: TextInputAction.done,
-          onSubmitted: (_) {
-            final token = controller.text.trim();
-            if (token.isNotEmpty) {
-              context.go(RoutePaths.inviteAccept(token));
-              Navigator.of(ctx).pop();
-            }
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final token = controller.text.trim();
-              if (token.isEmpty) return;
-              context.go(RoutePaths.inviteAccept(token));
-              Navigator.of(ctx).pop();
-            },
-            child: const Text('Open'),
-          ),
-        ],
-      ),
-    ).then((_) {
-      controller.dispose();
-      if (mounted) Navigator.of(context).pop();
-    });
+  Future<void> _openInviteByToken() async {
+    final token = await showTextInputSheet(
+      context,
+      title: 'Open invite by token',
+      hint: 'Paste invite token',
+    );
+    if (token != null && token.isNotEmpty && mounted) {
+      context.go(RoutePaths.inviteAccept(token));
+    }
   }
 
   @override
@@ -195,20 +165,6 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Handle
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-
-            // Title
             Row(
               children: [
                 Icon(Icons.bug_report_outlined,

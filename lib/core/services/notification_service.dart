@@ -7,8 +7,8 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../constants/firebase_config.dart';
 import '../constants/supabase_config.dart';
 import '../navigation/app_router.dart';
 import '../navigation/route_paths.dart';
@@ -25,7 +25,14 @@ part 'notification_service.g.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
+  if (kIsWeb) {
+    final options = firebaseOptionsForWeb;
+    if (options != null) {
+      await Firebase.initializeApp(options: options);
+    }
+  } else {
+    await Firebase.initializeApp();
+  }
   Log.debug('FCM background message: ${message.messageId}');
 
   // If we receive a data-only message (no notification payload), show a local
@@ -170,8 +177,8 @@ class NotificationService extends _$NotificationService {
     _initializing = true;
 
     try {
-      final client = Supabase.instance.client;
-      if (client.auth.currentUser == null) {
+      final client = supabaseClientIfConfigured;
+      if (client == null || client.auth.currentUser == null) {
         Log.warning('NotificationService: initialize called without authenticated user');
         return false;
       }
@@ -249,8 +256,9 @@ class NotificationService extends _$NotificationService {
 
     if (_currentToken == null) return;
 
+    final client = supabaseClientIfConfigured;
+    if (client == null) return;
     try {
-      final client = Supabase.instance.client;
       await client
           .from('device_tokens')
           .delete()
@@ -319,10 +327,10 @@ class NotificationService extends _$NotificationService {
           : (defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android');
 
       // Upsert into device_tokens (include locale for language-aware notifications)
-      final client = Supabase.instance.client;
-      final userId = client.auth.currentUser?.id;
-      if (userId == null) {
-        Log.warning('NotificationService: skip token upsert, no authenticated user');
+      final client = supabaseClientIfConfigured;
+      final userId = client?.auth.currentUser?.id;
+      if (client == null || userId == null) {
+        Log.warning('NotificationService: skip token upsert, no client or no authenticated user');
         return;
       }
 

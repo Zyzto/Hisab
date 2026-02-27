@@ -8,6 +8,8 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth_providers.dart';
+import '../layout/layout_breakpoints.dart';
+import '../layout/responsive_sheet.dart';
 import 'predefined_avatars.dart';
 
 /// Result from the sign-in sheet.
@@ -34,14 +36,13 @@ Future<SignInResult> showSignInSheet(
   BuildContext context,
   WidgetRef ref,
 ) async {
-  final result = await showModalBottomSheet<SignInResult>(
+  final result = await showResponsiveSheet<SignInResult>(
     context: context,
+    title: 'sign_in'.tr(),
     isScrollControlled: true,
     useSafeArea: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
-    builder: (ctx) => _SignInSheet(ref: ref),
+    centerInFullViewport: true,
+    child: _SignInSheet(ref: ref),
   );
   return result ?? SignInResult.cancelled;
 }
@@ -340,38 +341,41 @@ class _SignInSheetState extends State<_SignInSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Drag handle
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: colorScheme.outline.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(2),
+            if (!LayoutBreakpoints.isTabletOrWider(context)) ...[
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: colorScheme.outline.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
+            ],
 
-            // Title
-            Text(
-              _isSignUp ? 'auth_sign_up'.tr() : 'sign_in'.tr(),
-              style: textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
+            // Title (omit on tablet+ when top bar shows it)
+            if (!LayoutBreakpoints.isTabletOrWider(context)) ...[
+              Text(
+                _isSignUp ? 'auth_sign_up'.tr() : 'sign_in'.tr(),
+                style: textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _isSignUp
-                  ? 'auth_sign_up_subtitle'.tr()
-                  : 'auth_sign_in_subtitle'.tr(),
-              style: textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
+              const SizedBox(height: 8),
+              Text(
+                _isSignUp
+                    ? 'auth_sign_up_subtitle'.tr()
+                    : 'auth_sign_in_subtitle'.tr(),
+                style: textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
+            ],
 
             // Sign-up only: name and avatar
             if (_isSignUp) ...[

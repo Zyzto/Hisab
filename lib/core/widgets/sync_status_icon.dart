@@ -98,11 +98,15 @@ class _SyncStatusChipState extends ConsumerState<SyncStatusChip> {
                   _buildIcon(status, data),
                   if (showLabel) ...[
                     const SizedBox(width: 6),
-                    Text(
-                      data.label,
-                      style: Theme.of(context).textTheme.labelSmall!.copyWith(
-                        color: data.foregroundColor,
-                        fontWeight: FontWeight.w600,
+                    Flexible(
+                      child: Text(
+                        data.label,
+                        style: Theme.of(context).textTheme.labelSmall!.copyWith(
+                          color: data.foregroundColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
                     ),
                   ],
