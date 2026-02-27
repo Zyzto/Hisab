@@ -52,7 +52,7 @@ final class AppThemesProvider
   }
 }
 
-String _$appThemesHash() => r'ee1bc0104d51b958b0f6294d8efbaadbfb6c1f8f';
+String _$appThemesHash() => r'ae460d134c15c76e73c6d7a22b6aa05fae516b8e';
 
 /// ThemeMode for MaterialApp. Separate so locale changes don't trigger theme rebuild.
 

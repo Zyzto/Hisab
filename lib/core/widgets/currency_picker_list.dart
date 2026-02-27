@@ -20,8 +20,10 @@ class AppCurrencyPickerList extends StatefulWidget {
     this.showFlag = true,
     this.showCurrencyCode = true,
     this.showCurrencyName = true,
-  })  : assert(showCurrencyCode || showCurrencyName,
-            'showCurrencyCode and showCurrencyName cannot be both false');
+  }) : assert(
+         showCurrencyCode || showCurrencyName,
+         'showCurrencyCode and showCurrencyName cannot be both false',
+       );
 
   final ValueChanged<Currency> onSelect;
   final List<String>? favorite;
@@ -43,8 +45,7 @@ class _AppCurrencyPickerListState extends State<AppCurrencyPickerList> {
   late List<Currency> _favoritesList;
   late List<Currency> _restList;
 
-  static int _compareByCode(Currency a, Currency b) =>
-      a.code.compareTo(b.code);
+  static int _compareByCode(Currency a, Currency b) => a.code.compareTo(b.code);
 
   @override
   void initState() {
@@ -61,7 +62,9 @@ class _AppCurrencyPickerListState extends State<AppCurrencyPickerList> {
   void _buildLists() {
     List<Currency> list = _currencyService.getAll();
     list = list
-        .where((c) => !AppCurrencyPickerList.excludedCurrencyCodes.contains(c.code))
+        .where(
+          (c) => !AppCurrencyPickerList.excludedCurrencyCodes.contains(c.code),
+        )
         .toList();
 
     if (widget.currencyFilter != null) {
@@ -77,11 +80,11 @@ class _AppCurrencyPickerListState extends State<AppCurrencyPickerList> {
 
     final orderedFavoriteCodes =
         widget.favorite != null && widget.favorite!.isNotEmpty
-            ? widget.favorite!
-                .map((e) => e.trim().toUpperCase())
-                .where((e) => e.isNotEmpty)
-                .toList()
-            : <String>[];
+        ? widget.favorite!
+              .map((e) => e.trim().toUpperCase())
+              .where((e) => e.isNotEmpty)
+              .toList()
+        : <String>[];
     final favoriteCodes = orderedFavoriteCodes.toSet();
 
     // Preserve user settings order for favourites (no alphabetical sort).
@@ -91,9 +94,10 @@ class _AppCurrencyPickerListState extends State<AppCurrencyPickerList> {
         .map((code) => codeToCurrency[code]!)
         .toList();
 
-    _restList = favoriteCodes.isEmpty
-        ? list
-        : list.where((c) => !favoriteCodes.contains(c.code)).toList()
+    _restList =
+        favoriteCodes.isEmpty
+              ? list
+              : list.where((c) => !favoriteCodes.contains(c.code)).toList()
           ..sort(_compareByCode);
   }
 
@@ -131,7 +135,9 @@ class _AppCurrencyPickerListState extends State<AppCurrencyPickerList> {
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
                   borderSide: BorderSide(
-                    color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
+                    color: theme.colorScheme.outlineVariant.withValues(
+                      alpha: 0.2,
+                    ),
                   ),
                 ),
               ),

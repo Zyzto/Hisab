@@ -16,11 +16,18 @@ class AppTheme {
     required Color iconColor,
     required T extension,
     required Color primarySeed,
+    bool alwaysShowScrollbars = false,
   }) {
     return ThemeData(
       useMaterial3: true,
       textTheme: textTheme,
       colorScheme: colorScheme,
+      scrollbarTheme: alwaysShowScrollbars
+          ? ScrollbarThemeData(
+              thumbVisibility: WidgetStateProperty.all(true),
+              trackVisibility: WidgetStateProperty.all(true),
+            )
+          : null,
       appBarTheme: AppBarTheme(
         centerTitle: ThemeConfig.appBarCenterTitle,
         elevation: ThemeConfig.appBarElevation,
@@ -144,7 +151,11 @@ class AppTheme {
     );
   }
 
-  static ThemeData lightTheme({Color? seedColor, String? fontSizeScale}) {
+  static ThemeData lightTheme({
+    Color? seedColor,
+    String? fontSizeScale,
+    bool alwaysShowScrollbars = false,
+  }) {
     final baseSeedColor = seedColor ?? ThemeConfig.defaultSeedColor;
     final colorScheme = ColorScheme.fromSeed(
       seedColor: baseSeedColor,
@@ -177,10 +188,15 @@ class AppTheme {
       iconColor: ThemeConfig.lightIcon,
       extension: AppThemeExtension.light,
       primarySeed: baseSeedColor,
+      alwaysShowScrollbars: alwaysShowScrollbars,
     );
   }
 
-  static ThemeData darkTheme({Color? seedColor, String? fontSizeScale}) {
+  static ThemeData darkTheme({
+    Color? seedColor,
+    String? fontSizeScale,
+    bool alwaysShowScrollbars = false,
+  }) {
     final baseSeedColor = seedColor ?? ThemeConfig.defaultSeedColor;
     final colorScheme = ColorScheme.fromSeed(
       seedColor: baseSeedColor,
@@ -213,10 +229,15 @@ class AppTheme {
       iconColor: ThemeConfig.darkIcon,
       extension: AppThemeExtension.dark,
       primarySeed: baseSeedColor,
+      alwaysShowScrollbars: alwaysShowScrollbars,
     );
   }
 
-  static ThemeData amoledTheme({Color? seedColor, String? fontSizeScale}) {
+  static ThemeData amoledTheme({
+    Color? seedColor,
+    String? fontSizeScale,
+    bool alwaysShowScrollbars = false,
+  }) {
     final baseSeedColor = seedColor ?? ThemeConfig.defaultSeedColor;
     final colorScheme = ColorScheme.fromSeed(
       seedColor: baseSeedColor,
@@ -249,6 +270,7 @@ class AppTheme {
       iconColor: ThemeConfig.amoledIcon,
       extension: AppThemeExtension.dark,
       primarySeed: baseSeedColor,
+      alwaysShowScrollbars: alwaysShowScrollbars,
     );
   }
 }

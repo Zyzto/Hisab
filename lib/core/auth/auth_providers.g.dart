@@ -50,13 +50,23 @@ final class AuthServiceProvider
 
 String _$authServiceHash() => r'21d842d4dceafa3d239c0196a0f2b890d37c0b71';
 
+/// Emits a new value whenever auth state changes. We use [int] (not [AuthState])
+/// so Riverpod never stores Supabase's JS-backed types, avoiding web-only
+/// dart_rti / NoSuchMethodError when the stream updates.
+
 @ProviderFor(authStateChanges)
 final authStateChangesProvider = AuthStateChangesProvider._();
 
+/// Emits a new value whenever auth state changes. We use [int] (not [AuthState])
+/// so Riverpod never stores Supabase's JS-backed types, avoiding web-only
+/// dart_rti / NoSuchMethodError when the stream updates.
+
 final class AuthStateChangesProvider
-    extends
-        $FunctionalProvider<AsyncValue<AuthState>, AuthState, Stream<AuthState>>
-    with $FutureModifier<AuthState>, $StreamProvider<AuthState> {
+    extends $FunctionalProvider<AsyncValue<int>, int, Stream<int>>
+    with $FutureModifier<int>, $StreamProvider<int> {
+  /// Emits a new value whenever auth state changes. We use [int] (not [AuthState])
+  /// so Riverpod never stores Supabase's JS-backed types, avoiding web-only
+  /// dart_rti / NoSuchMethodError when the stream updates.
   AuthStateChangesProvider._()
     : super(
         from: null,
@@ -73,16 +83,16 @@ final class AuthStateChangesProvider
 
   @$internal
   @override
-  $StreamProviderElement<AuthState> $createElement($ProviderPointer pointer) =>
+  $StreamProviderElement<int> $createElement($ProviderPointer pointer) =>
       $StreamProviderElement(pointer);
 
   @override
-  Stream<AuthState> create(Ref ref) {
+  Stream<int> create(Ref ref) {
     return authStateChanges(ref);
   }
 }
 
-String _$authStateChangesHash() => r'aa24d610c15707c8006ecea4af9f5cd088440ba7';
+String _$authStateChangesHash() => r'37b8fec2d6d60badb2b051c1ca0c32bf46a29fb9';
 
 @ProviderFor(isAuthenticated)
 final isAuthenticatedProvider = IsAuthenticatedProvider._();
@@ -123,7 +133,7 @@ final class IsAuthenticatedProvider
   }
 }
 
-String _$isAuthenticatedHash() => r'1d1ac605f3e10dd5a3522cb54178ede4ee90fda8';
+String _$isAuthenticatedHash() => r'bb78fb83d37351ca71ccb52731cad7be00388ccf';
 
 @ProviderFor(currentUser)
 final currentUserProvider = CurrentUserProvider._();

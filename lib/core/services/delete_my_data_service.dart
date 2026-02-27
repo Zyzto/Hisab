@@ -2,6 +2,7 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../constants/supabase_config.dart';
 import '../../domain/delete_my_data_preview.dart';
 
 part 'delete_my_data_service.g.dart';
@@ -11,13 +12,7 @@ part 'delete_my_data_service.g.dart';
 DeleteMyDataService deleteMyDataService(Ref ref) => DeleteMyDataService();
 
 class DeleteMyDataService {
-  SupabaseClient? get _client {
-    try {
-      return Supabase.instance.client;
-    } catch (_) {
-      return null;
-    }
-  }
+  SupabaseClient? get _client => supabaseClientIfConfigured;
 
   /// Fetches counts for the current user (groups where owner, memberships, device tokens, invite usages, sole-member groups).
   Future<DeleteMyDataPreview> getDeleteMyDataPreview() async {

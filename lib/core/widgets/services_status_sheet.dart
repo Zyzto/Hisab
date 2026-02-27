@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../layout/layout_breakpoints.dart';
+import '../layout/responsive_sheet.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
 import '../services/connectivity_service.dart';
 import '../services/firebase_status_client.dart';
@@ -19,14 +21,12 @@ const _recentIncidentsHours = 6;
 /// Shows a bottom sheet with Supabase and Firebase status, links to status
 /// pages, and recent incidents (Supabase only). Call from [SyncStatusChip] onTap.
 void showServicesStatusSheet(BuildContext context, WidgetRef ref) {
-  showModalBottomSheet<void>(
+  showResponsiveSheet<void>(
     context: context,
+    title: 'services_status_title'.tr(),
     isScrollControlled: true,
     useSafeArea: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
-    builder: (ctx) => _ServicesStatusSheet(ref: ref),
+    child: _ServicesStatusSheet(ref: ref),
   );
 }
 
@@ -72,23 +72,13 @@ class _ServicesStatusSheetState extends ConsumerState<_ServicesStatusSheet> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: cs.outlineVariant,
-                    borderRadius: BorderRadius.circular(2),
+              if (!LayoutBreakpoints.isTabletOrWider(context))
+                Text(
+                  'services_status_title'.tr(),
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'services_status_title'.tr(),
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
               const SizedBox(height: 6),
               _SyncStatusLine(status: syncStatus),
               const SizedBox(height: 16),

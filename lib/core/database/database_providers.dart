@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:powersync/powersync.dart' hide SyncStatus;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../auth/auth_providers.dart';
 import '../constants/supabase_config.dart';
@@ -92,7 +91,11 @@ class DataSyncService extends _$DataSyncService {
 
     try {
       final db = ref.read(powerSyncDatabaseProvider);
-      final client = Supabase.instance.client;
+      final client = supabaseClientIfConfigured;
+      if (client == null) {
+        syncStatusNotifier.setSynced();
+        return;
+      }
       final engine = SyncEngine();
 
       Object? lastError;

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/legacy.dart' show StateProvider;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -49,15 +50,18 @@ AppThemes appThemes(Ref ref) {
     final lightTheme = AppTheme.lightTheme(
       seedColor: themeColor,
       fontSizeScale: fontSizeScale,
+      alwaysShowScrollbars: kIsWeb,
     );
     final darkTheme = themeModeValue == 'amoled'
         ? AppTheme.amoledTheme(
             seedColor: themeColor,
             fontSizeScale: fontSizeScale,
+            alwaysShowScrollbars: kIsWeb,
           )
         : AppTheme.darkTheme(
             seedColor: themeColor,
             fontSizeScale: fontSizeScale,
+            alwaysShowScrollbars: kIsWeb,
           );
     return AppThemes(light: lightTheme, dark: darkTheme);
   }

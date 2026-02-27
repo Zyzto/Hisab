@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_logging_service/flutter_logging_service.dart';
@@ -8,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'receipt_llm_service.dart';
 import 'receipt_providers.dart';
 import 'receipt_storage.dart';
+import 'receipt_temp_file.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
 
 /// Result of processing a receipt image. Either parsed (vendor, date, total) or fallback (ocrText, receiptImagePath).
@@ -148,4 +150,16 @@ Future<ReceiptScanResult?> processReceiptFile(
     Log.error('Receipt scan failed', error: e, stackTrace: st);
     rethrow;
   }
+}
+
+/// Process receipt from in-memory bytes (e.g. a photo already in the form). Mobile only; returns null on web.
+Future<ReceiptScanResult?> processReceiptBytes(
+  Uint8List bytes,
+  WidgetRef ref,
+  DateTime fallbackDate,
+) async {
+  if (kIsWeb) return null;
+  final path = await writeReceiptBytesToTempFile(bytes);
+  if (path == null) return null;
+  return processReceiptFile(XFile(path), ref, fallbackDate);
 }

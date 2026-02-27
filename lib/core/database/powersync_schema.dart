@@ -59,6 +59,7 @@ const schema = Schema([
     Column.text('tag'),
     Column.text('line_items_json'),
     Column.text('receipt_image_path'),
+    Column.text('receipt_image_paths'),
     Column.text('created_at'),
     Column.text('updated_at'),
   ]),
