@@ -52,9 +52,12 @@
   - `groups`, `group_members`, `participants`, `expenses`, `expense_tags`, `group_invites`, `invite_usages`
   - `local_archived_groups` — per-user “hide from my list” (not synced)
   - `pending_writes` queue for offline-online deferred writes
+- **PowerSync `id` column:** PowerSync adds an `id` column automatically to each table. Do not add `Column.text('id')` (or any custom `id` column) in the schema — it will trigger: *"id column is automatically added, custom id columns are not supported"*.
 - **Repositories** (`lib/core/repository/`): `group_repository`, `participant_repository`, `expense_repository`, `group_member_repository`, `group_invite_repository`, `tag_repository`, `powersync_repository`. Wired in `repository_providers.dart` with `effectiveLocalOnlyProvider` and connectivity; implementations in `powersync_repository.dart` and per-entity repositories.
 - Reads come from local DB; online mode writes target Supabase then local cache.
 - In online mode while temporarily offline, some writes (notably expense writes) are queued to `pending_writes`.
+
+**Schema alignment:** The source of truth for synced table columns is the INSERT column list in `lib/core/database/sync_engine.dart`. When adding or changing columns in Supabase (or in the local schema), keep all three in sync: (1) Supabase table definition (migrations), (2) `lib/core/database/powersync_schema.dart`, and (3) the corresponding INSERT in `sync_engine.dart`. PowerSync adds an `id` column automatically to each table — do not add a custom `Column.text('id')` in the schema (it will trigger an assertion). The test in `test/sync_test.dart` that runs `fetchAllWithBackend` with full rows for all seven synced tables helps catch missing-column mismatches.
 
 ### Domain
 
@@ -85,9 +88,15 @@ Key services: `lib/core/services/` — **notification_service** (FCM token, fore
 
 Shared widgets in `lib/core/widgets/`: **AsyncValueBuilder**, **BackButtonKeyboardDismiss**, **ConnectionBanner**, **CurrencyPickerList**, **ErrorContentWidget**, **ExpandableSection**, **FloatingNavBar**, **PwaInstallBanner**, **ServicesStatusSheet**, **SyncStatusChip** (`sync_status_icon.dart`), **Toast**.
 
+### Layout (core/layout)
+
+- **LayoutBreakpoints** (`layout_breakpoints.dart`) — width breakpoints (tablet ≥600px, desktop ≥840px), content max widths (600/720), navigation rail width, and **`contentBandMetrics(context, contentAreaWidth)`** returning `(leftOffset, contentMaxWidth)` so the app bar title and body share the same horizontal band.
+- **ConstrainedContent** (`constrained_content.dart`) — on tablet+ wraps [child] in a centered band using `contentBandMetrics`; on narrow screens returns [child] unchanged. Body content is wrapped in this so it does not span full width on large screens.
+- **ContentAlignedAppBar** (`content_aligned_app_bar.dart`) — a `PreferredSizeWidget` that places the title in the same horizontal band as the body (via `contentBandMetrics`). The title is absolutely positioned so it is not affected by leading/actions width. Use with a **LayoutBuilder** around the scaffold and pass `layoutConstraints.maxWidth` as `contentAreaWidth`. Used on all pages that have an app bar and `ConstrainedContent` body (home, settings, group detail/settings/create, invite management/scan/accept, archived groups, expense form, privacy policy).
+
 ### Receipt (core/receipt)
 
-Receipt storage (`receipt_storage`, `receipt_storage_upload` with io/stub), **scan** (`receipt_scan_service`), **LLM** (`receipt_llm_service`), **image view** (`receipt_image_view`), **providers** (`receipt_providers`). Used by expense form and settings (Receipt AI). Platform-specific impls in `*_io.dart` / `*_stub.dart`.
+Expense form **photos**: add up to 5 images (camera or gallery on all platforms, including web). Client-side compression (`receipt_image_compress`) before upload; upload from bytes (`receipt_storage_upload`: `uploadReceiptBytesToStorage` in io/stub) so web can upload without file paths. Optional **Scan receipt** (mobile): long-press a photo to run OCR/LLM (`processReceiptBytes` → `receipt_scan_service`). Receipt storage (`receipt_storage` for scan temp copy), **scan** (`receipt_scan_service`), **LLM** (`receipt_llm_service`), **image view** (`receipt_image_view`), **providers** (`receipt_providers`). Used by expense form and settings (Receipt AI). Platform-specific impls in `*_io.dart` / `*_stub.dart`.
 
 ## Navigation and Deep Links
 
@@ -95,6 +104,8 @@ Receipt storage (`receipt_storage`, `receipt_storage_upload` with io/stub), **sc
   - onboarding redirect guard
   - shell route for home/settings tabs
   - group/invite/expense routes
+- **Modals/sheets:** `lib/core/layout/responsive_sheet.dart` — `showResponsiveSheet` (bottom sheet on narrow, centered dialog on tablet+) and `showAppDialog`; both support `centerInFullViewport` and **click-outside-to-close** (barrier dismiss on all platforms, including desktop web via an explicit barrier gesture). See [MODAL_CENTERING_AND_RESPONSIVE_SHEET.md](MODAL_CENTERING_AND_RESPONSIVE_SHEET.md).
+- **App bar title alignment:** Pages that use `ConstrainedContent` for the body use **ContentAlignedAppBar** (see Layout above) so the app bar title sits in the same horizontal band as the content and scales with it (tablet/desktop with rail and max-width content).
 - Deep link handling: `lib/core/navigation/invite_link_handler.dart`
   - reads initial and streamed app links
   - persists pending invite token in settings to survive onboarding/OAuth redirects
@@ -133,7 +144,7 @@ Push notifications are sent when expenses are added/edited or members join a gro
 - Handles token refresh, foreground display (mobile: local notifications), and tap → navigate to group detail using `message.data['group_id']`.
 - Expects incoming messages to have `notification` (title, body) and `data.group_id` (string).
 
-**Backend:** Database trigger `notify_on_expense_change` (and `notify_on_member_join`) calls `notify_group_activity()`, which POSTs to the `send-notification` Edge Function with `group_id`, `actor_user_id`, `action`, and optional expense fields. The Edge Function (`supabase/functions/send-notification/index.ts`) loads other group members’ tokens and `locale` from `device_tokens` and sends FCM v1 messages (one per token). For **expense_created** and **expense_updated**, the actor is the user who created or last updated the expense; the Edge Function excludes that actor so only **other** group members receive the push. For `member_joined`, the actor is the new member; the Edge Function excludes the actor so the joinee does not receive a push notification. Notification title and body are localized per device using the stored `locale` (en/ar; fallback en).
+**Backend:** Database trigger `notify_on_expense_change` (and `notify_on_member_join`) calls `notify_group_activity()`, which POSTs to the `send-notification` Edge Function with `group_id`, `actor_user_id`, `action`, and optional expense fields. **Personal groups** (groups with `is_personal = true`; see [PERSONAL_FEATURE.md](docs/PERSONAL_FEATURE.md)) do not trigger push notifications—the trigger function skips the HTTP call for them. The Edge Function (`supabase/functions/send-notification/index.ts`) loads other group members’ tokens and `locale` from `device_tokens` and sends FCM v1 messages (one per token). For **expense_created** and **expense_updated**, the actor is the user who created or last updated the expense; the Edge Function excludes that actor so only **other** group members receive the push. For `member_joined`, the actor is the new member; the Edge Function excludes the actor so the joinee does not receive a push notification. Notification title and body are localized per device using the stored `locale` (en/ar; fallback en).
 
 **Web:** `web/index.html` initializes Firebase web SDK; `web/firebase-messaging-sw.js` handles background push and clicks. Web token registration requires `FCM_VAPID_KEY` at build time.
 
@@ -277,7 +288,7 @@ Build-time config is via `--dart-define` in `lib/core/constants/supabase_config.
 - `SITE_URL` (optional auth email redirect)
 - `FCM_VAPID_KEY` (web push)
 
-Secrets template: `lib/core/constants/app_secrets_example.dart`; see `docs/CONFIGURATION.md` for runtime configuration. If Supabase defines are missing, app runs local-only by design.
+Secrets template: `lib/core/constants/app_secrets_example.dart`; see `docs/CONFIGURATION.md` for runtime configuration. If Supabase defines are missing, app runs local-only by design. In local mode, no environment variables are required and the app must not crash or throw.
 
 ## Platform Permissions
 
@@ -327,6 +338,7 @@ iOS declarations are present in `ios/Runner/Info.plist`, including:
   - **Widget:** Public custom widgets under `test/` mirroring `lib/`: `test/core/` (async_value_builder, back_button_keyboard_dismiss, connection_banner, currency_picker_list, expandable_section, floating_nav_bar, invite_link_handler, pwa_install_banner, sync_status_chip), `test/groups/` (group_card, create_invite_sheet), `test/expenses/` (expense_list_tile, expense_title_section, expense_amount_section, expense_split_section, expense_bill_breakdown_section, expense_detail_body, expense_detail_body_header), `test/settings/` (logs_viewer_dialog, privacy_policy_page), `test/pages/` (main_scaffold, home_page, archived_groups_page), `test/balance/` (balance_list), `test/onboarding/` (onboarding_page), plus error_content and app. Widget tests use EasyLocalization + MaterialApp; Riverpod widgets use ProviderScope with overrides when needed. See [test/widget_test_helpers.dart](test/widget_test_helpers.dart) and [test/README.md](test/README.md).
   - **Locale:** Key widgets are tested in both English and Arabic via `test/widget_test_helpers.dart`: `pumpApp(tester, child: ..., locale: Locale('ar'))` and `testSupportedLocales`. Edge cases (empty/zero/long content, optional params) are covered where relevant.
   - **Integration-style:** Local PowerSync DB, sync engine with fake backend. See [test/README.md](test/README.md) for PowerSync native binary requirements and coverage (`flutter test --coverage`).
+  - **Integration:** Full-app flows in `integration_test/` (smoke, create group); run with `flutter test integration_test/ -d linux` (or Android/iOS device). App targets web (desktop/tablet/mobile), Android, iOS; integration tests run on Linux/Android/iOS (web not supported by Flutter for integration_test). See [test/README.md](test/README.md).
 - **Widget test helper:** `test/widget_test_helpers.dart` provides `pumpApp(tester, child, locale?, pumpAndSettle?)` to wrap the widget in EasyLocalization + MaterialApp; use for presentational widgets. For widgets that depend on Riverpod, build ProviderScope + EasyLocalization + MaterialApp inline with overrides (see e.g. `test/balance/balance_list_widget_test.dart`).
 - **Generated code:** Run `dart run build_runner build` (or `watch`) to regenerate `.g.dart` files before running tests or when changing providers/settings.
 
@@ -354,9 +366,12 @@ The following improvements are reflected in the codebase and docs:
 - **Anonymize participant name on account deletion only:** When a user's auth account is deleted (e.g. after an account deletion request), a database trigger runs and replaces their participant display name in all groups with a random placeholder (e.g. "Former member a3f2b1") and clears avatar, so expense history shows a neutral label. Leave/kick/archive do not change names. See migration `20250226000000_anonymize_only_on_account_delete.sql` (trigger on `auth.users` DELETE).
 - **Upgrader logging:** Debug logging from the upgrader package is disabled. The app logs one aggregated line per update check (manual from Settings > About and automatic via UpgradeAlert) via the logging service. See `lib/app.dart` (`debugLogging: false`, `willDisplayUpgrade`, and the manual-check callback).
 - **CODEBASE doc:** This overview was updated to reflect current lib layout (core subdirs, domain barrel, repositories), SyncEngine/SyncBackend, core services/widgets/receipt, feature details, Edge Functions (including og-invite-image), web assets, and test layout.
+- **Modal centering (web tablet/desktop):** Modals are centered in the full viewport by default (`centerInFullViewport` defaults to true). `showResponsiveSheet` and `showAppDialog` support `centerInFullViewport`; pass `false` for modals opened from home/settings that should stay in the content area next to the rail. The app builder uses `Positioned.fill` so the root navigator gets full viewport size. See `docs/MODAL_CENTERING_AND_RESPONSIVE_SHEET.md`.
+- **App bar title aligned with content:** All pages with a constrained body use **ContentAlignedAppBar** so the app bar title sits in the same horizontal band as the body (same `contentBandMetrics` as `ConstrainedContent`). The title is absolutely positioned in the app bar so it is not affected by leading/actions. Wrap the scaffold in `LayoutBuilder` and pass `layoutConstraints.maxWidth` as `contentAreaWidth`. See `lib/core/layout/content_aligned_app_bar.dart` and the “Layout (core/layout)” section above.
 
 ## Related Docs
 
+- `docs/MODAL_CENTERING_AND_RESPONSIVE_SHEET.md` - modal/dialog centering on web, `centerInFullViewport`, and responsive sheet API
 - `docs/SUPABASE_SETUP.md` - complete backend bootstrap and SQL/RPC policy setup
 - `docs/SUPABASE_BACKUP.md` - how to backup Supabase database (dashboard, pg_dump, script)
 - `docs/EDGE_FUNCTIONS.md` - Supabase Edge Functions list and deploy commands (invite-redirect, og-invite-image, send-notification, telemetry)
