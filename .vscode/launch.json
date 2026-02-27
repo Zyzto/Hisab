@@ -7,7 +7,30 @@
       "type": "dart",
       "program": "lib/main.dart",
       "toolArgs": [
-        "--dart-define-from-file=${workspaceFolder}/dart_defines_online.json"
+        "--dart-define-from-file=${workspaceFolder}/dart_defines_online.json",
+        "--web-port=8080"
+      ]
+    },
+    {
+      "name": "Hisab (Chrome Web)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "deviceId": "chrome",
+      "toolArgs": [
+        "--dart-define-from-file=${workspaceFolder}/dart_defines_online.json",
+        "--web-renderer=canvaskit",
+        "--web-port=8080"
+      ]
+    },
+    {
+      "name": "Hisab (Chrome Web, Offline)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "deviceId": "chrome",
+      "toolArgs": [
+        "--web-renderer=canvaskit"
       ]
     },
     {
