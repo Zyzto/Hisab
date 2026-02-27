@@ -1,7 +1,7 @@
 name: hisab
 description: "Group expense splitting and settle-up app."
 publish_to: 'none'
-version: 0.5.1+28
+version: 0.5.2+29
 
 environment:
   sdk: ^3.10.0
@@ -49,6 +49,7 @@ dependencies:
   image_picker_android: ^0.8.13
   image_picker_platform_interface: ^2.9.0
   google_mlkit_text_recognition: ^0.15.1
+  flutter_image_compress: ^2.3.0
 
   # Receipt AI (LangChain.dart – Gemini + OpenAI vision)
   langchain_google: ^0.7.1
@@ -103,6 +104,8 @@ dependencies:
 
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+  integration_test:
     sdk: flutter
   mocktail: ^1.0.4
   supabase: ^2.0.0
