@@ -215,6 +215,10 @@ keyAlias=hisab-release
 keyPassword=your_key_password
 ```
 
+## Known issues
+
+- **Change password modal — focus loss on text fields:** The change-password sheet (Settings → Change password) can lose focus on the current/new/confirm password fields at random when clicking (e.g. on the visibility toggles or elsewhere). In-app controls were made non-focusable (`canRequestFocus: false`) to reduce this, but the issue may still occur on some platforms or with certain focus/route updates. Workaround: tap directly on the text field again to refocus.
+
 ## License
 
 This project is licensed under **Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)**.
