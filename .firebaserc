@@ -1,8 +1,1 @@
-{
-  "projects": {
-    "default": "hisab-c8eb1",
-    "dev": "hisab-c8eb1"
-  },
-  "targets": {},
-  "etags": {}
-}
+{"projects":{"default":"your-firebase-project-id","dev":"your-firebase-project-id"},"targets":{},"etags":{}}

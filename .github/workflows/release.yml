@@ -26,6 +26,35 @@ env:
 
 jobs:
   # ──────────────────────────────────────────────
+  # 0. Unit, widget, and integration tests (Linux)
+  # ──────────────────────────────────────────────
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Run unit and widget tests
+        run: flutter test
+
+      - name: Install xvfb (for Linux desktop integration tests)
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      - name: Run integration tests
+        run: xvfb-run -s "-screen 0 1024x768x24" flutter test integration_test/ -d linux
+
+  # ──────────────────────────────────────────────
   # 1. Build Android APK + AAB
   # ──────────────────────────────────────────────
   build-android:
@@ -77,7 +106,7 @@ jobs:
           flutter build apk --release \
             --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
             --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
-            --dart-define=INVITE_BASE_URL=https://hisab.shenepoy.com \
+            --dart-define=INVITE_BASE_URL=${{ secrets.INVITE_BASE_URL }} \
             --dart-define=FCM_VAPID_KEY=${{ secrets.FCM_VAPID_KEY }}
 
       - name: Build App Bundle
@@ -85,7 +114,7 @@ jobs:
           flutter build appbundle --release \
             --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
             --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
-            --dart-define=INVITE_BASE_URL=https://hisab.shenepoy.com \
+            --dart-define=INVITE_BASE_URL=${{ secrets.INVITE_BASE_URL }} \
             --dart-define=FCM_VAPID_KEY=${{ secrets.FCM_VAPID_KEY }}
 
       - name: Upload APK artifact
@@ -184,9 +213,26 @@ jobs:
           flutter build web \
             --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
             --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
-            --dart-define=INVITE_BASE_URL=https://hisab.shenepoy.com \
+            --dart-define=INVITE_BASE_URL=${{ secrets.INVITE_BASE_URL }} \
             --dart-define=SITE_URL=${{ secrets.SITE_URL }} \
-            --dart-define=FCM_VAPID_KEY=${{ secrets.FCM_VAPID_KEY }}
+            --dart-define=FCM_VAPID_KEY=${{ secrets.FCM_VAPID_KEY }} \
+            --dart-define=FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }} \
+            --dart-define=FIREBASE_AUTH_DOMAIN=${{ secrets.FIREBASE_AUTH_DOMAIN }} \
+            --dart-define=FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }} \
+            --dart-define=FIREBASE_STORAGE_BUCKET=${{ secrets.FIREBASE_STORAGE_BUCKET }} \
+            --dart-define=FIREBASE_MESSAGING_SENDER_ID=${{ secrets.FIREBASE_MESSAGING_SENDER_ID }} \
+            --dart-define=FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }}
+
+      - name: Inject Firebase config into web assets
+        run: |
+          for f in build/web/index.html build/web/firebase-messaging-sw.js; do
+            sed -i "s|__FIREBASE_API_KEY__|${{ secrets.FIREBASE_API_KEY }}|g" "$f"
+            sed -i "s|__FIREBASE_AUTH_DOMAIN__|${{ secrets.FIREBASE_AUTH_DOMAIN }}|g" "$f"
+            sed -i "s|__FIREBASE_PROJECT_ID__|${{ secrets.FIREBASE_PROJECT_ID }}|g" "$f"
+            sed -i "s|__FIREBASE_STORAGE_BUCKET__|${{ secrets.FIREBASE_STORAGE_BUCKET }}|g" "$f"
+            sed -i "s|__FIREBASE_MESSAGING_SENDER_ID__|${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}|g" "$f"
+            sed -i "s|__FIREBASE_APP_ID__|${{ secrets.FIREBASE_APP_ID }}|g" "$f"
+          done
 
       - name: Copy static pages and PowerSync web assets for Firebase Hosting
         run: |
@@ -204,4 +250,4 @@ jobs:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           channelId: live
-          projectId: hisab-c8eb1
+          projectId: ${{ secrets.FIREBASE_PROJECT_ID }}
