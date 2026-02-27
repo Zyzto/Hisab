@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/layout/content_aligned_app_bar.dart';
+import '../../../core/layout/constrained_content.dart';
 import '../../../core/theme/theme_config.dart';
 
 class PrivacyPolicyPage extends StatelessWidget {
@@ -11,11 +14,19 @@ class PrivacyPolicyPage extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('privacy_policy'.tr()),
-      ),
-      body: ListView(
+    return LayoutBuilder(
+      builder: (context, layoutConstraints) {
+        return Scaffold(
+          appBar: ContentAlignedAppBar(
+            contentAreaWidth: layoutConstraints.maxWidth,
+            title: Text('privacy_policy'.tr()),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => context.pop(),
+            ),
+          ),
+          body: ConstrainedContent(
+            child: ListView(
         padding: const EdgeInsets.all(ThemeConfig.spacingM),
         children: [
           Text(
@@ -92,7 +103,10 @@ class PrivacyPolicyPage extends StatelessWidget {
           ),
           const SizedBox(height: ThemeConfig.spacingXL),
         ],
-      ),
+            ),
+          ),
+        );
+      },
     );
   }
 

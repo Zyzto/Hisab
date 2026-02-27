@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:currency_picker/currency_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,7 +17,12 @@ import 'package:feedback/feedback.dart';
 
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/auth/sign_in_sheet.dart';
+import '../../../core/log_web.dart';
 import '../../../core/constants/app_config.dart';
+import '../../../core/layout/content_aligned_app_bar.dart';
+import '../../../core/layout/constrained_content.dart';
+import '../../../core/layout/layout_breakpoints.dart';
+import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/constants/supabase_config.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/navigation/route_paths.dart';
@@ -26,15 +32,22 @@ import '../../../core/services/migration_service.dart';
 import '../../../core/services/connectivity_service.dart';
 import '../../../core/services/delete_my_data_service.dart';
 import '../../../core/services/github_user_client.dart';
-import '../../../core/services/notification_service.dart';
 import '../../../core/utils/currency_helpers.dart';
 import '../settings_definitions.dart';
 import '../providers/settings_framework_providers.dart';
 import '../backup_helper.dart';
 import '../feedback_handler.dart';
 import '../widgets/logs_viewer_dialog.dart';
+import '../widgets/change_password_sheet.dart';
 import '../widgets/edit_profile_sheet.dart';
+import '../widgets/setting_tile_helper.dart';
+import '../sections/settings_functional_section.dart';
+import '../sections/settings_privacy_section.dart';
+import '../sections/settings_advanced_section.dart';
+import '../sections/settings_data_backup_section.dart';
+import '../sections/settings_receipt_ai_section.dart';
 import '../../../core/auth/predefined_avatars.dart';
+import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/sync_status_icon.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../domain/domain.dart';
@@ -74,283 +87,129 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final settings = ref.watch(hisabSettingsProvidersProvider);
 
     if (settings == null) {
-      return Scaffold(
-        appBar: AppBar(
-          leading: const SyncStatusChip(),
-          title: Text('settings'.tr()),
-        ),
-        body: Center(child: Text('settings_unavailable'.tr())),
+      return LayoutBuilder(
+        builder: (context, layoutConstraints) {
+          return Scaffold(
+            appBar: ContentAlignedAppBar(
+              contentAreaWidth: layoutConstraints.maxWidth,
+              leading: const SyncStatusChip(),
+              title: Text('settings'.tr()),
+            ),
+            body: Center(child: Text('settings_unavailable'.tr())),
+          );
+        },
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: const SyncStatusChip(),
-        title: Text('settings'.tr()),
-      ),
-      body: ListView(
-        children: [
-          _buildAccountSection(context, ref, settings),
-          // Appearance: merged General + old Appearance
-          _buildSection(context, ref, settings, appearanceSection, [
-            _languageTile(context, ref, settings),
-            EnumSettingsTile.fromSetting(
-              setting: themeModeSettingDef,
-              title: 'theme'.tr(),
-              value: ref.watch(settings.provider(themeModeSettingDef)),
-              labelBuilder: (v) => v.tr(),
-              onChanged: (v) => ref
-                  .read(settings.provider(themeModeSettingDef).notifier)
-                  .set(v),
-            ),
-            ColorSettingsTile.fromSetting(
-              setting: themeColorSettingDef,
-              title: 'select_theme_color'.tr(),
-              value: ref.watch(settings.provider(themeColorSettingDef)),
-              onChanged: (v) => ref
-                  .read(settings.provider(themeColorSettingDef).notifier)
-                  .set(v),
-            ),
-            EnumSettingsTile.fromSetting(
-              setting: fontSizeScaleSettingDef,
-              title: 'font_size'.tr(),
-              value: ref.watch(settings.provider(fontSizeScaleSettingDef)),
-              labelBuilder: (v) => v.tr(),
-              onChanged: (v) => ref
-                  .read(settings.provider(fontSizeScaleSettingDef).notifier)
-                  .set(v),
-            ),
-            _favoriteCurrenciesTile(context, ref, settings),
-            SwitchSettingsTile.fromSetting(
-              setting: use24HourFormatSettingDef,
-              title: 'use_24_hour_format'.tr(),
-              subtitle: 'use_24_hour_format_description'.tr(),
-              value: ref.watch(settings.provider(use24HourFormatSettingDef)),
-              onChanged: (v) =>
-                  ref.read(settings.provider(use24HourFormatSettingDef).notifier).set(v),
-            ),
-          ]),
-          // Functional: behavior toggles (expense form mode, etc.)
-          _buildSection(context, ref, settings, functionalSection, [
-            SwitchSettingsTile.fromSetting(
-              setting: expenseFormFullFeaturesSettingDef,
-              title: 'expense_form_full_features'.tr(),
-              subtitle: 'expense_form_full_features_description'.tr(),
-              value: ref.watch(
-                settings.provider(expenseFormFullFeaturesSettingDef),
+    return LayoutBuilder(
+      builder: (context, layoutConstraints) {
+        return Scaffold(
+          appBar: ContentAlignedAppBar(
+            contentAreaWidth: layoutConstraints.maxWidth,
+            leading: const SyncStatusChip(),
+            title: Text('settings'.tr()),
+          ),
+          body: ConstrainedContent(
+        child: ListView(
+          key: const PageStorageKey<String>('settings_list'),
+          children: [
+            _buildAccountSection(context, ref, settings),
+            // Appearance: merged General + old Appearance
+            _buildSection(context, ref, settings, appearanceSection, [
+              _languageTile(context, ref, settings),
+              _themeModeTile(context, ref, settings),
+              _themeColorTile(context, ref, settings),
+              _fontSizeTile(context, ref, settings),
+              _favoriteCurrenciesTile(context, ref, settings),
+              buildBoolSettingTile(
+                ref,
+                settings,
+                use24HourFormatSettingDef,
+                titleKey: 'use_24_hour_format',
+                subtitleKey: 'use_24_hour_format_description',
               ),
-              onChanged: (v) => ref
-                  .read(
-                    settings
-                        .provider(expenseFormFullFeaturesSettingDef)
-                        .notifier,
-                  )
-                  .set(v),
+            ]),
+            // Functional: behavior toggles (expense form mode, etc.)
+            _buildSection(
+              context,
+              ref,
+              settings,
+              functionalSection,
+              buildFunctionalSectionTiles(context, ref, settings),
             ),
-            SwitchSettingsTile.fromSetting(
-              setting: expenseFormExpandDescriptionSettingDef,
-              title: 'expense_form_expand_description'.tr(),
-              subtitle: 'expense_form_expand_description_setting'.tr(),
-              value: ref.watch(
-                settings.provider(expenseFormExpandDescriptionSettingDef),
+            // Data & Backup: merged Data + old Backup
+            _buildSection(
+              context,
+              ref,
+              settings,
+              dataBackupSection,
+              buildDataBackupSectionTiles(
+                context,
+                ref,
+                settings,
+                localOnlyTile: _buildLocalOnlyTile(context, ref, settings),
+                onExport: () => _exportData(context, ref),
+                onImport: () => _importData(context, ref),
               ),
-              onChanged: (v) => ref
-                  .read(
-                    settings
-                        .provider(expenseFormExpandDescriptionSettingDef)
-                        .notifier,
-                  )
-                  .set(v),
             ),
-            SwitchSettingsTile.fromSetting(
-              setting: expenseFormExpandBillBreakdownSettingDef,
-              title: 'expense_form_expand_bill_breakdown'.tr(),
-              subtitle: 'expense_form_expand_bill_breakdown_setting'.tr(),
-              value: ref.watch(
-                settings.provider(
-                  expenseFormExpandBillBreakdownSettingDef,
-                ),
-              ),
-              onChanged: (v) => ref
-                  .read(
-                    settings
-                        .provider(
-                          expenseFormExpandBillBreakdownSettingDef,
-                        )
-                        .notifier,
-                  )
-                  .set(v),
-            ),
-          ]),
-          // Data & Backup: merged Data + old Backup
-          _buildSection(context, ref, settings, dataBackupSection, [
-            _buildLocalOnlyTile(context, ref, settings),
-            ActionSettingsTile(
-              leading: const Icon(Icons.upload_file),
-              title: Text('export_data'.tr()),
-              onTap: () => _exportData(context, ref),
-            ),
-            ActionSettingsTile(
-              leading: const Icon(Icons.download),
-              title: Text('import_data'.tr()),
-              subtitle: Text('import_data_subtitle'.tr()),
-              onTap: () => _importData(context, ref),
-            ),
-          ]),
-          _buildSection(context, ref, settings, receiptAiSection, [
-            SwitchSettingsTile.fromSetting(
-              setting: receiptOcrEnabledSettingDef,
-              title: 'receipt_ocr_enabled'.tr(),
-              subtitle: 'receipt_ocr_enabled_description'.tr(),
-              value: ref.watch(settings.provider(receiptOcrEnabledSettingDef)),
-              onChanged: (v) => ref
-                  .read(settings.provider(receiptOcrEnabledSettingDef).notifier)
-                  .set(v),
-            ),
-            SwitchSettingsTile.fromSetting(
-              setting: receiptAiEnabledSettingDef,
-              title: 'receipt_ai_enabled'.tr(),
-              subtitle: 'receipt_ai_enabled_description'.tr(),
-              value: ref.watch(settings.provider(receiptAiEnabledSettingDef)),
-              onChanged: (v) => ref
-                  .read(settings.provider(receiptAiEnabledSettingDef).notifier)
-                  .set(v),
-            ),
-            EnumSettingsTile.fromSetting(
-              setting: receiptAiProviderSettingDef,
-              title: 'receipt_ai_provider'.tr(),
-              value: ref.watch(settings.provider(receiptAiProviderSettingDef)),
-              labelBuilder: (v) => v.tr(),
-              onChanged: (v) => ref
-                  .read(settings.provider(receiptAiProviderSettingDef).notifier)
-                  .set(v),
-            ),
-            if (ref.watch(settings.provider(receiptAiProviderSettingDef)) ==
-                    'gemini' ||
-                ref.watch(geminiApiKeyProvider).isNotEmpty)
-              ListTile(
-                leading: const Icon(Icons.key),
-                title: Text('gemini_api_key'.tr()),
-                subtitle: Text(
-                  ref.watch(geminiApiKeyProvider).isEmpty
-                      ? 'receipt_ai_key_not_set'.tr()
-                      : 'receipt_ai_key_set'.tr(),
-                ),
-                onTap: () => _showApiKeyDialog(
+            _buildSection(
+              context,
+              ref,
+              settings,
+              receiptAiSection,
+              buildReceiptAiSectionTiles(
+                context,
+                ref,
+                settings,
+                ({
+                  required BuildContext context,
+                  required WidgetRef ref,
+                  required String titleKey,
+                  required String currentValue,
+                  required StringSetting settingDef,
+                }) => _showApiKeyDialog(
                   context: context,
                   ref: ref,
-                  titleKey: 'gemini_api_key',
-                  currentValue: ref.read(geminiApiKeyProvider),
-                  settingDef: geminiApiKeySettingDef,
+                  titleKey: titleKey,
+                  currentValue: currentValue,
+                  settingDef: settingDef,
                 ),
               ),
-            if (ref.watch(settings.provider(receiptAiProviderSettingDef)) ==
-                    'openai' ||
-                ref.watch(openaiApiKeyProvider).isNotEmpty)
-              ListTile(
-                leading: const Icon(Icons.key),
-                title: Text('openai_api_key'.tr()),
-                subtitle: Text(
-                  ref.watch(openaiApiKeyProvider).isEmpty
-                      ? 'receipt_ai_key_not_set'.tr()
-                      : 'receipt_ai_key_set'.tr(),
-                ),
-                onTap: () => _showApiKeyDialog(
-                  context: context,
-                  ref: ref,
-                  titleKey: 'openai_api_key',
-                  currentValue: ref.read(openaiApiKeyProvider),
-                  settingDef: openaiApiKeySettingDef,
-                ),
+            ),
+            // Privacy: renamed from Logging
+            _buildSection(
+              context,
+              ref,
+              settings,
+              privacySection,
+              buildPrivacySectionTiles(context, ref, settings),
+            ),
+            _buildSection(
+              context,
+              ref,
+              settings,
+              advancedSection,
+              buildAdvancedSectionTiles(
+                context,
+                ref,
+                settings,
+                onReturnToOnboarding: () =>
+                    _resetToOnboarding(context, ref, settings),
+                onViewLogs: () => _showLogsDialog(context),
+                onResetAllSettings: () =>
+                    _resetAllSettings(context, ref, settings),
+                onDeleteLocalData: () => _showDeleteLocalData(context, ref),
+                onDeleteCloudData: () => _showDeleteCloudData(context, ref),
+                supabaseAvailable: supabaseConfigAvailable,
+                isSignedIn: ref.watch(currentUserProvider) != null,
               ),
-          ]),
-          // Privacy: renamed from Logging
-          _buildSection(context, ref, settings, privacySection, [
-            NavigationSettingsTile(
-              leading: const Icon(Icons.privacy_tip_outlined),
-              title: Text('privacy_policy'.tr()),
-              onTap: () => context.push(RoutePaths.privacyPolicy),
             ),
-            SwitchSettingsTile.fromSetting(
-              setting: telemetryEnabledSettingDef,
-              title: 'telemetry_enabled'.tr(),
-              subtitle: 'telemetry_enabled_description'.tr(),
-              value: ref.watch(settings.provider(telemetryEnabledSettingDef)),
-              onChanged: (v) => ref
-                  .read(settings.provider(telemetryEnabledSettingDef).notifier)
-                  .set(v),
-            ),
-            if (!ref.watch(effectiveLocalOnlyProvider))
-              SwitchSettingsTile.fromSetting(
-                setting: notificationsEnabledSettingDef,
-                title: 'notifications_enabled'.tr(),
-                subtitle: 'notifications_enabled_description'.tr(),
-                value: ref.watch(
-                  settings.provider(notificationsEnabledSettingDef),
-                ),
-                onChanged: (v) async {
-                  final notifier = ref.read(
-                    settings.provider(notificationsEnabledSettingDef).notifier,
-                  );
-                  if (v) {
-                    final ok = await ref
-                        .read(notificationServiceProvider.notifier)
-                        .initialize(context);
-                    notifier.set(ok);
-                    if (!ok && context.mounted) {
-                      context.showToast('notifications_unavailable'.tr());
-                    }
-                  } else {
-                    ref
-                        .read(notificationServiceProvider.notifier)
-                        .unregisterToken();
-                    notifier.set(false);
-                  }
-                },
-              ),
-          ]),
-          _buildSection(context, ref, settings, advancedSection, [
-            ActionSettingsTile(
-              leading: const Icon(Icons.replay),
-              title: Text('return_to_onboarding'.tr()),
-              subtitle: Text('return_to_onboarding_description'.tr()),
-              onTap: () => _resetToOnboarding(context, ref, settings),
-            ),
-            ActionSettingsTile(
-              leading: const Icon(Icons.description),
-              title: Text('view_logs'.tr()),
-              onTap: () => _showLogsDialog(context),
-            ),
-            ActionSettingsTile(
-              leading: const Icon(Icons.restore),
-              title: Text('reset_all_settings'.tr()),
-              subtitle: Text('reset_all_settings_description'.tr()),
-              onTap: () => _resetAllSettings(context, ref, settings),
-            ),
-            ActionSettingsTile(
-              leading: const Icon(Icons.phone_android),
-              title: Text('delete_local_data'.tr()),
-              subtitle: Text('delete_local_data_description'.tr()),
-              onTap: () => _showDeleteLocalData(context, ref),
-            ),
-            if (supabaseConfigAvailable && ref.watch(currentUserProvider) != null)
-              ActionSettingsTile(
-                leading: const Icon(Icons.cloud),
-                title: Text('delete_cloud_data'.tr()),
-                subtitle: Text('delete_cloud_data_description'.tr()),
-                onTap: () => _showDeleteCloudData(context, ref),
-              )
-            else
-              ActionSettingsTile(
-                leading: const Icon(Icons.cloud),
-                title: Text('delete_cloud_data'.tr()),
-                subtitle: Text('delete_cloud_data_sign_in_required'.tr()),
-                onTap: null,
-              ),
-          ]),
-          _buildAboutSection(context, ref, settings),
-        ],
+            _buildAboutSection(context, ref, settings),
+          ],
+        ),
       ),
+    );
+      },
     );
   }
 
@@ -481,6 +340,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
           // Sync status & provider
           _buildAccountSyncTile(context, syncStatus, provider),
+          // Change password (email/password users only)
+          if (user != null &&
+              (user.appMetadata['provider'] as String?) == 'email') ...[
+            ActionSettingsTile(
+              leading: const Icon(Icons.lock_outline),
+              title: Text('change_password'.tr()),
+              onTap: () => showChangePasswordSheet(context, ref),
+            ),
+          ],
           // Sign out
           ActionSettingsTile(
             leading: const Icon(Icons.logout),
@@ -601,31 +469,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     WidgetRef ref,
     SettingsProviders settings,
   ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('sign_out_confirm_title'.tr()),
-        content: Text('sign_out_confirm_body'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('sign_out'.tr()),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmSheet(
+      context,
+      title: 'sign_out_confirm_title'.tr(),
+      content: 'sign_out_confirm_body'.tr(),
+      confirmLabel: 'sign_out'.tr(),
     );
     if (confirmed != true || !context.mounted) return;
     // Record current user so we can skip migration when they sign back in (same flow as online→local→online)
     final currentUser = ref.read(currentUserProvider);
     if (currentUser != null) {
       ref
-          .read(
-            settings.provider(localDataFromOnlineUserIdSettingDef).notifier,
-          )
+          .read(settings.provider(localDataFromOnlineUserIdSettingDef).notifier)
           .set(currentUser.id);
     }
     ref.read(settings.provider(localOnlySettingDef).notifier).set(true);
@@ -665,22 +520,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     WidgetRef ref,
     SettingsProviders settings,
   ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('return_to_onboarding'.tr()),
-        content: Text('return_to_onboarding_confirm'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('return_to_onboarding'.tr()),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmSheet(
+      context,
+      title: 'return_to_onboarding'.tr(),
+      content: 'return_to_onboarding_confirm'.tr(),
+      confirmLabel: 'return_to_onboarding'.tr(),
     );
     if (confirmed == true && context.mounted) {
       ref
@@ -697,22 +541,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     WidgetRef ref,
     SettingsProviders settings,
   ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('reset_all_settings'.tr()),
-        content: Text('reset_all_settings_confirm'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('reset_all_settings'.tr()),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmSheet(
+      context,
+      title: 'reset_all_settings'.tr(),
+      content: 'reset_all_settings_confirm'.tr(),
+      confirmLabel: 'reset_all_settings'.tr(),
     );
     if (confirmed != true || !context.mounted) return;
     await settings.controller.resetAll();
@@ -727,9 +560,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   ) async {
     final counts = await _getLocalDataCounts(ref);
     if (!context.mounted) return;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showResponsiveSheet<bool>(
       context: context,
-      builder: (ctx) => _DeleteLocalDataDialogContent(
+      title: 'delete_local_data'.tr(),
+      maxHeight: MediaQuery.of(context).size.height * 0.75,
+      isScrollControlled: true,
+      child: _DeleteLocalDataDialogContent(
         groups: counts.groups,
         participants: counts.participants,
         expenses: counts.expenses,
@@ -767,13 +603,26 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
   }
 
-  static Future<({int groups, int participants, int expenses, int expenseTags, int groupInvites})> _getLocalDataCounts(WidgetRef ref) async {
+  static Future<
+    ({
+      int groups,
+      int participants,
+      int expenses,
+      int expenseTags,
+      int groupInvites,
+    })
+  >
+  _getLocalDataCounts(WidgetRef ref) async {
     final db = ref.read(powerSyncDatabaseProvider);
     final groupRows = await db.getAll('SELECT COUNT(*) as cnt FROM groups');
-    final participantRows = await db.getAll('SELECT COUNT(*) as cnt FROM participants');
+    final participantRows = await db.getAll(
+      'SELECT COUNT(*) as cnt FROM participants',
+    );
     final expenseRows = await db.getAll('SELECT COUNT(*) as cnt FROM expenses');
     final tagRows = await db.getAll('SELECT COUNT(*) as cnt FROM expense_tags');
-    final inviteRows = await db.getAll('SELECT COUNT(*) as cnt FROM group_invites');
+    final inviteRows = await db.getAll(
+      'SELECT COUNT(*) as cnt FROM group_invites',
+    );
     int fromFirst(List<dynamic> rows) {
       if (rows.isEmpty) return 0;
       final r = rows.first;
@@ -786,6 +635,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       }
       return 0;
     }
+
     return (
       groups: fromFirst(groupRows),
       participants: fromFirst(participantRows),
@@ -800,11 +650,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     WidgetRef ref,
   ) async {
     try {
-      final preview = await ref.read(deleteMyDataServiceProvider).getDeleteMyDataPreview();
+      final preview = await ref
+          .read(deleteMyDataServiceProvider)
+          .getDeleteMyDataPreview();
       if (!context.mounted) return;
-      final result = await showDialog<bool?>(
+      final result = await showResponsiveSheet<bool?>(
         context: context,
-        builder: (ctx) => _DeleteCloudDataDialogContent(preview: preview),
+        title: 'delete_cloud_data'.tr(),
+        maxHeight: MediaQuery.of(context).size.height * 0.75,
+        isScrollControlled: true,
+        child: _DeleteCloudDataDialogContent(preview: preview),
       );
       // result: null = cancel, true = alsoDeleteLocal, false = cloud only
       if (result == null || !context.mounted) return;
@@ -852,22 +707,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     // Switching to local: show confirm then set.
     if (v == true) {
       if (!context.mounted) return;
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text('local_only_confirm_title'.tr()),
-          content: Text('local_only_confirm_body'.tr()),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text('cancel'.tr()),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text('local_only'.tr()),
-            ),
-          ],
-        ),
+      final confirmed = await showConfirmSheet(
+        context,
+        title: 'local_only_confirm_title'.tr(),
+        content: 'local_only_confirm_body'.tr(),
+        confirmLabel: 'local_only'.tr(),
       );
       if (confirmed != true || !context.mounted) return;
       ref.read(settings.provider(localOnlySettingDef).notifier).set(true);
@@ -894,9 +738,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (authService.isAuthenticated) {
       ref.read(settings.provider(localOnlySettingDef).notifier).set(false);
       ref
-          .read(
-            settings.provider(localDataFromOnlineUserIdSettingDef).notifier,
-          )
+          .read(settings.provider(localDataFromOnlineUserIdSettingDef).notifier)
           .set('');
       return;
     }
@@ -908,8 +750,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       case SignInResult.success:
         if (!context.mounted) return;
         // Skip migration if local data was from server (online → local → online, same user)
-        final fromOnlineUserId =
-            ref.read(settings.provider(localDataFromOnlineUserIdSettingDef));
+        final fromOnlineUserId = ref.read(
+          settings.provider(localDataFromOnlineUserIdSettingDef),
+        );
         final currentUser = ref.read(currentUserProvider);
         if (fromOnlineUserId.isNotEmpty &&
             currentUser != null &&
@@ -947,8 +790,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     WidgetRef ref,
     SettingsProviders settings,
   ) async {
+    final client = supabaseClientIfConfigured;
+    if (client == null) return;
     final db = ref.read(powerSyncDatabaseProvider);
-    final migrationService = MigrationService(db, Supabase.instance.client);
+    final migrationService = MigrationService(db, client);
 
     // Check if there is data to migrate
     final hasData = await migrationService.hasLocalData();
@@ -956,9 +801,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       // No data — just switch to online
       ref.read(settings.provider(localOnlySettingDef).notifier).set(false);
       ref
-          .read(
-            settings.provider(localDataFromOnlineUserIdSettingDef).notifier,
-          )
+          .read(settings.provider(localDataFromOnlineUserIdSettingDef).notifier)
           .set('');
       Log.info('Switched to online mode (no data to migrate)');
       return;
@@ -966,12 +809,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     if (!context.mounted) return;
 
-    // Show migration progress dialog
-    final migrationResult = await showDialog<MigrationResult>(
+    // Show migration progress sheet
+    final migrationResult = await showResponsiveSheet<MigrationResult>(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) =>
-          _MigrationProgressDialog(migrationService: migrationService),
+      title: 'migration_title'.tr(),
+      barrierDismissible: true,
+      maxHeight: MediaQuery.of(context).size.height * 0.5,
+      isScrollControlled: true,
+      child: _MigrationProgressDialog(migrationService: migrationService),
     );
 
     if (!context.mounted) return;
@@ -986,6 +831,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             .set('');
         Log.info('Switched to online mode after migration');
         context.showSuccess('migration_success'.tr());
+        break;
       case MigrationResult.failed:
       case null:
         context.showError('migration_failed'.tr());
@@ -1028,35 +874,37 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             : _localeDisplayName(const Locale('en')),
       ),
       onTap: () async {
-        final chosen = await showModalBottomSheet<Locale>(
+        final chosen = await showResponsiveSheet<Locale>(
           context: context,
+          title: 'language'.tr(),
+          maxHeight: MediaQuery.of(context).size.height * 0.75,
           isScrollControlled: true,
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.75,
-          ),
-          builder: (ctx) => SafeArea(
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(ctx).padding.bottom + 16,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(
-                        'language'.tr(),
-                        style: Theme.of(ctx).textTheme.titleMedium,
+          child: Builder(
+            builder: (ctx) => SafeArea(
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(ctx).padding.bottom + 16,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (!LayoutBreakpoints.isTabletOrWider(context))
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Text(
+                            'language'.tr(),
+                            style: Theme.of(ctx).textTheme.titleMedium,
+                          ),
+                        ),
+                      ..._supportedLocales.map(
+                        (locale) => ListTile(
+                          title: Text(_localeDisplayName(locale)),
+                          onTap: () => Navigator.of(ctx).pop(locale),
+                        ),
                       ),
-                    ),
-                    ..._supportedLocales.map(
-                      (locale) => ListTile(
-                        title: Text(_localeDisplayName(locale)),
-                        onTap: () => Navigator.of(ctx).pop(locale),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1068,6 +916,201 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               .read(settings.provider(languageSettingDef).notifier)
               .set(langCode);
           // _LocaleSync will call setLocale when it sees provider != context.locale
+        }
+      },
+    );
+  }
+
+  static const _themeModeOptions = ['system', 'light', 'dark', 'amoled'];
+
+  Widget _themeModeTile(
+    BuildContext context,
+    WidgetRef ref,
+    SettingsProviders settings,
+  ) {
+    final value = ref.watch(settings.provider(themeModeSettingDef));
+    return ListTile(
+      leading: Icon(themeModeSettingDef.icon),
+      title: Text('theme'.tr()),
+      subtitle: Text(value.tr()),
+      onTap: () async {
+        final chosen = await showResponsiveSheet<String>(
+          context: context,
+          title: 'theme'.tr(),
+          maxHeight: MediaQuery.of(context).size.height * 0.75,
+          isScrollControlled: true,
+          child: Builder(
+            builder: (ctx) => SafeArea(
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(ctx).padding.bottom + 16,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (!LayoutBreakpoints.isTabletOrWider(context))
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Text(
+                            'theme'.tr(),
+                            style: Theme.of(ctx).textTheme.titleMedium,
+                          ),
+                        ),
+                      ..._themeModeOptions.map(
+                        (option) => ListTile(
+                          title: Text(option.tr()),
+                          onTap: () => Navigator.of(ctx).pop(option),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        if (chosen != null && context.mounted) {
+          ref.read(settings.provider(themeModeSettingDef).notifier).set(chosen);
+        }
+      },
+    );
+  }
+
+  /// Preset theme colors: (value as int, label key for .tr()).
+  static const _themeColorPresets = [
+    (0xFF2E7D32, 'green'),
+    (0xFF1565C0, 'blue'),
+    (0xFF00897B, 'teal'),
+    (0xFF6A1B9A, 'purple'),
+    (0xFFC62828, 'red'),
+    (0xFFE65100, 'orange'),
+  ];
+
+  Widget _themeColorTile(
+    BuildContext context,
+    WidgetRef ref,
+    SettingsProviders settings,
+  ) {
+    final value = ref.watch(settings.provider(themeColorSettingDef));
+    final preset = _themeColorPresets.where((e) => e.$1 == value);
+    final currentLabel = preset.isEmpty
+        ? 'select_theme_color'.tr()
+        : preset.first.$2.tr();
+    return ListTile(
+      leading: Icon(themeColorSettingDef.icon),
+      title: Text('select_theme_color'.tr()),
+      subtitle: Text(currentLabel),
+      onTap: () async {
+        final chosen = await showResponsiveSheet<int>(
+          context: context,
+          title: 'select_theme_color'.tr(),
+          maxHeight: MediaQuery.of(context).size.height * 0.75,
+          isScrollControlled: true,
+          child: Builder(
+            builder: (ctx) => SafeArea(
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(ctx).padding.bottom + 16,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (!LayoutBreakpoints.isTabletOrWider(context))
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Text(
+                            'select_theme_color'.tr(),
+                            style: Theme.of(ctx).textTheme.titleMedium,
+                          ),
+                        ),
+                      ..._themeColorPresets.map(
+                        (preset) => ListTile(
+                          leading: Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              color: Color(preset.$1),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Theme.of(ctx).colorScheme.outline,
+                              ),
+                            ),
+                          ),
+                          title: Text(preset.$2.tr()),
+                          onTap: () => Navigator.of(ctx).pop(preset.$1),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        if (chosen != null && context.mounted) {
+          ref
+              .read(settings.provider(themeColorSettingDef).notifier)
+              .set(chosen);
+        }
+      },
+    );
+  }
+
+  static const _fontSizeOptions = ['small', 'normal', 'large', 'extra_large'];
+
+  Widget _fontSizeTile(
+    BuildContext context,
+    WidgetRef ref,
+    SettingsProviders settings,
+  ) {
+    final value = ref.watch(settings.provider(fontSizeScaleSettingDef));
+    return ListTile(
+      leading: Icon(fontSizeScaleSettingDef.icon),
+      title: Text('font_size'.tr()),
+      subtitle: Text(value.tr()),
+      onTap: () async {
+        final chosen = await showResponsiveSheet<String>(
+          context: context,
+          title: 'font_size'.tr(),
+          maxHeight: MediaQuery.of(context).size.height * 0.75,
+          isScrollControlled: true,
+          child: Builder(
+            builder: (ctx) => SafeArea(
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(ctx).padding.bottom + 16,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (!LayoutBreakpoints.isTabletOrWider(context))
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Text(
+                            'font_size'.tr(),
+                            style: Theme.of(ctx).textTheme.titleMedium,
+                          ),
+                        ),
+                      ..._fontSizeOptions.map(
+                        (option) => ListTile(
+                          title: Text(option.tr()),
+                          onTap: () => Navigator.of(ctx).pop(option),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        if (chosen != null && context.mounted) {
+          ref
+              .read(settings.provider(fontSizeScaleSettingDef).notifier)
+              .set(chosen);
         }
       },
     );
@@ -1125,13 +1168,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       CurrencyHelpers.getEffectiveFavorites(stored),
     );
 
-    showModalBottomSheet(
+    showResponsiveSheet<void>(
       context: context,
+      title: 'favorite_currencies'.tr(),
+      maxHeight: MediaQuery.of(context).size.height * 0.75,
       isScrollControlled: true,
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.75,
-      ),
-      builder: (ctx) => _FavoriteCurrenciesSheet(
+      child: _FavoriteCurrenciesSheet(
         initial: current,
         onSave: (updated) {
           final encoded = CurrencyHelpers.encodeFavorites(updated);
@@ -1220,40 +1262,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     required String currentValue,
     required StringSetting settingDef,
   }) async {
-    final controller = TextEditingController(text: currentValue);
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(titleKey.tr()),
-        content: TextField(
-          controller: controller,
-          obscureText: true,
-          decoration: InputDecoration(
-            hintText: 'receipt_ai_key_hint'.tr(),
-            border: const OutlineInputBorder(),
-          ),
-          maxLines: 1,
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('done'.tr()),
-          ),
-        ],
-      ),
+    final value = await showTextInputSheet(
+      context,
+      title: titleKey.tr(),
+      hint: 'receipt_ai_key_hint'.tr(),
+      initialValue: currentValue,
+      obscureText: true,
     );
-    if (result == true && context.mounted) {
+    if (value != null && context.mounted) {
       try {
         final settings = ref.read(hisabSettingsProvidersProvider);
         if (settings != null) {
-          ref
-              .read(settings.provider(settingDef).notifier)
-              .set(controller.text.trim());
+          ref.read(settings.provider(settingDef).notifier).set(value);
         }
       } catch (e) {
         Log.warning('Failed to set API key', error: e);
@@ -1264,57 +1284,73 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   static Future<void> _showLogsDialog(BuildContext context) async {
     Log.debug('Opening logs dialog');
     String content;
-    try {
-      content = await LoggingService.getLogContent(maxLines: 500);
-    } catch (e) {
-      content = 'logs_not_available'.tr();
+    if (kIsWeb) {
+      content = getWebLogContent();
+      if (content.isEmpty) {
+        content = 'logs_web_empty'.tr();
+      }
+    } else {
+      try {
+        content = await LoggingService.getLogContent(maxLines: 500);
+      } catch (e) {
+        content = 'logs_not_available'.tr();
+      }
     }
     if (!context.mounted) return;
     final scaffoldContext = context;
-    await showDialog(
+    await showResponsiveSheet<void>(
       context: context,
-      builder: (ctx) => LogsViewerDialog(
-        content: content,
-        onCopy: () async {
-          await Clipboard.setData(ClipboardData(text: content));
-          if (scaffoldContext.mounted) {
-            scaffoldContext.showSuccess('logs_copied'.tr());
-          }
-        },
-        onClear: () async {
-          final confirmed = await showDialog<bool>(
-            context: ctx,
-            builder: (c) => AlertDialog(
-              title: Text('clear_logs'.tr()),
-              content: Text('clear_logs_confirm'.tr()),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(c, false),
-                  child: Text('cancel'.tr()),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.pop(c, true),
-                  child: Text('clear_logs'.tr()),
-                ),
-              ],
-            ),
-          );
-          if (confirmed == true) {
-            try {
-              await LoggingService.clearLogs();
-              if (ctx.mounted) Navigator.pop(ctx);
+      title: 'view_logs'.tr(),
+      maxWidth: 600,
+      maxHeight: 700,
+      centerInFullViewport: false,
+      child: Builder(
+        builder: (ctx) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).padding.bottom + 16,
+          ),
+          child: LogsViewerDialog(
+            content: content,
+            onCopy: () async {
+              await Clipboard.setData(ClipboardData(text: content));
               if (scaffoldContext.mounted) {
-                scaffoldContext.showSuccess('logs_cleared'.tr());
+                scaffoldContext.showSuccess('logs_copied'.tr());
               }
-            } catch (e) {
-              if (scaffoldContext.mounted) {
-                scaffoldContext.showToast('logs_not_available'.tr());
+            },
+            onClear: () async {
+              final confirmed = await showConfirmSheet(
+                ctx,
+                title: 'clear_logs'.tr(),
+                content: 'clear_logs_confirm'.tr(),
+                confirmLabel: 'clear_logs'.tr(),
+              );
+              if (confirmed == true) {
+                if (kIsWeb) {
+                  clearWebLogContent();
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (scaffoldContext.mounted) {
+                    scaffoldContext.showSuccess('logs_cleared'.tr());
+                  }
+                } else {
+                  try {
+                    await LoggingService.clearLogs();
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (scaffoldContext.mounted) {
+                      scaffoldContext.showSuccess('logs_cleared'.tr());
+                    }
+                  } catch (e) {
+                    if (scaffoldContext.mounted) {
+                      scaffoldContext.showToast('logs_not_available'.tr());
+                    }
+                  }
+                }
               }
-            }
-          }
-        },
-        onReportIssue: () => _handleReportIssue(ctx, scaffoldContext, content),
-        onClose: () => Navigator.pop(ctx),
+            },
+            onReportIssue: () =>
+                _handleReportIssue(ctx, scaffoldContext, content),
+            onClose: () => Navigator.pop(ctx),
+          ),
+        ),
       ),
     );
   }
@@ -1326,36 +1362,19 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   ) async {
     String description = '';
     if (reportIssueUrl.isNotEmpty) {
-      final controller = TextEditingController();
-      final result = await showDialog<String?>(
-        context: dialogContext,
-        builder: (c) => AlertDialog(
-          title: Text('report_issue'.tr()),
-          content: TextField(
-            controller: controller,
-            decoration: InputDecoration(
-              hintText: 'report_issue_description_hint'.tr(),
-              border: const OutlineInputBorder(),
-            ),
-            maxLines: 3,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(c, null),
-              child: Text('cancel'.tr()),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(c, controller.text.trim()),
-              child: Text('done'.tr()),
-            ),
-          ],
-        ),
+      final result = await showTextInputSheet(
+        dialogContext,
+        title: 'report_issue'.tr(),
+        hint: 'report_issue_description_hint'.tr(),
+        maxLines: 3,
       );
       if (result == null) return;
       description = result;
     }
     try {
-      final formatted = await LoggingService.formatLogsForGitHub(description);
+      final String formatted = kIsWeb
+          ? '**Description**\n$description\n\n**Logs**\n$logsContent'
+          : await LoggingService.formatLogsForGitHub(description);
       await Clipboard.setData(ClipboardData(text: formatted));
       if (reportIssueUrl.isNotEmpty) {
         await launchUrl(Uri.parse(reportIssueUrl));
@@ -1408,22 +1427,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   static Future<void> _importData(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('import_data'.tr()),
-        content: Text('import_confirm'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('import_data'.tr()),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmSheet(
+      context,
+      title: 'import_data'.tr(),
+      content: 'import_confirm'.tr(),
+      confirmLabel: 'import_data'.tr(),
     );
     if (confirmed != true || !context.mounted) return;
     try {
@@ -1442,7 +1450,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       final parseResult = parseBackupJson(jsonString);
       if (parseResult.data == null) {
         if (context.mounted) {
-          final message = parseResult.errorMessageKey?.tr() ?? 'import_invalid_file'.tr();
+          final message =
+              parseResult.errorMessageKey?.tr() ?? 'import_invalid_file'.tr();
           context.showError(message);
         }
         return;
@@ -1504,6 +1513,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             tag: e.tag,
             lineItems: e.lineItems,
             receiptImagePath: e.receiptImagePath,
+            receiptImagePaths: e.receiptImagePaths,
           );
           await expenseRepo.create(expense);
         }
@@ -1548,22 +1558,57 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   static void _showAboutMe(BuildContext context) {
-    showDialog(
+    showResponsiveSheet<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('about_me'.tr()),
-        content: SingleChildScrollView(
-          child: _AboutMeDialogContent(
-            profileUrl: githubDeveloperProfileUrl,
-            username: githubDeveloperUsername,
+      title: 'about_me'.tr(),
+      maxHeight: MediaQuery.of(context).size.height * 0.75,
+      isScrollControlled: true,
+      child: Builder(
+        builder: (ctx) => SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).padding.bottom + 16,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (!LayoutBreakpoints.isTabletOrWider(context))
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        'about_me'.tr(),
+                        style: Theme.of(ctx).textTheme.titleMedium,
+                      ),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: _AboutMeDialogContent(
+                      profileUrl: githubDeveloperProfileUrl,
+                      username: githubDeveloperUsername,
+                    ),
+                  ),
+                  if (!LayoutBreakpoints.isTabletOrWider(context)) ...[
+                    const SizedBox(height: 24),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          FilledButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: Text('done'.tr()),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('done'.tr()),
-          ),
-        ],
       ),
     );
   }
@@ -1685,8 +1730,8 @@ class _AboutMeDialogContentState extends State<_AboutMeDialogContent> {
           Text(
             blog.trim(),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.primary,
-                ),
+              color: Theme.of(context).colorScheme.primary,
+            ),
             textAlign: TextAlign.center,
           ),
         ],
@@ -1748,17 +1793,38 @@ class _MigrationProgressDialogState extends State<_MigrationProgressDialog> {
   @override
   Widget build(BuildContext context) {
     final progress = _total > 0 ? _completed / _total : 0.0;
-    return AlertDialog(
-      title: Text('migration_title'.tr()),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('migration_uploading'.tr()),
-          const SizedBox(height: 16),
-          LinearProgressIndicator(value: progress),
-          const SizedBox(height: 8),
-          Text('$_completed / $_total'),
-        ],
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).padding.bottom + 16,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!LayoutBreakpoints.isTabletOrWider(context))
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  'migration_title'.tr(),
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('migration_uploading'.tr()),
+                  const SizedBox(height: 16),
+                  LinearProgressIndicator(value: progress),
+                  const SizedBox(height: 8),
+                  Text('$_completed / $_total'),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1796,6 +1862,7 @@ class _FavoriteCurrenciesSheetState extends State<_FavoriteCurrenciesSheet> {
           setState(() => _codes.add(currency.code));
         }
       },
+      centerInFullViewport: false,
     );
   }
 
@@ -1808,37 +1875,40 @@ class _FavoriteCurrenciesSheetState extends State<_FavoriteCurrenciesSheet> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Drag handle
-          Center(
-            child: Container(
-              margin: const EdgeInsets.only(top: 12, bottom: 4),
-              width: 32,
-              height: 4,
-              decoration: BoxDecoration(
-                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(2),
+          // Header
+          if (!LayoutBreakpoints.isTabletOrWider(context))
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'favorite_currencies'.tr(),
+                      style: textTheme.titleMedium,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add),
+                    tooltip: 'add_currency'.tr(),
+                    onPressed: _addCurrency,
+                  ),
+                ],
               ),
             ),
-          ),
-          // Header
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'favorite_currencies'.tr(),
-                    style: textTheme.titleMedium,
+          if (LayoutBreakpoints.isTabletOrWider(context))
+            Padding(
+              padding: const EdgeInsets.only(top: 8, right: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.add),
+                    tooltip: 'add_currency'.tr(),
+                    onPressed: _addCurrency,
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.add),
-                  tooltip: 'add_currency'.tr(),
-                  onPressed: _addCurrency,
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
@@ -1911,17 +1981,21 @@ class _FavoriteCurrenciesSheetState extends State<_FavoriteCurrenciesSheet> {
             ),
             child: Row(
               children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text('cancel'.tr()),
+                if (!LayoutBreakpoints.isTabletOrWider(context)) ...[
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text('cancel'.tr()),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
+                  const SizedBox(width: 12),
+                ],
                 Expanded(
                   child: FilledButton(
                     onPressed: () {
-                      widget.onSave(_codes);
+                      if (!listEquals(_codes, widget.initial)) {
+                        widget.onSave(_codes);
+                      }
                       Navigator.pop(context);
                     },
                     child: Text('done'.tr()),
@@ -1981,44 +2055,79 @@ class _DeleteLocalDataDialogContentState
   @override
   Widget build(BuildContext context) {
     final canConfirm = _secondsLeft <= 0;
-    final summary = 'delete_local_data_summary'.tr(namedArgs: {
-      'groups': '${widget.groups}',
-      'participants': '${widget.participants}',
-      'expenses': '${widget.expenses}',
-    });
-    return AlertDialog(
-      title: Text('delete_local_data'.tr()),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(summary),
-            const SizedBox(height: 16),
-            Text(
-              canConfirm
-                  ? 'delete_confirm_ready'.tr()
-                  : 'delete_confirm_countdown'.tr(namedArgs: {
-                      'seconds': '$_secondsLeft',
-                    }),
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-          ],
+    final summary = 'delete_local_data_summary'.tr(
+      namedArgs: {
+        'groups': '${widget.groups}',
+        'participants': '${widget.participants}',
+        'expenses': '${widget.expenses}',
+      },
+    );
+    return SafeArea(
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).padding.bottom + 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (!LayoutBreakpoints.isTabletOrWider(context))
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    'delete_local_data'.tr(),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(summary),
+                    const SizedBox(height: 16),
+                    Text(
+                      canConfirm
+                          ? 'delete_confirm_ready'.tr()
+                          : 'delete_confirm_countdown'.tr(
+                              namedArgs: {'seconds': '$_secondsLeft'},
+                            ),
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    if (!LayoutBreakpoints.isTabletOrWider(context))
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: Text('cancel'.tr()),
+                      ),
+                    if (!LayoutBreakpoints.isTabletOrWider(context))
+                      const SizedBox(width: 8),
+                    FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Theme.of(context).colorScheme.error,
+                      ),
+                      onPressed: canConfirm
+                          ? () => Navigator.pop(context, true)
+                          : null,
+                      child: Text('delete_local_data_confirm_label'.tr()),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: Text('cancel'.tr()),
-        ),
-        FilledButton(
-          style: FilledButton.styleFrom(
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-          onPressed: canConfirm ? () => Navigator.pop(context, true) : null,
-          child: Text('delete_local_data_confirm_label'.tr()),
-        ),
-      ],
     );
   }
 }
@@ -2060,66 +2169,100 @@ class _DeleteCloudDataDialogContentState
   Widget build(BuildContext context) {
     final canConfirm = _secondsLeft <= 0;
     final p = widget.preview;
-    final summary = 'delete_cloud_data_summary'.tr(namedArgs: {
-      'ownerGroups': '${p.groupsWhereOwner}',
-      'memberships': '${p.groupMemberships}',
-      'tokens': '${p.deviceTokensCount}',
-      'invites': '${p.inviteUsagesCount}',
-    });
-    return AlertDialog(
-      title: Text('delete_cloud_data'.tr()),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(summary),
-            if (p.soleMemberGroupCount > 0) ...[
-              const SizedBox(height: 8),
-              Text(
-                'delete_cloud_data_sole_member_warning'.tr(namedArgs: {
-                  'count': '${p.soleMemberGroupCount}',
-                }),
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.error,
+    final summary = 'delete_cloud_data_summary'.tr(
+      namedArgs: {
+        'ownerGroups': '${p.groupsWhereOwner}',
+        'memberships': '${p.groupMemberships}',
+        'tokens': '${p.deviceTokensCount}',
+        'invites': '${p.inviteUsagesCount}',
+      },
+    );
+    return SafeArea(
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).padding.bottom + 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (!LayoutBreakpoints.isTabletOrWider(context))
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    'delete_cloud_data'.tr(),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(summary),
+                    if (p.soleMemberGroupCount > 0) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'delete_cloud_data_sole_member_warning'.tr(
+                          namedArgs: {'count': '${p.soleMemberGroupCount}'},
+                        ),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    CheckboxListTile(
+                      value: _alsoDeleteLocal,
+                      onChanged: (v) =>
+                          setState(() => _alsoDeleteLocal = v ?? false),
+                      title: Text('also_delete_local_data_option'.tr()),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
                     ),
+                    const SizedBox(height: 8),
+                    Text(
+                      canConfirm
+                          ? 'delete_confirm_ready'.tr()
+                          : 'delete_confirm_countdown'.tr(
+                              namedArgs: {'seconds': '$_secondsLeft'},
+                            ),
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    if (!LayoutBreakpoints.isTabletOrWider(context))
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, null),
+                        child: Text('cancel'.tr()),
+                      ),
+                    if (!LayoutBreakpoints.isTabletOrWider(context))
+                      const SizedBox(width: 8),
+                    FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Theme.of(context).colorScheme.error,
+                      ),
+                      onPressed: canConfirm
+                          ? () => Navigator.pop(context, _alsoDeleteLocal)
+                          : null,
+                      child: Text('delete_cloud_data_confirm_label'.tr()),
+                    ),
+                  ],
+                ),
               ),
             ],
-            const SizedBox(height: 16),
-            CheckboxListTile(
-              value: _alsoDeleteLocal,
-              onChanged: (v) => setState(() => _alsoDeleteLocal = v ?? false),
-              title: Text('also_delete_local_data_option'.tr()),
-              controlAffinity: ListTileControlAffinity.leading,
-              contentPadding: EdgeInsets.zero,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              canConfirm
-                  ? 'delete_confirm_ready'.tr()
-                  : 'delete_confirm_countdown'.tr(namedArgs: {
-                      'seconds': '$_secondsLeft',
-                    }),
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-          ],
+          ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, null),
-          child: Text('cancel'.tr()),
-        ),
-        FilledButton(
-          style: FilledButton.styleFrom(
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-          onPressed: canConfirm
-              ? () => Navigator.pop(context, _alsoDeleteLocal)
-              : null,
-          child: Text('delete_cloud_data_confirm_label'.tr()),
-        ),
-      ],
     );
   }
 }

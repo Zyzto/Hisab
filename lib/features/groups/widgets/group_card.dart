@@ -58,107 +58,155 @@ class GroupCard extends ConsumerWidget {
       label: group.name,
       hint: (group.isPersonal ? 'open_list' : 'open_group').tr(),
       button: true,
-      child: Card(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        color: isSelected
-            ? theme.colorScheme.primaryContainer.withValues(alpha: 0.4)
-            : null,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
-          side: isSelected
-              ? BorderSide(
-                  color: theme.colorScheme.primary,
-                  width: 2,
-                )
-              : isPinned
-                  ? BorderSide(
-                      color: theme.colorScheme.primary.withValues(alpha: 0.5),
-                      width: 1,
-                    )
-                  : BorderSide(
-                      color: theme.colorScheme.outlineVariant,
-                      width: 1,
-                    ),
-        ),
-        child: InkWell(
-          onTap: () {
-            HapticFeedback.lightImpact();
-            onTap?.call();
-          },
-          onLongPress: onLongPress != null
-              ? () {
-                  HapticFeedback.mediumImpact();
-                  onLongPress!();
-                }
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Card(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          color: isSelected
+              ? theme.colorScheme.primaryContainer.withValues(alpha: 0.4)
               : null,
-          borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                if (createdDateLabel != null) ...[
-                  SizedBox(
-                    width: 44,
-                    child: Text(
-                      createdDateLabel!,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
+            side: isSelected
+                ? BorderSide(
+                    color: theme.colorScheme.primary,
+                    width: 2,
+                  )
+                : isPinned
+                    ? BorderSide(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.5),
+                        width: 1,
+                      )
+                    : BorderSide(
+                        color: theme.colorScheme.outlineVariant,
+                        width: 1,
                       ),
-                      maxLines: 2,
-                      textAlign: TextAlign.center,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                leadingWidget,
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Align(
-                    alignment: AlignmentDirectional.centerStart,
+          ),
+          child: InkWell(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              onTap?.call();
+            },
+            onLongPress: onLongPress != null
+                ? () {
+                    HapticFeedback.mediumImpact();
+                    onLongPress!();
+                  }
+                : null,
+            borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
+            child: _buildListContent(theme: theme, leadingWidget: leadingWidget),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildListContent({
+    required ThemeData theme,
+    required Widget leadingWidget,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        children: [
+          if (createdDateLabel != null) ...[
+            SizedBox(
+              width: 44,
+              child: Text(
+                createdDateLabel!,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                maxLines: 2,
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          leadingWidget,
+          const SizedBox(width: 14),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final hasBoundedHeight = constraints.maxHeight.isFinite;
+                if (hasBoundedHeight) {
+                  return ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: constraints.maxHeight),
                     child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                      mainAxisSize: MainAxisSize.max,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          group.name,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            fontSize: (theme.textTheme.titleMedium?.fontSize ?? 16) * (18 / 16),
+                        Flexible(
+                          child: Text(
+                            group.name,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              fontSize: (theme.textTheme.titleMedium?.fontSize ?? 16) * (18 / 16),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          group.currencyCode,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                        Flexible(
+                          child: Text(
+                            group.currencyCode,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ),
-                if (onPinToggle != null)
-                  IconButton(
-                    icon: Icon(
-                      isPinned ? Icons.push_pin : Icons.push_pin_outlined,
-                      color: isPinned
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.onSurfaceVariant,
-                      size: 22,
+                  );
+                }
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      group.name,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        fontSize: (theme.textTheme.titleMedium?.fontSize ?? 16) * (18 / 16),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    onPressed: () {
-                      HapticFeedback.lightImpact();
-                      onPinToggle!();
-                    },
-                    tooltip: isPinned ? 'unpin'.tr() : 'pin'.tr(),
-                  ),
-              ],
+                    const SizedBox(height: 4),
+                    Text(
+                      group.currencyCode,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                );
+              },
             ),
           ),
-        ),
+          if (onPinToggle != null)
+            IconButton(
+              icon: Icon(
+                isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                color: isPinned
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurfaceVariant,
+                size: 22,
+              ),
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                onPinToggle!();
+              },
+              tooltip: isPinned ? 'unpin'.tr() : 'pin'.tr(),
+            ),
+        ],
       ),
     );
   }

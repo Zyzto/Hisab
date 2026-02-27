@@ -31,26 +31,32 @@
 
   <title>Hisab</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    html, body {
+      min-width: 320px;
+      min-height: 500px;
+    }
+  </style>
 </head>
 <body>
   <!-- Firebase SDK (required for FCM web push notifications) -->
   <script src="https://www.gstatic.com/firebasejs/11.4.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/11.4.0/firebase-messaging-compat.js"></script>
   <script>
-    // Firebase config — replace with your values from Firebase Console.
-    // These are safe to expose (they are public identifiers, not secrets).
+    // Firebase config — placeholders replaced at build time (CI) or from dart_defines_online.json (debug).
+    // Do not commit real values. See CONFIGURATION.md and dart_defines_online.example.json.
     const firebaseConfig = {
-      apiKey: "AIzaSyAHqu53pQGNME24l4XvsZZ3YvT1u--rfxk",
-      authDomain: "hisab-c8eb1.firebaseapp.com",
-      projectId: "hisab-c8eb1",
-      storageBucket: "hisab-c8eb1.firebasestorage.app",
-      messagingSenderId: "981938007704",
-      appId: "1:981938007704:web:9a607f674d6cdae0b1aaed",
+      apiKey: "__FIREBASE_API_KEY__",
+      authDomain: "__FIREBASE_AUTH_DOMAIN__",
+      projectId: "__FIREBASE_PROJECT_ID__",
+      storageBucket: "__FIREBASE_STORAGE_BUCKET__",
+      messagingSenderId: "__FIREBASE_MESSAGING_SENDER_ID__",
+      appId: "__FIREBASE_APP_ID__",
     };
 
     function hasPlaceholderFirebaseConfig(config) {
       const values = Object.values(config);
-      return values.some((v) => typeof v === "string" && v.includes("YOUR_"));
+      return values.some((v) => typeof v === "string" && (v.includes("YOUR_") || v.includes("__FIREBASE_")));
     }
 
     if (hasPlaceholderFirebaseConfig(firebaseConfig)) {

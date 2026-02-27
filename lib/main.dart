@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
@@ -15,8 +16,10 @@ import 'package:powersync/powersync.dart' show PowerSyncDatabase, Schema;
 import 'package:pwa_install/pwa_install.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'core/constants/firebase_config.dart';
 import 'core/constants/supabase_config.dart';
 import 'core/database/database_providers.dart';
+import 'core/log_web.dart';
 import 'core/database/delete_db_file.dart';
 import 'core/image_picker_init.dart';
 import 'core/database/powersync_schema.dart' as ps;
@@ -25,96 +28,86 @@ import 'features/settings/providers/settings_framework_providers.dart';
 import 'features/settings/settings_definitions.dart';
 import 'app.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // PWA install prompt (web only)
-  if (kIsWeb) {
-    PWAInstall().setup(installCallback: () {
-      debugPrint('PWA installed!');
-    });
-  }
-
-  // Log framework and async errors before logging service is ready
-  FlutterError.onError = (FlutterErrorDetails details) {
-    FlutterError.presentError(details);
-    LoggingService.severe(
-      'Flutter framework error: ${details.exception}',
-      component: 'CrashHandler',
-      error: details.exception,
-      stackTrace: details.stack,
-    );
-  };
-  PlatformDispatcher.instance.onError = (error, stack) {
-    // Known web issue: PowerSync/sqlite3_web can emit LegacyJavaScriptObject
-    // in internal streams where Dart expects UpdateNotification. We use
-    // polling instead of watch() on web, but the SDK may still create
-    // internal listeners. Suppress this specific error from surfacing.
-    if (kIsWeb &&
-        error is TypeError &&
-        error.toString().contains('LegacyJavaScriptObject') &&
-        error.toString().contains('UpdateNotification')) {
-      Log.debug(
-        'Suppressed known web stream type error (PowerSync/sqlite3_web): $error',
-      );
-      return true;
-    }
-    // Firebase not initialized: native plugins may fire async events even
-    // after Firebase.initializeApp() failed. The root failure is already
-    // logged as a warning; suppress the cascading [core/no-app] noise.
-    if (error.toString().contains('[core/no-app]')) {
-      Log.debug(
-        'Suppressed Firebase [core/no-app] (Firebase not initialized)',
-      );
-      return true;
-    }
-    LoggingService.severe(
-      'Uncaught async error: $error',
-      component: 'CrashHandler',
-      error: error,
-      stackTrace: stack,
-    );
-    return true;
-  };
-
-  // Friendlier error widget when the framework hits a build error (e.g. missing
-  // provider or invalid widget state) instead of the default gray box.
-  ErrorWidget.builder = (FlutterErrorDetails details) {
-    return Material(
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.error_outline,
-                size: 48,
-                color: Colors.red,
+void main() {
+  runZonedGuarded(
+    () async {
+      void setupErrorHandlers() {
+        FlutterError.onError = (FlutterErrorDetails details) {
+          final msg = details.exception.toString();
+          if (kIsWeb &&
+              (msg.contains('EngineFlutterView') && msg.contains('disposed'))) {
+            Log.debug(
+              'Suppressed known web error: render on disposed view (e.g. after hot restart)',
+            );
+            return;
+          }
+          FlutterError.presentError(details);
+          LoggingService.severe(
+            'Flutter framework error: ${details.exception}',
+            component: 'CrashHandler',
+            error: details.exception,
+            stackTrace: details.stack,
+          );
+        };
+        PlatformDispatcher.instance.onError = (error, stack) {
+          if (kIsWeb &&
+              error is TypeError &&
+              error.toString().contains('LegacyJavaScriptObject') &&
+              error.toString().contains('UpdateNotification')) {
+            return true;
+          }
+          if (error.toString().contains('[core/no-app]')) {
+            Log.debug(
+              'Suppressed Firebase [core/no-app] (Firebase not initialized)',
+            );
+            return true;
+          }
+          LoggingService.severe(
+            'Uncaught async error: $error',
+            component: 'CrashHandler',
+            error: error,
+            stackTrace: stack,
+          );
+          return true;
+        };
+        ErrorWidget.builder = (FlutterErrorDetails details) {
+          return Material(
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: Colors.red,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      details.exceptionAsString(),
+                      style: const TextStyle(fontSize: 14),
+                      textAlign: TextAlign.center,
+                      maxLines: 8,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 16),
-              Text(
-                details.exceptionAsString(),
-                style: const TextStyle(fontSize: 14),
-                textAlign: TextAlign.center,
-                maxLines: 8,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
+            ),
+          );
+        };
+      }
+
+      Future<void> runRestOfMain() async {
+    await LoggingService.init(
+      const LoggingConfig(
+        appName: 'Hisab',
+        logFileName: 'hisab.log',
+        crashLogFileName: 'hisab_crashes.log',
       ),
     );
-  };
-
-  await LoggingService.init(
-    const LoggingConfig(
-      appName: 'Hisab',
-      logFileName: 'hisab.log',
-      crashLogFileName: 'hisab_crashes.log',
-    ),
-  );
-  Log.info('main: LoggingService initialized');
+    Log.info('main: LoggingService initialized');
 
   // Timeout to avoid release hang if asset loading never completes (e.g. release bundle)
   bool easyLocalizationReady = false;
@@ -172,7 +165,7 @@ void main() async {
     Log.info('main: Supabase client initialized');
 
     if (settingsProviders != null) {
-      final session = Supabase.instance.client.auth.currentSession;
+      final session = supabaseClientIfConfigured?.auth.currentSession;
 
       // Handle pending OAuth redirects (web only — page reloaded after redirect)
       final onboardingPending = settingsProviders.controller.get(
@@ -242,12 +235,28 @@ void main() async {
   if (supabaseConfigAvailable) {
     try {
       Log.info('main: Initializing Firebase...');
-      await Firebase.initializeApp();
-      firebaseInitialized = true;
-      FirebaseMessaging.onBackgroundMessage(
-        firebaseMessagingBackgroundHandler,
-      );
-      Log.info('main: Firebase initialized');
+      if (kIsWeb) {
+        final options = firebaseOptionsForWeb;
+        if (options != null) {
+          await Firebase.initializeApp(options: options);
+          firebaseInitialized = true;
+          FirebaseMessaging.onBackgroundMessage(
+            firebaseMessagingBackgroundHandler,
+          );
+          Log.info('main: Firebase initialized');
+        } else {
+          Log.info(
+            'main: Firebase web options missing (push notifications disabled on web)',
+          );
+        }
+      } else {
+        await Firebase.initializeApp();
+        firebaseInitialized = true;
+        FirebaseMessaging.onBackgroundMessage(
+          firebaseMessagingBackgroundHandler,
+        );
+        Log.info('main: Firebase initialized');
+      }
     } catch (e, st) {
       Log.warning('main: Firebase init failed (push notifications disabled)',
           error: e, stackTrace: st);
@@ -303,6 +312,54 @@ void main() async {
       ),
     ),
   );
+  if (kIsWeb) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      SemanticsBinding.instance.ensureSemantics();
+    });
+  }
+      }
+
+  if (kIsWeb) {
+    await runZoned(() async {
+      WidgetsFlutterBinding.ensureInitialized();
+      PWAInstall().setup(installCallback: () {
+        debugPrint('PWA installed!');
+      });
+      initWebLogCapture();
+      setupErrorHandlers();
+      await runRestOfMain();
+    }, zoneSpecification: ZoneSpecification(
+      print: (Zone self, ZoneDelegate parent, Zone zone, String line) {
+        capturePrintLine(line);
+        parent.print(zone, line);
+      },
+    ));
+  } else {
+    WidgetsFlutterBinding.ensureInitialized();
+    setupErrorHandlers();
+    await runRestOfMain();
+  }
+    },
+    (error, stack) {
+      if (kIsWeb &&
+          error is TypeError &&
+          error.toString().contains('LegacyJavaScriptObject') &&
+          error.toString().contains('UpdateNotification')) {
+        return;
+      }
+      // Log stack for NoSuchMethodError / dart_rti so we can trace web-only failures.
+      if (error is NoSuchMethodError ||
+          (error.toString().contains('dart_rti') ||
+              error.toString().contains('non-function'))) {
+        Log.error(
+          'Zone error (see stack trace for location)',
+          error: error,
+          stackTrace: stack,
+        );
+      }
+      PlatformDispatcher.instance.onError?.call(error, stack);
+    },
+  );
 }
 
 /// Initialize PowerSync DB. On failure (e.g. schema mismatch from upgrade),
@@ -350,11 +407,22 @@ class _LocaleSync extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final languageCode = ref.watch(languageProvider);
+    String languageCode;
+    try {
+      languageCode = ref.watch(languageProvider);
+    } catch (e, st) {
+      Log.warning('_LocaleSync: languageProvider read failed', error: e, stackTrace: st);
+      languageCode = 'en';
+    }
     if (context.locale.languageCode != languageCode) {
       final locale = Locale(languageCode);
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) context.setLocale(locale);
+        if (!context.mounted) return;
+        try {
+          context.setLocale(locale);
+        } catch (e, st) {
+          Log.warning('_LocaleSync: setLocale failed', error: e, stackTrace: st);
+        }
       });
     }
     return child;

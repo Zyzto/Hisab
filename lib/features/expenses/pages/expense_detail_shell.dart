@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
+import '../../../core/layout/constrained_content.dart';
+import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -233,7 +235,7 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
 
     return Scaffold(
       appBar: appBar,
-      body: body,
+      body: ConstrainedContent(child: body),
     );
   }
 
@@ -242,27 +244,14 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
     WidgetRef ref,
     Expense expense,
   ) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('delete_expense_confirm'.tr()),
-        content: Text(
+    final ok = await showConfirmSheet(
+      context,
+      title: 'delete_expense_confirm'.tr(),
+      content:
           '${expense.title} – ${CurrencyFormatter.formatCents(expense.amountCents, expense.currencyCode)}',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            child: Text('delete'.tr()),
-          ),
-        ],
-      ),
+      confirmLabel: 'delete'.tr(),
+      isDestructive: true,
+      centerInFullViewport: true,
     );
     if (ok == true && context.mounted) {
       await ref.read(expenseRepositoryProvider).delete(expense.id);

@@ -24,15 +24,15 @@ Future<Map<String, dynamic>> exportDataToJson({
   required ITagRepository tagRepo,
 }) async {
   final groups = await groupRepo.getAll();
-  final participants = <Participant>[];
-  final expenses = <Expense>[];
-  final expenseTags = <ExpenseTag>[];
+  final groupIds = groups.map((g) => g.id).toSet();
 
-  for (final g in groups) {
-    participants.addAll(await participantRepo.getByGroupId(g.id));
-    expenses.addAll(await expenseRepo.getByGroupId(g.id));
-    expenseTags.addAll(await tagRepo.getByGroupId(g.id));
-  }
+  final allParticipants = await participantRepo.getAll();
+  final allExpenses = await expenseRepo.getAll();
+  final allTags = await tagRepo.getAll();
+
+  final participants = allParticipants.where((p) => groupIds.contains(p.groupId)).toList();
+  final expenses = allExpenses.where((e) => groupIds.contains(e.groupId)).toList();
+  final expenseTags = allTags.where((t) => groupIds.contains(t.groupId)).toList();
 
   final localArchivedGroupIds =
       await groupRepo.getLocallyArchivedGroupIds();
@@ -93,6 +93,7 @@ Map<String, dynamic> _expenseToMap(Expense e) => {
   'tag': e.tag,
   'lineItems': e.lineItems?.map((l) => l.toJson()).toList(),
   'receiptImagePath': e.receiptImagePath,
+  'receiptImagePaths': e.receiptImagePaths,
 };
 
 Map<String, dynamic> _tagToMap(ExpenseTag t) => {
@@ -254,8 +255,25 @@ Expense _mapToExpense(Map<String, dynamic> m) {
     lineItems: lineItems
         ?.map((e) => ReceiptLineItem.fromJson(e as Map<String, dynamic>))
         .toList(),
-    receiptImagePath: m['receiptImagePath'] as String?,
+    receiptImagePath: _backupReceiptImagePath(m),
+    receiptImagePaths: _backupReceiptImagePaths(m),
   );
+}
+
+String? _backupReceiptImagePath(Map<String, dynamic> m) {
+  final paths = _backupReceiptImagePaths(m);
+  if (paths != null && paths.isNotEmpty) return paths.first;
+  return m['receiptImagePath'] as String?;
+}
+
+List<String>? _backupReceiptImagePaths(Map<String, dynamic> m) {
+  final raw = m['receiptImagePaths'];
+  if (raw is List) {
+    final list = raw.whereType<String>().where((s) => s.isNotEmpty).toList();
+    return list.isEmpty ? null : list;
+  }
+  final single = m['receiptImagePath'] as String?;
+  return single != null && single.isNotEmpty ? [single] : null;
 }
 
 ExpenseTag _mapToTag(Map<String, dynamic> m) => ExpenseTag(

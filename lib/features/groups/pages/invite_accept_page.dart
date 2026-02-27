@@ -7,6 +7,8 @@ import 'package:easy_localization/easy_localization.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/auth/sign_in_sheet.dart';
 import '../../../core/database/database_providers.dart';
+import '../../../core/layout/content_aligned_app_bar.dart';
+import '../../../core/layout/constrained_content.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/toast.dart';
@@ -29,6 +31,7 @@ class InviteAcceptPage extends ConsumerStatefulWidget {
 class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
   bool _accepting = false;
   String? _error;
+
   /// Set when accept fails because user is already a member; enables "Open Group" action.
   String? _alreadyMemberGroupId;
 
@@ -40,9 +43,14 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
 
     // Web: when local-only or not signed in, show "Accept invite in browser" landing with Sign in CTA
     if (kIsWeb && (localOnly || !isAuthenticated)) {
-      return Scaffold(
-        appBar: AppBar(title: Text('invite'.tr())),
-        body: Center(
+      return LayoutBuilder(
+        builder: (context, layoutConstraints) {
+          return Scaffold(
+            appBar: ContentAlignedAppBar(
+              contentAreaWidth: layoutConstraints.maxWidth,
+              title: Text('invite'.tr()),
+            ),
+            body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
@@ -69,14 +77,21 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
             ),
           ),
         ),
+          );
+        },
       );
     }
 
     // Native app in local-only: show generic online-required message
     if (localOnly) {
-      return Scaffold(
-        appBar: AppBar(title: Text('invite'.tr())),
-        body: Center(
+      return LayoutBuilder(
+        builder: (context, layoutConstraints) {
+          return Scaffold(
+            appBar: ContentAlignedAppBar(
+              contentAreaWidth: layoutConstraints.maxWidth,
+              title: Text('invite'.tr()),
+            ),
+            body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Text(
@@ -86,48 +101,58 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
             ),
           ),
         ),
+          );
+        },
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('invite'.tr()),
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () => context.go(RoutePaths.home),
-        ),
-      ),
-      body: inviteAsync.when(
-        data: (data) {
-          if (data == null) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.link_off,
-                    size: 64,
-                    color: Theme.of(context).colorScheme.error,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'invite_expired'.tr(),
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                ],
-              ),
-            );
-          }
-          return _buildInviteContent(context, data.invite, data.group);
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: ErrorContentWidget(
-            message: e.toString(),
-            onRetry: () => ref.invalidate(inviteByTokenProvider(widget.token)),
+    return LayoutBuilder(
+      builder: (context, layoutConstraints) {
+        return Scaffold(
+          appBar: ContentAlignedAppBar(
+            contentAreaWidth: layoutConstraints.maxWidth,
+            title: Text('invite'.tr()),
+            leading: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => context.go(RoutePaths.home),
+            ),
+          ),
+          body: ConstrainedContent(
+        child: inviteAsync.when(
+          data: (data) {
+            if (data == null) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.link_off,
+                      size: 64,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'invite_expired'.tr(),
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                  ],
+                ),
+              );
+            }
+            return _buildInviteContent(context, data.invite, data.group);
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(
+            child: ErrorContentWidget(
+              message: e.toString(),
+              onRetry: () =>
+                  ref.invalidate(inviteByTokenProvider(widget.token)),
+            ),
           ),
         ),
       ),
+        );
+      },
     );
   }
 
@@ -183,7 +208,8 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
           const SizedBox(height: 32),
           if (_alreadyMemberGroupId != null)
             FilledButton(
-              onPressed: () => context.go(RoutePaths.groupDetail(_alreadyMemberGroupId!)),
+              onPressed: () =>
+                  context.go(RoutePaths.groupDetail(_alreadyMemberGroupId!)),
               child: Text('open_group'.tr()),
             )
           else
@@ -243,7 +269,10 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
           ? name
           : (ref.read(currentUserProvider)?.email ?? 'Member');
       final repo = ref.read(groupInviteRepositoryProvider);
-      final groupId = await repo.accept(widget.token, newParticipantName: displayName);
+      final groupId = await repo.accept(
+        widget.token,
+        newParticipantName: displayName,
+      );
       TelemetryService.sendEvent('invite_accepted', {
         'groupId': groupId,
       }, enabled: ref.read(telemetryEnabledProvider));
@@ -260,7 +289,9 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
         if (i < maxAttempts - 1) await Future.delayed(retryDelay);
       }
       if (groupInDb == null) {
-        Log.info('Group $groupId not in DB after $maxAttempts attempts, syncing once more');
+        Log.info(
+          'Group $groupId not in DB after $maxAttempts attempts, syncing once more',
+        );
         await ref.read(dataSyncServiceProvider.notifier).syncNow();
       }
       Log.info('Sync after invite complete, navigating to group $groupId');
@@ -273,7 +304,9 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
     } catch (e, st) {
       Log.warning('Invite accept or sync failed', error: e, stackTrace: st);
       if (mounted) {
-        final isAlreadyMember = e.toString().contains('Already a member of this group');
+        final isAlreadyMember = e.toString().contains(
+          'Already a member of this group',
+        );
         setState(() {
           if (isAlreadyMember) {
             _error = 'invite_already_member'.tr();

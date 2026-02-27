@@ -7,9 +7,13 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 
 import '../../../core/constants/supabase_config.dart';
+import '../../../core/layout/content_aligned_app_bar.dart';
+import '../../../core/layout/constrained_content.dart';
+import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/widgets/error_content.dart';
+import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../domain/domain.dart';
 import '../providers/group_invite_provider.dart';
@@ -34,127 +38,139 @@ class _InviteManagementPageState extends ConsumerState<InviteManagementPage> {
     final theme = Theme.of(context);
     final invitesAsync = ref.watch(invitesByGroupProvider(widget.groupId));
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('invite_links'.tr()),
-      ),
-      floatingActionButton: FloatingActionButton(
+    return LayoutBuilder(
+      builder: (context, layoutConstraints) {
+        return Scaffold(
+          appBar: ContentAlignedAppBar(
+            contentAreaWidth: layoutConstraints.maxWidth,
+            title: Text('invite_links'.tr()),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ),
+          floatingActionButton: FloatingActionButton(
         onPressed: () => showCreateInviteSheet(context, ref, widget.groupId),
         tooltip: 'create_invite'.tr(),
         child: const Icon(Icons.add),
       ),
-      body: invitesAsync.when(
-        data: (invites) {
-          // Sort: active first, then by created_at desc
-          invites.sort((a, b) {
-            final aActive = a.status == InviteStatus.active ? 0 : 1;
-            final bActive = b.status == InviteStatus.active ? 0 : 1;
-            if (aActive != bActive) return aActive.compareTo(bActive);
-            return b.createdAt.compareTo(a.createdAt);
-          });
+      body: ConstrainedContent(
+        child: invitesAsync.when(
+          data: (invites) {
+            // Sort: active first, then by created_at desc
+            invites.sort((a, b) {
+              final aActive = a.status == InviteStatus.active ? 0 : 1;
+              final bActive = b.status == InviteStatus.active ? 0 : 1;
+              if (aActive != bActive) return aActive.compareTo(bActive);
+              return b.createdAt.compareTo(a.createdAt);
+            });
 
-          final filtered = _filter == null
-              ? invites
-              : invites.where((i) => i.status == _filter).toList();
+            final filtered = _filter == null
+                ? invites
+                : invites.where((i) => i.status == _filter).toList();
 
-          return Column(
-            children: [
-              // Filter chips
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: ThemeConfig.spacingM,
-                  vertical: ThemeConfig.spacingS,
-                ),
-                child: Row(
-                  children: [
-                    _FilterChip(
-                      label: 'invite_filter_all'.tr(),
-                      count: invites.length,
-                      selected: _filter == null,
-                      onSelected: () => setState(() => _filter = null),
-                    ),
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: 'invite_filter_active'.tr(),
-                      count: invites
-                          .where((i) => i.status == InviteStatus.active)
-                          .length,
-                      selected: _filter == InviteStatus.active,
-                      onSelected: () =>
-                          setState(() => _filter = InviteStatus.active),
-                    ),
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: 'invite_filter_expired'.tr(),
-                      count: invites
-                          .where((i) => i.status == InviteStatus.expired)
-                          .length,
-                      selected: _filter == InviteStatus.expired,
-                      onSelected: () =>
-                          setState(() => _filter = InviteStatus.expired),
-                    ),
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: 'invite_filter_revoked'.tr(),
-                      count: invites
-                          .where((i) => i.status == InviteStatus.revoked)
-                          .length,
-                      selected: _filter == InviteStatus.revoked,
-                      onSelected: () =>
-                          setState(() => _filter = InviteStatus.revoked),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              // List
-              Expanded(
-                child: filtered.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.link_off,
-                              size: 48,
-                              color: theme.colorScheme.onSurfaceVariant
-                                  .withAlpha(120),
-                            ),
-                            const SizedBox(height: ThemeConfig.spacingM),
-                            Text(
-                              'invite_empty'.tr(),
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.only(
-                          top: ThemeConfig.spacingS,
-                          bottom: 80,
-                        ),
-                        itemCount: filtered.length,
-                        itemBuilder: (context, i) => _InviteCard(
-                          invite: filtered[i],
-                          groupId: widget.groupId,
-                        ),
+            return Column(
+              children: [
+                // Filter chips
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: ThemeConfig.spacingM,
+                    vertical: ThemeConfig.spacingS,
+                  ),
+                  child: Row(
+                    children: [
+                      _FilterChip(
+                        label: 'invite_filter_all'.tr(),
+                        count: invites.length,
+                        selected: _filter == null,
+                        onSelected: () => setState(() => _filter = null),
                       ),
-              ),
-            ],
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: ErrorContentWidget(
-            message: e.toString(),
-            onRetry: () => ref.invalidate(invitesByGroupProvider(widget.groupId)),
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: 'invite_filter_active'.tr(),
+                        count: invites
+                            .where((i) => i.status == InviteStatus.active)
+                            .length,
+                        selected: _filter == InviteStatus.active,
+                        onSelected: () =>
+                            setState(() => _filter = InviteStatus.active),
+                      ),
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: 'invite_filter_expired'.tr(),
+                        count: invites
+                            .where((i) => i.status == InviteStatus.expired)
+                            .length,
+                        selected: _filter == InviteStatus.expired,
+                        onSelected: () =>
+                            setState(() => _filter = InviteStatus.expired),
+                      ),
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: 'invite_filter_revoked'.tr(),
+                        count: invites
+                            .where((i) => i.status == InviteStatus.revoked)
+                            .length,
+                        selected: _filter == InviteStatus.revoked,
+                        onSelected: () =>
+                            setState(() => _filter = InviteStatus.revoked),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                // List
+                Expanded(
+                  child: filtered.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.link_off,
+                                size: 48,
+                                color: theme.colorScheme.onSurfaceVariant
+                                    .withAlpha(120),
+                              ),
+                              const SizedBox(height: ThemeConfig.spacingM),
+                              Text(
+                                'invite_empty'.tr(),
+                                style: theme.textTheme.bodyLarge?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.only(
+                            top: ThemeConfig.spacingS,
+                            bottom: 80,
+                          ),
+                          itemCount: filtered.length,
+                          itemBuilder: (context, i) => _InviteCard(
+                            invite: filtered[i],
+                            groupId: widget.groupId,
+                          ),
+                        ),
+                ),
+              ],
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(
+            child: ErrorContentWidget(
+              message: e.toString(),
+              onRetry: () =>
+                  ref.invalidate(invitesByGroupProvider(widget.groupId)),
+            ),
           ),
         ),
       ),
     );
+  },
+  );
   }
 }
 
@@ -243,10 +259,7 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
         color: bg,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Text(
-        text,
-        style: theme.textTheme.labelSmall?.copyWith(color: fg),
-      ),
+      child: Text(text, style: theme.textTheme.labelSmall?.copyWith(color: fg)),
     );
   }
 
@@ -254,9 +267,9 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
     final invite = widget.invite;
     if (invite.expiresAt == null) return 'invite_never_expires'.tr();
     if (invite.isExpired) {
-      return 'invite_expired_on'.tr(args: [
-        DateFormat.yMMMd().format(invite.expiresAt!),
-      ]);
+      return 'invite_expired_on'.tr(
+        args: [DateFormat.yMMMd().format(invite.expiresAt!)],
+      );
     }
     final diff = invite.expiresAt!.difference(DateTime.now());
     if (diff.inDays > 0) {
@@ -291,22 +304,12 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
   }
 
   Future<void> _revoke() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('invite_revoke_title'.tr()),
-        content: Text('invite_revoke_confirm'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('invite_revoke'.tr()),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmSheet(
+      context,
+      title: 'invite_revoke_title'.tr(),
+      content: 'invite_revoke_confirm'.tr(),
+      confirmLabel: 'invite_revoke'.tr(),
+      centerInFullViewport: true,
     );
     if (confirmed != true || !mounted) return;
     setState(() => _actionLoading = true);
@@ -323,14 +326,14 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
 
   void _showQrCode() {
     final url = _inviteUrl(widget.invite.token);
-    showModalBottomSheet(
+    showResponsiveSheet<void>(
       context: context,
+      title: 'show_qr_code'.tr(),
+      centerInFullViewport: true,
+      maxHeight: MediaQuery.of(context).size.height * 0.75,
       isScrollControlled: true,
       useSafeArea: true,
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.75,
-      ),
-      builder: (ctx) => _InviteQrSheetContent(url: url),
+      child: _InviteQrSheetContent(url: url),
     );
   }
 
@@ -387,10 +390,8 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
                                 ),
                                 child: Text(
                                   'group_admin'.tr(),
-                                  style:
-                                      theme.textTheme.labelSmall?.copyWith(
-                                    color:
-                                        theme.colorScheme.onPrimaryContainer,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: theme.colorScheme.onPrimaryContainer,
                                   ),
                                 ),
                               ),
@@ -419,9 +420,7 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
                     ),
                   ),
                   Icon(
-                    _expanded
-                        ? Icons.expand_less
-                        : Icons.expand_more,
+                    _expanded ? Icons.expand_less : Icons.expand_more,
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ],
@@ -435,9 +434,11 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
 
                 // Created info
                 Text(
-                  'invite_created_on'.tr(args: [
-                    DateFormat.yMMMd().add_jm().format(invite.createdAt),
-                  ]),
+                  'invite_created_on'.tr(
+                    args: [
+                      DateFormat.yMMMd().add_jm().format(invite.createdAt),
+                    ],
+                  ),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -463,8 +464,7 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
                           label: 'copy_link'.tr(),
                           onPressed: () {
                             Clipboard.setData(
-                              ClipboardData(
-                                  text: _inviteUrl(invite.token)),
+                              ClipboardData(text: _inviteUrl(invite.token)),
                             );
                             context.showSuccess('invite_link_copied'.tr());
                           },
@@ -508,7 +508,9 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
                   ),
                   const SizedBox(height: ThemeConfig.spacingXS),
                   _UsageHistoryList(
-                      inviteId: invite.id, groupId: widget.groupId),
+                    inviteId: invite.id,
+                    groupId: widget.groupId,
+                  ),
                 ],
               ],
             ],
@@ -561,8 +563,7 @@ class _ActionChip extends StatelessWidget {
 class _UsageHistoryList extends ConsumerWidget {
   final String inviteId;
   final String groupId;
-  const _UsageHistoryList(
-      {required this.inviteId, required this.groupId});
+  const _UsageHistoryList({required this.inviteId, required this.groupId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -584,16 +585,16 @@ class _UsageHistoryList extends ConsumerWidget {
         };
         final userIdToName = <String, String>{
           for (final p in participants)
-            if (p.userId != null &&
-                p.name.isNotEmpty &&
-                p.userId!.isNotEmpty)
+            if (p.userId != null && p.name.isNotEmpty && p.userId!.isNotEmpty)
               p.userId!: p.name,
         };
         return Column(
           children: usages.map((usage) {
-            final dateStr =
-                DateFormat.yMMMd().add_jm().format(usage.acceptedAt);
-            final displayLabel = userIdToName[usage.userId] ??
+            final dateStr = DateFormat.yMMMd().add_jm().format(
+              usage.acceptedAt,
+            );
+            final displayLabel =
+                userIdToName[usage.userId] ??
                 (usage.userId.length > 8
                     ? '${usage.userId.substring(0, 8)}...'
                     : usage.userId);
@@ -608,10 +609,7 @@ class _UsageHistoryList extends ConsumerWidget {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      displayLabel,
-                      style: theme.textTheme.bodySmall,
-                    ),
+                    child: Text(displayLabel, style: theme.textTheme.bodySmall),
                   ),
                   Text(
                     dateStr,
@@ -705,8 +703,7 @@ class _InviteQrSheetContentState extends State<_InviteQrSheetContent> {
               children: [
                 FilledButton.tonalIcon(
                   onPressed: () {
-                    Clipboard.setData(
-                        ClipboardData(text: widget.url));
+                    Clipboard.setData(ClipboardData(text: widget.url));
                     context.showSuccess('invite_link_copied'.tr());
                   },
                   icon: const Icon(Icons.copy),

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/material_symbols_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +11,8 @@ import '../../../core/auth/auth_providers.dart';
 import '../../../core/auth/sign_in_sheet.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../core/constants/supabase_config.dart';
+import '../../../core/layout/layout_breakpoints.dart';
+import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/services/permission_service.dart';
 import '../../../core/theme/theme_config.dart';
@@ -28,6 +31,10 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
 
   static const List<Locale> _supportedLocales = [Locale('en'), Locale('ar')];
 
+  bool? _cameraGranted;
+  bool? _notificationGranted;
+  Future<({bool camera, bool notification})>? _permissionStatusFuture;
+
   @override
   void initState() {
     super.initState();
@@ -38,6 +45,12 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   void dispose() {
     _pageController.dispose();
     super.dispose();
+  }
+
+  Future<({bool camera, bool notification})> _loadPermissionStatus() async {
+    final camera = await PermissionService.isCameraPermissionGranted();
+    final notification = await PermissionService.isNotificationPermissionGranted();
+    return (camera: camera, notification: notification);
   }
 
   static String _localeDisplayName(Locale locale) {
@@ -70,7 +83,14 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
             Expanded(
               child: PageView(
                 controller: _pageController,
-                onPageChanged: (i) => setState(() => _currentPage = i),
+                onPageChanged: (i) {
+                  setState(() {
+                    _currentPage = i;
+                    if (i == 1 && _permissionStatusFuture == null) {
+                      _permissionStatusFuture = _loadPermissionStatus();
+                    }
+                  });
+                },
                 children: [
                   _buildPage1(context, ref, settings),
                   _buildPermissionsPage(context),
@@ -118,56 +138,64 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   ) {
     final currentLang = ref.watch(settings.provider(languageSettingDef));
     final colorScheme = Theme.of(context).colorScheme;
-    return IconButton(
-      style: IconButton.styleFrom(
-        backgroundColor: colorScheme.surfaceContainerHighest,
-        foregroundColor: colorScheme.onSurface,
-      ),
-      onPressed: () async {
-        final chosen = await showModalBottomSheet<Locale>(
-          context: context,
-          isScrollControlled: true,
-          constraints: BoxConstraints(
+    final tooltip =
+        '${'language'.tr()}: ${currentLang == 'ar' ? _localeDisplayName(const Locale('ar')) : _localeDisplayName(const Locale('en'))}';
+    return Semantics(
+      button: true,
+      label: tooltip,
+      child: IconButton(
+        style: IconButton.styleFrom(
+          backgroundColor: colorScheme.surfaceContainerHighest,
+          foregroundColor: colorScheme.onSurface,
+        ),
+        onPressed: () async {
+          final chosen = await showResponsiveSheet<Locale>(
+            context: context,
+            title: 'language'.tr(),
             maxHeight: MediaQuery.of(context).size.height * 0.75,
-          ),
-          builder: (ctx) => SafeArea(
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(ctx).padding.bottom + 16,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(
-                        'language'.tr(),
-                        style: Theme.of(ctx).textTheme.titleMedium,
-                      ),
+            isScrollControlled: true,
+            centerInFullViewport: true,
+            child: Builder(
+              builder: (ctx) => SafeArea(
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.of(ctx).padding.bottom + 16,
                     ),
-                    ..._supportedLocales.map(
-                      (locale) => ListTile(
-                        title: Text(_localeDisplayName(locale)),
-                        onTap: () => Navigator.of(ctx).pop(locale),
-                      ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (!LayoutBreakpoints.isTabletOrWider(context))
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Text(
+                              'language'.tr(),
+                              style: Theme.of(ctx).textTheme.titleMedium,
+                            ),
+                          ),
+                        ..._supportedLocales.map(
+                          (locale) => ListTile(
+                            title: Text(_localeDisplayName(locale)),
+                            onTap: () => Navigator.of(ctx).pop(locale),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
-        );
-        if (chosen != null && context.mounted) {
-          await ref
-              .read(settings.provider(languageSettingDef).notifier)
-              .set(chosen.languageCode);
-          // _LocaleSync will call setLocale when it sees provider != context.locale
-        }
-      },
-      icon: const Icon(Icons.language),
-      tooltip:
-          '${'language'.tr()}: ${currentLang == 'ar' ? _localeDisplayName(const Locale('ar')) : _localeDisplayName(const Locale('en'))}',
+          );
+          if (chosen != null && context.mounted) {
+            await ref
+                .read(settings.provider(languageSettingDef).notifier)
+                .set(chosen.languageCode);
+            // _LocaleSync will call setLocale when it sees provider != context.locale
+          }
+        },
+        icon: const Icon(Icons.language),
+        tooltip: tooltip,
+      ),
     );
   }
 
@@ -178,19 +206,24 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   ) {
     final currentTheme = ref.watch(settings.provider(themeModeSettingDef));
     final colorScheme = Theme.of(context).colorScheme;
-    return IconButton(
-      style: IconButton.styleFrom(
-        backgroundColor: colorScheme.surfaceContainerHighest,
-        foregroundColor: colorScheme.onSurface,
+    final tooltip = '${'theme'.tr()}: ${currentTheme.tr()}';
+    return Semantics(
+      button: true,
+      label: tooltip,
+      child: IconButton(
+        style: IconButton.styleFrom(
+          backgroundColor: colorScheme.surfaceContainerHighest,
+          foregroundColor: colorScheme.onSurface,
+        ),
+        onPressed: () {
+          const order = ['light', 'dark', 'system', 'amoled'];
+          final idx = order.indexOf(currentTheme);
+          final next = order[(idx + 1) % order.length];
+          ref.read(settings.provider(themeModeSettingDef).notifier).set(next);
+        },
+        icon: Icon(_themeIcon(currentTheme)),
+        tooltip: tooltip,
       ),
-      onPressed: () {
-        const order = ['light', 'dark', 'system', 'amoled'];
-        final idx = order.indexOf(currentTheme);
-        final next = order[(idx + 1) % order.length];
-        ref.read(settings.provider(themeModeSettingDef).notifier).set(next);
-      },
-      icon: Icon(_themeIcon(currentTheme)),
-      tooltip: '${'theme'.tr()}: ${currentTheme.tr()}',
     );
   }
 
@@ -211,56 +244,72 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
           ),
         ],
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: _currentPage > 0
-                  ? TextButton.icon(
-                      onPressed: () {
-                        _pageController.previousPage(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                        );
-                      },
-                      icon: const Icon(Icons.arrow_back),
-                      label: Text('onboarding_back'.tr()),
-                    )
-                  : const SizedBox.shrink(),
+      child: Semantics(
+        container: true,
+        explicitChildNodes: true,
+        child: Row(
+          children: [
+            Expanded(
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: _currentPage > 0
+                    ? Semantics(
+                        button: true,
+                        label: 'onboarding_back'.tr(),
+                        child: TextButton.icon(
+                          onPressed: () {
+                            _pageController.previousPage(
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeInOut,
+                            );
+                          },
+                          icon: const Icon(Icons.arrow_back),
+                          label: Text('onboarding_back'.tr()),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
             ),
-          ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildLanguageButton(context, ref, settings),
-              const SizedBox(width: ThemeConfig.spacingS),
-              _buildThemeButton(context, ref, settings),
-            ],
-          ),
-          Expanded(
-            child: Align(
-              alignment: AlignmentDirectional.centerEnd,
-              child: _currentPage < _lastPageIndex
-                  ? FilledButton.icon(
-                      onPressed: () {
-                        _pageController.nextPage(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                        );
-                      },
-                      icon: const Icon(Icons.arrow_forward),
-                      label: Text('onboarding_next'.tr()),
-                    )
-                  : FilledButton.icon(
-                      onPressed: () async =>
-                          await _completeOnboarding(ref, settings),
-                      icon: const Icon(Icons.check),
-                      label: Text('onboarding_complete'.tr()),
-                    ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildLanguageButton(context, ref, settings),
+                const SizedBox(width: ThemeConfig.spacingS),
+                _buildThemeButton(context, ref, settings),
+              ],
             ),
-          ),
-        ],
+            Expanded(
+              child: Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: _currentPage < _lastPageIndex
+                    ? Semantics(
+                        button: true,
+                        label: 'onboarding_next'.tr(),
+                        child: FilledButton.icon(
+                          onPressed: () {
+                            _pageController.nextPage(
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeInOut,
+                            );
+                          },
+                          icon: const Icon(Icons.arrow_forward),
+                          label: Text('onboarding_next'.tr()),
+                        ),
+                      )
+                    : Semantics(
+                        button: true,
+                        label: 'onboarding_complete'.tr(),
+                        child: FilledButton.icon(
+                          onPressed: () async =>
+                              await _completeOnboarding(ref, settings),
+                          icon: const Icon(Icons.check),
+                          label: Text('onboarding_complete'.tr()),
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -466,24 +515,57 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                       ),
                     ),
                     const SizedBox(height: ThemeConfig.spacingXL),
-                    _buildPermissionRow(
-                      context,
-                      icon: Icons.camera_alt_outlined,
-                      title: 'onboarding_permission_camera'.tr(),
-                      subtitle: 'onboarding_permission_camera_desc'.tr(),
-                      onAllow: () =>
-                          PermissionService.requestCameraPermission(context),
-                    ),
-                    _buildPermissionRow(
-                      context,
-                      icon: Icons.notifications_outlined,
-                      title: 'onboarding_permission_notifications'.tr(),
-                      subtitle:
-                          'onboarding_permission_notifications_desc'.tr(),
-                      onAllow: () =>
-                          PermissionService.requestNotificationPermission(
-                        context,
-                      ),
+                    FutureBuilder<({bool camera, bool notification})>(
+                      future: _permissionStatusFuture,
+                      builder: (context, snapshot) {
+                        final cameraGranted =
+                            _cameraGranted ?? snapshot.data?.camera ?? false;
+                        final notificationGranted =
+                            _notificationGranted ??
+                            snapshot.data?.notification ??
+                            false;
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (!kIsWeb)
+                              _buildPermissionRow(
+                                context,
+                                icon: Icons.camera_alt_outlined,
+                                title: 'onboarding_permission_camera'.tr(),
+                                subtitle:
+                                    'onboarding_permission_camera_desc'.tr(),
+                                granted: cameraGranted,
+                                onAllow: () async {
+                                  final result = await PermissionService
+                                      .requestCameraPermission(context);
+                                  if (mounted) {
+                                    setState(() => _cameraGranted = result);
+                                  }
+                                },
+                              ),
+                            _buildPermissionRow(
+                              context,
+                              icon: Icons.notifications_outlined,
+                              title:
+                                  'onboarding_permission_notifications'.tr(),
+                              subtitle:
+                                  'onboarding_permission_notifications_desc'
+                                      .tr(),
+                              granted: notificationGranted,
+                              onAllow: () async {
+                                final result = await PermissionService
+                                    .requestNotificationPermission(context);
+                                if (mounted) {
+                                  setState(
+                                    () => _notificationGranted = result,
+                                  );
+                                }
+                              },
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -500,7 +582,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     required IconData icon,
     required String title,
     required String subtitle,
-    required VoidCallback onAllow,
+    required bool granted,
+    required Future<void> Function() onAllow,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     return Card(
@@ -549,13 +632,29 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                 ],
               ),
             ),
-            Semantics(
-              label: '$title ${'onboarding_permission_allow'.tr()}',
-              child: FilledButton.tonal(
-                onPressed: onAllow,
-                child: Text('onboarding_permission_allow'.tr()),
+            if (granted)
+              Semantics(
+                label: '$title ${'onboarding_permission_allowed'.tr()}',
+                child: FilledButton.tonal(
+                  onPressed: null,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check_circle, size: 18, color: colorScheme.primary),
+                      const SizedBox(width: 6),
+                      Text('onboarding_permission_allowed'.tr()),
+                    ],
+                  ),
+                ),
+              )
+            else
+              Semantics(
+                label: '$title ${'onboarding_permission_allow'.tr()}',
+                child: FilledButton.tonal(
+                  onPressed: () async => await onAllow(),
+                  child: Text('onboarding_permission_allow'.tr()),
+                ),
               ),
-            ),
           ],
         ),
       ),

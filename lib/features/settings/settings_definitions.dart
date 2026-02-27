@@ -267,15 +267,15 @@ final homeListSection = const SettingSection(
   initiallyExpanded: true,
 );
 
-/// 'combined' = one list; 'separate' = Personal + Groups sections.
+/// Sections: separate (Personal + Groups) or combined list. Default list with Personal + Groups.
 final homeListDisplaySettingDef = const EnumSetting(
   'home_list_display',
-  defaultValue: 'separate',
+  defaultValue: 'list_separate',
   titleKey: 'home_list_display',
-  options: ['separate', 'combined'],
+  options: ['list_separate', 'list_combined'],
   optionLabels: {
-    'separate': 'home_list_display_separate',
-    'combined': 'home_list_display_combined',
+    'list_separate': 'home_list_display_list_separate',
+    'list_combined': 'home_list_display_list_combined',
   },
   icon: Icons.view_list,
   section: 'home_list',

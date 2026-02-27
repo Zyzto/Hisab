@@ -17,16 +17,16 @@ void main() {
         startLocale: const Locale('en'),
         child: MaterialApp(
           home: Scaffold(
-            body: Builder(
-              builder: (context) {
-                return LogsViewerDialog(
-                  content: 'Log line 1\nLog line 2',
-                  onCopy: () async {},
-                  onClear: () async {},
-                  onReportIssue: () async {},
-                  onClose: () {},
-                );
-              },
+            body: SizedBox(
+              width: 400,
+              height: 600,
+              child: LogsViewerDialog(
+                content: 'Log line 1\nLog line 2',
+                onCopy: () async {},
+                onClear: () async {},
+                onReportIssue: () async {},
+                onClose: () {},
+              ),
             ),
           ),
         ),
@@ -34,6 +34,6 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.byType(LogsViewerDialog), findsOneWidget);
-    expect(find.byIcon(Icons.terminal), findsOneWidget);
+    expect(find.byIcon(Icons.delete_outline), findsOneWidget);
   });
 }

@@ -28,6 +28,29 @@ flutter test test/settle_up_service_test.dart
 
 Tests in `local_database_test.dart`, `sync_test.dart`, and `supabase_repository_test.dart` depend on the PowerSync native binary. On first run they probe for availability (e.g. by initializing a temporary database). If the binary cannot be loaded (e.g. in some CI environments or when the platform is unsupported), those tests are skipped; the rest of the suite still runs.
 
+## Integration tests
+
+Full-app integration tests live in `integration_test/`. They run the real UI (App + GoRouter + providers) with a temp PowerSync DB and no live Supabase/Firebase (local-only).
+
+**App targets:** Web (desktop/tablet/mobile), Android, iOS. Integration tests run on a device or desktop that Flutter supports for `integration_test` (not web — Flutter does not support web for integration tests yet).
+
+Run on Linux desktop (e.g. CI or local):
+
+```bash
+flutter test integration_test/ -d linux
+```
+
+Run on Android or iOS when an emulator/device is available:
+
+```bash
+flutter test integration_test/ -d <device_id>
+```
+
+- **Bootstrap:** `integration_test/integration_test_bootstrap.dart` initializes EasyLocalization, a temp DB, and settings (onboarding completed, local-only), then calls `runApp(...)` with the same overrides as production. No Supabase/Firebase or LoggingService.
+- **Tests:** `integration_test/app_test.dart` contains a smoke test (app opens to home) and a create-group flow (FAB → Create Group → name → Next → Skip → Next → Create Group).
+- **Requirements:** PowerSync native binary (same as `local_database_test.dart`). If the binary is unavailable, the bootstrap returns `false` and tests fail with a clear message.
+- **CI:** Uses Linux desktop (`flutter test integration_test/ -d linux` with xvfb). For Android/iOS, use an emulator or Firebase Test Lab.
+
 ## Supabase
 
 There are no live Supabase calls in CI. Online-mode repository behaviour is tested with a fake or mock client. For optional manual integration tests against a real Supabase project, run with:

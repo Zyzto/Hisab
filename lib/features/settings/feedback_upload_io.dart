@@ -9,8 +9,8 @@ const String _bucket = 'feedback-screenshots';
 
 /// Upload failure is non-fatal; issue body still includes fallback text.
 Future<String?> uploadFeedbackScreenshot(Uint8List pngBytes) async {
-  if (!supabaseConfigAvailable || pngBytes.isEmpty) return null;
-  final client = Supabase.instance.client;
+  final client = supabaseClientIfConfigured;
+  if (client == null || pngBytes.isEmpty) return null;
   final bucketKey = 'feedback/${const Uuid().v4()}.png';
   try {
     await client.storage.from(_bucket).uploadBinary(

@@ -4,13 +4,14 @@ import 'package:easy_localization/easy_localization.dart';
 import '../../../domain/domain.dart';
 import '../constants/expense_form_constants.dart';
 
-/// Title input with category tag button and receipt scan button.
+/// Title input with category tag button and optional add-photos button.
+/// When [onPickReceipt] is null, the camera button is hidden (e.g. when Photos section is visible).
 class ExpenseTitleSection extends StatelessWidget {
   final TextEditingController controller;
   final String? selectedTag;
   final List<ExpenseTag> customTags;
   final VoidCallback onTagPicker;
-  final VoidCallback onPickReceipt;
+  final VoidCallback? onPickReceipt;
   final String? Function(String?)? validator;
 
   const ExpenseTitleSection({
@@ -19,7 +20,7 @@ class ExpenseTitleSection extends StatelessWidget {
     required this.selectedTag,
     required this.customTags,
     required this.onTagPicker,
-    required this.onPickReceipt,
+    this.onPickReceipt,
     this.validator,
   });
 
@@ -78,14 +79,15 @@ class ExpenseTitleSection extends StatelessWidget {
                   onPressed: onTagPicker,
                   tooltip: tagLabel ?? 'category'.tr(),
                 ),
-                IconButton(
-                  icon: Icon(
-                    Icons.camera_alt_outlined,
-                    color: theme.colorScheme.onSurfaceVariant,
+                if (onPickReceipt != null)
+                  IconButton(
+                    icon: Icon(
+                      Icons.camera_alt_outlined,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    onPressed: onPickReceipt,
+                    tooltip: 'add_photos'.tr(),
                   ),
-                  onPressed: onPickReceipt,
-                  tooltip: 'scan_receipt'.tr(),
-                ),
               ],
             ),
           ),

@@ -932,7 +932,7 @@ final class HomeListDisplayProvider
   }
 }
 
-String _$homeListDisplayHash() => r'a84613e1fb88e9876d9b403e0059f3a178c7de21';
+String _$homeListDisplayHash() => r'ffcfa9791b77d9b46f55d0a5ab9d4a4356a732b3';
 
 @ProviderFor(homeListSort)
 final homeListSortProvider = HomeListSortProvider._();

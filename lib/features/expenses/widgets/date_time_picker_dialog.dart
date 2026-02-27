@@ -1,8 +1,11 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../../core/layout/layout_breakpoints.dart';
+import '../../../core/layout/responsive_sheet.dart';
+import '../../../core/widgets/sheet_helpers.dart';
 
-/// Shows a combined date and time picker dialog.
+/// Shows a combined date and time picker as a responsive sheet.
 /// Returns the selected [DateTime] (local) on OK, or null if cancelled.
 /// [use24h] when true forces 24-hour time; when false forces 12-hour AM/PM; when null uses [MediaQuery.alwaysUse24HourFormatOf].
 Future<DateTime?> showDateTimePickerDialog(
@@ -10,24 +13,40 @@ Future<DateTime?> showDateTimePickerDialog(
   required DateTime initial,
   bool? use24h,
 }) async {
-  return showDialog<DateTime>(
+  return showResponsiveSheet<DateTime>(
     context: context,
-    builder: (ctx) => _DateTimePickerDialog(initial: initial, use24h: use24h),
+    title: 'date_and_time'.tr(),
+    maxHeight: MediaQuery.of(context).size.height * 0.85,
+    isScrollControlled: true,
+    centerInFullViewport: true,
+    child: Builder(
+      builder: (ctx) => _DateTimePickerSheetContent(
+        initial: initial,
+        use24h: use24h,
+        sheetContext: ctx,
+      ),
+    ),
   );
 }
 
-/// Single dialog: calendar on top, time selector below, Cancel/OK. No Start/End tabs.
-class _DateTimePickerDialog extends StatefulWidget {
+/// Sheet content: calendar, time selector, Today, Cancel/OK.
+class _DateTimePickerSheetContent extends StatefulWidget {
+  const _DateTimePickerSheetContent({
+    required this.initial,
+    this.use24h,
+    required this.sheetContext,
+  });
+
   final DateTime initial;
   final bool? use24h;
-
-  const _DateTimePickerDialog({required this.initial, this.use24h});
+  final BuildContext sheetContext;
 
   @override
-  State<_DateTimePickerDialog> createState() => _DateTimePickerDialogState();
+  State<_DateTimePickerSheetContent> createState() =>
+      _DateTimePickerSheetContentState();
 }
 
-class _DateTimePickerDialogState extends State<_DateTimePickerDialog> {
+class _DateTimePickerSheetContentState extends State<_DateTimePickerSheetContent> {
   late DateTime _selectedDate;
   /// Hour in 24h (0-23). Used for both 24h and 12h; in 12h we derive display from this.
   late int _hour24;
@@ -37,14 +56,21 @@ class _DateTimePickerDialogState extends State<_DateTimePickerDialog> {
   @override
   void initState() {
     super.initState();
-    _selectedDate = DateTime(
-      widget.initial.year,
-      widget.initial.month,
-      widget.initial.day,
-    );
-    _hour24 = widget.initial.hour;
-    _minute = widget.initial.minute;
-    _isAm = widget.initial.hour < 12;
+    final i = widget.initial;
+    _selectedDate = DateTime(i.year, i.month, i.day);
+    _hour24 = i.hour;
+    _minute = i.minute;
+    _isAm = i.hour < 12;
+  }
+
+  void _setToNow() {
+    final now = DateTime.now();
+    setState(() {
+      _selectedDate = DateTime(now.year, now.month, now.day);
+      _hour24 = now.hour;
+      _minute = now.minute;
+      _isAm = now.hour < 12;
+    });
   }
 
   /// 12h display value: 12 for 0 or 12, 1-11 for 1-11 and 13-23.
@@ -59,131 +85,127 @@ class _DateTimePickerDialogState extends State<_DateTimePickerDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final ctx = widget.sheetContext;
     final use24h = widget.use24h ?? MediaQuery.alwaysUse24HourFormatOf(context);
-    return AlertDialog(
-      title: Text('date_and_time'.tr()),
-      contentPadding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-      content: SizedBox(
-        width: 320,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            CalendarDatePicker(
-                key: ValueKey('${_selectedDate.year}-${_selectedDate.month}'),
-                initialDate: _selectedDate,
-                firstDate: DateTime(2000),
-                lastDate: DateTime(2100),
-                currentDate: _selectedDate,
-                onDateChanged: (d) => setState(() => _selectedDate = d),
+    return buildSheetShell(
+      ctx,
+      title: 'date_and_time'.tr(),
+      showTitleInBody: !LayoutBreakpoints.isTabletOrWider(context),
+      body: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                _setToNow();
+              },
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              Semantics(
-                label: 'time'.tr(),
-                value: () {
-                  final t = DateTime(2000, 1, 1, _hour24, _minute);
-                  return use24h
-                      ? DateFormat.Hm().format(t)
-                      : DateFormat.jm().format(t);
-                }(),
-                readOnly: true,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _TimeColumn<int>(
-                          items: use24h
-                              ? List.generate(24, (i) => i)
-                              : List.generate(12, (i) => i == 0 ? 12 : i),
-                          value: use24h ? _hour24 : _hour12Value,
-                          onChanged: (v) => setState(() {
-                            if (use24h) {
-                              _hour24 = v;
-                            } else {
-                              _hour24 = _DateTimePickerDialogState._hour24From12h(
-                                  v, _isAm);
-                            }
-                          }),
-                          format: (v) => '$v',
-                          semanticLabel: 'hour'.tr(),
-                        ),
-                        const SizedBox(width: 8),
-                        _TimeColumn<int>(
-                          items: List.generate(60, (i) => i),
-                          value: _minute,
-                          onChanged: (v) => setState(() => _minute = v),
-                          format: (v) => v.toString().padLeft(2, '0'),
-                          semanticLabel: 'minute'.tr(),
-                        ),
-                        if (!use24h) ...[
-                          const SizedBox(width: 8),
-                          _TimeColumn<DayPeriod>(
-                            items: const [DayPeriod.am, DayPeriod.pm],
-                            value: _isAm ? DayPeriod.am : DayPeriod.pm,
-                            onChanged: (v) =>
-                                setState(() => _isAm = v == DayPeriod.am),
-                            format: (v) => v == DayPeriod.am ? 'AM' : 'PM',
-                            semanticLabel: 'period'.tr(),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              icon: const Icon(Icons.today_outlined, size: 18),
+              label: Text('today'.tr()),
+            ),
           ),
-        ),
-      actionsPadding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-      actions: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            OutlinedButton.icon(
-                onPressed: () {
-                  HapticFeedback.lightImpact();
-                  final now = DateTime.now();
-                  setState(() {
-                    _selectedDate = DateTime(now.year, now.month, now.day);
-                    _hour24 = now.hour;
-                    _minute = now.minute;
-                    _isAm = now.hour < 12;
-                  });
-                },
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                icon: const Icon(Icons.today_outlined, size: 18),
-                label: Text('today'.tr()),
-              ),
-            Row(
+          SizedBox(
+            width: 320,
+            child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text('cancel'.tr()),
+                CalendarDatePicker(
+                  key: ValueKey('${_selectedDate.year}-${_selectedDate.month}'),
+                  initialDate: _selectedDate,
+                  firstDate: DateTime(2000),
+                  lastDate: DateTime(2100),
+                  currentDate: _selectedDate,
+                  onDateChanged: (d) => setState(() => _selectedDate = d),
                 ),
-                FilledButton(
-                  onPressed: () {
-                    Navigator.of(context).pop(
-                      DateTime(
-                        _selectedDate.year,
-                        _selectedDate.month,
-                        _selectedDate.day,
-                        _hour24,
-                        _minute,
+                Semantics(
+                  label: 'time'.tr(),
+                  value: () {
+                    final t = DateTime(2000, 1, 1, _hour24, _minute);
+                    return use24h
+                        ? DateFormat.Hm().format(t)
+                        : DateFormat.jm().format(t);
+                  }(),
+                  readOnly: true,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _TimeColumn<int>(
+                            items: use24h
+                                ? List.generate(24, (i) => i)
+                                : List.generate(12, (i) => i == 0 ? 12 : i),
+                            value: use24h ? _hour24 : _hour12Value,
+                            onChanged: (v) => setState(() {
+                              if (use24h) {
+                                _hour24 = v;
+                              } else {
+                                _hour24 =
+                                    _DateTimePickerSheetContentState._hour24From12h(
+                                        v, _isAm);
+                              }
+                            }),
+                            format: (v) => '$v',
+                            semanticLabel: 'hour'.tr(),
+                          ),
+                          const SizedBox(width: 8),
+                          _TimeColumn<int>(
+                            items: List.generate(60, (i) => i),
+                            value: _minute,
+                            onChanged: (v) => setState(() => _minute = v),
+                            format: (v) => v.toString().padLeft(2, '0'),
+                            semanticLabel: 'minute'.tr(),
+                          ),
+                          if (!use24h) ...[
+                            const SizedBox(width: 8),
+                            _TimeColumn<DayPeriod>(
+                              items: const [DayPeriod.am, DayPeriod.pm],
+                              value: _isAm ? DayPeriod.am : DayPeriod.pm,
+                              onChanged: (v) =>
+                                  setState(() => _isAm = v == DayPeriod.am),
+                              format: (v) => v == DayPeriod.am ? 'AM' : 'PM',
+                              semanticLabel: 'period'.tr(),
+                            ),
+                          ],
+                        ],
                       ),
-                    );
-                  },
-                  child: Text('ok'.tr()),
+                    ],
+                  ),
                 ),
               ],
             ),
-          ],
+          ),
+        ],
+      ),
+      actions: [
+        if (!LayoutBreakpoints.isTabletOrWider(context))
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('cancel'.tr()),
+          ),
+        FilledButton(
+          onPressed: () {
+            Navigator.of(ctx).pop(
+              DateTime(
+                _selectedDate.year,
+                _selectedDate.month,
+                _selectedDate.day,
+                _hour24,
+                _minute,
+              ),
+            );
+          },
+          child: Text('ok'.tr()),
         ),
       ],
     );

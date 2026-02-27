@@ -4,6 +4,10 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:custom_sliding_segmented_control/custom_sliding_segmented_control.dart';
+import '../../../core/layout/content_aligned_app_bar.dart';
+import '../../../core/layout/constrained_content.dart';
+import '../../../core/layout/layout_breakpoints.dart';
+import '../../../core/layout/responsive_sheet.dart';
 import '../providers/groups_provider.dart';
 import '../providers/group_member_provider.dart';
 import '../widgets/create_invite_sheet.dart';
@@ -14,6 +18,7 @@ import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/widgets/async_value_builder.dart';
 import '../../../core/widgets/error_content.dart';
+import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/toast.dart';
 import '../../expenses/widgets/expense_list_tile.dart';
 import '../../expenses/category_icons.dart';
@@ -89,6 +94,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
   late ValueNotifier<int> _tabIndexNotifier;
   late PageController _pageController;
   late CustomSegmentedController<int> _segmentController;
+
   /// When non-null, we're animating to this page from a segment tap; ignore
   /// intermediate [onPageChanged] until we reach this index.
   int? _programmaticTargetPage;
@@ -116,7 +122,9 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
       await ref.read(dataSyncServiceProvider.notifier).syncNow();
       Log.info('Group detail refresh: sync complete, invalidating providers');
     } else {
-      Log.debug('Group detail refresh: local-only, invalidating providers only');
+      Log.debug(
+        'Group detail refresh: local-only, invalidating providers only',
+      );
     }
     ref.invalidate(futureGroupProvider(widget.group.id));
     ref.invalidate(expensesByGroupProvider(widget.group.id));
@@ -185,7 +193,8 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                (widget.group.isPersonal ? 'list_archived' : 'group_archived').tr(),
+                (widget.group.isPersonal ? 'list_archived' : 'group_archived')
+                    .tr(),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -246,187 +255,198 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
         : ref.watch(myRoleInGroupProvider(widget.group.id));
     final myRole = myRoleAsync.value;
 
-    return Scaffold(
-      appBar: AppBar(
-        titleSpacing: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go(RoutePaths.home);
-            }
-          },
-        ),
-        title: _buildAppBarTitle(context),
-        actions: [
-          if (!localOnly &&
-              (myRole == GroupRole.owner || myRole == GroupRole.admin) &&
-              !widget.group.isPersonal)
-            IconButton(
-              icon: const Icon(Icons.person_add),
-              tooltip: 'invite_people'.tr(),
-              onPressed: () =>
-                  showCreateInviteSheet(context, ref, widget.group.id),
+    return LayoutBuilder(
+      builder: (context, layoutConstraints) {
+        return Scaffold(
+          appBar: ContentAlignedAppBar(
+            contentAreaWidth: layoutConstraints.maxWidth,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () {
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go(RoutePaths.home);
+                }
+              },
             ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () =>
-                context.push(RoutePaths.groupSettings(widget.group.id)),
+            title: _buildAppBarTitle(context),
+            actions: [
+              if (!localOnly &&
+                  (myRole == GroupRole.owner || myRole == GroupRole.admin) &&
+                  !widget.group.isPersonal)
+                IconButton(
+                  icon: const Icon(Icons.person_add),
+                  tooltip: 'invite_people'.tr(),
+                  onPressed: () =>
+                      showCreateInviteSheet(context, ref, widget.group.id),
+                ),
+              IconButton(
+                icon: const Icon(Icons.settings),
+                onPressed: () =>
+                    context.push(RoutePaths.groupSettings(widget.group.id)),
+              ),
+            ],
           ),
-        ],
-      ),
-      body: Column(
-        children: [
-          if (widget.group.isArchived) _buildArchivedBanner(context),
-          if (widget.group.isPersonal) ...[
-            _PersonalBudgetHeader(
-              group: widget.group,
-              onRefresh: _onRefresh,
-            ),
-            Expanded(
-              child: _ExpensesTab(
-                groupId: widget.group.id,
-                group: widget.group,
-                onRefresh: _onRefresh,
-              ),
-            ),
-          ] else ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Theme(
-                data: Theme.of(context).copyWith(
-                  splashFactory: NoSplash.splashFactory,
-                  highlightColor: Colors.transparent,
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Builder(
-                    builder: (context) {
-                      final theme = Theme.of(context);
-                      final colorScheme = theme.colorScheme;
-                      return CustomSlidingSegmentedControl<int>(
-                        controller: _segmentController,
-                        children: {
-                          0: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: Text(
-                              'expenses'.tr(),
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: _selectedTabIndex == 0
-                                    ? colorScheme.primary
-                                    : colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                          1: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: Text(
-                              'balance'.tr(),
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: _selectedTabIndex == 1
-                                    ? colorScheme.primary
-                                    : colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                          2: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: Text(
-                              'people'.tr(),
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: _selectedTabIndex == 2
-                                    ? colorScheme.primary
-                                    : colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                        },
-                        height: 52,
-                        padding: 16,
-                        innerPadding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest
-                              .withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        thumbDecoration: BoxDecoration(
-                          color: colorScheme.surface,
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: [
-                            BoxShadow(
-                              color: colorScheme.shadow.withValues(alpha: 0.1),
-                              blurRadius: 3,
-                              offset: const Offset(0, 1),
-                            ),
-                          ],
-                        ),
-                        isStretch: true,
-                        duration: const Duration(milliseconds: 200),
-                        curve: Curves.easeInOut,
-                        onValueChanged: (v) {
-                          setState(() {
-                            _selectedTabIndex = v;
-                            _programmaticTargetPage = v;
-                          });
-                          _tabIndexNotifier.value = v;
-                          _pageController.animateToPage(
-                            v,
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeInOut,
-                          ).whenComplete(() {
-                            if (mounted) {
-                              setState(() => _programmaticTargetPage = null);
-                            }
-                          });
-                        },
-                      );
-                    },
-                  ),
+          body: ConstrainedContent(
+        child: Column(
+          children: [
+            if (widget.group.isArchived) _buildArchivedBanner(context),
+            if (widget.group.isPersonal) ...[
+              _PersonalBudgetHeader(group: widget.group, onRefresh: _onRefresh),
+              Expanded(
+                child: _ExpensesTab(
+                  groupId: widget.group.id,
+                  group: widget.group,
+                  onRefresh: _onRefresh,
                 ),
               ),
-            ),
-            Expanded(
-              child: PageView(
-                controller: _pageController,
-                onPageChanged: (i) {
-                  if (_programmaticTargetPage != null && i != _programmaticTargetPage) {
-                    return;
-                  }
-                  if (_programmaticTargetPage != null) {
-                    setState(() => _programmaticTargetPage = null);
-                  }
-                  setState(() => _selectedTabIndex = i);
-                  _tabIndexNotifier.value = i;
-                  _segmentController.value = i;
-                },
-                children: [
-                  _ExpensesTab(
-                    groupId: widget.group.id,
-                    group: widget.group,
-                    onRefresh: _onRefresh,
+            ] else ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                child: Theme(
+                  data: Theme.of(context).copyWith(
+                    splashFactory: NoSplash.splashFactory,
+                    highlightColor: Colors.transparent,
                   ),
-                  _BalanceTab(
-                    groupId: widget.group.id,
-                    onRefresh: _onRefresh,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Builder(
+                      builder: (context) {
+                        final theme = Theme.of(context);
+                        final colorScheme = theme.colorScheme;
+                        return CustomSlidingSegmentedControl<int>(
+                          controller: _segmentController,
+                          children: {
+                            0: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Text(
+                                'expenses'.tr(),
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: _selectedTabIndex == 0
+                                      ? colorScheme.primary
+                                      : colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                            1: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Text(
+                                'balance'.tr(),
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: _selectedTabIndex == 1
+                                      ? colorScheme.primary
+                                      : colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                            2: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Text(
+                                'people'.tr(),
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: _selectedTabIndex == 2
+                                      ? colorScheme.primary
+                                      : colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                          },
+                          height: 52,
+                          padding: 16,
+                          innerPadding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerHighest
+                                .withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          thumbDecoration: BoxDecoration(
+                            color: colorScheme.surface,
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: [
+                              BoxShadow(
+                                color: colorScheme.shadow.withValues(
+                                  alpha: 0.1,
+                                ),
+                                blurRadius: 3,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                          isStretch: true,
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeInOut,
+                          onValueChanged: (v) {
+                            setState(() {
+                              _selectedTabIndex = v;
+                              _programmaticTargetPage = v;
+                            });
+                            _tabIndexNotifier.value = v;
+                            _pageController
+                                .animateToPage(
+                                  v,
+                                  duration: const Duration(milliseconds: 300),
+                                  curve: Curves.easeInOut,
+                                )
+                                .whenComplete(() {
+                                  if (mounted) {
+                                    setState(
+                                      () => _programmaticTargetPage = null,
+                                    );
+                                  }
+                                });
+                          },
+                        );
+                      },
+                    ),
                   ),
-                  _PeopleTab(
-                    groupId: widget.group.id,
-                    group: widget.group,
-                    onRefresh: _onRefresh,
-                  ),
-                ],
+                ),
               ),
-            ),
+              Expanded(
+                child: PageView(
+                  controller: _pageController,
+                  onPageChanged: (i) {
+                    if (_programmaticTargetPage != null &&
+                        i != _programmaticTargetPage) {
+                      return;
+                    }
+                    if (_programmaticTargetPage != null) {
+                      setState(() => _programmaticTargetPage = null);
+                    }
+                    setState(() => _selectedTabIndex = i);
+                    _tabIndexNotifier.value = i;
+                    _segmentController.value = i;
+                  },
+                  children: [
+                    _ExpensesTab(
+                      groupId: widget.group.id,
+                      group: widget.group,
+                      onRefresh: _onRefresh,
+                    ),
+                    _BalanceTab(
+                      groupId: widget.group.id,
+                      onRefresh: _onRefresh,
+                    ),
+                    _PeopleTab(
+                      groupId: widget.group.id,
+                      group: widget.group,
+                      onRefresh: _onRefresh,
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
       floatingActionButton: ValueListenableBuilder<int>(
         valueListenable: _tabIndexNotifier,
@@ -439,16 +459,15 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
             ) ??
             const SizedBox.shrink(),
       ),
+        );
+      },
     );
   }
 }
 
 /// Budget summary for personal groups: My budget + total spent; theme-aware color when near/over budget.
 class _PersonalBudgetHeader extends ConsumerWidget {
-  const _PersonalBudgetHeader({
-    required this.group,
-    required this.onRefresh,
-  });
+  const _PersonalBudgetHeader({required this.group, required this.onRefresh});
 
   final Group group;
   final Future<void> Function() onRefresh;
@@ -463,14 +482,19 @@ class _PersonalBudgetHeader extends ConsumerWidget {
 
     return expensesAsync.when(
       data: (expenses) {
-        final totalSpentCents =
-            expenses.fold<int>(0, (s, e) => s + e.effectiveBaseAmountCents);
+        final totalSpentCents = expenses.fold<int>(
+          0,
+          (s, e) => s + e.effectiveBaseAmountCents,
+        );
         final hasBudget = budgetCents != null && budgetCents > 0;
         final overBudget = hasBudget && totalSpentCents >= budgetCents;
         final nearBudget =
-            hasBudget && !overBudget && totalSpentCents >= (budgetCents * 0.8).round();
-        final attentionColor =
-            overBudget ? colorScheme.error : (nearBudget ? colorScheme.tertiary : null);
+            hasBudget &&
+            !overBudget &&
+            totalSpentCents >= (budgetCents * 0.8).round();
+        final attentionColor = overBudget
+            ? colorScheme.error
+            : (nearBudget ? colorScheme.tertiary : null);
 
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -479,7 +503,9 @@ class _PersonalBudgetHeader extends ConsumerWidget {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
               side: BorderSide(
-                color: attentionColor ?? colorScheme.outline.withValues(alpha: 0.2),
+                color:
+                    attentionColor ??
+                    colorScheme.outline.withValues(alpha: 0.2),
               ),
             ),
             child: Padding(
@@ -579,7 +605,8 @@ class _ExpensesTab extends ConsumerWidget {
     return participantsAsync.when(
       data: (participants) {
         final nameOf = {for (final p in participants) p.id: p.name};
-        final currentUserParticipantId = myMemberAsync is AsyncData<GroupMember?>
+        final currentUserParticipantId =
+            myMemberAsync is AsyncData<GroupMember?>
             ? myMemberAsync.value?.participantId
             : null;
 
@@ -634,74 +661,75 @@ class _ExpensesTab extends ConsumerWidget {
             return RefreshIndicator(
               onRefresh: onRefresh,
               child: ListView.builder(
+                key: const PageStorageKey<String>('group_detail_expenses'),
                 padding: const EdgeInsets.only(bottom: 24),
                 itemCount: flattenedItems.length,
                 itemBuilder: (context, index) {
-                final item = flattenedItems[index];
-                switch (item) {
-                  case _ExpenseListSummaryItem():
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      child: group.isPersonal
-                          ? _ExpenseSummaryCard(
-                              label: 'my_expenses'.tr(),
-                              value:
-                                  '${CurrencyFormatter.formatCompactCents(item.totalCents)} $currencyCode',
-                              theme: theme,
-                            )
-                          : Row(
-                              children: [
-                                Expanded(
-                                  child: _ExpenseSummaryCard(
-                                    label: 'my_expenses'.tr(),
-                                    value:
-                                        '${CurrencyFormatter.formatCompactCents(item.myExpensesCents)} $currencyCode',
-                                    theme: theme,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _ExpenseSummaryCard(
-                                    label: 'total_expenses'.tr(),
-                                    value:
-                                        '${CurrencyFormatter.formatCompactCents(item.totalCents)} $currencyCode',
-                                    theme: theme,
-                                  ),
-                                ),
-                              ],
-                            ),
-                    );
-                  case _ExpenseListDateHeaderItem():
-                    return Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
-                      child: Text(
-                        dateFormat.format(item.date),
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                  final item = flattenedItems[index];
+                  switch (item) {
+                    case _ExpenseListSummaryItem():
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
                         ),
-                      ),
-                    );
-                  case _ExpenseListExpenseItem():
-                    final expense = item.expense;
-                    return InkWell(
-                      key: ValueKey(expense.id),
-                      onTap: () => context.push(
-                        RoutePaths.groupExpenseDetail(groupId, expense.id),
-                      ),
-                      child: ExpenseListTile(
-                        expense: expense,
-                        payerName:
-                            nameOf[expense.payerParticipantId] ??
-                            expense.payerParticipantId,
-                        icon: iconForExpenseTag(expense.tag, customTags),
-                        showPaidBy: !group.isPersonal,
-                      ),
-                    );
-                }
-              },
+                        child: group.isPersonal
+                            ? _ExpenseSummaryCard(
+                                label: 'my_expenses'.tr(),
+                                value:
+                                    '${CurrencyFormatter.formatCompactCents(item.totalCents)} $currencyCode',
+                                theme: theme,
+                              )
+                            : Row(
+                                children: [
+                                  Expanded(
+                                    child: _ExpenseSummaryCard(
+                                      label: 'my_expenses'.tr(),
+                                      value:
+                                          '${CurrencyFormatter.formatCompactCents(item.myExpensesCents)} $currencyCode',
+                                      theme: theme,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: _ExpenseSummaryCard(
+                                      label: 'total_expenses'.tr(),
+                                      value:
+                                          '${CurrencyFormatter.formatCompactCents(item.totalCents)} $currencyCode',
+                                      theme: theme,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                      );
+                    case _ExpenseListDateHeaderItem():
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+                        child: Text(
+                          dateFormat.format(item.date),
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      );
+                    case _ExpenseListExpenseItem():
+                      final expense = item.expense;
+                      return InkWell(
+                        key: ValueKey(expense.id),
+                        onTap: () => context.push(
+                          RoutePaths.groupExpenseDetail(groupId, expense.id),
+                        ),
+                        child: ExpenseListTile(
+                          expense: expense,
+                          payerName:
+                              nameOf[expense.payerParticipantId] ??
+                              expense.payerParticipantId,
+                          icon: iconForExpenseTag(expense.tag, customTags),
+                          showPaidBy: !group.isPersonal,
+                        ),
+                      );
+                  }
+                },
               ),
             );
           },
@@ -765,7 +793,8 @@ class _PeopleTab extends ConsumerWidget {
           data: (members) {
             final theme = Theme.of(context);
             final myRole = myRoleAsync.value;
-            final isOwnerOrAdmin = localOnly ||
+            final isOwnerOrAdmin =
+                localOnly ||
                 myRole == GroupRole.owner ||
                 myRole == GroupRole.admin;
 
@@ -798,134 +827,136 @@ class _PeopleTab extends ConsumerWidget {
             return RefreshIndicator(
               onRefresh: onRefresh,
               child: ListView(
+                key: const PageStorageKey<String>('group_detail_members'),
                 padding: const EdgeInsets.symmetric(
                   vertical: 8,
                   horizontal: 16,
                 ),
                 children: [
-                ...activeParticipants.map((p) {
-                  final linkedMember = memberByParticipantId[p.id];
-                  final hasUserId = p.userId != null;
-                  final isActive = linkedMember != null;
-                  final isLeft = hasUserId && !isActive;
+                  ...activeParticipants.map((p) {
+                    final linkedMember = memberByParticipantId[p.id];
+                    final hasUserId = p.userId != null;
+                    final isActive = linkedMember != null;
+                    final isLeft = hasUserId && !isActive;
 
-                  final emoji = avatarEmoji(p.avatarId);
-
-                  return ListTile(
-                    key: ValueKey(p.id),
-                    leading: CircleAvatar(
-                      backgroundColor: isLeft
-                          ? theme.colorScheme.surfaceContainerHighest
-                          : null,
-                      child: emoji != null
-                          ? Text(
-                              emoji,
-                              style: TextStyle(
-                                fontSize: 22,
-                                color: isLeft
-                                    ? theme.colorScheme.onSurfaceVariant
-                                    : null,
-                              ),
-                            )
-                          : Text(
-                              p.name.isNotEmpty
-                                  ? p.name[0].toUpperCase()
-                                  : '?',
-                              style: isLeft
-                                  ? TextStyle(
-                                      color: theme.colorScheme.onSurfaceVariant,
-                                    )
-                                  : null,
-                            ),
-                    ),
-                    title: Text(
-                      p.name,
-                      style: isLeft
-                          ? TextStyle(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            )
-                          : null,
-                    ),
-                    subtitle: isActive
-                        ? Text(_roleLabel(linkedMember.role))
-                        : isLeft
-                            ? Text(
-                                'left'.tr(),
-                                style: TextStyle(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                  fontStyle: FontStyle.italic,
-                                ),
-                              )
-                            : null,
-                    trailing: _buildTrailing(
-                      context,
-                      ref,
-                      groupId,
-                      p,
-                      linkedMember,
-                      isActive,
-                      isLeft,
-                      isOwnerOrAdmin,
-                      myRole,
-                      localOnly,
-                      members,
-                      participants,
-                    ),
-                  );
-                }),
-                if (pastParticipants.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 16, bottom: 8),
-                    child: Text(
-                      'past_members'.tr(),
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                  ...pastParticipants.map((p) {
                     final emoji = avatarEmoji(p.avatarId);
+
                     return ListTile(
-                      key: ValueKey('past_${p.id}'),
+                      key: ValueKey(p.id),
                       leading: CircleAvatar(
-                        backgroundColor:
-                            theme.colorScheme.surfaceContainerHighest,
+                        backgroundColor: isLeft
+                            ? theme.colorScheme.surfaceContainerHighest
+                            : null,
                         child: emoji != null
                             ? Text(
                                 emoji,
                                 style: TextStyle(
                                   fontSize: 22,
-                                  color: theme.colorScheme.onSurfaceVariant,
+                                  color: isLeft
+                                      ? theme.colorScheme.onSurfaceVariant
+                                      : null,
                                 ),
                               )
                             : Text(
                                 p.name.isNotEmpty
                                     ? p.name[0].toUpperCase()
                                     : '?',
-                                style: TextStyle(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
+                                style: isLeft
+                                    ? TextStyle(
+                                        color:
+                                            theme.colorScheme.onSurfaceVariant,
+                                      )
+                                    : null,
                               ),
                       ),
                       title: Text(
                         p.name,
-                        style: TextStyle(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                        style: isLeft
+                            ? TextStyle(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              )
+                            : null,
                       ),
-                      subtitle: Text(
-                        'left'.tr(),
-                        style: TextStyle(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          fontStyle: FontStyle.italic,
-                        ),
+                      subtitle: isActive
+                          ? Text(_roleLabel(linkedMember.role))
+                          : isLeft
+                          ? Text(
+                              'left'.tr(),
+                              style: TextStyle(
+                                color: theme.colorScheme.onSurfaceVariant,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            )
+                          : null,
+                      trailing: _buildTrailing(
+                        context,
+                        ref,
+                        groupId,
+                        p,
+                        linkedMember,
+                        isActive,
+                        isLeft,
+                        isOwnerOrAdmin,
+                        myRole,
+                        localOnly,
+                        members,
+                        participants,
                       ),
-                      trailing: null,
                     );
                   }),
+                  if (pastParticipants.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 16, bottom: 8),
+                      child: Text(
+                        'past_members'.tr(),
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    ...pastParticipants.map((p) {
+                      final emoji = avatarEmoji(p.avatarId);
+                      return ListTile(
+                        key: ValueKey('past_${p.id}'),
+                        leading: CircleAvatar(
+                          backgroundColor:
+                              theme.colorScheme.surfaceContainerHighest,
+                          child: emoji != null
+                              ? Text(
+                                  emoji,
+                                  style: TextStyle(
+                                    fontSize: 22,
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                )
+                              : Text(
+                                  p.name.isNotEmpty
+                                      ? p.name[0].toUpperCase()
+                                      : '?',
+                                  style: TextStyle(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                        ),
+                        title: Text(
+                          p.name,
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'left'.tr(),
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                        trailing: null,
+                      );
+                    }),
+                  ],
                 ],
-              ],
               ),
             );
           },
@@ -933,7 +964,8 @@ class _PeopleTab extends ConsumerWidget {
           error: (e, _) => Center(
             child: ErrorContentWidget(
               message: e.toString(),
-              onRetry: () => ref.invalidate(participantsByGroupProvider(groupId)),
+              onRetry: () =>
+                  ref.invalidate(participantsByGroupProvider(groupId)),
             ),
           ),
         );
@@ -975,24 +1007,15 @@ class _PeopleTab extends ConsumerWidget {
           }
         },
         itemBuilder: (ctx) => [
-          PopupMenuItem(
-            value: 'edit',
-            child: Text('edit_name'.tr()),
-          ),
+          PopupMenuItem(value: 'edit', child: Text('edit_name'.tr())),
           if (myRole == GroupRole.owner) ...[
-            PopupMenuItem(
-              value: 'role',
-              child: Text('change_role'.tr()),
-            ),
+            PopupMenuItem(value: 'role', child: Text('change_role'.tr())),
             PopupMenuItem(
               value: 'transfer',
               child: Text('transfer_ownership'.tr()),
             ),
           ],
-          PopupMenuItem(
-            value: 'kick',
-            child: Text('kick_member'.tr()),
-          ),
+          PopupMenuItem(value: 'kick', child: Text('kick_member'.tr())),
         ],
       );
     }
@@ -1034,15 +1057,9 @@ class _PeopleTab extends ConsumerWidget {
           }
         },
         itemBuilder: (ctx) => [
-          PopupMenuItem(
-            value: 'edit',
-            child: Text('edit_name'.tr()),
-          ),
+          PopupMenuItem(value: 'edit', child: Text('edit_name'.tr())),
           if (!localOnly)
-            PopupMenuItem(
-              value: 'merge',
-              child: Text('merge_with_user'.tr()),
-            ),
+            PopupMenuItem(value: 'merge', child: Text('merge_with_user'.tr())),
           PopupMenuItem(
             value: 'delete',
             child: Text('delete_participant'.tr()),
@@ -1060,28 +1077,21 @@ class _PeopleTab extends ConsumerWidget {
     String groupId,
     Participant participant,
   ) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('archive_participant'.tr()),
-        content: Text(
-          'archive_participant_confirm'.tr().replaceAll('{name}', participant.name),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('archive_participant'.tr()),
-          ),
-        ],
+    final ok = await showConfirmSheet(
+      context,
+      title: 'archive_participant'.tr(),
+      content: 'archive_participant_confirm'.tr().replaceAll(
+        '{name}',
+        participant.name,
       ),
+      confirmLabel: 'archive_participant'.tr(),
+      centerInFullViewport: true,
     );
     if (ok == true && context.mounted) {
       try {
-        await ref.read(participantRepositoryProvider).archive(groupId, participant.id);
+        await ref
+            .read(participantRepositoryProvider)
+            .archive(groupId, participant.id);
         ref.invalidate(participantsByGroupProvider(groupId));
         if (!ref.read(effectiveLocalOnlyProvider)) {
           await ref.read(dataSyncServiceProvider.notifier).syncNow();
@@ -1103,46 +1113,25 @@ class _PeopleTab extends ConsumerWidget {
     WidgetRef ref,
     Participant participant,
   ) async {
-    final nameController = TextEditingController(text: participant.name);
-    try {
-      final newName = await showDialog<String>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text('participant_name'.tr()),
-          content: TextField(
-            controller: nameController,
-            decoration: InputDecoration(
-              labelText: 'participant_name'.tr(),
-            ),
-            autofocus: true,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text('cancel'.tr()),
-            ),
-            FilledButton(
-              onPressed: () =>
-                  Navigator.of(ctx).pop(nameController.text.trim()),
-              child: Text('done'.tr()),
-            ),
-          ],
-        ),
-      );
-      if (newName != null && newName.isNotEmpty && context.mounted) {
-        await ref
-            .read(participantRepositoryProvider)
-            .update(participant.copyWith(name: newName));
-        ref.invalidate(participantsByGroupProvider(groupId));
-      }
-    } finally {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        nameController.dispose();
-      });
+    final newName = await showTextInputSheet(
+      context,
+      title: 'participant_name'.tr(),
+      hint: 'participant_name'.tr(),
+      initialValue: participant.name,
+      centerInFullViewport: true,
+    );
+    if (newName != null && newName.isNotEmpty && context.mounted) {
+      await ref
+          .read(participantRepositoryProvider)
+          .update(participant.copyWith(name: newName));
+      ref.invalidate(participantsByGroupProvider(groupId));
     }
   }
 
-  static bool _participantUsedInExpenses(String participantId, List<Expense> expenses) {
+  static bool _participantUsedInExpenses(
+    String participantId,
+    List<Expense> expenses,
+  ) {
     for (final e in expenses) {
       if (e.payerParticipantId == participantId) return true;
       if (e.splitShares.containsKey(participantId)) return true;
@@ -1157,34 +1146,34 @@ class _PeopleTab extends ConsumerWidget {
     String groupId,
     Participant participant,
   ) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('delete_participant'.tr()),
-        content: Text(
-          'delete_participant_confirm'.tr().replaceAll('{name}', participant.name),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('delete'.tr()),
-          ),
-        ],
+    final ok = await showConfirmSheet(
+      context,
+      title: 'delete_participant'.tr(),
+      content: 'delete_participant_confirm'.tr().replaceAll(
+        '{name}',
+        participant.name,
       ),
+      confirmLabel: 'delete'.tr(),
+      isDestructive: true,
+      centerInFullViewport: true,
     );
     if (ok == true && context.mounted) {
       try {
         // Load expenses from DB so we know if this participant is used (archive vs delete).
         List<Expense> expenses;
         try {
-          expenses = await ref.read(expenseRepositoryProvider).getByGroupId(groupId);
-          Log.info('Remove participant: expenses loaded count=${expenses.length}');
+          expenses = await ref
+              .read(expenseRepositoryProvider)
+              .getByGroupId(groupId);
+          Log.info(
+            'Remove participant: expenses loaded count=${expenses.length}',
+          );
         } catch (e, st) {
-          Log.warning('Remove participant: failed to load expenses', error: e, stackTrace: st);
+          Log.warning(
+            'Remove participant: failed to load expenses',
+            error: e,
+            stackTrace: st,
+          );
           expenses = <Expense>[];
         }
         if (!context.mounted) return;
@@ -1203,10 +1192,17 @@ class _PeopleTab extends ConsumerWidget {
             );
           }
         }
-        final usedInExpenses = _participantUsedInExpenses(participant.id, expenses);
-        Log.info('Remove participant: usedInExpenses=$usedInExpenses -> ${usedInExpenses ? "archive" : "delete"}');
+        final usedInExpenses = _participantUsedInExpenses(
+          participant.id,
+          expenses,
+        );
+        Log.info(
+          'Remove participant: usedInExpenses=$usedInExpenses -> ${usedInExpenses ? "archive" : "delete"}',
+        );
         if (usedInExpenses) {
-          await ref.read(participantRepositoryProvider).archive(groupId, participant.id);
+          await ref
+              .read(participantRepositoryProvider)
+              .archive(groupId, participant.id);
           ref.invalidate(participantsByGroupProvider(groupId));
           if (!ref.read(effectiveLocalOnlyProvider)) {
             await ref.read(dataSyncServiceProvider.notifier).syncNow();
@@ -1236,58 +1232,61 @@ class _PeopleTab extends ConsumerWidget {
     List<Participant> participants,
   ) async {
     final theme = Theme.of(context);
-    final chosen = await showModalBottomSheet<GroupMember>(
+    final chosen = await showResponsiveSheet<GroupMember>(
       context: context,
+      title: 'merge_with_user'.tr(),
       isScrollControlled: true,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                'merge_with_user'.tr(),
-                style: theme.textTheme.titleLarge,
-              ),
-            ),
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: members.length,
-                itemBuilder: (ctx, i) {
-                  final m = members[i];
-                  Participant? linked;
-                  if (m.participantId != null) {
-                    try {
-                      linked = participants.firstWhere(
-                        (p) => p.id == m.participantId,
-                      );
-                    } catch (_) {
+      centerInFullViewport: true,
+      child: Builder(
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!LayoutBreakpoints.isTabletOrWider(context))
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    'merge_with_user'.tr(),
+                    style: theme.textTheme.titleLarge,
+                  ),
+                ),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: members.length,
+                  itemBuilder: (ctx, i) {
+                    final m = members[i];
+                    Participant? linked;
+                    if (m.participantId != null) {
+                      try {
+                        linked = participants.firstWhere(
+                          (p) => p.id == m.participantId,
+                        );
+                      } catch (_) {
+                        linked = null;
+                      }
+                    } else {
                       linked = null;
                     }
-                  } else {
-                    linked = null;
-                  }
-                  final label = linked?.name ?? 'group_member'.tr();
-                  return ListTile(
-                    title: Text(label),
-                    subtitle: Text(_roleLabel(m.role)),
-                    onTap: () => Navigator.pop(ctx, m),
-                  );
-                },
+                    final label = linked?.name ?? 'group_member'.tr();
+                    return ListTile(
+                      title: Text(label),
+                      subtitle: Text(_roleLabel(m.role)),
+                      onTap: () => Navigator.pop(ctx, m),
+                    );
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
     if (chosen == null || !context.mounted) return;
     try {
-      await ref.read(groupMemberRepositoryProvider).mergeParticipantWithMember(
-            groupId,
-            participant.id,
-            chosen.id,
-          );
+      await ref
+          .read(groupMemberRepositoryProvider)
+          .mergeParticipantWithMember(groupId, participant.id, chosen.id);
       ref.invalidate(participantsByGroupProvider(groupId));
       ref.invalidate(membersByGroupProvider(groupId));
       if (!ref.read(effectiveLocalOnlyProvider)) {
@@ -1326,22 +1325,42 @@ class _PeopleTab extends ConsumerWidget {
     WidgetRef ref,
     GroupMember member,
   ) async {
-    final role = await showDialog<GroupRole>(
+    final role = await showResponsiveSheet<GroupRole>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('change_role'.tr()),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: Text('group_admin'.tr()),
-              onTap: () => Navigator.pop(ctx, GroupRole.admin),
+      title: 'change_role'.tr(),
+      maxHeight: MediaQuery.of(context).size.height * 0.75,
+      isScrollControlled: true,
+      centerInFullViewport: true,
+      child: Builder(
+        builder: (ctx) => SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).padding.bottom + 16,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (!LayoutBreakpoints.isTabletOrWider(context))
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        'change_role'.tr(),
+                        style: Theme.of(ctx).textTheme.titleMedium,
+                      ),
+                    ),
+                  ListTile(
+                    title: Text('group_admin'.tr()),
+                    onTap: () => Navigator.pop(ctx, GroupRole.admin),
+                  ),
+                  ListTile(
+                    title: Text('group_member'.tr()),
+                    onTap: () => Navigator.pop(ctx, GroupRole.member),
+                  ),
+                ],
+              ),
             ),
-            ListTile(
-              title: Text('group_member'.tr()),
-              onTap: () => Navigator.pop(ctx, GroupRole.member),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -1388,22 +1407,12 @@ class _PeopleTab extends ConsumerWidget {
     WidgetRef ref,
     GroupMember member,
   ) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('kick_member'.tr()),
-        content: Text('kick_member_confirm'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('kick_member'.tr()),
-          ),
-        ],
-      ),
+    final ok = await showConfirmSheet(
+      context,
+      title: 'kick_member'.tr(),
+      content: 'kick_member_confirm'.tr(),
+      confirmLabel: 'kick_member'.tr(),
+      centerInFullViewport: true,
     );
     if (ok == true && context.mounted) {
       try {
@@ -1427,7 +1436,6 @@ class _PeopleTab extends ConsumerWidget {
       }
     }
   }
-
 }
 
 /// Sealed-like item types for virtualized expense list.
@@ -1555,40 +1563,15 @@ Future<void> _showAddParticipant(
   String groupId,
   int currentCount,
 ) async {
-  final nameController = TextEditingController();
-  try {
-    final name = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('add_participant'.tr()),
-        content: TextField(
-          controller: nameController,
-          decoration: InputDecoration(
-            labelText: 'participants'.tr(),
-            hintText: 'participant_name'.tr(),
-          ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(nameController.text.trim()),
-            child: Text('done'.tr()),
-          ),
-        ],
-      ),
-    );
-    if (name != null && name.isNotEmpty && context.mounted) {
-      await ref
-          .read(participantRepositoryProvider)
-          .create(groupId, name, currentCount);
-    }
-  } finally {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      nameController.dispose();
-    });
+  final name = await showTextInputSheet(
+    context,
+    title: 'add_participant'.tr(),
+    hint: 'participant_name'.tr(),
+    centerInFullViewport: true,
+  );
+  if (name != null && name.isNotEmpty && context.mounted) {
+    await ref
+        .read(participantRepositoryProvider)
+        .create(groupId, name, currentCount);
   }
 }

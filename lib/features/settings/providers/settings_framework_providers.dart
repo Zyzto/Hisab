@@ -343,15 +343,19 @@ bool expenseFormExpandBillBreakdown(Ref ref) {
 String homeListDisplay(Ref ref) {
   try {
     final settings = ref.watch(hisabSettingsProvidersProvider);
-    if (settings == null) return 'separate';
-    return ref.watch(settings.provider(homeListDisplaySettingDef));
+    if (settings == null) return 'list_separate';
+    final v = ref.watch(settings.provider(homeListDisplaySettingDef));
+    // Migrate legacy values
+    if (v == 'separate') return 'list_separate';
+    if (v == 'combined') return 'list_combined';
+    return v;
   } catch (e, stackTrace) {
     Log.warning(
-      'homeListDisplay read failed, defaulting to separate',
+      'homeListDisplay read failed, defaulting to list_separate',
       error: e,
       stackTrace: stackTrace,
     );
-    return 'separate';
+    return 'list_separate';
   }
 }
 

@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 import '../../../core/constants/supabase_config.dart';
+import '../../../core/layout/layout_breakpoints.dart';
+import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/telemetry/telemetry_service.dart';
 import '../../../core/theme/theme_config.dart';
@@ -51,11 +53,13 @@ Future<String?> showCreateInviteSheet(
   WidgetRef ref,
   String groupId,
 ) async {
-  return showModalBottomSheet<String>(
+  return showResponsiveSheet<String>(
     context: context,
+    title: 'create_invite'.tr(),
     isScrollControlled: true,
     useSafeArea: true,
-    builder: (ctx) => _CreateInviteSheet(groupId: groupId),
+    centerInFullViewport: true,
+    child: _CreateInviteSheet(groupId: groupId),
   );
 }
 
@@ -132,27 +136,18 @@ class _CreateInviteSheetState extends ConsumerState<_CreateInviteSheet> {
             MediaQuery.of(context).viewInsets.bottom +
             ThemeConfig.spacingL,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Handle
-          Center(
-            child: Container(
-              width: 32,
-              height: 4,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
-                borderRadius: BorderRadius.circular(2),
-              ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+          if (!LayoutBreakpoints.isTabletOrWider(context)) ...[
+            Text(
+              'create_invite'.tr(),
+              style: theme.textTheme.titleLarge,
             ),
-          ),
-          const SizedBox(height: ThemeConfig.spacingM),
-          Text(
-            'create_invite'.tr(),
-            style: theme.textTheme.titleLarge,
-          ),
-          const SizedBox(height: ThemeConfig.spacingM),
+            const SizedBox(height: ThemeConfig.spacingM),
+          ],
 
           // Label
           TextField(
@@ -236,6 +231,7 @@ class _CreateInviteSheetState extends ConsumerState<_CreateInviteSheet> {
           ),
           const SizedBox(height: ThemeConfig.spacingS),
         ],
+        ),
       ),
     );
   }
@@ -291,18 +287,6 @@ class _InviteResultViewState extends State<_InviteResultView> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Handle
-          Center(
-            child: Container(
-              width: 32,
-              height: 4,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
           Icon(
             Icons.check_circle_outline,
             color: theme.colorScheme.primary,

@@ -97,7 +97,6 @@ class _AppState extends ConsumerState<App> {
 
     // Watch DataSyncService to reactively fetch/push data
     ref.watch(dataSyncServiceProvider);
-    final syncStatus = ref.watch(syncStatusForDisplayProvider);
 
     // Initialize push notifications when user authenticates and setting is enabled.
     // listen handles sign-in/sign-out transitions; watch handles initial state.
@@ -160,24 +159,13 @@ class _AppState extends ConsumerState<App> {
           );
           final contentWithSyncIndicator = Stack(
             children: [
-              innerContent,
-              if (syncStatus == SyncStatus.syncing)
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: SafeArea(
-                    bottom: false,
-                    child: SizedBox(
-                      height: 3,
-                      child: LinearProgressIndicator(
-                        backgroundColor: Theme.of(context)
-                            .colorScheme
-                            .surfaceContainerHighest,
-                      ),
-                    ),
-                  ),
-                ),
+              Positioned.fill(child: innerContent),
+              const Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: _SyncProgressLine(),
+              ),
             ],
           );
           // In release, first frame paints without UpgradeAlert to avoid
@@ -244,6 +232,30 @@ class _AppState extends ConsumerState<App> {
         themeMode: themeMode,
         routerConfig: router,
         ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Sync progress line that watches [syncStatusForDisplayProvider] so only this
+/// widget rebuilds when sync status changes, not the rest of the app (avoids
+/// overlay/dialog rebuild and focus loss when sync completes).
+class _SyncProgressLine extends ConsumerWidget {
+  const _SyncProgressLine();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final syncStatus = ref.watch(syncStatusForDisplayProvider);
+    if (syncStatus != SyncStatus.syncing) return const SizedBox.shrink();
+    return SafeArea(
+      bottom: false,
+      child: SizedBox(
+        height: 3,
+        child: LinearProgressIndicator(
+          backgroundColor: Theme.of(context)
+              .colorScheme
+              .surfaceContainerHighest,
         ),
       ),
     );
