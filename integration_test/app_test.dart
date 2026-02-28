@@ -1,71 +1,23 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_test/flutter_test.dart';
-import 'package:integration_test/integration_test.dart';
+// Barrel file: imports all integration test modules.
+// Run everything via:
+//   flutter drive --driver=test_driver/integration_test.dart --target=integration_test/app_test.dart -d web-server --release
+// Or on Android:
+//   flutter test integration_test/app_test.dart -d <device_id>
 
-import 'integration_test_bootstrap.dart';
+import 'smoke_test.dart' as smoke;
+import 'onboarding_test.dart' as onboarding;
+import 'group_flows_test.dart' as group_flows;
+import 'personal_test.dart' as personal;
+import 'expense_flows_test.dart' as expense_flows;
+import 'balance_test.dart' as balance;
+import 'settings_test.dart' as settings;
 
 void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-
-  testWidgets('app opens to home (smoke)', (WidgetTester tester) async {
-    final ready = await runIntegrationTestApp();
-    if (!ready) {
-      throw TestFailure('Integration test bootstrap failed (e.g. PowerSync unavailable)');
-    }
-    await tester.pumpAndSettle(const Duration(seconds: 10));
-
-    // Home shows shell: either section headers / empty state, or FAB
-    final hasGroups = find.text('Groups').evaluate().isNotEmpty;
-    final hasNoGroups = find.text('No Groups Yet').evaluate().isNotEmpty;
-    final hasPersonal = find.text('Personal').evaluate().isNotEmpty;
-    final hasFab = find.byIcon(Icons.add).evaluate().isNotEmpty;
-    expect(
-      hasGroups || hasNoGroups || hasPersonal || hasFab,
-      isTrue,
-      reason: 'Expected home shell (Groups, No Groups Yet, Personal, or FAB)',
-    );
-  });
-
-  testWidgets('create group flow', (WidgetTester tester) async {
-    final ready = await runIntegrationTestApp();
-    if (!ready) {
-      throw TestFailure('Integration test bootstrap failed (e.g. PowerSync unavailable)');
-    }
-    await tester.pumpAndSettle(const Duration(seconds: 5));
-
-    // Tap FAB to open create modal (FAB has Icons.add)
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pumpAndSettle(const Duration(seconds: 2));
-
-    // Tap "Create Group" in the sheet (first ListTile)
-    await tester.tap(find.text('Create Group').first);
-    await tester.pumpAndSettle(const Duration(seconds: 2));
-
-    // Step 1: enter group name
-    await tester.enterText(find.byType(TextField).first, 'Integration Test Group');
-    await tester.pump(const Duration(milliseconds: 300));
-
-    // Next
-    await tester.tap(find.text('Next'));
-    await tester.pumpAndSettle(const Duration(seconds: 2));
-
-    // Step 2: Skip participants
-    await tester.tap(find.text('Skip'));
-    await tester.pumpAndSettle(const Duration(seconds: 2));
-
-    // Step 3: Next (icon/color)
-    await tester.tap(find.text('Next'));
-    await tester.pumpAndSettle(const Duration(seconds: 2));
-
-    // Step 4: Create Group
-    await tester.tap(find.text('Create Group'));
-    await tester.pumpAndSettle(const Duration(seconds: 5));
-
-    // Should be on group detail or back at home with the new group
-    expect(
-      find.text('Integration Test Group').evaluate().isNotEmpty ||
-          find.text('Groups').evaluate().isNotEmpty,
-      isTrue,
-    );
-  });
+  smoke.main();
+  onboarding.main();
+  group_flows.main();
+  personal.main();
+  expense_flows.main();
+  balance.main();
+  settings.main();
 }

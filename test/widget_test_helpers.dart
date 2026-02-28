@@ -8,7 +8,9 @@ const List<Locale> testSupportedLocales = [Locale('en'), Locale('ar')];
 /// Pumps [child] inside EasyLocalization and MaterialApp.
 /// [locale] defaults to English; use [Locale('ar')] to test Arabic/RTL.
 /// Calls [pumpWidget] and, when [pumpAndSettle] is true, [pumpAndSettle].
-/// For tests that need Riverpod overrides, build ProviderScope + EasyLocalization + MaterialApp inline (see balance_list_widget_test.dart).
+/// For widgets that depend on Riverpod providers, build ProviderScope +
+/// EasyLocalization + MaterialApp inline with overrides (see
+/// balance_list_widget_test.dart, sync_status_chip_widget_test.dart).
 Future<void> pumpApp(
   WidgetTester tester, {
   required Widget child,
