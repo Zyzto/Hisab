@@ -14,6 +14,7 @@ import 'core/update/app_update_helper.dart';
 import 'core/update/update_check_providers.dart';
 import 'core/update/upgrader_messages.dart';
 import 'features/settings/providers/settings_framework_providers.dart';
+import 'features/settings/settings_definitions.dart';
 import 'core/theme/app_scroll_behavior.dart';
 import 'core/theme/theme_config.dart';
 import 'core/theme/theme_providers.dart';
@@ -31,7 +32,8 @@ class App extends ConsumerStatefulWidget {
   ConsumerState<App> createState() => _AppState();
 }
 
-class _AppState extends ConsumerState<App> {
+class _AppState extends ConsumerState<App>
+    with WidgetsBindingObserver {
   late final Upgrader _upgrader;
   /// In release, defer UpgradeAlert until after first frame to avoid any
   /// upgrader work blocking the first paint (splash can disappear).
@@ -43,6 +45,7 @@ class _AppState extends ConsumerState<App> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _upgrader = Upgrader(
       durationUntilAlertAgain: const Duration(days: 3),
       debugLogging: false, // use app-level aggregated log instead of package prints
@@ -57,6 +60,40 @@ class _AppState extends ConsumerState<App> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _showUpgradeAlert = true);
       });
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _saveCurrentRoute();
+    } else if (state == AppLifecycleState.resumed) {
+      _clearSavedRoute();
+    }
+  }
+
+  void _saveCurrentRoute() {
+    if (!mounted) return;
+    final path = ref.read(routerProvider).routerDelegate.currentConfiguration.uri.path;
+    if (path.isEmpty || path == '/') return;
+    final settings = ref.read(hisabSettingsProvidersProvider);
+    if (settings != null) {
+      ref.read(settings.provider(lastRoutePathSettingDef).notifier).set(path);
+    }
+  }
+
+  void _clearSavedRoute() {
+    if (!mounted) return;
+    final settings = ref.read(hisabSettingsProvidersProvider);
+    if (settings != null) {
+      ref.read(settings.provider(lastRoutePathSettingDef).notifier).set('');
     }
   }
 

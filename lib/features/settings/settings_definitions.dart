@@ -180,6 +180,17 @@ final pendingInviteTokenSettingDef = const StringSetting(
   order: -4, // Internal, not shown in settings UI
 );
 
+/// Last route path when app went to background; used to restore after process kill (e.g. returning from camera).
+/// Cleared on resume; non-empty on cold start means we were likely killed.
+final lastRoutePathSettingDef = const StringSetting(
+  'last_route_path',
+  defaultValue: '',
+  titleKey: 'last_route_path',
+  icon: Icons.route,
+  section: 'appearance',
+  order: -5, // Internal, not shown in settings UI
+);
+
 /// When true, app uses only local storage (PowerSync SQLite). When false, syncs with Supabase.
 final localOnlySettingDef = const BoolSetting(
   'local_only',
@@ -398,6 +409,7 @@ final allSettings = <SettingDefinition>[
   onboardingOnlinePendingSettingDef,
   settingsOnlinePendingSettingDef,
   pendingInviteTokenSettingDef,
+  lastRoutePathSettingDef,
   themeModeSettingDef,
   themeColorSettingDef,
   languageSettingDef,
