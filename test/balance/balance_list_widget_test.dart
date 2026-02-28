@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hisab/domain/domain.dart';
 import 'package:hisab/features/balance/providers/balance_provider.dart';
 import 'package:hisab/features/balance/widgets/balance_list.dart';
+import '../widget_test_helpers.dart';
 
 void main() {
   const groupId = 'g1';
@@ -82,9 +83,9 @@ void main() {
         ],
         child: EasyLocalization(
           path: 'assets/translations',
-          supportedLocales: const [Locale('en')],
-          startLocale: const Locale('en'),
+          supportedLocales: testSupportedLocales,
           fallbackLocale: const Locale('en'),
+          startLocale: const Locale('en'),
           child: const MaterialApp(
             home: Scaffold(
               body: BalanceList(groupId: groupId),

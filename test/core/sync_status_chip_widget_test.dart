@@ -19,7 +19,7 @@ void main() {
         ],
         child: EasyLocalization(
           path: 'assets/translations',
-          supportedLocales: const [Locale('en')],
+          supportedLocales: testSupportedLocales,
           fallbackLocale: const Locale('en'),
           startLocale: const Locale('en'),
           child: const MaterialApp(
@@ -41,7 +41,7 @@ void main() {
         ],
         child: EasyLocalization(
           path: 'assets/translations',
-          supportedLocales: const [Locale('en')],
+          supportedLocales: testSupportedLocales,
           fallbackLocale: const Locale('en'),
           startLocale: const Locale('en'),
           child: const MaterialApp(
@@ -63,7 +63,7 @@ void main() {
         ],
         child: EasyLocalization(
           path: 'assets/translations',
-          supportedLocales: const [Locale('en')],
+          supportedLocales: testSupportedLocales,
           fallbackLocale: const Locale('en'),
           startLocale: const Locale('en'),
           child: const MaterialApp(
