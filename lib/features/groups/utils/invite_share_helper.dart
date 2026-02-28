@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:share_plus/share_plus.dart' show ShareParams, SharePlus, XFile;
 
 import '../../../core/widgets/toast.dart';
 
@@ -53,9 +53,8 @@ Future<void> shareInviteLink({
         mimeType: 'image/png',
         name: 'hisab_invite_qr.png',
       );
-      await Share.shareXFiles(
-        [xFile],
-        text: text,
+      await SharePlus.instance.share(
+        ShareParams(files: [xFile], text: text),
       );
       return;
     } catch (e, st) {
@@ -64,7 +63,7 @@ Future<void> shareInviteLink({
     }
   }
 
-  await Share.share(text);
+  await SharePlus.instance.share(ShareParams(text: text));
 }
 
 /// Shares the invite [url] (and optionally QR from [boundary]); on failure
