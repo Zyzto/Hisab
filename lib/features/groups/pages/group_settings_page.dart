@@ -10,6 +10,7 @@ import '../providers/groups_provider.dart';
 import '../providers/group_member_provider.dart';
 import '../providers/group_invite_provider.dart';
 import '../widgets/create_invite_sheet.dart';
+import '../widgets/group_color_picker.dart';
 import '../utils/group_icon_utils.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
@@ -654,12 +655,14 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
       centerInFullViewport: true,
       onSelect: (Currency currency) async {
         if (currency.code == group.currencyCode) return;
+        if (!mounted) return;
 
         // Warn if expenses exist
         final expenses = expensesAsync.value;
         if (expenses != null && expenses.isNotEmpty) {
+          final pageContext = context;
           final ok = await showConfirmSheet(
-            context,
+            pageContext,
             title: 'change_currency'.tr(),
             content: 'currency_change_warning'.tr(),
             confirmLabel: 'change_currency'.tr(),
@@ -1437,47 +1440,10 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                       ),
                     ),
                     const SizedBox(height: ThemeConfig.spacingM),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: groupColors.map((color) {
-                        final isSelected = selectedColor == color;
-                        return GestureDetector(
-                          onTap: () =>
-                              setSheetState(() => selectedColor = color),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: color,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isSelected
-                                    ? colorScheme.onSurface
-                                    : Colors.transparent,
-                                width: 3,
-                              ),
-                              boxShadow: isSelected
-                                  ? [
-                                      BoxShadow(
-                                        color: color.withValues(alpha: 0.4),
-                                        blurRadius: 8,
-                                        spreadRadius: 1,
-                                      ),
-                                    ]
-                                  : null,
-                            ),
-                            child: isSelected
-                                ? const Icon(
-                                    Icons.check,
-                                    color: Colors.white,
-                                    size: 22,
-                                  )
-                                : null,
-                          ),
-                        );
-                      }).toList(),
+                    GroupColorPicker(
+                      selectedColor: selectedColor,
+                      onColorSelected: (color) =>
+                          setSheetState(() => selectedColor = color),
                     ),
                     const SizedBox(height: ThemeConfig.spacingXL),
 

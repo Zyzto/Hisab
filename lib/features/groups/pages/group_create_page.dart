@@ -9,11 +9,13 @@ import '../../../core/layout/constrained_content.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/telemetry/telemetry_service.dart';
-import '../../../core/widgets/toast.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/currency_helpers.dart';
+import '../../../core/utils/form_validators.dart';
+import '../../../core/utils/run_guarded_async.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 import '../utils/group_icon_utils.dart';
+import '../widgets/group_color_picker.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Wizard entry point (keeps the same class name for router compatibility)
@@ -116,14 +118,20 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
       final name = _nameController.text.trim();
       final currencyCode = _selectedCurrency.code;
       final repo = ref.read(groupRepositoryProvider);
-      final id = await repo.create(
-        name,
-        currencyCode,
-        icon: _selectedIcon,
-        color: _selectedColor.toARGB32(),
-        initialParticipants: widget.isPersonal ? [] : _participants,
-        isPersonal: widget.isPersonal,
+      final id = await runGuardedAsync<String>(
+        repo.create(
+          name,
+          currencyCode,
+          icon: _selectedIcon,
+          color: _selectedColor.toARGB32(),
+          initialParticipants: widget.isPersonal ? [] : _participants,
+          isPersonal: widget.isPersonal,
+        ),
+        'Group create failed',
+        context: context,
+        errorToastMessage: 'create_group_failed'.tr(),
       );
+      if (id == null) return;
       Log.info(
         'Group created via wizard: id=$id name="$name" currency=$currencyCode participants=${_participants.length}',
       );
@@ -136,11 +144,6 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
         }, enabled: ref.read(telemetryEnabledProvider));
       } catch (_) {}
       if (mounted) context.go(RoutePaths.groupDetail(id));
-    } catch (e, st) {
-      Log.warning('Group create failed', error: e, stackTrace: st);
-      if (mounted) {
-        context.showError('create_group_failed'.tr());
-      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -270,6 +273,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
               alignment: AlignmentDirectional.centerEnd,
               child: isLastPage
                   ? FilledButton.icon(
+                      key: const Key('wizard_create_button'),
                       onPressed: _saving ? null : _createGroup,
                       icon: _saving
                           ? const SizedBox(
@@ -333,6 +337,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
             ),
             const SizedBox(height: ThemeConfig.spacingXL),
             TextFormField(
+              key: const Key('wizard_name_field'),
               controller: _nameController,
               autofocus: true,
               decoration: InputDecoration(
@@ -342,8 +347,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                 border: const OutlineInputBorder(),
                 prefixIcon: const Icon(Icons.group_outlined),
               ),
-              validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'required'.tr() : null,
+              validator: FormValidators.required,
               textInputAction: TextInputAction.next,
               onChanged: (_) => setState(() {}),
             ),
@@ -634,42 +638,9 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
           ),
         ),
         const SizedBox(height: ThemeConfig.spacingM),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: groupColors.map((color) {
-            final isSelected = _selectedColor == color;
-            return GestureDetector(
-              onTap: () => setState(() => _selectedColor = color),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isSelected
-                        ? colorScheme.onSurface
-                        : Colors.transparent,
-                    width: 3,
-                  ),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: color.withValues(alpha: 0.4),
-                            blurRadius: 8,
-                            spreadRadius: 1,
-                          ),
-                        ]
-                      : null,
-                ),
-                child: isSelected
-                    ? const Icon(Icons.check, color: Colors.white, size: 22)
-                    : null,
-              ),
-            );
-          }).toList(),
+        GroupColorPicker(
+          selectedColor: _selectedColor,
+          onColorSelected: (color) => setState(() => _selectedColor = color),
         ),
       ],
     );

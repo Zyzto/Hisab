@@ -1,6 +1,7 @@
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
+import '../../../core/utils/form_validators.dart';
 import '../../../domain/domain.dart';
 import '../constants/expense_form_constants.dart';
 
@@ -91,9 +92,7 @@ class ExpenseTitleSection extends StatelessWidget {
               ],
             ),
           ),
-          validator:
-              validator ??
-              (v) => v == null || v.trim().isEmpty ? 'required'.tr() : null,
+          validator: validator ?? FormValidators.required,
         ),
       ],
     );
