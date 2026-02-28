@@ -26,7 +26,7 @@ env:
 
 jobs:
   # ──────────────────────────────────────────────
-  # 0. Unit, widget, and integration tests (Linux)
+  # 0. Unit, widget, and integration tests (web Chrome)
   # ──────────────────────────────────────────────
   test:
     name: Test
@@ -48,11 +48,90 @@ jobs:
       - name: Run unit and widget tests
         run: flutter test
 
-      - name: Install xvfb (for Linux desktop integration tests)
-        run: sudo apt-get update && sudo apt-get install -y xvfb
+      - name: Install Chrome
+        uses: browser-actions/setup-chrome@v1
 
-      - name: Run integration tests
-        run: xvfb-run -s "-screen 0 1024x768x24" flutter test integration_test/ -d linux
+      - name: Install ChromeDriver
+        uses: nanasess/setup-chromedriver@v2
+
+      - name: Start ChromeDriver
+        run: |
+          chromedriver --port=4444 &
+          sleep 3
+
+      - name: Run integration tests (web)
+        run: |
+          flutter drive \
+            --driver=test_driver/integration_test.dart \
+            --target=integration_test/app_test.dart \
+            -d web-server \
+            --release \
+            --web-browser-flag=--no-sandbox \
+            --web-browser-flag=--disable-dev-shm-usage
+
+  # ──────────────────────────────────────────────
+  # 0b. Online integration tests (local Supabase + web Chrome)
+  # ──────────────────────────────────────────────
+  test-online:
+    name: Online Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase
+        run: supabase start
+
+      - name: Reset database (migrations + seed)
+        run: supabase db reset
+
+      - name: Extract Supabase credentials
+        id: supabase
+        run: |
+          echo "url=$(supabase status --output json | jq -r '.API_URL')" >> "$GITHUB_OUTPUT"
+          echo "anon_key=$(supabase status --output json | jq -r '.ANON_KEY')" >> "$GITHUB_OUTPUT"
+
+      - name: Install Chrome
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Install ChromeDriver
+        uses: nanasess/setup-chromedriver@v2
+
+      - name: Start ChromeDriver
+        run: |
+          chromedriver --port=4444 &
+          sleep 3
+
+      - name: Run online integration tests (web)
+        run: |
+          flutter drive \
+            --driver=test_driver/integration_test.dart \
+            --target=integration_test/online_app_test.dart \
+            -d web-server \
+            --release \
+            --dart-define=SUPABASE_URL=${{ steps.supabase.outputs.url }} \
+            --dart-define=SUPABASE_ANON_KEY=${{ steps.supabase.outputs.anon_key }} \
+            --web-browser-flag=--no-sandbox \
+            --web-browser-flag=--disable-dev-shm-usage
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop
 
   # ──────────────────────────────────────────────
   # 1. Build Android APK + AAB
