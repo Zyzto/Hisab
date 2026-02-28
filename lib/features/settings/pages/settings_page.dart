@@ -1304,6 +1304,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       maxWidth: 600,
       maxHeight: 700,
       centerInFullViewport: false,
+      barrierDismissible: false,
       child: Builder(
         builder: (ctx) => Padding(
           padding: EdgeInsets.only(

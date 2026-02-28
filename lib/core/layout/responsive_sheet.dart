@@ -158,7 +158,10 @@ Future<T?> showResponsiveSheet<T>({
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.only(top: topBarContentPadding),
+                      padding: EdgeInsets.only(
+                        top: topBarContentPadding,
+                        bottom: MediaQuery.viewInsetsOf(ctx).bottom,
+                      ),
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
                           maxHeight: effectiveMaxHeight -
@@ -257,12 +260,19 @@ Future<T?> showResponsiveSheet<T>({
         const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
-    builder: (ctx) => barrierDismissible
-        ? TapRegion(
-            onTapOutside: (_) => Navigator.of(ctx).pop(),
-            child: child,
-          )
-        : child,
+    builder: (ctx) {
+      final viewInsetsBottom = MediaQuery.viewInsetsOf(ctx).bottom;
+      final paddedChild = Padding(
+        padding: EdgeInsets.only(bottom: viewInsetsBottom),
+        child: child,
+      );
+      return barrierDismissible
+          ? TapRegion(
+              onTapOutside: (_) => Navigator.of(ctx).pop(),
+              child: paddedChild,
+            )
+          : paddedChild;
+    },
   );
 }
 
@@ -334,7 +344,12 @@ Future<T?> _showWebBottomSheet<T>({
                         constraints: BoxConstraints(
                           maxHeight: effectiveMaxHeight - (showDragHandle ? 24.0 : 0) - 24,
                         ),
-                        child: child,
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                            bottom: MediaQuery.viewInsetsOf(ctx).bottom,
+                          ),
+                          child: child,
+                        ),
                       ),
                     ],
                   ),

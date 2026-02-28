@@ -87,7 +87,12 @@ class CurrencyHelpers {
           child: AppCurrencyPickerList(
             onSelect: (currency) {
               onSelect(currency);
-              Navigator.pop(ctx);
+              // Defer pop so sync setState (expense form) or async start (group) runs before sheet closes.
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (ctx.mounted) {
+                  Navigator.of(ctx, rootNavigator: true).pop();
+                }
+              });
             },
             favorite: favorite,
             currencyFilter: currencyFilter,

@@ -90,9 +90,11 @@ class _ShellWithShortcutsState extends State<_ShellWithShortcuts> {
             },
           ),
         },
+        // autofocus: false so we don't steal focus from text fields (expense form,
+        // group create, modals). Shortcuts (Alt+1/2) still work when shell has focus.
         child: Focus(
           focusNode: _focusNode,
-          autofocus: true,
+          autofocus: false,
           child: MainScaffold(
             selectedIndex: widget.selectedIndex,
             location: widget.location,
@@ -125,9 +127,21 @@ GoRouter router(Ref ref) {
       final onOnboarding = state.matchedLocation == RoutePaths.onboarding;
       final onPrivacyPolicy =
           state.matchedLocation == RoutePaths.privacyPolicy;
-      // Pending invite from deep link: send to invite page and clear
       final settings = ref.read(hisabSettingsProvidersProvider);
       if (settings != null) {
+        // Restore route after process kill (e.g. returning from camera)
+        final lastPath = ref.read(
+          settings.provider(lastRoutePathSettingDef),
+        );
+        if (lastPath.isNotEmpty &&
+            lastPath != RoutePaths.home &&
+            onboardingCompleted) {
+          ref
+              .read(settings.provider(lastRoutePathSettingDef).notifier)
+              .set('');
+          return lastPath;
+        }
+        // Pending invite from deep link: send to invite page and clear
         final pendingToken = ref.read(
           settings.provider(pendingInviteTokenSettingDef),
         );
