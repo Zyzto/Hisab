@@ -17,7 +17,7 @@ dependencies:
 
   # Navigation
   go_router: ^17.0.0
-  back_button_interceptor: ^7.0.3
+  back_button_interceptor: ^8.0.4
 
   # Localization
   easy_localization: ^3.0.7
@@ -36,7 +36,7 @@ dependencies:
   collection: ^1.18.0
 
   # UI & animations
-  google_fonts: ^6.2.1
+  google_fonts: ^8.0.2
   animations: ^2.1.0
   custom_sliding_segmented_control: ^1.8.5
   toastification: ^3.0.3
@@ -82,32 +82,35 @@ dependencies:
   url_launcher: ^6.2.5
   material_symbols_icons: ^4.2906.0
   pretty_qr_code: ^3.6.0
-  mobile_scanner: ^6.0.2
+  mobile_scanner: ^7.2.0
   connectivity_plus: ^7.0.0
   app_links: ^6.3.2
   currency_picker: ^2.0.21
 
   # Push notifications
-  firebase_core: ^3.12.1
-  firebase_messaging: ^15.2.4
-  flutter_local_notifications: ^18.0.1
+  firebase_core: ^4.4.0
+  firebase_messaging: ^16.1.1
+  flutter_local_notifications: ^20.1.0
   pwa_install: ^0.0.6
 
   # Permissions
-  permission_handler: ^11.3.1
+  permission_handler: ^12.0.1
 
   # Interactive feedback with annotated screenshots
   feedback: ^3.2.0
   clipboard: ^3.0.14
-  share_plus: ^10.1.4
+  share_plus: ^12.0.1
   web: ^1.1.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_driver:
+    sdk: flutter
   integration_test:
     sdk: flutter
   mocktail: ^1.0.4
+  plugin_platform_interface: ^2.1.8
   supabase: ^2.0.0
   flutter_lints: ^6.0.0
   build_runner: ^2.4.9

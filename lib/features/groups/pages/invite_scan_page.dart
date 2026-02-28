@@ -133,7 +133,7 @@ class _InviteScanPageState extends State<InviteScanPage> {
                   }
                 }
               },
-              errorBuilder: (context, error, child) => Center(
+              errorBuilder: (context, error) => Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [

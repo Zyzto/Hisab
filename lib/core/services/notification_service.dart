@@ -58,7 +58,7 @@ Future<void> _showDataOnlyNotificationInBackground(RemoteMessage message) async 
       requestSoundPermission: false,
     );
     await plugin.initialize(
-      const InitializationSettings(
+      settings: const InitializationSettings(
         android: androidInit,
         iOS: darwinInit,
         macOS: darwinInit,
@@ -74,10 +74,10 @@ Future<void> _showDataOnlyNotificationInBackground(RemoteMessage message) async 
     final id = (message.messageId ?? groupId).hashCode.abs() % 0x7FFFFFFF;
 
     await plugin.show(
-      id,
-      title,
-      body,
-      NotificationDetails(
+      id: id,
+      title: title,
+      body: body,
+      notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           _androidChannel.id,
           _androidChannel.name,
@@ -281,7 +281,7 @@ class NotificationService extends _$NotificationService {
     );
 
     await _localNotifications.initialize(
-      const InitializationSettings(
+      settings: const InitializationSettings(
         android: androidInit,
         iOS: darwinInit,
         macOS: darwinInit,
@@ -375,10 +375,10 @@ class NotificationService extends _$NotificationService {
     // Show a local notification on mobile
     final notificationId = _notificationIdForMessage(message);
     _localNotifications.show(
-      notificationId,
-      notification.title,
-      notification.body,
-      NotificationDetails(
+      id: notificationId,
+      title: notification.title,
+      body: notification.body,
+      notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           _androidChannel.id,
           _androidChannel.name,
