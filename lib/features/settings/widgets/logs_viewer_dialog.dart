@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 
 import '../../../core/layout/layout_breakpoints.dart';
+import '../../../core/utils/log_level_colors.dart';
 
 /// A full-screen logs viewer dialog with terminal-style layout,
 /// color-coded log levels, and scrollable content.
@@ -50,7 +51,6 @@ class _LogsViewerDialogState extends State<LogsViewerDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final showTitleInBody = !LayoutBreakpoints.isTabletOrWider(context);
 
     return Column(
@@ -76,11 +76,6 @@ class _LogsViewerDialogState extends State<LogsViewerDialog> {
                     ),
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: widget.onClose,
-                  tooltip: 'done'.tr(),
-                ),
               ],
             ),
           ),
@@ -91,9 +86,7 @@ class _LogsViewerDialogState extends State<LogsViewerDialog> {
           child: Container(
             margin: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: isDark
-                  ? const Color(0xFF0D1117)
-                  : const Color(0xFFF6F8FA),
+              color: LogLevelColors.containerBackground(theme),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
                 color: theme.colorScheme.outline.withValues(alpha: 0.3),
@@ -112,7 +105,6 @@ class _LogsViewerDialogState extends State<LogsViewerDialog> {
                       child: _LogContent(
                         content: widget.content,
                         theme: theme,
-                        isDark: isDark,
                       ),
                     ),
                   ),
@@ -161,12 +153,10 @@ class _LogContent extends StatelessWidget {
   const _LogContent({
     required this.content,
     required this.theme,
-    required this.isDark,
   });
 
   final String content;
   final ThemeData theme;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
@@ -174,7 +164,7 @@ class _LogContent extends StatelessWidget {
     final textSpans = <InlineSpan>[];
 
     for (final line in lines) {
-      final levelColor = _levelColorForLine(line, isDark);
+      final levelColor = LogLevelColors.levelColorForLine(line, theme.brightness);
       textSpans.add(
         TextSpan(
           text: '$line\n',
@@ -205,24 +195,4 @@ class _LogContent extends StatelessWidget {
     );
   }
 
-  Color? _levelColorForLine(String line, bool isDark) {
-    if (line.contains('[DEBUG]')) {
-      return isDark ? const Color(0xFF8B949E) : const Color(0xFF57606A);
-    }
-    if (line.contains('[INFO]')) {
-      return isDark ? const Color(0xFF58A6FF) : const Color(0xFF0969DA);
-    }
-    if (line.contains('[WARNING]') || line.contains('[WARN]')) {
-      return isDark ? const Color(0xFFD29922) : const Color(0xFF9A6700);
-    }
-    if (line.contains('[ERROR]') || line.contains('[SEVERE]')) {
-      return isDark ? const Color(0xFFF85149) : const Color(0xFFCF222E);
-    }
-    if (line.contains('=== MAIN LOG ===') ||
-        line.contains('=== CRASH LOG ===') ||
-        line.contains('... (showing last ')) {
-      return isDark ? const Color(0xFF7EE787) : const Color(0xFF1A7F37);
-    }
-    return null;
-  }
 }

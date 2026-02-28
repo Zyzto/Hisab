@@ -1,6 +1,11 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
+/// Shared loading content for async/loading states.
+/// Use for consistent loading UI (e.g. with [AsyncValueBuilder]).
+// ignore: constant_identifier_names
+const LoadingContent = Center(child: CircularProgressIndicator());
+
 /// Shared error content for async/error states. Shows icon, optional title,
 /// message, and optional retry button. Use with [AsyncValue.when] error builder
 /// or anywhere a consistent error UI is needed.

@@ -4,39 +4,13 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 import '../layout/responsive_sheet.dart';
+import 'receipt_image_view_url.dart';
 import 'receipt_utils.dart';
 
 /// Shows the receipt image full-screen (dialog). Tap or back to close.
 void showReceiptImageFullScreen(BuildContext context, String imagePath) {
   if (isReceiptImageUrl(imagePath)) {
-    showAppDialog<void>(
-      context: context,
-      barrierColor: Theme.of(context).colorScheme.scrim,
-      barrierDismissible: true,
-      centerInFullViewport: true,
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: EdgeInsets.zero,
-        child: InteractiveViewer(
-          minScale: 0.5,
-          maxScale: 4,
-          child: GestureDetector(
-            onTap: () => Navigator.of(ctx).pop(),
-            child: Center(
-              child: Image.network(
-                imagePath,
-                fit: BoxFit.contain,
-                loadingBuilder: (_, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return const Center(child: CircularProgressIndicator());
-                },
-                errorBuilder: (_, _, _) => const SizedBox.shrink(),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+    showReceiptImageDialogForUrl(context, imagePath);
     return;
   }
   final file = File(imagePath);

@@ -1,6 +1,7 @@
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'error_content.dart';
 
 class AsyncValueBuilder<T> extends StatelessWidget {
   final AsyncValue<T> value;
@@ -29,34 +30,10 @@ class AsyncValueBuilder<T> extends StatelessWidget {
         return this.data(context, data);
       },
       loading: () =>
-          loading?.call(context) ??
-          const Center(child: CircularProgressIndicator()),
+          loading?.call(context) ?? LoadingContent,
       error: (error, stack) =>
           this.error?.call(context, error, stack) ??
-          SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.error_outline,
-                  size: 48,
-                  color: Theme.of(context).colorScheme.error,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'generic_error'.tr(),
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  error.toString(),
-                  style: Theme.of(context).textTheme.bodySmall,
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
+          ErrorContentWidget(message: error.toString()),
     );
   }
 }

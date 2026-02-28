@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../../core/utils/currency_helpers.dart';
+import '../../../core/utils/form_validators.dart';
 import '../constants/expense_form_constants.dart';
 
 /// Amount input with tappable currency selector and optional exchange rate section.
@@ -117,8 +118,9 @@ class ExpenseAmountSection extends StatelessWidget {
                 validator:
                     validator ??
                     (v) {
-                      if (v == null || v.trim().isEmpty) return 'required'.tr();
-                      if (double.tryParse(v) == null) {
+                      final requiredErr = FormValidators.required(v);
+                      if (requiredErr != null) return requiredErr;
+                      if (double.tryParse(v!) == null) {
                         return 'invalid_number'.tr();
                       }
                       return null;

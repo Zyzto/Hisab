@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+
+import '../../../core/utils/run_guarded_async.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 import '../../../core/constants/supabase_config.dart';
 import '../../../core/layout/layout_breakpoints.dart';
@@ -87,12 +88,10 @@ class _CreateInviteSheetState extends ConsumerState<_CreateInviteSheet> {
 
   Future<void> _create() async {
     setState(() => _creating = true);
-    try {
-      final expiry = _expiryOptions[_expiryIndex];
-      final maxUses = _maxUsesOptions[_maxUsesIndex];
-      final result = await ref
-          .read(groupInviteRepositoryProvider)
-          .createInvite(
+    final expiry = _expiryOptions[_expiryIndex];
+    final maxUses = _maxUsesOptions[_maxUsesIndex];
+    final result = await runGuardedAsync<({String id, String token})>(
+      ref.read(groupInviteRepositoryProvider).createInvite(
             widget.groupId,
             role: _role,
             label: _labelController.text.trim().isEmpty
@@ -100,23 +99,24 @@ class _CreateInviteSheetState extends ConsumerState<_CreateInviteSheet> {
                 : _labelController.text.trim(),
             maxUses: maxUses.value,
             expiresIn: expiry.duration,
-          );
-      TelemetryService.sendEvent(
-        'invite_created',
-        {'groupId': widget.groupId},
-        enabled: ref.read(telemetryEnabledProvider),
-      );
-      setState(() {
-        _createdToken = result.token;
-        _creating = false;
-      });
-    } catch (e, st) {
-      Log.warning('Create invite failed', error: e, stackTrace: st);
+          ),
+      'Create invite failed',
+      context: context,
+      errorToastMessage: 'generic_error'.tr(),
+    );
+    if (result == null) {
       setState(() => _creating = false);
-      if (mounted) {
-        context.showError('generic_error'.tr());
-      }
+      return;
     }
+    TelemetryService.sendEvent(
+      'invite_created',
+      {'groupId': widget.groupId},
+      enabled: ref.read(telemetryEnabledProvider),
+    );
+    setState(() {
+      _createdToken = result.token;
+      _creating = false;
+    });
   }
 
   @override
