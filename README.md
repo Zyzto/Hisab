@@ -136,9 +136,25 @@ Full configuration reference: [CONFIGURATION.md](docs/CONFIGURATION.md).
 
 All secrets are provided at build time via `--dart-define` — nothing is committed to the repository. The only gitignored file for local secrets is `lib/core/constants/app_secrets.dart` (copy from `app_secrets_example.dart`); it holds the report-issue URL. All Supabase and Firebase values are provided via `--dart-define` only.
 
+## Testing
+
+```bash
+# Unit + widget tests
+flutter test
+
+# Local-only integration tests (web — requires ChromeDriver on port 4444)
+flutter drive --driver=test_driver/integration_test.dart \
+  --target=integration_test/app_test.dart -d web-server --release
+
+# Online integration tests (requires Docker + Supabase CLI)
+./scripts/run_online_tests.sh
+```
+
+Online integration tests run against a **local Supabase instance** (Docker). They cover auth (sign-in/out), data sync (create group/expense → verify in Supabase DB), and multi-user invite flows. See [test/README.md](test/README.md) for full setup and troubleshooting.
+
 ## CI/CD (GitHub Actions)
 
-The project includes a release workflow (`.github/workflows/release.yml`) that builds Android APK/AAB, deploys to Google Play, and deploys the web app to Firebase Hosting. It triggers on version tags (`v*`) or manual dispatch.
+The project includes a release workflow (`.github/workflows/release.yml`) that builds Android APK/AAB, deploys to Google Play, and deploys the web app to Firebase Hosting. It triggers on version tags (`v*`) or manual dispatch. It also runs local-only and online integration tests (the latter using a Docker-based Supabase instance).
 
 ### Required GitHub Secrets
 

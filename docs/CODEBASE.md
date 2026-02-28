@@ -27,9 +27,12 @@
 | `supabase/functions/og-invite-image/` | Edge Function: GET `?token=...` → 1200×630 PNG (QR, branding) for invite previews |
 | `supabase/functions/send-notification/` | Edge Function: FCM push (expenses, member_joined; excludes joinee) |
 | `supabase/functions/telemetry/` | Edge Function: anonymous telemetry ingest |
-| `docs/` | Setup and architecture documentation |
+| `docs/` | Setup and architecture documentation; see [docs/README.md](README.md) for an index |
 | `test/` | Tests mirroring `lib/` layout; see [test/README.md](test/README.md) |
-| `.github/workflows/release.yml` | CI/CD for Android builds/releases + web deploy |
+| `integration_test/` | Full-app integration tests (local-only + online); see [test/README.md](test/README.md) |
+| `supabase/` | Local Supabase config, 18 migrations, seed data for online integration tests |
+| `scripts/` | Helper scripts (`run_online_tests.sh` for online tests) |
+| `.github/workflows/release.yml` | CI/CD for Android builds/releases + web deploy + online integration tests |
 
 ## App Startup Flow
 
@@ -311,10 +314,14 @@ iOS declarations are present in `ios/Runner/Info.plist`, including:
 `.github/workflows/release.yml`:
 
 - triggers on tags `v*` or manual dispatch
+- **test** job: unit + widget tests, local-only integration tests on web (Chrome)
+- **test-online** job: online integration tests against a local Supabase Docker instance (auth, sync, invite flows)
 - builds Android APK + AAB
 - creates GitHub release (tag flow)
 - optional Play Store internal deploy
 - builds/deploys Flutter web to Firebase Hosting (copies privacy page to build output)
+
+The `test-online` job requires no additional secrets — it uses the local Supabase instance's auto-generated credentials. It sets up the Supabase CLI, starts Docker containers, resets the database (18 migrations + seed), and runs `flutter drive` with the online test barrel.
 
 ## Key Dependencies (Selected)
 
@@ -338,7 +345,9 @@ iOS declarations are present in `ios/Runner/Info.plist`, including:
   - **Widget:** Public custom widgets under `test/` mirroring `lib/`: `test/core/` (async_value_builder, back_button_keyboard_dismiss, connection_banner, currency_picker_list, expandable_section, floating_nav_bar, invite_link_handler, pwa_install_banner, sync_status_chip), `test/groups/` (group_card, create_invite_sheet), `test/expenses/` (expense_list_tile, expense_title_section, expense_amount_section, expense_split_section, expense_bill_breakdown_section, expense_detail_body, expense_detail_body_header), `test/settings/` (logs_viewer_dialog, privacy_policy_page), `test/pages/` (main_scaffold, home_page, archived_groups_page), `test/balance/` (balance_list), `test/onboarding/` (onboarding_page), plus error_content and app. Widget tests use EasyLocalization + MaterialApp; Riverpod widgets use ProviderScope with overrides when needed. See [test/widget_test_helpers.dart](test/widget_test_helpers.dart) and [test/README.md](test/README.md).
   - **Locale:** Key widgets are tested in both English and Arabic via `test/widget_test_helpers.dart`: `pumpApp(tester, child: ..., locale: Locale('ar'))` and `testSupportedLocales`. Edge cases (empty/zero/long content, optional params) are covered where relevant.
   - **Integration-style:** Local PowerSync DB, sync engine with fake backend. See [test/README.md](test/README.md) for PowerSync native binary requirements and coverage (`flutter test --coverage`).
-  - **Integration:** Full-app flows in `integration_test/` (smoke, create group); run with `flutter test integration_test/ -d linux` (or Android/iOS device). App targets web (desktop/tablet/mobile), Android, iOS; integration tests run on Linux/Android/iOS (web not supported by Flutter for integration_test). See [test/README.md](test/README.md).
+  - **Integration (local-only):** Full-app flows in `integration_test/` — smoke, onboarding, group, personal, expense (tags, photos, currencies, bill breakdown), balance (settlements, freeze), settings. Run with `flutter drive` on web or `flutter test integration_test/ -d <device>`. See [test/README.md](test/README.md).
+  - **Integration (online):** Full end-to-end tests against a **local Supabase instance** (Docker) — auth (sign-in/out), data sync (create group/expense → verify in Supabase DB), and multi-user invite flow. Run with `./scripts/run_online_tests.sh` or manually via `supabase start` + `flutter drive`. See [test/README.md](test/README.md) for full setup.
+  - **Maestro E2E:** YAML flows in `.maestro/` (web-first: smoke, create group); run via Maestro CLI after starting the web app. See [test/README.md](test/README.md) for install and run instructions.
 - **Widget test helper:** `test/widget_test_helpers.dart` provides `pumpApp(tester, child, locale?, pumpAndSettle?)` to wrap the widget in EasyLocalization + MaterialApp; use for presentational widgets. For widgets that depend on Riverpod, build ProviderScope + EasyLocalization + MaterialApp inline with overrides (see e.g. `test/balance/balance_list_widget_test.dart`).
 - **Generated code:** Run `dart run build_runner build` (or `watch`) to regenerate `.g.dart` files before running tests or when changing providers/settings.
 
@@ -369,6 +378,8 @@ The following improvements are reflected in the codebase and docs:
 - **Modal centering (web tablet/desktop):** Modals are centered in the full viewport by default (`centerInFullViewport` defaults to true). `showResponsiveSheet` and `showAppDialog` support `centerInFullViewport`; pass `false` for modals opened from home/settings that should stay in the content area next to the rail. The app builder uses `Positioned.fill` so the root navigator gets full viewport size. See `docs/MODAL_CENTERING_AND_RESPONSIVE_SHEET.md`.
 - **App bar title aligned with content:** All pages with a constrained body use **ContentAlignedAppBar** so the app bar title sits in the same horizontal band as the body (same `contentBandMetrics` as `ConstrainedContent`). The title is absolutely positioned in the app bar so it is not affected by leading/actions. Wrap the scaffold in `LayoutBuilder` and pass `layoutConstraints.maxWidth` as `contentAreaWidth`. See `lib/core/layout/content_aligned_app_bar.dart` and the “Layout (core/layout)” section above.
 
+- **Online integration tests:** Full end-to-end tests against a local Supabase Docker instance — auth, sync, and invite flows. Local Supabase setup (config, 18 migrations, seed) lives in `supabase/`. Run with `./scripts/run_online_tests.sh`. CI runs them in the `test-online` GitHub Actions job. See [test/README.md](test/README.md) for full setup, prerequisites, and troubleshooting.
+
 ## Related Docs
 
 - `docs/MODAL_CENTERING_AND_RESPONSIVE_SHEET.md` - modal/dialog centering on web, `centerInFullViewport`, and responsive sheet API
@@ -379,3 +390,4 @@ The following improvements are reflected in the codebase and docs:
 - `docs/CONFIGURATION.md` - runtime configuration quick reference
 - `docs/RELEASE_SETUP.md` and `docs/PLAY_CONSOLE_DECLARATIONS.md` - release/distribution notes
 - `docs/DELETE_ACCOUNT.md` - user-facing guide for deleting data and requesting account deletion
+- `test/README.md` - comprehensive test documentation: unit, widget, integration (local + online), Maestro, coverage

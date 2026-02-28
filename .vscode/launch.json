@@ -38,6 +38,93 @@
       "request": "launch",
       "type": "dart",
       "program": "lib/main.dart"
+    },
+    {
+      "name": "Integration: Current File (Linux)",
+      "request": "launch",
+      "type": "dart",
+      "program": "${file}",
+      "deviceId": "linux"
+    },
+    {
+      "name": "Integration: Current File (Android)",
+      "request": "launch",
+      "type": "dart",
+      "program": "${file}",
+      "deviceId": "emulator-5554"
+    },
+    {
+      "name": "Integration: All (Linux)",
+      "request": "launch",
+      "type": "dart",
+      "program": "integration_test/app_test.dart",
+      "deviceId": "linux"
+    },
+    {
+      "name": "Integration: All (Android)",
+      "request": "launch",
+      "type": "dart",
+      "program": "integration_test/app_test.dart",
+      "deviceId": "emulator-5554"
+    },
+    {
+      "name": "Integration: Smoke (Linux)",
+      "request": "launch",
+      "type": "dart",
+      "program": "integration_test/smoke_test.dart",
+      "deviceId": "linux"
+    },
+    {
+      "name": "Integration: Onboarding (Linux)",
+      "request": "launch",
+      "type": "dart",
+      "program": "integration_test/onboarding_test.dart",
+      "deviceId": "linux"
+    },
+    {
+      "name": "Integration: Settings (Linux)",
+      "request": "launch",
+      "type": "dart",
+      "program": "integration_test/settings_test.dart",
+      "deviceId": "linux"
+    },
+    {
+      "name": "Integration: Expense Flows (Linux)",
+      "request": "launch",
+      "type": "dart",
+      "program": "integration_test/expense_flows_test.dart",
+      "deviceId": "linux"
+    },
+    {
+      "name": "Integration: Group Flows (Linux)",
+      "request": "launch",
+      "type": "dart",
+      "program": "integration_test/group_flows_test.dart",
+      "deviceId": "linux"
+    },
+    {
+      "name": "Integration: Balance (Linux)",
+      "request": "launch",
+      "type": "dart",
+      "program": "integration_test/balance_test.dart",
+      "deviceId": "linux"
+    },
+    {
+      "name": "Integration: Personal (Linux)",
+      "request": "launch",
+      "type": "dart",
+      "program": "integration_test/personal_test.dart",
+      "deviceId": "linux"
+    },
+    {
+      "name": "Integration: Online (Linux)",
+      "request": "launch",
+      "type": "dart",
+      "program": "integration_test/online_app_test.dart",
+      "deviceId": "linux",
+      "toolArgs": [
+        "--dart-define-from-file=${workspaceFolder}/dart_defines_online.json"
+      ]
     }
   ]
 }

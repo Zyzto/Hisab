@@ -1,6 +1,6 @@
 # Adaptive and Responsive Design Plan (Hisab)
 
-This plan is based on the [Flutter Adaptive and Responsive Design](https://docs.flutter.dev/ui/adaptive-responsive) documentation. It maps each doc section to the current Hisab codebase and lists concrete changes.
+This plan is based on the [Flutter Adaptive and Responsive Design](https://docs.flutter.dev/ui/adaptive-responsive) documentation. It maps each doc section to the current Hisab codebase and lists concrete changes. For implementation details on modal centering and responsive sheets, see [MODAL_CENTERING_AND_RESPONSIVE_SHEET.md](MODAL_CENTERING_AND_RESPONSIVE_SHEET.md).
 
 **References:** [Overview](https://docs.flutter.dev/ui/adaptive-responsive) · [General approach](https://docs.flutter.dev/ui/adaptive-responsive/general) · [SafeArea & MediaQuery](https://docs.flutter.dev/ui/adaptive-responsive/safearea-mediaquery) · [Large screens](https://docs.flutter.dev/ui/adaptive-responsive/large-screens) · [User input](https://docs.flutter.dev/ui/adaptive-responsive/input) · [Best practices](https://docs.flutter.dev/ui/adaptive-responsive/best-practices) · [Capabilities & policies](https://docs.flutter.dev/ui/adaptive-responsive/capabilities) · [More info](https://docs.flutter.dev/ui/adaptive-responsive/more-info)
 

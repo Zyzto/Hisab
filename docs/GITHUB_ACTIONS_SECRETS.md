@@ -41,6 +41,22 @@ Add these in **GitHub → Your repo → Settings → Secrets and variables → A
 
 ---
 
+## Online integration tests (`test-online` job)
+
+The `test-online` job in `.github/workflows/release.yml` runs end-to-end tests against a **local Supabase Docker instance**. It does **not** require any additional secrets — the local Supabase instance generates its own URL and anon key at startup.
+
+What the job does:
+1. Sets up Flutter and Supabase CLI
+2. Starts local Supabase containers (`supabase start`)
+3. Resets the database — applies 18 migrations from `supabase/migrations/` and seeds test users from `supabase/seed.sql`
+4. Extracts `SUPABASE_URL` and `SUPABASE_ANON_KEY` from the running instance
+5. Runs `flutter drive` with the online test barrel (`integration_test/online_app_test.dart`)
+6. Stops Supabase in an `always()` cleanup step
+
+Docker is available by default on GitHub Actions `ubuntu-latest` runners.
+
+---
+
 ## Summary checklist
 
 - [ ] `SUPABASE_URL`

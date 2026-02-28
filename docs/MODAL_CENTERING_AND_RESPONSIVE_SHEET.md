@@ -1,6 +1,6 @@
 # Modal centering and responsive sheet
 
-This document describes modal/dialog centering on web (tablet and desktop), **click-outside-to-close** behavior, and how modals behave when opened from shell vs non–shell routes.
+This document describes modal/dialog centering on web (tablet and desktop), **click-outside-to-close** behavior, and how modals behave when opened from shell vs non–shell routes. For the broader adaptive/responsive plan (breakpoints, SafeArea, large screens), see [ADAPTIVE_RESPONSIVE_PLAN.md](ADAPTIVE_RESPONSIVE_PLAN.md).
 
 ## Problems addressed
 

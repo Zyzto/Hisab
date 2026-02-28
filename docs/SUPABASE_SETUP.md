@@ -1742,7 +1742,7 @@ To control the redirect from the app (e.g. when Site URL is wrong), pass `--dart
 
 ## 5. Deploy Edge Functions
 
-Hisab uses three Supabase Edge Functions. Deploy them using the Supabase CLI or dashboard.
+Hisab uses several Supabase Edge Functions. For the full list and deploy commands, see [EDGE_FUNCTIONS.md](EDGE_FUNCTIONS.md). You can deploy using the Supabase CLI or dashboard.
 
 ### invite-redirect
 
