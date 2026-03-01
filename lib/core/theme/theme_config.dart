@@ -79,6 +79,13 @@ class ThemeConfig {
   static const double appBarElevation = elevationNone;
   static const bool appBarCenterTitle = true;
 
+  /// Returns a contrasting foreground color (white or black) for content drawn
+  /// on the given [background]. Use for icons/text on arbitrary colors (e.g.
+  /// group color, color picker chip), not for theme surfaces.
+  static Color foregroundOnBackground(Color background) {
+    return background.computeLuminance() > 0.5 ? Colors.black : Colors.white;
+  }
+
   static double getTextScaleFactor(String? fontSizeScale) {
     switch (fontSizeScale) {
       case 'small':
