@@ -14,15 +14,37 @@ Run a single file:
 flutter test test/settle_up_service_test.dart
 ```
 
+## Run all tests (runner)
+
+A cross-platform Dart runner runs unit/widget tests, then in parallel: Android integration (with optional AVD launch) and web integration (ChromeDriver + `flutter drive`), and prints a summary with log paths.
+
+**From repo root (all platforms):**
+
+```bash
+dart run tool/run_all_tests.dart
+```
+
+Optional wrappers: `./scripts/run_all_tests.sh` (Linux/macOS) or `scripts\run_all_tests.bat` (Windows).
+
+**Options:** `--skip-unit` (skip unit & widget tests), `--skip-android`, `--skip-web`, `--no-avd` (do not launch an emulator; fail if no Android device is present).
+
+**Logs:** Written to `logs/test_run_<timestamp>/` (e.g. `unit_widget.log`, `integration_android.log`, `integration_web.log`). The summary table and any error log paths are printed at the end.
+
+**Prerequisites:** Flutter SDK, Dart SDK. For Android: a device or AVD (runner can launch the first available emulator). For web: Chrome and ChromeDriver on PATH (version-matched); set `CHROME_EXECUTABLE` if Chrome is not in the default location.
+
 ## Widget tests
 
 - **Layout:** Test directories mirror `lib/`: `test/core/`, `test/groups/`, `test/expenses/`, `test/settings/`, `test/pages/`, plus `test/balance/`, `test/` (app, error content, etc.).
 - **Helper:** `test/widget_test_helpers.dart` provides:
   - `pumpApp(tester, child: widget, locale: Locale('en')|Locale('ar'), pumpAndSettle: true)` — wraps the widget in EasyLocalization + MaterialApp + Scaffold, then pumps. Use for presentational widgets that do not need Riverpod.
   - `testSupportedLocales` — `[Locale('en'), Locale('ar')]` for use when building EasyLocalization manually (e.g. with ProviderScope overrides).
-- **Conventions:** Use `setUpAll` to disable Easy Localization build logging (`EasyLocalization.logger.enableBuildModes = []`). For widgets that depend on providers, wrap in `ProviderScope(overrides: [...])` then EasyLocalization then MaterialApp (see e.g. `test/balance/balance_list_widget_test.dart`, `test/core/sync_status_chip_widget_test.dart`).
+- **Conventions:** Use `setUpAll` to disable Easy Localization build logging (`EasyLocalization.logger.enableBuildModes = []`). For widgets that depend on providers, wrap in `ProviderScope(overrides: [...])` then EasyLocalization then MaterialApp (see e.g. `test/balance/balance_list_widget_test.dart`, `test/core/sync_status_chip_widget_test.dart`). The balance list test overrides `myMemberInGroupProvider` and `myRoleInGroupProvider` to assert both owner (record enabled) and member-not-debtor (record disabled) behaviour.
 - **Locale:** Key widgets have at least one test with `locale: Locale('ar')` (via `pumpApp` or manual `startLocale: Locale('ar')`) to ensure RTL/translations work.
 - **Edge cases:** Tests cover empty/zero/long content and optional parameters where relevant (e.g. GroupCard empty name, personal group, pin; ExpenseListTile zero amount, long title, income type; ExpandableSection empty `trailingSummary`).
+
+## Schema alignment
+
+`test/schema_alignment_test.dart` asserts that synced table columns match between `lib/core/database/powersync_schema.dart` and the INSERT column lists in `lib/core/database/sync_engine.dart`. It runs with `flutter test` and fails the build on mismatch. See `docs/CODEBASE.md` "Schema alignment".
 
 ## PowerSync
 
@@ -105,6 +127,19 @@ Run on iOS when a simulator or device is available:
 flutter test integration_test/ -d <ios_device_id>
 ```
 
+**Android emulator troubleshooting**
+
+- **`VmServiceDisappearedException`**, **`registerService: (-32000) Service connection disposed`**, or **`ext.flutter.driver: (112) Service has disappeared`** — The test driver lost the VM service connection to the app (often during "loading" or mid-run). This is emulator/connection instability, not test code. When using `dart run tool/run_all_tests.dart`, the runner continues to the web phase after Android fails; the **Stage Log** printed at the end is from the **web** run, not Android. **Workaround — use `flutter drive`** for Android (the runner uses this with `--android-drive`):
+  ```bash
+  flutter drive \
+    --driver=test_driver/integration_test.dart \
+    --target=integration_test/app_test.dart \
+    -d emulator-5554
+  ```
+  Or with the full runner: `dart run tool/run_all_tests.dart --android-drive`. Other options: (1) Cold boot the emulator (AVD Manager → Cold Boot Now) and retry. (2) Use a real device if available. (3) Reduce emulator load (Developer options → disable animations). (4) Update Flutter (`flutter upgrade`).
+- **`adb: device offline`** — Restart the emulator and/or run `adb kill-server` then `adb start-server`. Ensure the emulator has enough RAM and disk.
+- **`INSTALL_FAILED_INSUFFICIENT_STORAGE`** — Free space on the emulator (e.g. wipe data or use a larger virtual disk).
+
 **File structure:**
 
 ```
@@ -116,7 +151,7 @@ integration_test/
     fake_image_picker.dart       -- mock ImagePickerPlatform for photo tests
     test_db_path.dart            -- platform-conditional DB path (io/stub)
   smoke_test.dart                -- app opens, home visible, nav works
-  onboarding_test.dart           -- full 3-page onboarding flow
+  onboarding_test.dart           -- full 4-page onboarding flow (Welcome → Preferences → Permissions → Connect)
   group_flows_test.dart          -- create group, detail tabs, settings, archive
   personal_test.dart             -- create personal budget, simplified UI, add expense
   expense_flows_test.dart        -- add/edit/view expenses, all split types, income/transfer
@@ -130,8 +165,12 @@ integration_test/
   online_app_test.dart           -- barrel that imports all online test files
 test_driver/
   integration_test.dart          -- web driver entry point (custom diagnostics)
+tool/
+  run_all_tests.dart            -- cross-platform runner: unit/widget, then Android + web integration, summary
+  run_online_tests.dart         -- cross-platform online test runner (Supabase, ChromeDriver, cleanup)
 scripts/
-  run_online_tests.sh            -- one-command online test runner (starts Supabase, runs tests)
+  run_all_tests.sh, run_all_tests.bat  -- wrappers for dart run tool/run_all_tests.dart
+  run_online_tests.sh           -- wrapper for dart run tool/run_online_tests.dart (Linux/macOS)
 ```
 
 - **Bootstrap (local):** `integration_test/helpers/test_bootstrap.dart` initializes EasyLocalization, a temp PowerSync DB, and settings (onboarding completed, local-only), then calls `runApp(...)` with the same overrides as production. No Supabase/Firebase or LoggingService. Set `skipOnboarding: false` to exercise the onboarding flow.
@@ -139,11 +178,11 @@ scripts/
 - **Helpers:** `integration_test/helpers/test_helpers.dart` provides `pumpAndSettleWithTimeout`, `tapAndSettle`, `enterTextAndPump` (with web fallback), `waitForWidget`, `scrollUntilVisible`, `tapSubmitExpenseButton`, `ensureFormClosed`, `stage` (stage-based progress recording), and `ensureBootstrapReady`.
 - **Test flows — local-only mode** (`app_test.dart`):
   - **Smoke:** App opens to home (Groups/Personal/FAB visible); navigate to Settings and back.
-  - **Onboarding:** Complete all 3 pages (Welcome → Permissions → Connect) and land on home.
+  - **Onboarding:** Complete all 4 pages (Welcome → Preferences → Permissions → Connect) and land on home.
   - **Group flows:** Create group with participants (Alice, Bob) → verify detail tabs (Expenses/Balance/People) → open group settings → change icon/color/currency/settlement → archive group.
   - **Personal:** Create personal budget → verify simplified UI (no Balance/People tabs) → add expense.
   - **Expense flows:** Create group with 2 participants → add expenses with tags, description, bill breakdown, long titles, currency change, exchange rates → all split types → photo attachment (skipped on web) → view detail → edit expense → add Income and Transfer.
-  - **Balance:** Create group, add expense → switch to Balance tab → verify balances and settlement suggestions → record and freeze settlements.
+  - **Balance:** Create group, add expense → switch to Balance tab → verify balances and settlement suggestions → record and freeze settlements. The test user is the group owner, so they can record any settlement (by default only the owner or the debtor can record; see group setting "Members can record settlements for others").
   - **Settings:** Change theme, language (Arabic and back), font size, toggle telemetry; verify settings persist across navigation.
 - **Test flows — online mode** (`online_app_test.dart`, requires local Supabase):
   - **Auth:** Sign in as User A → verify session → navigate to Settings → sign out → programmatic re-sign-in → sign in as User B.
@@ -151,47 +190,6 @@ scripts/
   - **Invite:** User A creates group → creates invite token (RPC) → signs out → User B accepts invite (RPC) → verify membership → User A verifies member list → cleanup.
 - **Requirements:** For web, Chrome/Chromium must be installed (set `CHROME_EXECUTABLE` if needed). PowerSync is used; on web it uses the web-backed storage. If the bootstrap fails (e.g. PowerSync unavailable), tests fail with a clear message.
 - **CI:** Runs local integration tests on **web** (`flutter drive` with `-d chrome`). Online tests run separately with a Docker-based Supabase instance. For Android/iOS, use an emulator or Firebase Test Lab.
-
-## Maestro E2E
-
-[Maestro](https://maestro.dev) provides YAML-based E2E flows that run alongside the Flutter integration tests. The project targets the **web** app first (no iOS/Android required).
-
-**Prerequisite:** The Flutter web app must already be running. Maestro only opens a browser to the flow URL and drives the UI; it does not start the app. If the app is not running, flows will fail (e.g. "Settings" is visible assertion fails). If you see a **white page** in the browser, run the app with `--release` (see step 1 below) so it does not wait for the debug service.
-
-**Install Maestro CLI:** See [maestro.dev](https://maestro.dev) (e.g. `curl -Ls "https://get.maestro.mobile.dev" | bash`). Optionally install Maestro Studio for visual authoring and recording.
-
-**Run flows (web):**
-
-1. Start the Flutter web app on port 9090 (flows use `http://localhost:9090`). Use **release** mode so the app renders immediately (debug mode waits for the debug service and can show a white screen). Keep it running:
-   ```bash
-   flutter run -d web-server --web-port=9090 --release
-   ```
-2. In another terminal, from the repo root:
-   ```bash
-   maestro test .maestro/
-   ```
-   Maestro opens a browser to the URL and runs the flows. To use a different URL (e.g. deployed staging), pass env: `maestro test .maestro/ --env MAESTRO_WEB_URL=https://your-app.web.app` (and set `url` in the flow config to `${MAESTRO_WEB_URL}` if your Maestro version supports it), or edit the `url` in each YAML file under `.maestro/`.
-
-**Flows:** Both flows assume **first launch** (onboarding is shown). They complete onboarding (Next → Next → Start with Offline) then run the test. If you have already completed onboarding in the browser, clear the site's storage (e.g. Application → Storage → Clear site data) so onboarding appears again, or run in an incognito window.
-
-- **smoke.yaml** — Launch → complete onboarding → assert home (Settings and Create Group FAB visible).
-- **create_group.yaml** — Launch → complete onboarding → create group: name (EUR Group), currency (EUR), participants (Alice, Bob), through Personalize and Review, then assert group created.
-
-These mirror the scenarios in `integration_test/app_test.dart`. Android and iOS can be added later by using `appId` (e.g. `com.shenepoy.hisab`) in the flow config and running Maestro with a device or emulator.
-
-**Seeing what Maestro sees:** To debug selectors or understand why a step fails:
-
-- **Maestro Studio** — Use [Maestro Studio](https://maestro.dev) (desktop app). Connect to **Web** and open your app URL. Use the **Inspect Screen** feature: click an element on the screenshot to see how Maestro identifies it (text, id, etc.) and get suggested commands (`tapOn`, `assertVisible`, …). You can run actions and insert them into a flow.
-- **Screenshot flow** — Run the inspect flow to capture what Maestro's browser sees: `maestro test .maestro/inspect.yaml`. A PNG is saved (path shown in the CLI output, often under the current directory or `~/.maestro`). Compare that to what you see in your own browser to spot missing content or wrong page.
-
-**Troubleshooting (web: "Chrome instance exited" / SessionNotCreatedException):** Maestro web uses Selenium and ChromeDriver to drive Chrome. If you see `session not created: Chrome instance exited`:
-
-1. **Chrome vs ChromeDriver version** — The major version of Chrome and the ChromeDriver that Maestro uses must match. Check your Chrome version (e.g. `google-chrome-stable --version` or `chromium --version`). Maestro downloads its own driver; if your Chrome is much newer or older, the session can fail.
-2. **Chrome binary path** — If Chrome is not in a standard location, set the executable before running Maestro (Selenium often respects `CHROME_BIN` or `CHROME_EXECUTABLE`), e.g. `export CHROME_BIN=/usr/bin/google-chrome-stable` or `export CHROME_EXECUTABLE=/usr/bin/chromium`.
-3. **ChromeDriver verbose log** — The error suggests examining the ChromeDriver verbose log to see why Chrome exited; run with debug/verbose if Maestro or your environment supports it.
-4. **Sandbox / headless** — On some Linux setups Chrome needs `--no-sandbox` or `--disable-dev-shm-usage` to start. Maestro may pass some flags already; if you can pass extra Chrome args (e.g. via an env or config), try adding those.
-
-If the problem persists, run the Flutter integration tests on web instead (see "Integration tests" above); they use ChromeDriver directly and you can match Chrome and ChromeDriver versions manually.
 
 ## Online integration tests (local Supabase)
 
@@ -203,27 +201,25 @@ Online integration tests run the app against a **local Supabase instance** via D
 |---|---|
 | Docker | `docker info` (must be running) |
 | Supabase CLI | `supabase --version` (install: `npm i -g supabase` or [docs](https://supabase.com/docs/guides/cli/getting-started)) |
-| `jq` | `jq --version` (used by the run script to extract credentials) |
-| Chrome + ChromeDriver | Same as local integration tests (version-matched) |
+| Chrome + ChromeDriver (web) | Same as local integration tests (version-matched); only needed for web |
 
 ### Quick start (one command)
 
-```bash
-./scripts/run_online_tests.sh
-```
-
-This script:
-1. Starts local Supabase containers (`supabase start`)
-2. Resets the database — applies all 18 migrations and seeds two test users
-3. Extracts `SUPABASE_URL` and `SUPABASE_ANON_KEY` from the running instance
-4. Runs `flutter drive` with the online test barrel on web
-5. Stops Supabase on exit
-
-Pass `android` to run on a connected device instead:
+**Recommended — cross-platform Dart runner (all platforms):**
 
 ```bash
-./scripts/run_online_tests.sh android
+dart run tool/run_online_tests.dart
 ```
+
+Optional: `dart run tool/run_online_tests.dart android` to run on a connected Android device. On Linux/macOS you can use the shell wrapper: `./scripts/run_online_tests.sh` or `./scripts/run_online_tests.sh android`.
+
+The runner:
+1. Checks prerequisites (Docker, Supabase CLI, ChromeDriver for web)
+2. Starts local Supabase (`supabase start`) and resets the database (migrations + seed)
+3. Parses credentials from `supabase status --output json` (no `jq` required)
+4. For web: starts ChromeDriver on port 4444 if needed, then runs `flutter drive` with the online test barrel
+5. Stops Supabase and ChromeDriver (if started) on exit, including on interrupt (e.g. Ctrl+C)
+6. Writes all output to `logs/online_tests_<timestamp>.log` and prints "Online tests: PASS" or "Online tests: FAILED (see log: ...)"
 
 ### Manual steps (step by step)
 
@@ -258,7 +254,7 @@ All configuration lives under `supabase/`:
 | File | Purpose |
 |---|---|
 | `supabase/config.toml` | Supabase project config: ports, auth settings, storage buckets, rate limits |
-| `supabase/migrations/20250101000001_*.sql` – `…000018_*.sql` | 18 ordered migrations covering schema, RLS, RPCs, indexes, and features |
+| `supabase/migrations/20250101000001_*.sql` – `…000019_*.sql` | 19 ordered migrations covering schema, RLS, RPCs, indexes, and features |
 | `supabase/seed.sql` | Seeds two test users into `auth.users` + `auth.identities` |
 
 **Test users** (seeded automatically by `supabase db reset`):
@@ -275,7 +271,7 @@ All configuration lives under `supabase/`:
 - `auth.rate_limit.*` = `1000` — high limits to prevent throttling during test runs
 - `storage.buckets.receipt-images` — pre-created bucket for receipt image uploads
 
-**Migrations:** The 18 migration files consolidate the complete Supabase schema from `docs/SUPABASE_SETUP.md`:
+**Migrations:** The 19 migration files consolidate the complete Supabase schema from `docs/SUPABASE_SETUP.md`:
 
 1. `core_schema` — tables (groups, participants, expenses, etc.)
 2. `rls_policies` — row-level security
@@ -295,6 +291,7 @@ All configuration lives under `supabase/`:
 16. `groups_personal_budget` — personal budget columns
 17. `anonymize_on_delete` — name anonymization on account delete
 18. `receipt_image_paths` — receipt image path columns
+19. `groups_allow_member_settle_for_others` — settlement permission (owner or debtor only by default)
 
 > **Note:** Migration 6 from the original setup (pg_net notification triggers) is intentionally skipped — `pg_net` is not available in the local Supabase environment.
 

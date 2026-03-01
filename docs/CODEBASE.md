@@ -30,7 +30,7 @@
 | `docs/` | Setup and architecture documentation; see [docs/README.md](README.md) for an index |
 | `test/` | Tests mirroring `lib/` layout; see [test/README.md](test/README.md) |
 | `integration_test/` | Full-app integration tests (local-only + online); see [test/README.md](test/README.md) |
-| `supabase/` | Local Supabase config, 18 migrations, seed data for online integration tests |
+| `supabase/` | Local Supabase config, 19 migrations, seed data for online integration tests |
 | `scripts/` | Helper scripts (`run_online_tests.sh` for online tests) |
 | `.github/workflows/release.yml` | CI/CD for Android builds/releases + web deploy + online integration tests |
 
@@ -59,6 +59,7 @@
 - **Repositories** (`lib/core/repository/`): `group_repository`, `participant_repository`, `expense_repository`, `group_member_repository`, `group_invite_repository`, `tag_repository`, `powersync_repository`. Wired in `repository_providers.dart` with `effectiveLocalOnlyProvider` and connectivity; implementations in `powersync_repository.dart` and per-entity repositories.
 - Reads come from local DB; online mode writes target Supabase then local cache.
 - In online mode while temporarily offline, some writes (notably expense writes) are queued to `pending_writes`.
+- **Expense exchange rate:** Each expense stores `exchange_rate` and `base_amount_cents` (group-currency amount). Display and settle-up **always** use these stored values so amounts stay consistent over time and when editing; do not recalculate from a live API for existing expenses.
 
 **Schema alignment:** The source of truth for synced table columns is the INSERT column list in `lib/core/database/sync_engine.dart`. When adding or changing columns in Supabase (or in the local schema), keep all three in sync: (1) Supabase table definition (migrations), (2) `lib/core/database/powersync_schema.dart`, and (3) the corresponding INSERT in `sync_engine.dart`. PowerSync adds an `id` column automatically to each table — do not add a custom `Column.text('id')` in the schema (it will trigger an assertion). The test in `test/sync_test.dart` that runs `fetchAllWithBackend` with full rows for all seven synced tables helps catch missing-column mismatches.
 
@@ -156,9 +157,9 @@ Push notifications are sent when expenses are added/edited or members join a gro
 ## Feature Modules
 
 - `features/home`: groups list (Personal and Groups sections) via **home_list_provider** (ordered list, pinned/custom order), **routes**, create FAB + modal (Create group / Create personal), manual refresh trigger
-- `features/groups`: create/detail/settings (including personal vs group branches and convert flows), invite management, invite acceptance; **invite_redirect_proxy** (and _web, _stub, _page) for web/invite redirect; **create_invite_sheet** (invite creation UI)
+- `features/groups`: create/detail/settings (including personal vs group branches and convert flows), invite management, invite acceptance; group settings include permission toggles (e.g. Members can add expenses, Members can record settlements for others). **invite_redirect_proxy** (and _web, _stub, _page) for web/invite redirect; **create_invite_sheet** (invite creation UI)
 - `features/expenses`: create/edit/detail expenses (**expense_detail_shell**), split logic UI, receipt input hooks; **expense_navigation_direction** (provider), **expense_form_constants**, **category_icons**
-- `features/balance`: settlement list and record settlement flow
+- `features/balance`: settlement list and record settlement flow. By default only the group owner or the debtor (participant who owes) can record a settlement; group setting **Members can record settlements for others** (Group.allowMemberSettleForOthers) allows any member to record. Balance list (`balance_list.dart`) uses `myMemberInGroupProvider` and `myRoleInGroupProvider` to enable or disable the record button per row.
 - `features/settings`:
   - account mode and auth controls; **edit_profile_sheet**
   - theme/language/font/favorite currencies
@@ -321,12 +322,13 @@ iOS declarations are present in `ios/Runner/Info.plist`, including:
 - optional Play Store internal deploy
 - builds/deploys Flutter web to Firebase Hosting (copies privacy page to build output)
 
-The `test-online` job requires no additional secrets — it uses the local Supabase instance's auto-generated credentials. It sets up the Supabase CLI, starts Docker containers, resets the database (18 migrations + seed), and runs `flutter drive` with the online test barrel.
+The `test-online` job requires no additional secrets — it uses the local Supabase instance's auto-generated credentials. It sets up the Supabase CLI, starts Docker containers, resets the database (19 migrations + seed), and runs `flutter drive` with the online test barrel.
 
 ## Key Dependencies (Selected)
 
 - state: `flutter_riverpod`, `riverpod_annotation`
 - navigation: `go_router`
+- **Git deps:** `flutter_logging_service` (siglat), `flutter_settings_framework` (edadat) — pinned to `ref: main` in pubspec for CI; local path override (lock not committed) is used for fast iteration on those packages. Optional: publish to pub.dev or vendor into this repo for long-term reproducibility.
 - local db/sync engine: `powersync`
 - backend/auth: `supabase_flutter`
 - notifications: `firebase_core`, `firebase_messaging`, `flutter_local_notifications`
@@ -342,12 +344,11 @@ The `test-online` job requires no additional secrets — it uses the local Supab
 - **Run all tests:** `flutter test`
 - **Coverage:**
   - **Unit:** domain, settle-up, sync error classification, backup parse, translations.
-  - **Widget:** Public custom widgets under `test/` mirroring `lib/`: `test/core/` (async_value_builder, back_button_keyboard_dismiss, connection_banner, currency_picker_list, expandable_section, floating_nav_bar, invite_link_handler, pwa_install_banner, sync_status_chip), `test/groups/` (group_card, create_invite_sheet), `test/expenses/` (expense_list_tile, expense_title_section, expense_amount_section, expense_split_section, expense_bill_breakdown_section, expense_detail_body, expense_detail_body_header), `test/settings/` (logs_viewer_dialog, privacy_policy_page), `test/pages/` (main_scaffold, home_page, archived_groups_page), `test/balance/` (balance_list), `test/onboarding/` (onboarding_page), plus error_content and app. Widget tests use EasyLocalization + MaterialApp; Riverpod widgets use ProviderScope with overrides when needed. See [test/widget_test_helpers.dart](test/widget_test_helpers.dart) and [test/README.md](test/README.md).
+  - **Widget:** Public custom widgets under `test/` mirroring `lib/`: `test/core/` (async_value_builder, back_button_keyboard_dismiss, connection_banner, currency_picker_list, expandable_section, floating_nav_bar, invite_link_handler, pwa_install_banner, sync_status_chip), `test/groups/` (group_card, create_invite_sheet), `test/expenses/` (expense_list_tile, expense_title_section, expense_amount_section, expense_split_section, expense_bill_breakdown_section, expense_detail_body, expense_detail_body_header), `test/settings/` (logs_viewer_dialog, privacy_policy_page), `test/pages/` (main_scaffold, home_page, archived_groups_page), `test/balance/` (balance_list: settlement permission — owner vs member/debtor), `test/onboarding/` (onboarding_page), plus error_content and app. Widget tests use EasyLocalization + MaterialApp; Riverpod widgets use ProviderScope with overrides when needed. See [test/widget_test_helpers.dart](test/widget_test_helpers.dart) and [test/README.md](test/README.md).
   - **Locale:** Key widgets are tested in both English and Arabic via `test/widget_test_helpers.dart`: `pumpApp(tester, child: ..., locale: Locale('ar'))` and `testSupportedLocales`. Edge cases (empty/zero/long content, optional params) are covered where relevant.
   - **Integration-style:** Local PowerSync DB, sync engine with fake backend. See [test/README.md](test/README.md) for PowerSync native binary requirements and coverage (`flutter test --coverage`).
   - **Integration (local-only):** Full-app flows in `integration_test/` — smoke, onboarding, group, personal, expense (tags, photos, currencies, bill breakdown), balance (settlements, freeze), settings. Run with `flutter drive` on web or `flutter test integration_test/ -d <device>`. See [test/README.md](test/README.md).
   - **Integration (online):** Full end-to-end tests against a **local Supabase instance** (Docker) — auth (sign-in/out), data sync (create group/expense → verify in Supabase DB), and multi-user invite flow. Run with `./scripts/run_online_tests.sh` or manually via `supabase start` + `flutter drive`. See [test/README.md](test/README.md) for full setup.
-  - **Maestro E2E:** YAML flows in `.maestro/` (web-first: smoke, create group); run via Maestro CLI after starting the web app. See [test/README.md](test/README.md) for install and run instructions.
 - **Widget test helper:** `test/widget_test_helpers.dart` provides `pumpApp(tester, child, locale?, pumpAndSettle?)` to wrap the widget in EasyLocalization + MaterialApp; use for presentational widgets. For widgets that depend on Riverpod, build ProviderScope + EasyLocalization + MaterialApp inline with overrides (see e.g. `test/balance/balance_list_widget_test.dart`).
 - **Generated code:** Run `dart run build_runner build` (or `watch`) to regenerate `.g.dart` files before running tests or when changing providers/settings.
 
@@ -363,7 +364,7 @@ The following improvements are reflected in the codebase and docs:
 - **Sync:** DataSyncService retries sync on transient errors (up to 3 attempts with backoff). Auth errors (401/403) do not retry and set a “sync failed” UI status. See `lib/core/database/sync_errors.dart` and `SyncStatus.syncFailed` in `lib/core/services/connectivity_service.dart`.
 - **Error UX:** Default async error title is localized (`generic_error`). Shared `ErrorContentWidget` (with optional retry) is used for error states in balance, group detail, invite accept/management, archived groups, expense form, and group settings. See `lib/core/widgets/error_content.dart`.
 - **Backup import:** `parseBackupJson()` returns `BackupParseResult` with `data` and `errorMessageKey` so the settings import UI can show specific messages (invalid format, unsupported version, or parse failure). See `lib/features/settings/backup_helper.dart`.
-- **Accessibility:** Semantics/semanticsLabel added for main actions (create group, scan invite, archived, open group, add expense/participant, record settlement) and for the sync status chip. See home, group card, group detail, balance list, sync_status_icon.
+- **Accessibility:** Semantics/semanticsLabel added for main actions (create group, scan invite, archived, open group, add expense/participant, record settlement) and for the sync status chip. See home, group card, group detail, balance list, sync_status_icon. When the user cannot record a settlement (not owner and not debtor), the balance list uses `record_settlement_restricted` for tooltip/semantics.
 - **Tests:** Unit tests (sync errors, backup parse, domain, settle-up, translations). Widget tests cover public custom widgets (core, groups, expenses, settings, pages) with a shared helper `pumpApp()` and locale/edge-case coverage (en/ar, empty/zero/long). See `test/widget_test_helpers.dart` and `test/README.md`. CODEBASE “Testing” and “Development” sections describe how to run tests and use build_runner/MCP.
 - **Config/docs:** Receipt AI API keys documented as user-provided and device-only in `docs/CONFIGURATION.md`. Custom `ErrorWidget.builder` in `main.dart` for framework build errors.
 - **Expense split UX:** In the expense form, when split type is **Parts**, each participant row has minus/plus buttons to adjust the part value (0–999) without typing. **Amounts** and **Parts** rows use a single field per participant (the separate “formatted amount” column was removed); the “Total: X / Y” line remains for amounts validation. See `lib/features/expenses/widgets/expense_split_section.dart`.
@@ -378,7 +379,8 @@ The following improvements are reflected in the codebase and docs:
 - **Modal centering (web tablet/desktop):** Modals are centered in the full viewport by default (`centerInFullViewport` defaults to true). `showResponsiveSheet` and `showAppDialog` support `centerInFullViewport`; pass `false` for modals opened from home/settings that should stay in the content area next to the rail. The app builder uses `Positioned.fill` so the root navigator gets full viewport size. See `docs/MODAL_CENTERING_AND_RESPONSIVE_SHEET.md`.
 - **App bar title aligned with content:** All pages with a constrained body use **ContentAlignedAppBar** so the app bar title sits in the same horizontal band as the body (same `contentBandMetrics` as `ConstrainedContent`). The title is absolutely positioned in the app bar so it is not affected by leading/actions. Wrap the scaffold in `LayoutBuilder` and pass `layoutConstraints.maxWidth` as `contentAreaWidth`. See `lib/core/layout/content_aligned_app_bar.dart` and the “Layout (core/layout)” section above.
 
-- **Online integration tests:** Full end-to-end tests against a local Supabase Docker instance — auth, sync, and invite flows. Local Supabase setup (config, 18 migrations, seed) lives in `supabase/`. Run with `./scripts/run_online_tests.sh`. CI runs them in the `test-online` GitHub Actions job. See [test/README.md](test/README.md) for full setup, prerequisites, and troubleshooting.
+- **Settlement permission:** By default only the group owner or the debtor (participant who owes) can record a settlement. Group setting **Members can record settlements for others** (`Group.allowMemberSettleForOthers`, default false) allows any member to record. Schema: `groups.allow_member_settle_for_others`; sync, repository, backup, and Migration 20 in `docs/SUPABASE_SETUP.md`; local Supabase migration `20250101000019_groups_allow_member_settle_for_others.sql`. Balance list and group settings UI enforce the rule. See `lib/features/balance/widgets/balance_list.dart`, `lib/features/groups/pages/group_settings_page.dart`, `lib/domain/group.dart`.
+- **Online integration tests:** Full end-to-end tests against a local Supabase Docker instance — auth, sync, and invite flows. Local Supabase setup (config, 19 migrations, seed) lives in `supabase/`. Run with `./scripts/run_online_tests.sh`. CI runs them in the `test-online` GitHub Actions job. See [test/README.md](test/README.md) for full setup, prerequisites, and troubleshooting.
 
 ## Related Docs
 
@@ -390,4 +392,4 @@ The following improvements are reflected in the codebase and docs:
 - `docs/CONFIGURATION.md` - runtime configuration quick reference
 - `docs/RELEASE_SETUP.md` and `docs/PLAY_CONSOLE_DECLARATIONS.md` - release/distribution notes
 - `docs/DELETE_ACCOUNT.md` - user-facing guide for deleting data and requesting account deletion
-- `test/README.md` - comprehensive test documentation: unit, widget, integration (local + online), Maestro, coverage
+- `test/README.md` - comprehensive test documentation: unit, widget, integration (local + online), coverage

@@ -31,6 +31,7 @@ This guide walks you through setting up the Supabase backend for Hisab from scra
    - [Migration 17: Anonymize participant name on leave/remove](#migration-17-anonymize-participant-name-on-leaveremove)
    - [Migration 18: Anonymize only on account delete](#migration-18-anonymize-only-on-account-delete)
    - [Migration 19: Receipt image paths (multiple photos)](#migration-19-receipt-image-paths-multiple-photos)
+   - [Migration 20: Groups allow_member_settle_for_others](#migration-20-groups-allow_member_settle_for_others)
 4. [Configure Authentication](#4-configure-authentication)
 5. [Deploy Edge Functions](#5-deploy-edge-functions)
    - [Push notifications: end-to-end flow and verification](#push-notifications-end-to-end-flow-and-verification)
@@ -1692,6 +1693,15 @@ Adds `receipt_image_paths` (TEXT, JSON array of URLs) to `expenses` for up to 5 
 - **Supabase MCP:** `apply_migration` with `project_id`, `name`: `receipt_image_paths`, and `query` from that file (or the one-liner: `ALTER TABLE public.expenses ADD COLUMN IF NOT EXISTS receipt_image_paths TEXT;`).
 - **CLI:** From repo root, `supabase db push` (or link project and run migrations).
 
+### Migration 20: Groups allow_member_settle_for_others
+
+Adds `allow_member_settle_for_others` to `groups`. When false (default), only the group owner or the debtor (participant who owes) can record a settlement in the app; when true, any member can record any settlement. Enforcement is client-side (UI); recording creates an expense, so existing expense RLS applies.
+
+```sql
+ALTER TABLE public.groups
+  ADD COLUMN IF NOT EXISTS allow_member_settle_for_others BOOLEAN DEFAULT false NOT NULL;
+```
+
 ---
 
 ## 4. Configure Authentication
@@ -2036,7 +2046,7 @@ The following matches the live schema when Migrations 1–8 (or equivalent) are 
 
 | Table | Key columns (public schema) |
 |-------|-----------------------------|
-| **groups** | id, name, currency_code, owner_id, settlement_method, treasurer_participant_id, settlement_freeze_at, settlement_snapshot_json, allow_member_add_expense, allow_member_add_participant, allow_member_change_settings, require_participant_assignment, allow_expense_as_other_participant, icon, color, created_at, updated_at |
+| **groups** | id, name, currency_code, owner_id, settlement_method, treasurer_participant_id, settlement_freeze_at, settlement_snapshot_json, allow_member_add_expense, allow_member_add_participant, allow_member_change_settings, require_participant_assignment, allow_expense_as_other_participant, allow_member_settle_for_others, icon, color, created_at, updated_at |
 | **participants** | id, group_id, name, sort_order, user_id, avatar_id, left_at, created_at, updated_at |
 | **group_members** | id, group_id, user_id, role, participant_id, joined_at |
 | **expenses** | id, group_id, payer_participant_id, amount_cents, currency_code, exchange_rate, base_amount_cents, title, description, date, split_type, split_shares_json, type, to_participant_id, tag, line_items_json, receipt_image_path, receipt_image_paths, created_at, updated_at |
@@ -2091,7 +2101,7 @@ The "Current schema reference" table above can be re-verified with `list_tables`
 |------|-------------|
 | **Owner** | Full control: CRUD all data, manage members, change settings, delete group, transfer ownership |
 | **Admin** | Manage members, create invites, CRUD expenses/participants/tags, change group settings |
-| **Member** | Conditional: add expenses (if `allow_member_add_expense`), add participants (if `allow_member_add_participant`), change settings (if `allow_member_change_settings`). When `allow_expense_as_other_participant` is false, members may only create/update expenses where they are the payer (payer_participant_id = their own participant). |
+| **Member** | Conditional: add expenses (if `allow_member_add_expense`), add participants (if `allow_member_add_participant`), change settings (if `allow_member_change_settings`). When `allow_expense_as_other_participant` is false, members may only create/update expenses where they are the payer (payer_participant_id = their own participant). When `allow_member_settle_for_others` is false, only the owner or the debtor can record a settlement (UI enforcement). |
 
 ### Schema and behavior notes
 
