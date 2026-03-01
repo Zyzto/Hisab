@@ -5,12 +5,9 @@ import 'package:flutter/material.dart';
 class LogLevelColors {
   LogLevelColors._();
 
-  /// Background color for the log content area.
+  /// Background color for the log content area (matches app surface).
   static Color containerBackground(ThemeData theme) {
-    final isDark = theme.brightness == Brightness.dark;
-    return isDark
-        ? const Color(0xFF0D1117)
-        : const Color(0xFFF6F8FA);
+    return theme.colorScheme.surfaceContainerHighest;
   }
 
   /// Returns the color for a log line based on level markers, or null for default text color.

@@ -158,6 +158,13 @@ Future<String?> showTextInputSheet(
       ),
     ),
   );
-  future.then((_) => controller.dispose());
+  // Defer dispose until the sheet route is fully removed from the tree.
+  // Disposing when the future completes can run while the TextField is still
+  // in the tree (e.g. during close animation), causing "used after being disposed".
+  future.then((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.dispose();
+    });
+  });
   return future;
 }

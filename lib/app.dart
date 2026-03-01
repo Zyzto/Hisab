@@ -6,17 +6,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:upgrader/upgrader.dart';
+import 'package:version/version.dart';
 import 'core/auth/auth_providers.dart';
 import 'core/database/database_providers.dart';
 import 'core/services/notification_service.dart';
 import 'core/debug/debug_menu.dart';
+import 'core/debug/integration_test_mode.dart';
 import 'core/update/app_update_helper.dart';
 import 'core/update/update_check_providers.dart';
 import 'core/update/upgrader_messages.dart';
 import 'features/settings/providers/settings_framework_providers.dart';
 import 'features/settings/settings_definitions.dart';
 import 'core/theme/app_scroll_behavior.dart';
-import 'core/theme/theme_config.dart';
 import 'core/theme/theme_providers.dart';
 import 'package:toastification/toastification.dart';
 import 'core/navigation/app_router.dart';
@@ -105,13 +106,32 @@ class _AppState extends ConsumerState<App>
         Upgrader.clearSavedSettings();
         await _upgrader.updateVersionInfo();
         if (!mounted) return;
+        final vi = _upgrader.versionInfo;
+        final pkg = _upgrader.state.packageInfo;
+        // Don't show update dialog when store version is same or older (e.g. Play
+        // Store internal/closed/open testing returning same version).
+        if (vi != null &&
+            vi.appStoreVersion != null &&
+            pkg != null &&
+            pkg.version.isNotEmpty) {
+          try {
+            final installed = Version.parse(pkg.version);
+            if (vi.appStoreVersion! <= installed) {
+              if (context.mounted) {
+                context.showToast('no_update_available'.tr());
+              }
+              return;
+            }
+          } catch (_) {
+            // Continue and let upgrader decide if parse failed.
+          }
+        }
         _upgrader.updateState(
           _upgrader.state.copyWith(debugDisplayAlways: true),
         );
         await Future.delayed(const Duration(milliseconds: 400));
         if (!mounted) return;
         final shouldShow = _upgrader.shouldDisplayUpgrade();
-        final vi = _upgrader.versionInfo;
         Log.debug(
           'Upgrader (manual): store=${vi?.appStoreVersion}, installed=${vi?.installedVersion}, showDialog=$shouldShow',
         );
@@ -156,7 +176,7 @@ class _AppState extends ConsumerState<App>
       background: themes.light.colorScheme.surfaceContainerHighest,
       feedbackSheetColor: themes.light.colorScheme.surface,
       drawColors: [
-        ThemeConfig.defaultSeedColor,
+        themes.light.colorScheme.primary,
         themes.light.colorScheme.secondary,
         themes.light.colorScheme.tertiary,
       ],
@@ -211,7 +231,7 @@ class _AppState extends ConsumerState<App>
             return Stack(
               children: [
                 contentWithSyncIndicator,
-                if (isDebug && _debugFabVisible)
+                if (isDebug && !isIntegrationTestMode && _debugFabVisible)
                   Positioned(
                     bottom: 96,
                     left: isRtl ? null : 8,
@@ -245,7 +265,7 @@ class _AppState extends ConsumerState<App>
                 },
                 child: contentWithSyncIndicator,
               ),
-              if (isDebug && _debugFabVisible)
+              if (isDebug && !isIntegrationTestMode && _debugFabVisible)
                 Positioned(
                   bottom: 96,
                   left: isRtl ? null : 8,

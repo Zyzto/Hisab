@@ -196,8 +196,10 @@ Future<T?> showResponsiveSheet<T>({
               Positioned.fill(
                 child: GestureDetector(
                   behavior: HitTestBehavior.translucent,
-                  onTap: () =>
-                      Navigator.of(ctx, rootNavigator: true).pop(null),
+                  onTap: () {
+                    final navigator = Navigator.of(ctx, rootNavigator: true);
+                    if (navigator.canPop()) navigator.pop(null);
+                  },
                   child: const SizedBox.expand(),
                 ),
               ),
@@ -268,7 +270,10 @@ Future<T?> showResponsiveSheet<T>({
       );
       return barrierDismissible
           ? TapRegion(
-              onTapOutside: (_) => Navigator.of(ctx).pop(),
+              onTapOutside: (_) {
+                final navigator = Navigator.of(ctx);
+                if (navigator.canPop()) navigator.pop();
+              },
               child: paddedChild,
             )
           : paddedChild;
@@ -308,7 +313,10 @@ Future<T?> _showWebBottomSheet<T>({
             Positioned.fill(
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
-                onTap: () => Navigator.of(ctx, rootNavigator: true).pop(null),
+                onTap: () {
+                  final navigator = Navigator.of(ctx, rootNavigator: true);
+                  if (navigator.canPop()) navigator.pop(null);
+                },
                 child: const SizedBox.expand(),
               ),
             ),
@@ -413,8 +421,10 @@ Future<T?> showAppDialog<T>({
               Positioned.fill(
                 child: GestureDetector(
                   behavior: HitTestBehavior.translucent,
-                  onTap: () =>
-                      Navigator.of(ctx, rootNavigator: true).pop(null),
+                  onTap: () {
+                    final navigator = Navigator.of(ctx, rootNavigator: true);
+                    if (navigator.canPop()) navigator.pop(null);
+                  },
                   child: const SizedBox.expand(),
                 ),
               ),
