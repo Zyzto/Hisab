@@ -43,6 +43,7 @@ Future<bool> runIntegrationTestApp({bool skipOnboarding = true}) async {
       settingsProviders.controller.set(onboardingCompletedSettingDef, false);
     }
     settingsProviders.controller.set(localOnlySettingDef, true);
+    settingsProviders.controller.set(languageSettingDef, 'en');
   }
 
   PowerSyncDatabase db;
