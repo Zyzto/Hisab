@@ -36,6 +36,7 @@ dependencies:
   collection: ^1.18.0
 
   # UI & animations
+  flex_color_scheme: ^8.4.0
   google_fonts: ^8.0.2
   animations: ^2.1.0
   custom_sliding_segmented_control: ^1.8.5
@@ -60,11 +61,13 @@ dependencies:
   flutter_logging_service:
     git:
       url: https://github.com/Zyzto/siglat.git
+      ref: main
 
   # Settings (theme + "Local Only" toggle)
   flutter_settings_framework:
     git:
       url: https://github.com/Zyzto/edadat.git
+      ref: main
 
   # About (version, licenses)
   package_info_plus: ^9.0.0
@@ -72,6 +75,7 @@ dependencies:
   # App update (version check + Android in-app update)
   upgrader: ^12.5.0
   in_app_update: ^4.2.5
+  version: ^3.0.2
 
   # Backup (file picker for export/import)
   file_picker: ^10.3.10
