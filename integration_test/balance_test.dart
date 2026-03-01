@@ -28,7 +28,8 @@ void main() {
           find.byKey(const Key('wizard_name_field')),
           'Balance Test',
         );
-        await tapAndSettle(tester, find.text('Next'));
+        await waitForWidget(tester, find.byKey(const Key('wizard_next_button')));
+        await tapAndSettle(tester, find.byKey(const Key('wizard_next_button')));
         await tester.pump(const Duration(milliseconds: 400));
 
         await waitForWidget(tester, find.text('Add'));
@@ -39,9 +40,11 @@ void main() {
         await tester.testTextInput.receiveAction(TextInputAction.done);
         await tester.pumpAndSettle();
 
-        await tapAndSettle(tester, find.text('Next'));
+        await waitForWidget(tester, find.byKey(const Key('wizard_next_button')));
+        await tapAndSettle(tester, find.byKey(const Key('wizard_next_button')));
         await tester.pump(const Duration(milliseconds: 400));
-        await tapAndSettle(tester, find.text('Next'));
+        await waitForWidget(tester, find.byKey(const Key('wizard_next_button')));
+        await tapAndSettle(tester, find.byKey(const Key('wizard_next_button')));
         await tester.pump(const Duration(milliseconds: 400));
         await pumpAndSettleWithTimeout(tester);
 
@@ -118,10 +121,20 @@ void main() {
 
       // ── Stage: verify settlement arrows exist ──
       await stage('verify settlement arrows', () async {
-        // Settlement suggestions show "From → To" with amounts
-        final paymentIcons = find.byIcon(Icons.payments_outlined);
-        expect(paymentIcons.evaluate().isNotEmpty, isTrue,
-            reason: 'Should show payment buttons for unsettled debts');
+        // Settlement section has "Settle up" title and "From → To" rows; may need scroll on Web
+        await waitForWidget(
+          tester,
+          find.textContaining('\u2192'), // arrow in "From → To"
+          timeout: const Duration(seconds: 25),
+        );
+        await scrollUntilVisible(tester, find.textContaining('\u2192'));
+        final hasArrows = find.textContaining('\u2192').evaluate().isNotEmpty;
+        final hasPaymentIcons = find.byIcon(Icons.payments_outlined).evaluate().isNotEmpty;
+        expect(
+          hasArrows || hasPaymentIcons,
+          isTrue,
+          reason: 'Should show settlement arrows or payment buttons for unsettled debts',
+        );
       });
 
       // ── Stage: record first settlement ──

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:hisab/features/expenses/widgets/expense_bill_breakdown_section.dart';
 
 import 'helpers/fake_image_picker.dart';
 import 'helpers/test_helpers.dart';
@@ -53,7 +54,8 @@ void main() {
           find.byKey(const Key('wizard_name_field')),
           'Expense Test Group',
         );
-        await tapAndSettle(tester, find.text('Next'));
+        await waitForWidget(tester, find.byKey(const Key('wizard_next_button')));
+        await tapAndSettle(tester, find.byKey(const Key('wizard_next_button')));
         await tester.pump(const Duration(milliseconds: 400));
 
         // Add Alice & Bob via onSubmitted (keyboard done action)
@@ -67,9 +69,11 @@ void main() {
         await tester.pumpAndSettle();
 
         // Step 2 → Step 3 → Step 4
-        await tapAndSettle(tester, find.text('Next'));
+        await waitForWidget(tester, find.byKey(const Key('wizard_next_button')));
+        await tapAndSettle(tester, find.byKey(const Key('wizard_next_button')));
         await tester.pump(const Duration(milliseconds: 400));
-        await tapAndSettle(tester, find.text('Next'));
+        await waitForWidget(tester, find.byKey(const Key('wizard_next_button')));
+        await tapAndSettle(tester, find.byKey(const Key('wizard_next_button')));
         await tester.pump(const Duration(milliseconds: 400));
         await pumpAndSettleWithTimeout(tester);
 
@@ -163,32 +167,39 @@ void main() {
 
         // Expand the bill breakdown section
         final breakdownSection = find.text('Bill breakdown');
-        if (breakdownSection.evaluate().isNotEmpty) {
-          await scrollUntilVisible(tester, breakdownSection);
-          await tapAndSettle(tester, breakdownSection.first);
-          await pumpAndSettleWithTimeout(tester);
+        await waitForWidget(tester, breakdownSection);
+        await scrollUntilVisible(tester, breakdownSection);
+        await tapAndSettle(tester, breakdownSection.first);
+        await tester.pump(const Duration(milliseconds: 500));
 
-          // Tap "Add item" to add a line item
-          final addItem = find.text('Add item');
-          if (addItem.evaluate().isNotEmpty) {
-            await scrollUntilVisible(tester, addItem);
-            await tapAndSettle(tester, addItem);
-            await pumpAndSettleWithTimeout(tester);
+        // Tap "Add item" to add first line item; slow down so section builds
+        final addItem = find.text('Add item');
+        await waitForWidget(tester, addItem);
+        await scrollUntilVisible(tester, addItem);
+        await tapAndSettle(tester, addItem);
+        await tester.pump(const Duration(milliseconds: 500));
 
-            // Add a second item
-            await tapAndSettle(tester, find.text('Add item'));
-            await pumpAndSettleWithTimeout(tester);
+        // Add a second item
+        await tapAndSettle(tester, find.text('Add item'));
+        await tester.pump(const Duration(milliseconds: 500));
 
-            // ListView disposes off-screen widgets; use relative indices
-            // within the visible breakdown fields (0=desc1, 1=amt1, 2=desc2, 3=amt2).
-            final fields = find.byType(TextFormField);
-            await tester.ensureVisible(fields.at(0));
-            await enterTextAndPump(tester, fields.at(0), 'Appetizers');
-            await enterTextAndPump(tester, fields.at(1), '35');
-            await enterTextAndPump(tester, fields.at(2), 'Main Course');
-            await enterTextAndPump(tester, fields.at(3), '50');
-          }
-        }
+        // Target only fields inside the bill breakdown section (desc1, amt1, desc2, amt2)
+        final breakdownWidget = find.byType(ExpenseBillBreakdownSection);
+        final breakdownFields = find.descendant(
+          of: breakdownWidget,
+          matching: find.byType(TextFormField),
+        );
+        const pumpAfterType = Duration(milliseconds: 400);
+        await tester.ensureVisible(breakdownFields.at(0));
+        await enterTextAndPump(tester, breakdownFields.at(0), 'Appetizers',
+            pumpDuration: pumpAfterType);
+        await enterTextAndPump(tester, breakdownFields.at(1), '35',
+            pumpDuration: pumpAfterType);
+        await tester.ensureVisible(breakdownFields.at(2));
+        await enterTextAndPump(tester, breakdownFields.at(2), 'Main Course',
+            pumpDuration: pumpAfterType);
+        await enterTextAndPump(tester, breakdownFields.at(3), '50',
+            pumpDuration: pumpAfterType);
 
         await tapSubmitExpenseButton(tester);
         await ensureFormClosed(tester);
@@ -313,9 +324,10 @@ void main() {
         await tapAndSettle(tester, find.byIcon(Icons.add));
         await pumpAndSettleWithTimeout(tester);
 
-        await waitForWidget(tester, find.text('Income'));
-        await tester.ensureVisible(find.text('Income'));
-        await tapAndSettle(tester, find.text('Income'));
+        await waitForWidget(tester, find.text('Income'), timeout: const Duration(seconds: 15));
+        await scrollUntilVisible(tester, find.text('Income'));
+        await tester.ensureVisible(find.text('Income').first);
+        await tapAndSettle(tester, find.text('Income').first);
 
         await enterTextAndPump(
             tester, find.byType(TextField).first, 'Refund');
@@ -425,6 +437,11 @@ void main() {
         await tapAndSettle(tester, confirmButton.last);
 
         await waitForWidget(tester, find.text('Expenses'));
+        // Wait for list to update (Web can be slower)
+        for (var i = 0; i < 50; i++) {
+          await tester.pump(const Duration(milliseconds: 200));
+          if (find.text('Updated Dinner').evaluate().isEmpty) break;
+        }
         expect(find.text('Updated Dinner'), findsNothing);
       });
     });

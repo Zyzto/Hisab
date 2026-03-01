@@ -6,7 +6,10 @@ import 'test_bootstrap.dart';
 
 /// Records stage progress in the binding's reportData so the web driver
 /// can display which stage passed/failed even when failure details are empty.
+/// Also prints to the console so you can see where a test failed when running
+/// integration tests.
 void recordStage(String testName, String info) {
+  debugPrint('[integration stage] [$testName] $info');
   try {
     final binding = IntegrationTestWidgetsFlutterBinding.instance;
     binding.reportData ??= <String, dynamic>{};
@@ -184,6 +187,7 @@ Future<void> ensureIntegrationTestReady(
   bool skipOnboarding = true,
   Duration? waitTimeout,
 }) async {
+  recordStage('ensureIntegrationTestReady', 'STARTED');
   final ready = await runIntegrationTestApp(skipOnboarding: skipOnboarding);
   ensureBootstrapReady(ready);
   await waitForWidget(
@@ -191,4 +195,5 @@ Future<void> ensureIntegrationTestReady(
     find.byIcon(Icons.add),
     timeout: waitTimeout ?? const Duration(seconds: 30),
   );
+  recordStage('ensureIntegrationTestReady', 'PASSED');
 }
