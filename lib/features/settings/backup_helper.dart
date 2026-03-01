@@ -58,6 +58,7 @@ Map<String, dynamic> _groupToMap(Group g) => {
   'treasurerParticipantId': g.treasurerParticipantId,
   'settlementFreezeAt': g.settlementFreezeAt?.millisecondsSinceEpoch,
   'settlementSnapshotJson': g.settlementSnapshotJson,
+  'allowMemberSettleForOthers': g.allowMemberSettleForOthers,
   'icon': g.icon,
   'color': g.color,
   'archivedAt': g.archivedAt?.toIso8601String(),
@@ -191,6 +192,7 @@ Group _mapToGroup(Map<String, dynamic> m) {
   final archivedAt = m['archivedAt'];
   final isPersonal = m['isPersonal'] == true;
   final budgetAmountCents = (m['budgetAmountCents'] as num?)?.toInt();
+  final allowMemberSettleForOthers = m['allowMemberSettleForOthers'] == true;
   return Group(
     id: m['id'] as String,
     name: m['name'] as String,
@@ -203,6 +205,7 @@ Group _mapToGroup(Map<String, dynamic> m) {
         ? DateTime.fromMillisecondsSinceEpoch(m['settlementFreezeAt'] as int)
         : null,
     settlementSnapshotJson: m['settlementSnapshotJson'] as String?,
+    allowMemberSettleForOthers: allowMemberSettleForOthers,
     icon: m['icon'] as String?,
     color: (m['color'] as num?)?.toInt(),
     archivedAt: archivedAt != null ? DateTime.tryParse(archivedAt as String) : null,
