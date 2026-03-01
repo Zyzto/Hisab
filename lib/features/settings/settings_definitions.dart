@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 
+import '../../core/theme/flex_theme_builder.dart'
+    show defaultThemeSchemeId, flexSchemeOptionIds;
+
 final accountSection = const SettingSection(
   key: 'account',
   titleKey: 'account',
@@ -101,13 +104,36 @@ final themeModeSettingDef = const EnumSetting(
   order: 0,
 );
 
+/// Color scheme: predefined FlexScheme or "custom" (then [theme_color] is used).
+final themeSchemeSettingDef = const EnumSetting(
+  'theme_scheme',
+  defaultValue: defaultThemeSchemeId,
+  titleKey: 'color_scheme',
+  options: flexSchemeOptionIds,
+  optionLabels: {
+    'green': 'theme_scheme_green',
+    'blue': 'theme_scheme_blue',
+    'tealM3': 'theme_scheme_teal',
+    'indigo': 'theme_scheme_indigo',
+    'mandyRed': 'theme_scheme_mandyRed',
+    'red': 'theme_scheme_red',
+    'purpleBrown': 'theme_scheme_purpleBrown',
+    'deepPurple': 'theme_scheme_deepPurple',
+    'amber': 'theme_scheme_amber',
+    'custom': 'theme_scheme_custom',
+  },
+  icon: Icons.palette_outlined,
+  section: 'appearance',
+  order: 1,
+);
+
 final themeColorSettingDef = const ColorSetting(
   'theme_color',
   defaultValue: 0xFF2E7D32,
   titleKey: 'select_theme_color',
   icon: Icons.palette,
   section: 'appearance',
-  order: 1,
+  order: 2,
 );
 
 final languageSettingDef = const EnumSetting(
@@ -118,7 +144,7 @@ final languageSettingDef = const EnumSetting(
   optionLabels: {'en': 'English', 'ar': 'العربية'},
   icon: Icons.language,
   section: 'appearance',
-  order: 2,
+  order: 3,
 );
 
 final fontSizeScaleSettingDef = const EnumSetting(
@@ -134,7 +160,7 @@ final fontSizeScaleSettingDef = const EnumSetting(
   },
   icon: Icons.text_fields,
   section: 'appearance',
-  order: 3,
+  order: 4,
 );
 
 /// When true, user has completed first-launch onboarding.
@@ -360,7 +386,18 @@ final favoriteCurrenciesSettingDef = const StringSetting(
   titleKey: 'favorite_currencies',
   icon: Icons.star_outline,
   section: 'appearance',
-  order: 4,
+  order: 5,
+);
+
+/// Optional single currency to show as secondary amount below main amounts (group detail, expense detail).
+/// Stored as one ISO 4217 code; empty string means do not show secondary line.
+final displayCurrencySettingDef = const StringSetting(
+  'display_currency',
+  defaultValue: '',
+  titleKey: 'display_currency',
+  icon: Icons.visibility_outlined,
+  section: 'appearance',
+  order: 6,
 );
 
 /// When true, show times in 24-hour format (e.g. 14:30). When false, use 12-hour AM/PM.
@@ -370,7 +407,7 @@ final use24HourFormatSettingDef = const BoolSetting(
   titleKey: 'use_24_hour_format',
   icon: Icons.schedule,
   section: 'appearance',
-  order: 5,
+  order: 7,
 );
 
 /// When true, expense form shows full options (Expense / Income / Transfer pill).
@@ -411,10 +448,12 @@ final allSettings = <SettingDefinition>[
   pendingInviteTokenSettingDef,
   lastRoutePathSettingDef,
   themeModeSettingDef,
+  themeSchemeSettingDef,
   themeColorSettingDef,
   languageSettingDef,
   fontSizeScaleSettingDef,
   favoriteCurrenciesSettingDef,
+  displayCurrencySettingDef,
   use24HourFormatSettingDef,
   expenseFormFullFeaturesSettingDef,
   expenseFormExpandDescriptionSettingDef,

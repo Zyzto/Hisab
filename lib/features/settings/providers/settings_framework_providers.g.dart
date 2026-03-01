@@ -439,6 +439,47 @@ final class ThemeModeProvider
 
 String _$themeModeHash() => r'667cf4a837745c594e2c5a0d7647113817220a52';
 
+@ProviderFor(themeScheme)
+final themeSchemeProvider = ThemeSchemeProvider._();
+
+final class ThemeSchemeProvider
+    extends $FunctionalProvider<String, String, String>
+    with $Provider<String> {
+  ThemeSchemeProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'themeSchemeProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$themeSchemeHash();
+
+  @$internal
+  @override
+  $ProviderElement<String> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  String create(Ref ref) {
+    return themeScheme(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String>(value),
+    );
+  }
+}
+
+String _$themeSchemeHash() => r'1279f10ffdf1be3bd3e103877adc109abd3456c0';
+
 @ProviderFor(themeColor)
 final themeColorProvider = ThemeColorProvider._();
 
@@ -560,6 +601,47 @@ final class FavoriteCurrenciesProvider
 
 String _$favoriteCurrenciesHash() =>
     r'9306918f4bdde5c7aaa548a24133f65222b74e67';
+
+@ProviderFor(displayCurrency)
+final displayCurrencyProvider = DisplayCurrencyProvider._();
+
+final class DisplayCurrencyProvider
+    extends $FunctionalProvider<String, String, String>
+    with $Provider<String> {
+  DisplayCurrencyProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'displayCurrencyProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$displayCurrencyHash();
+
+  @$internal
+  @override
+  $ProviderElement<String> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  String create(Ref ref) {
+    return displayCurrency(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String>(value),
+    );
+  }
+}
+
+String _$displayCurrencyHash() => r'c8fa74b09b1b952a5982d1faddddb8698a39b7c5';
 
 @ProviderFor(fontSizeScale)
 final fontSizeScaleProvider = FontSizeScaleProvider._();

@@ -4,7 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/widgets/amount_with_secondary_display.dart';
 import '../../../core/widgets/error_content.dart';
+import '../../../domain/domain.dart';
+import '../../groups/providers/group_member_provider.dart';
 import '../providers/balance_provider.dart';
 import 'record_settlement_sheet.dart';
 
@@ -17,6 +20,8 @@ class BalanceList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final balanceAsync = ref.watch(groupBalanceProvider(groupId));
+    final myMemberAsync = ref.watch(myMemberInGroupProvider(groupId));
+    final myRoleAsync = ref.watch(myRoleInGroupProvider(groupId));
 
     return balanceAsync.when(
       data: (result) {
@@ -27,6 +32,16 @@ class BalanceList extends ConsumerWidget {
         final participants = result.participants;
         final balances = result.balances;
         final settlements = result.settlements;
+
+        final myMember = myMemberAsync.hasValue ? myMemberAsync.value : null;
+        final myRole = myRoleAsync.hasValue ? myRoleAsync.value : null;
+        bool canRecordSettlement(SettlementTransaction s) {
+          if (group.isSettlementFrozen) return false;
+          if (group.allowMemberSettleForOthers) return true;
+          if (myRole == GroupRole.owner) return true;
+          if (myMember?.participantId == s.fromParticipantId) return true;
+          return false;
+        }
 
         final nameOf = {for (final p in participants) p.id: p.name};
         final theme = Theme.of(context);
@@ -107,13 +122,23 @@ class BalanceList extends ConsumerWidget {
               final color = isPositive
                   ? theme.colorScheme.primary
                   : theme.colorScheme.error;
+              final amountStyle = theme.textTheme.bodyLarge?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  ) ??
+                  TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  );
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
                   title: Text(name),
-                  trailing: Text(
-                    '${isPositive ? '' : '-'}${CurrencyFormatter.formatCompactCents(b.balanceCents.abs())} ${group.currencyCode}',
-                    style: TextStyle(color: color, fontWeight: FontWeight.w600),
+                  trailing: AmountWithSecondaryDisplay(
+                    amountCents: b.balanceCents.abs(),
+                    groupCurrencyCode: group.currencyCode,
+                    primaryStyle: amountStyle,
+                    isNegative: !isPositive,
                   ),
                 ),
               );
@@ -139,6 +164,7 @@ class BalanceList extends ConsumerWidget {
             final s = settlements[i];
             final from = nameOf[s.fromParticipantId] ?? s.fromParticipantId;
             final to = nameOf[s.toParticipantId] ?? s.toParticipantId;
+            final canRecord = canRecordSettlement(s);
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
               child: ListTile(
@@ -146,11 +172,17 @@ class BalanceList extends ConsumerWidget {
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      CurrencyFormatter.formatCents(
-                        s.amountCents,
-                        s.currencyCode,
+                    AmountWithSecondaryDisplay(
+                      amountCents: s.amountCents,
+                      groupCurrencyCode: s.currencyCode,
+                      primaryStyle: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.onSurface,
                       ),
+                      secondaryStyle: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      secondaryOnSameRow: true,
                     ),
                     if (s.items != null && s.items!.isNotEmpty) ...[
                       const SizedBox(height: 4),
@@ -170,37 +202,47 @@ class BalanceList extends ConsumerWidget {
                 ),
                 trailing: !hasFrozen
                     ? Semantics(
-                        label: 'record_settlement'.tr(),
+                        label: canRecord
+                            ? 'record_settlement'.tr()
+                            : 'record_settlement_restricted'.tr(),
                         button: true,
                         child: IconButton(
                           icon: Icon(
                             Icons.payments_outlined,
-                            color: theme.colorScheme.primary,
+                            color: canRecord
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onSurfaceVariant,
                           ),
-                          tooltip: 'record_settlement'.tr(),
-                          onPressed: () => showRecordSettlementSheet(
-                          context,
-                          ref,
-                          groupId: groupId,
-                          currencyCode: group.currencyCode,
-                          settlement: s,
-                          fromName: from,
-                          toName: to,
+                          tooltip: canRecord
+                              ? 'record_settlement'.tr()
+                              : 'record_settlement_restricted'.tr(),
+                          onPressed: canRecord
+                              ? () => showRecordSettlementSheet(
+                                    context,
+                                    ref,
+                                    groupId: groupId,
+                                    currencyCode: group.currencyCode,
+                                    settlement: s,
+                                    fromName: from,
+                                    toName: to,
+                                  )
+                              : null,
                         ),
-                      ),
-                    )
+                      )
                     : null,
                 onTap: hasFrozen
                     ? null
-                    : () => showRecordSettlementSheet(
-                        context,
-                        ref,
-                        groupId: groupId,
-                        currencyCode: group.currencyCode,
-                        settlement: s,
-                        fromName: from,
-                        toName: to,
-                      ),
+                    : canRecord
+                        ? () => showRecordSettlementSheet(
+                              context,
+                              ref,
+                              groupId: groupId,
+                              currencyCode: group.currencyCode,
+                              settlement: s,
+                              fromName: from,
+                              toName: to,
+                            )
+                        : null,
               ),
             );
           },

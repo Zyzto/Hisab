@@ -38,6 +38,8 @@ import '../providers/settings_framework_providers.dart';
 import '../backup_helper.dart';
 import '../feedback_handler.dart';
 import '../widgets/logs_viewer_dialog.dart';
+import '../../../core/theme/flex_theme_builder.dart'
+    show flexSchemeOptionIds, primaryColorForSchemeId;
 import '../widgets/change_password_sheet.dart';
 import '../widgets/edit_profile_sheet.dart';
 import '../widgets/setting_tile_helper.dart';
@@ -92,7 +94,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           return Scaffold(
             appBar: ContentAlignedAppBar(
               contentAreaWidth: layoutConstraints.maxWidth,
-              leading: const SyncStatusChip(),
+              leading: const Padding(
+                padding: EdgeInsets.only(left: 8),
+                child: SyncStatusChip(),
+              ),
               title: Text('settings'.tr()),
             ),
             body: Center(child: Text('settings_unavailable'.tr())),
@@ -106,7 +111,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         return Scaffold(
           appBar: ContentAlignedAppBar(
             contentAreaWidth: layoutConstraints.maxWidth,
-            leading: const SyncStatusChip(),
+            leading: const Padding(
+              padding: EdgeInsets.only(left: 8),
+              child: SyncStatusChip(),
+            ),
             title: Text('settings'.tr()),
           ),
           body: ConstrainedContent(
@@ -118,9 +126,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             _buildSection(context, ref, settings, appearanceSection, [
               _languageTile(context, ref, settings),
               _themeModeTile(context, ref, settings),
-              _themeColorTile(context, ref, settings),
+              _themeSchemeTile(context, ref, settings),
               _fontSizeTile(context, ref, settings),
               _favoriteCurrenciesTile(context, ref, settings),
+              _displayCurrencyTile(context, ref, settings),
               buildBoolSettingTile(
                 ref,
                 settings,
@@ -740,6 +749,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ref
           .read(settings.provider(localDataFromOnlineUserIdSettingDef).notifier)
           .set('');
+      await ref.read(dataSyncServiceProvider.notifier).syncNow();
       return;
     }
 
@@ -766,6 +776,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           Log.info(
             'Switched to online (data was from server, skipping migration)',
           );
+          await ref.read(dataSyncServiceProvider.notifier).syncNow();
           if (context.mounted) {
             context.showSuccess('switched_to_online_syncing'.tr());
           }
@@ -804,6 +815,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           .read(settings.provider(localDataFromOnlineUserIdSettingDef).notifier)
           .set('');
       Log.info('Switched to online mode (no data to migrate)');
+      await ref.read(dataSyncServiceProvider.notifier).syncNow();
       return;
     }
 
@@ -830,11 +842,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             )
             .set('');
         Log.info('Switched to online mode after migration');
+        await ref.read(dataSyncServiceProvider.notifier).syncNow();
+        if (!context.mounted) return;
         context.showSuccess('migration_success'.tr());
         break;
       case MigrationResult.failed:
       case null:
-        context.showError('migration_failed'.tr());
+        if (context.mounted) context.showError('migration_failed'.tr());
     }
   }
 
@@ -977,7 +991,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
-  /// Preset theme colors: (value as int, label key for .tr()).
+  /// Preset theme colors for "Custom" scheme: (value as int, label key for .tr()).
   static const _themeColorPresets = [
     (0xFF2E7D32, 'green'),
     (0xFF1565C0, 'blue'),
@@ -987,24 +1001,42 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     (0xFFE65100, 'orange'),
   ];
 
-  Widget _themeColorTile(
+  Widget _themeSchemeTile(
     BuildContext context,
     WidgetRef ref,
     SettingsProviders settings,
   ) {
-    final value = ref.watch(settings.provider(themeColorSettingDef));
-    final preset = _themeColorPresets.where((e) => e.$1 == value);
-    final currentLabel = preset.isEmpty
-        ? 'select_theme_color'.tr()
-        : preset.first.$2.tr();
+    final schemeValue = ref.watch(settings.provider(themeSchemeSettingDef));
+    final themeColorValue = ref.watch(settings.provider(themeColorSettingDef));
+    final currentLabel = 'theme_scheme_$schemeValue'.tr();
+    final displayColor = schemeValue == 'custom'
+        ? Color(themeColorValue)
+        : primaryColorForSchemeId(schemeValue);
     return ListTile(
-      leading: Icon(themeColorSettingDef.icon),
-      title: Text('select_theme_color'.tr()),
+      leading: Container(
+        width: 40,
+        height: 40,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: displayColor != Colors.transparent
+              ? displayColor
+              : Theme.of(context).colorScheme.surfaceContainerHighest,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outline,
+            width: 1.5,
+          ),
+        ),
+        child: displayColor == Colors.transparent
+            ? Icon(themeSchemeSettingDef.icon, size: 22)
+            : null,
+      ),
+      title: Text('color_scheme'.tr()),
       subtitle: Text(currentLabel),
       onTap: () async {
-        final chosen = await showResponsiveSheet<int>(
+        final chosenScheme = await showResponsiveSheet<String>(
           context: context,
-          title: 'select_theme_color'.tr(),
+          title: 'color_scheme'.tr(),
           maxHeight: MediaQuery.of(context).size.height * 0.75,
           isScrollControlled: true,
           child: Builder(
@@ -1021,26 +1053,35 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         Padding(
                           padding: const EdgeInsets.all(16),
                           child: Text(
-                            'select_theme_color'.tr(),
+                            'color_scheme'.tr(),
                             style: Theme.of(ctx).textTheme.titleMedium,
                           ),
                         ),
-                      ..._themeColorPresets.map(
-                        (preset) => ListTile(
-                          leading: Container(
-                            width: 24,
-                            height: 24,
-                            decoration: BoxDecoration(
-                              color: Color(preset.$1),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Theme.of(ctx).colorScheme.outline,
+                      ...flexSchemeOptionIds.map(
+                        (schemeId) {
+                          final chipColor = schemeId == 'custom'
+                              ? Color(themeColorValue)
+                              : primaryColorForSchemeId(schemeId);
+                          return ListTile(
+                            leading: Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: chipColor != Colors.transparent
+                                    ? chipColor
+                                    : Theme.of(ctx)
+                                        .colorScheme
+                                        .surfaceContainerHighest,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Theme.of(ctx).colorScheme.outline,
+                                ),
                               ),
                             ),
-                          ),
-                          title: Text(preset.$2.tr()),
-                          onTap: () => Navigator.of(ctx).pop(preset.$1),
-                        ),
+                            title: Text('theme_scheme_$schemeId'.tr()),
+                            onTap: () => Navigator.of(ctx).pop(schemeId),
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -1049,10 +1090,64 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
           ),
         );
-        if (chosen != null && context.mounted) {
+        if (chosenScheme != null && context.mounted) {
           ref
-              .read(settings.provider(themeColorSettingDef).notifier)
-              .set(chosen);
+              .read(settings.provider(themeSchemeSettingDef).notifier)
+              .set(chosenScheme);
+          if (chosenScheme == 'custom') {
+            final chosenColor = await showResponsiveSheet<int>(
+              context: context,
+              title: 'select_theme_color'.tr(),
+              maxHeight: MediaQuery.of(context).size.height * 0.75,
+              isScrollControlled: true,
+              child: Builder(
+                builder: (ctx) => SafeArea(
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                        bottom: MediaQuery.of(ctx).padding.bottom + 16,
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (!LayoutBreakpoints.isTabletOrWider(context))
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Text(
+                                'select_theme_color'.tr(),
+                                style: Theme.of(ctx).textTheme.titleMedium,
+                              ),
+                            ),
+                          ..._themeColorPresets.map(
+                            (preset) => ListTile(
+                              leading: Container(
+                                width: 24,
+                                height: 24,
+                                decoration: BoxDecoration(
+                                  color: Color(preset.$1),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Theme.of(ctx).colorScheme.outline,
+                                  ),
+                                ),
+                              ),
+                              title: Text(preset.$2.tr()),
+                              onTap: () => Navigator.of(ctx).pop(preset.$1),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+            if (chosenColor != null && context.mounted) {
+              ref
+                  .read(settings.provider(themeColorSettingDef).notifier)
+                  .set(chosenColor);
+            }
+          }
         }
       },
     );
@@ -1158,6 +1253,76 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
   }
 
+  Widget _displayCurrencyTile(
+    BuildContext context,
+    WidgetRef ref,
+    SettingsProviders settings,
+  ) {
+    final stored = ref.watch(settings.provider(displayCurrencySettingDef)).trim();
+    final label = stored.isEmpty
+        ? 'display_currency_none'.tr()
+        : (CurrencyHelpers.fromCode(stored) != null
+            ? CurrencyHelpers.shortLabel(CurrencyHelpers.fromCode(stored)!)
+            : stored);
+
+    return ListTile(
+      leading: const Icon(Icons.visibility_outlined),
+      title: Text('display_currency'.tr()),
+      subtitle: Text(
+        'display_currency_hint'.tr(),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (stored.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Text(
+                label,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          if (stored.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.clear),
+              tooltip: 'display_currency_none'.tr(),
+              onPressed: () {
+                ref
+                    .read(settings.provider(displayCurrencySettingDef).notifier)
+                    .set('');
+              },
+            ),
+        ],
+      ),
+      onTap: () => _showDisplayCurrencyPicker(context, ref, settings),
+    );
+  }
+
+  void _showDisplayCurrencyPicker(
+    BuildContext context,
+    WidgetRef ref,
+    SettingsProviders settings,
+  ) {
+    final favorites = CurrencyHelpers.getEffectiveFavorites(
+      ref.read(favoriteCurrenciesProvider),
+    );
+    CurrencyHelpers.showPicker(
+      context: context,
+      centerInFullViewport: false,
+      favorite: favorites,
+      onSelect: (currency) {
+        ref
+            .read(settings.provider(displayCurrencySettingDef).notifier)
+            .set(currency.code);
+      },
+    );
+  }
+
   void _showFavoriteCurrenciesEditor(
     BuildContext context,
     WidgetRef ref,
@@ -1205,19 +1370,23 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             final version = snapshot.hasData
                 ? '${snapshot.data!.appName} ${snapshot.data!.version}+${snapshot.data!.buildNumber}'
                 : '—';
+            final isWeb = kIsWeb;
             return NavigationSettingsTile(
               leading: const Icon(Icons.info_outline),
               title: Text('version'.tr()),
               subtitle: Text(version),
-              onTap: () {
-                final trigger = ref.read(updateCheckTriggerProvider).callback;
-                if (trigger != null) {
-                  if (context.mounted) {
-                    context.showToast('checking_for_updates'.tr());
-                  }
-                  trigger(context);
-                }
-              },
+              onTap: isWeb
+                  ? null
+                  : () {
+                      final trigger =
+                          ref.read(updateCheckTriggerProvider).callback;
+                      if (trigger != null) {
+                        if (context.mounted) {
+                          context.showToast('checking_for_updates'.tr());
+                        }
+                        trigger(context);
+                      }
+                    },
             );
           },
         ),
