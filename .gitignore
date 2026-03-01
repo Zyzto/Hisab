@@ -49,6 +49,7 @@ app.*.symbols
 app.*.map.json
 
 # Android (build artifacts; android/.gitignore has local.properties, key.properties)
+android/build/
 android/secrets.properties
 android/app/google-services.json
 /android/app/debug
