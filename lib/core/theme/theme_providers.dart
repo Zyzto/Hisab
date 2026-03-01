@@ -2,8 +2,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/legacy.dart' show StateProvider;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'app_theme.dart';
 import 'experiment_styles.dart';
+import 'flex_theme_builder.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
 
 part 'theme_providers.g.dart';
@@ -34,35 +34,30 @@ class AppThemes {
   const AppThemes({required this.light, required this.dark});
 }
 
-/// Theme data provider. Rebuilds when themeMode, themeColor, fontSizeScale, or experiment style index change.
+/// Theme data provider. Rebuilds when themeMode, themeScheme, themeColor, fontSizeScale, or experiment style index change.
 @riverpod
 AppThemes appThemes(Ref ref) {
   final experimentIndex = ref.watch(experimentStyleIndexProvider);
   final themeModeValue = ref.watch(themeModeProvider);
+  final themeSchemeValue = ref.watch(themeSchemeProvider);
   final themeColorValue = ref.watch(themeColorProvider);
   final fontSizeScaleValue = ref.watch(fontSizeScaleProvider);
 
-  final themeColor = Color(themeColorValue);
-  final fontSizeScale = fontSizeScaleValue;
-
-  // Index 0 = Default: use existing app theme from settings.
+  // Index 0 = Default: use FlexColorScheme-based theme from settings.
   if (experimentIndex == 0) {
-    final lightTheme = AppTheme.lightTheme(
-      seedColor: themeColor,
-      fontSizeScale: fontSizeScale,
+    final lightTheme = FlexThemeBuilder.light(
+      themeScheme: themeSchemeValue,
+      themeColorValue: themeColorValue,
+      fontSizeScale: fontSizeScaleValue,
       alwaysShowScrollbars: kIsWeb,
     );
-    final darkTheme = themeModeValue == 'amoled'
-        ? AppTheme.amoledTheme(
-            seedColor: themeColor,
-            fontSizeScale: fontSizeScale,
-            alwaysShowScrollbars: kIsWeb,
-          )
-        : AppTheme.darkTheme(
-            seedColor: themeColor,
-            fontSizeScale: fontSizeScale,
-            alwaysShowScrollbars: kIsWeb,
-          );
+    final darkTheme = FlexThemeBuilder.dark(
+      themeScheme: themeSchemeValue,
+      themeColorValue: themeColorValue,
+      fontSizeScale: fontSizeScaleValue,
+      alwaysShowScrollbars: kIsWeb,
+      amoled: themeModeValue == 'amoled',
+    );
     return AppThemes(light: lightTheme, dark: darkTheme);
   }
 
