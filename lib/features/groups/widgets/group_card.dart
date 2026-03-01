@@ -220,15 +220,16 @@ class GroupCard extends ConsumerWidget {
     required IconData? iconData,
     required String groupName,
   }) {
+    final fgOnGroup = ThemeConfig.foregroundOnBackground(groupColor);
     final defaultAvatar = CircleAvatar(
       radius: 22,
       backgroundColor: groupColor,
       child: iconData != null
-          ? Icon(iconData, color: Colors.white, size: 22)
+          ? Icon(iconData, color: fgOnGroup, size: 22)
           : Text(
               groupName.isNotEmpty ? groupName[0].toUpperCase() : '?',
               style: theme.textTheme.titleMedium?.copyWith(
-                color: Colors.white,
+                color: fgOnGroup,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -247,12 +248,12 @@ class GroupCard extends ConsumerWidget {
             borderRadius: BorderRadius.circular(12),
           ),
           child: iconData != null
-              ? Icon(iconData, color: Colors.white, size: 22)
+              ? Icon(iconData, color: fgOnGroup, size: 22)
               : Center(
                   child: Text(
                     groupName.isNotEmpty ? groupName[0].toUpperCase() : '?',
                     style: theme.textTheme.titleMedium?.copyWith(
-                      color: Colors.white,
+                      color: fgOnGroup,
                       fontWeight: FontWeight.w600,
                     ),
                   ),

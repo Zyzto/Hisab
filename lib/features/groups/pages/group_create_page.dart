@@ -276,12 +276,12 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                       key: const Key('wizard_create_button'),
                       onPressed: _saving ? null : _createGroup,
                       icon: _saving
-                          ? const SizedBox(
+                          ? SizedBox(
                               height: 18,
                               width: 18,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Colors.white,
+                                color: colorScheme.onPrimary,
                               ),
                             )
                           : const Icon(Icons.check),
@@ -292,6 +292,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                       ),
                     )
                   : FilledButton.icon(
+                      key: const Key('wizard_next_button'),
                       onPressed: _goNext,
                       icon: const Icon(Icons.arrow_forward),
                       label: Text(
@@ -448,7 +449,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
           child: ListTile(
             leading: CircleAvatar(
               backgroundColor: colorScheme.primary,
-              child: const Icon(Icons.person, color: Colors.white),
+              child: Icon(Icons.person, color: colorScheme.onPrimary),
             ),
             title: Text(
               'wizard_you'.tr(),
@@ -687,20 +688,30 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
             child: Column(
               children: [
                 // Group avatar
-                CircleAvatar(
-                  radius: 36,
-                  backgroundColor: _selectedColor,
-                  child: iconDef != null && iconDef.key != groupIconLetterKey
-                      ? Icon(iconDef.icon, size: 36, color: Colors.white)
-                      : Text(
-                          _nameController.text.trim().isNotEmpty
-                              ? _nameController.text.trim()[0].toUpperCase()
-                              : '?',
-                          style: theme.textTheme.headlineMedium?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                Builder(
+                  builder: (_) {
+                    final fgOnColor =
+                        ThemeConfig.foregroundOnBackground(_selectedColor);
+                    return CircleAvatar(
+                      radius: 36,
+                      backgroundColor: _selectedColor,
+                      child: iconDef != null &&
+                              iconDef.key != groupIconLetterKey
+                          ? Icon(iconDef.icon, size: 36, color: fgOnColor)
+                          : Text(
+                              _nameController.text.trim().isNotEmpty
+                                  ? _nameController
+                                      .text
+                                      .trim()[0]
+                                      .toUpperCase()
+                                  : '?',
+                              style: theme.textTheme.headlineMedium?.copyWith(
+                                color: fgOnColor,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                    );
+                  },
                 ),
                 const SizedBox(height: ThemeConfig.spacingM),
                 // Group name

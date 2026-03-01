@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/theme_config.dart';
 import '../utils/group_icon_utils.dart';
 
 /// A wrap of color circles for selecting a group color.
@@ -50,7 +51,11 @@ class GroupColorPicker extends StatelessWidget {
                   : null,
             ),
             child: isSelected
-                ? const Icon(Icons.check, color: Colors.white, size: 22)
+                ? Icon(
+                    Icons.check,
+                    color: ThemeConfig.foregroundOnBackground(color),
+                    size: 22,
+                  )
                 : null,
           ),
         );

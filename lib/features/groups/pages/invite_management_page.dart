@@ -232,8 +232,8 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
 
     switch (invite.status) {
       case InviteStatus.active:
-        bg = Colors.green.withAlpha(30);
-        fg = Colors.green;
+        bg = theme.colorScheme.primary.withAlpha(30);
+        fg = theme.colorScheme.primary;
         text = 'invite_status_active'.tr();
         break;
       case InviteStatus.expired:
@@ -242,8 +242,8 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
         text = 'invite_status_expired'.tr();
         break;
       case InviteStatus.maxedOut:
-        bg = Colors.orange.withAlpha(30);
-        fg = Colors.orange;
+        bg = theme.colorScheme.tertiary.withAlpha(30);
+        fg = theme.colorScheme.tertiary;
         text = 'invite_status_maxed'.tr();
         break;
       case InviteStatus.revoked:
@@ -666,25 +666,30 @@ class _InviteQrSheetContentState extends State<_InviteQrSheetContent> {
           children: [
             RepaintBoundary(
               key: _qrKey,
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: SizedBox(
-                  width: 200,
-                  height: 200,
-                  child: PrettyQrView.data(
-                    data: widget.url,
-                    errorCorrectLevel: QrErrorCorrectLevel.M,
-                    decoration: const PrettyQrDecoration(
-                      shape: PrettyQrSmoothSymbol(color: Colors.black),
-                      background: Colors.white,
-                      quietZone: PrettyQrQuietZone.zero,
+              child: Builder(
+                builder: (context) {
+                  final colorScheme = Theme.of(context).colorScheme;
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surface,
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                  ),
-                ),
+                    child: SizedBox(
+                      width: 200,
+                      height: 200,
+                      child: PrettyQrView.data(
+                        data: widget.url,
+                        errorCorrectLevel: QrErrorCorrectLevel.M,
+                        decoration: PrettyQrDecoration(
+                          shape: PrettyQrSmoothSymbol(color: colorScheme.onSurface),
+                          background: colorScheme.surface,
+                          quietZone: PrettyQrQuietZone.zero,
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
             const SizedBox(height: 16),
