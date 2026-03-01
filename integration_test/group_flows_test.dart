@@ -30,7 +30,8 @@ void main() {
           'Trip to Tokyo',
         );
 
-        await tapAndSettle(tester, find.text('Next'));
+        await waitForWidget(tester, find.byKey(const Key('wizard_next_button')));
+        await tapAndSettle(tester, find.byKey(const Key('wizard_next_button')));
         await tester.pump(const Duration(milliseconds: 400));
 
         // Step 2: Add participants via onSubmitted (keyboard done action)
@@ -47,7 +48,8 @@ void main() {
         await tester.testTextInput.receiveAction(TextInputAction.done);
         await tester.pumpAndSettle();
 
-        await tapAndSettle(tester, find.text('Next'));
+        await waitForWidget(tester, find.byKey(const Key('wizard_next_button')));
+        await tapAndSettle(tester, find.byKey(const Key('wizard_next_button')));
         await tester.pump(const Duration(milliseconds: 400));
 
         // Step 3: Icon & Color selection
@@ -64,7 +66,8 @@ void main() {
           await tapAndSettle(tester, animatedContainers.at(4));
         }
 
-        await tapAndSettle(tester, find.text('Next'));
+        await waitForWidget(tester, find.byKey(const Key('wizard_next_button')));
+        await tapAndSettle(tester, find.byKey(const Key('wizard_next_button')));
         await tester.pump(const Duration(milliseconds: 400));
         await pumpAndSettleWithTimeout(tester);
 
@@ -91,10 +94,51 @@ void main() {
       await stage('people tab shows participants', () async {
         await tapAndSettle(tester, find.text('People'));
         await pumpAndSettleWithTimeout(tester);
-
+        // Allow async participant list to load (Web can be slower)
+        for (var i = 0; i < 15; i++) {
+          await tester.pump(const Duration(milliseconds: 500));
+          if (find.text('Alice').evaluate().isNotEmpty) break;
+        }
+        await waitForWidget(
+          tester,
+          find.text('Alice'),
+          timeout: const Duration(seconds: 25),
+        );
+        await scrollUntilVisible(tester, find.text('Alice'));
         expect(find.text('Alice'), findsWidgets);
         expect(find.text('Bob'), findsWidgets);
         expect(find.text('Charlie'), findsWidgets);
+      });
+
+      // ── Stage: add participant manually (sheet) ──
+      // Exercises the manual add-participant flow (FAB → sheet → name → Done).
+      // The deferred create() in group_detail_page avoids the _dependents.isEmpty
+      // race so this path behaves consistently in tests and production.
+      // Group detail uses _FABWithLabel (Icon in Material/InkWell), not FloatingActionButton.
+      await stage('add participant manually via sheet', () async {
+        await waitForWidget(tester, find.byIcon(Icons.person_add));
+        await tester.ensureVisible(find.byIcon(Icons.person_add).first);
+        await tapAndSettle(tester, find.byIcon(Icons.person_add));
+        await pumpAndSettleWithTimeout(tester);
+
+        await waitForWidget(tester, find.text('Add Participant'));
+        // Sheet body may build after title; wait for the name field (TextField is more reliable than EditableText on some devices)
+        await tester.pump(const Duration(milliseconds: 500));
+        await pumpAndSettleWithTimeout(tester);
+        await waitForWidget(
+          tester,
+          find.byType(TextField),
+          timeout: const Duration(seconds: 15),
+        );
+        await enterTextAndPump(
+          tester,
+          find.byType(TextField).first,
+          'Diana',
+        );
+        await tapAndSettle(tester, find.text('Done'));
+        await pumpAndSettleWithTimeout(tester);
+
+        expect(find.text('Diana'), findsWidgets);
       });
 
       // ── Stage: switch back to Expenses tab ──
@@ -156,10 +200,11 @@ void main() {
               await pumpAndSettleWithTimeout(tester);
             }
 
-            // Tap the first USD item to select it
-            final usdItem = find.textContaining('USD');
-            if (usdItem.evaluate().isNotEmpty) {
-              await tapAndSettle(tester, usdItem.first);
+            // Tap the USD row by its full name (list shows code + "United States Dollar")
+            final usdRow = find.text('United States Dollar');
+            if (usdRow.evaluate().isNotEmpty) {
+              await tester.ensureVisible(usdRow.first);
+              await tapAndSettle(tester, usdRow.first);
               await pumpAndSettleWithTimeout(tester);
             }
 
@@ -290,15 +335,38 @@ void main() {
 
       // ── Stage: unfreeze settlements ──
       await stage('unfreeze settlements', () async {
-        // We're on the Balance tab; try to unfreeze from the banner
-        final unfreezeButton = find.text('Unfreeze settlement');
-        if (unfreezeButton.evaluate().isNotEmpty) {
-          await tapAndSettle(tester, unfreezeButton);
-          await pumpAndSettleWithTimeout(tester);
-        }
-
-        // Verify freeze is removed (no more pause icon)
+        // We're on the Balance tab. The "Unfreeze settlement" button navigates
+        // to Group Settings; we then toggle the Settlement freeze switch off.
+        await waitForWidget(tester, find.text('Unfreeze settlement'));
+        await scrollUntilVisible(tester, find.text('Unfreeze settlement'));
+        final unfreezeButton =
+            find.widgetWithText(TextButton, 'Unfreeze settlement');
+        await tapAndSettle(tester, unfreezeButton);
         await pumpAndSettleWithTimeout(tester);
+
+        // Now on Group Settings: turn off Settlement freeze switch
+        await waitForWidget(tester, find.text('Group Settings'));
+        await scrollUntilVisible(tester, find.text('Settlement freeze'));
+        final freezeTile = find.ancestor(
+          of: find.text('Settlement freeze'),
+          matching: find.byType(SwitchListTile),
+        );
+        expect(freezeTile, findsOneWidget);
+        final switchWidget = find.descendant(
+          of: freezeTile,
+          matching: find.byType(Switch),
+        );
+        await tapAndSettle(tester, switchWidget);
+        await pumpAndSettleWithTimeout(tester);
+
+        // Verify freeze is removed: go back to Balance and check no pause icon
+        final backIcon = find.byIcon(Icons.arrow_back);
+        if (backIcon.evaluate().isNotEmpty) {
+          await tapAndSettle(tester, backIcon.first);
+        }
+        await tapAndSettle(tester, find.text('Balance').first);
+        await pumpAndSettleWithTimeout(tester);
+        expect(find.byIcon(Icons.pause_circle), findsNothing);
       });
 
       // ── Stage: delete group ──

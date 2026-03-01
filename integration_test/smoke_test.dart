@@ -9,24 +9,30 @@ void main() {
 
   group('Smoke', () {
     testWidgets('app opens to home with FAB visible', (tester) async {
+      recordStage('smoke: bootstrap', 'STARTED');
       await ensureIntegrationTestReady(tester);
+      recordStage('smoke: bootstrap', 'PASSED');
 
+      recordStage('smoke: FAB visible', 'STARTED');
       expect(find.byIcon(Icons.add), findsOneWidget);
+      recordStage('smoke: FAB visible', 'PASSED');
     });
 
     testWidgets('can navigate to Settings and back', (tester) async {
+      recordStage('smoke: bootstrap', 'STARTED');
       await ensureIntegrationTestReady(tester);
+      recordStage('smoke: bootstrap', 'PASSED');
 
-      // Tap Settings in bottom nav or rail
+      recordStage('smoke: open Settings', 'STARTED');
       await tapAndSettle(tester, find.text('Settings'));
-
       expect(find.text('Appearance'), findsWidgets);
+      recordStage('smoke: open Settings', 'PASSED');
 
-      // Go back to Home
+      recordStage('smoke: back to Home', 'STARTED');
       await tapAndSettle(tester, find.text('Groups'));
-
       final hasFab = find.byIcon(Icons.add).evaluate().isNotEmpty;
       expect(hasFab, isTrue, reason: 'FAB should be visible after returning to Home');
+      recordStage('smoke: back to Home', 'PASSED');
     });
   });
 }

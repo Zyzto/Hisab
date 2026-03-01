@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:hisab/app.dart';
 import 'package:hisab/core/constants/supabase_config.dart';
+import 'package:hisab/core/debug/integration_test_mode.dart';
 import 'package:hisab/core/database/database_providers.dart';
 import 'package:hisab/core/database/powersync_schema.dart' as ps;
 import 'package:hisab/features/settings/providers/settings_framework_providers.dart';
@@ -91,6 +92,7 @@ Future<bool> runOnlineTestApp({
       ? Locale(settingsProviders.controller.get(languageSettingDef))
       : const Locale('en');
 
+  isIntegrationTestMode = true;
   runApp(
     EasyLocalization(
       supportedLocales: const [Locale('en'), Locale('ar')],

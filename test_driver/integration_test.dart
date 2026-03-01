@@ -6,11 +6,38 @@ import 'package:flutter_driver/flutter_driver.dart';
 import 'package:integration_test/common.dart';
 
 Future<void> main() async {
-  final driver = await FlutterDriver.connect();
-  final jsonResult = await driver.requestData(
-    null,
-    timeout: const Duration(minutes: 20),
-  );
+  FlutterDriver driver;
+  try {
+    driver = await FlutterDriver.connect();
+  } catch (e) {
+    print('FlutterDriver.connect failed: $e');
+    exit(1);
+  }
+
+  String? jsonResult;
+  try {
+    jsonResult = await driver.requestData(
+      null,
+      timeout: const Duration(minutes: 20),
+    );
+  } catch (e) {
+    await driver.close();
+    final msg = e.toString();
+    if (msg.contains('Service has disappeared') ||
+        msg.contains('Service connection disposed') ||
+        msg.contains('VmServiceDisappeared')) {
+      print('');
+      print('Integration test run incomplete: device/emulator connection was lost.');
+      print('This is usually an emulator or ADB issue, not a test failure.');
+      print('Error: $e');
+      print('');
+      print('See test/README.md "Android emulator troubleshooting" for workarounds.');
+    } else {
+      print('driver.requestData failed: $e');
+    }
+    exit(1);
+  }
+
   await driver.close();
 
   final response = Response.fromJson(jsonResult);
