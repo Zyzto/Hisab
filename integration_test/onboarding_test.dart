@@ -10,33 +10,41 @@ void main() {
 
   group('Onboarding', () {
     testWidgets('complete onboarding flow lands on home', (tester) async {
+      recordStage('onboarding: bootstrap', 'STARTED');
       final ready = await runIntegrationTestApp(skipOnboarding: false);
       ensureBootstrapReady(ready);
       await pumpAndSettleWithTimeout(tester);
+      recordStage('onboarding: bootstrap', 'PASSED');
 
-      // Page 1: Welcome
+      recordStage('onboarding: Welcome page', 'STARTED');
       await waitForWidget(tester, find.text('Welcome to Hisab'));
       expect(find.text('Welcome to Hisab'), findsOneWidget);
+      recordStage('onboarding: Welcome page', 'PASSED');
 
-      // Tap Next to go to page 2 (Permissions)
+      recordStage('onboarding: Preferences page', 'STARTED');
       await tapAndSettle(tester, find.text('Next'));
       await tester.pump(const Duration(milliseconds: 500));
       await pumpAndSettleWithTimeout(tester);
+      await waitForWidget(tester, find.text('Preferences'));
+      recordStage('onboarding: Preferences page', 'PASSED');
 
+      recordStage('onboarding: Permissions page', 'STARTED');
+      await tapAndSettle(tester, find.text('Next'));
+      await tester.pump(const Duration(milliseconds: 500));
+      await pumpAndSettleWithTimeout(tester);
       await waitForWidget(tester, find.text('Permissions'));
+      recordStage('onboarding: Permissions page', 'PASSED');
 
-      // Tap Next to go to page 3 (Connect / mode selection)
+      recordStage('onboarding: Connect page', 'STARTED');
       await tapAndSettle(tester, find.text('Next'));
       await tester.pump(const Duration(milliseconds: 500));
       await pumpAndSettleWithTimeout(tester);
-
       await waitForWidget(tester, find.text('Connect'));
+      recordStage('onboarding: Connect page', 'PASSED');
 
-      // Complete onboarding
+      recordStage('onboarding: complete and land on home', 'STARTED');
       await tapAndSettle(tester, find.text('Start'));
       await pumpAndSettleWithTimeout(tester);
-
-      // Should land on Home
       await waitForWidget(tester, find.byIcon(Icons.add));
       final hasGroups = find.text('Groups').evaluate().isNotEmpty;
       final hasNoGroups = find.text('No Groups Yet').evaluate().isNotEmpty;
@@ -45,6 +53,7 @@ void main() {
         isTrue,
         reason: 'After onboarding, home page should be visible',
       );
+      recordStage('onboarding: complete and land on home', 'PASSED');
     });
   });
 }
