@@ -29,6 +29,7 @@ class HomePage extends ConsumerWidget {
 
   void _showCreateModal(BuildContext context, WidgetRef ref) {
     ref.read(selectedGroupIdsProvider.notifier).state = {};
+    final colorScheme = Theme.of(context).colorScheme;
     showResponsiveSheet<void>(
       context: context,
       title: 'create'.tr(),
@@ -37,7 +38,10 @@ class HomePage extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.group_outlined),
+              leading: Icon(
+                Icons.group_outlined,
+                color: colorScheme.onSurfaceVariant,
+              ),
               title: Text('create_group'.tr()),
               onTap: () {
                 ref.read(selectedGroupIdsProvider.notifier).state = {};
@@ -46,7 +50,10 @@ class HomePage extends ConsumerWidget {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.person_outline),
+              leading: Icon(
+                Icons.person_outline,
+                color: colorScheme.onSurfaceVariant,
+              ),
               title: Text('create_personal'.tr()),
               onTap: () {
                 ref.read(selectedGroupIdsProvider.notifier).state = {};

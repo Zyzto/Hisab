@@ -92,7 +92,7 @@ final class AuthStateChangesProvider
   }
 }
 
-String _$authStateChangesHash() => r'37b8fec2d6d60badb2b051c1ca0c32bf46a29fb9';
+String _$authStateChangesHash() => r'c3ca227f2322b95b2ae35b2edf79e4d04bb6afd1';
 
 @ProviderFor(isAuthenticated)
 final isAuthenticatedProvider = IsAuthenticatedProvider._();
