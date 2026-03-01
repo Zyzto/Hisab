@@ -17,6 +17,7 @@ const schema = Schema([
     Column.integer('allow_member_change_settings'),
     Column.integer('require_participant_assignment'),
     Column.integer('allow_expense_as_other_participant'),
+    Column.integer('allow_member_settle_for_others'),
     Column.text('icon'),
     Column.integer('color'),
     Column.text('archived_at'),
