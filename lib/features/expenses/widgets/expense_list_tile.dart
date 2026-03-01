@@ -14,18 +14,33 @@ class ExpenseListTile extends StatelessWidget {
   /// When false (e.g. personal group), the "Paid by" line is hidden.
   final bool showPaidBy;
 
+  /// When set, the primary amount is shown in group currency (using stored conversion when expense currency differs).
+  final String? groupCurrencyCode;
+
   const ExpenseListTile({
     super.key,
     required this.expense,
     required this.payerName,
     this.icon,
     this.showPaidBy = true,
+    this.groupCurrencyCode,
   });
+
+  /// Primary amount for display: group currency when [groupCurrencyCode] is set and differs from expense currency, else expense amount.
+  (int cents, String currencyCode) get _primaryAmount {
+    if (groupCurrencyCode != null &&
+        groupCurrencyCode!.isNotEmpty &&
+        expense.currencyCode != groupCurrencyCode) {
+      return (expense.effectiveBaseAmountCents, groupCurrencyCode!);
+    }
+    return (expense.amountCents, expense.currencyCode);
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final effectiveIcon = icon ?? defaultExpenseIcon;
+    final (cents, currencyCode) = _primaryAmount;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -63,10 +78,7 @@ class ExpenseListTile extends StatelessWidget {
               ),
             ),
             Text(
-              CurrencyFormatter.formatCents(
-                expense.amountCents,
-                expense.currencyCode,
-              ),
+              CurrencyFormatter.formatCents(cents, currencyCode),
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w600,
               ),

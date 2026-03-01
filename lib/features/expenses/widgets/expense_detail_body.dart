@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../../core/receipt/receipt_image_view.dart';
+import '../../../core/widgets/amount_with_secondary_display.dart';
 import '../../../features/settings/providers/settings_framework_providers.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../domain/domain.dart';
@@ -23,6 +24,7 @@ class ExpenseDetailBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final expenseAsync = ref.watch(futureExpenseProvider(expenseId));
     final participantsAsync = ref.watch(participantsByGroupProvider(groupId));
+    final groupAsync = ref.watch(futureGroupProvider(groupId));
 
     return expenseAsync.when(
       data: (expense) {
@@ -35,6 +37,17 @@ class ExpenseDetailBody extends ConsumerWidget {
         return participantsAsync.when(
           data: (participants) {
             final nameOf = {for (final p in participants) p.id: p.name};
+            final group = groupAsync.asData?.value;
+            final groupCurrencyCode = group?.currencyCode;
+            final useGroupCurrency = groupCurrencyCode != null &&
+                groupCurrencyCode.isNotEmpty &&
+                expense.currencyCode != groupCurrencyCode;
+            final payerCents = useGroupCurrency
+                ? expense.effectiveBaseAmountCents
+                : expense.amountCents;
+            final displayCurrencyCode =
+                useGroupCurrency ? groupCurrencyCode : expense.currencyCode;
+
             return ListView(
               padding: const EdgeInsets.symmetric(
                 horizontal: 20,
@@ -94,8 +107,12 @@ class ExpenseDetailBody extends ConsumerWidget {
                   name:
                       nameOf[expense.payerParticipantId] ??
                       expense.payerParticipantId,
-                  amountCents: expense.amountCents,
-                  currencyCode: expense.currencyCode,
+                  amountCents: payerCents,
+                  currencyCode: displayCurrencyCode,
+                  amountWidget: AmountWithSecondaryDisplay(
+                    amountCents: payerCents,
+                    groupCurrencyCode: displayCurrencyCode,
+                  ),
                 ),
                 const SizedBox(height: 24),
                 _SectionLabel(
@@ -105,13 +122,22 @@ class ExpenseDetailBody extends ConsumerWidget {
                           : 'participants'.tr(),
                 ),
                 const SizedBox(height: 10),
-                ..._participantShares(expense, participants, nameOf).map(
+                ..._participantShares(
+                  expense,
+                  participants,
+                  nameOf,
+                  useGroupCurrency ? groupCurrencyCode : null,
+                ).map(
                   (e) => Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: _PersonCard(
                       name: e.name,
                       amountCents: e.cents,
-                      currencyCode: expense.currencyCode,
+                      currencyCode: e.currencyCode,
+                      amountWidget: AmountWithSecondaryDisplay(
+                        amountCents: e.cents,
+                        groupCurrencyCode: e.currencyCode,
+                      ),
                     ),
                   ),
                 ),
@@ -141,14 +167,29 @@ class ExpenseDetailBody extends ConsumerWidget {
     Expense expense,
     List<Participant> participants,
     Map<String, String> nameOf,
+    String? groupCurrencyCode,
   ) {
+    final useGroupCurrency = groupCurrencyCode != null &&
+        groupCurrencyCode.isNotEmpty &&
+        expense.currencyCode != groupCurrencyCode;
+    final conversionFactor = useGroupCurrency && expense.amountCents > 0
+        ? expense.effectiveBaseAmountCents / expense.amountCents
+        : 1.0;
+    final displayCode = useGroupCurrency ? groupCurrencyCode : expense.currencyCode;
+
+    int toDisplayCents(int cents) {
+      if (!useGroupCurrency) return cents;
+      return (cents * conversionFactor).round();
+    }
+
     if (expense.transactionType == TransactionType.transfer) {
       final toId = expense.toParticipantId;
       if (toId == null) return [];
       return [
         _ShareEntry(
           name: nameOf[toId] ?? toId,
-          cents: expense.amountCents,
+          cents: toDisplayCents(expense.amountCents),
+          currencyCode: displayCode,
         ),
       ];
     }
@@ -159,7 +200,8 @@ class ExpenseDetailBody extends ConsumerWidget {
         .map(
           (p) => _ShareEntry(
             name: nameOf[p.id] ?? p.id,
-            cents: shares[p.id]!,
+            cents: toDisplayCents(shares[p.id]!),
+            currencyCode: displayCode,
           ),
         )
         .toList();
@@ -169,7 +211,12 @@ class ExpenseDetailBody extends ConsumerWidget {
 class _ShareEntry {
   final String name;
   final int cents;
-  _ShareEntry({required this.name, required this.cents});
+  final String currencyCode;
+  _ShareEntry({
+    required this.name,
+    required this.cents,
+    required this.currencyCode,
+  });
 }
 
 class ExpenseDetailBodyHeader extends StatelessWidget {
@@ -248,11 +295,14 @@ class _PersonCard extends StatelessWidget {
   final String name;
   final int amountCents;
   final String currencyCode;
+  /// When set, shown instead of the default formatted amount (e.g. [AmountWithSecondaryDisplay]).
+  final Widget? amountWidget;
 
   const _PersonCard({
     required this.name,
     required this.amountCents,
     required this.currencyCode,
+    this.amountWidget,
   });
 
   @override
@@ -287,13 +337,14 @@ class _PersonCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          Text(
-            CurrencyFormatter.formatCents(amountCents, currencyCode),
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: theme.colorScheme.primary,
-            ),
-          ),
+          amountWidget ??
+              Text(
+                CurrencyFormatter.formatCents(amountCents, currencyCode),
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
         ],
       ),
     );

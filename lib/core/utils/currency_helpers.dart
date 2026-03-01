@@ -87,12 +87,9 @@ class CurrencyHelpers {
           child: AppCurrencyPickerList(
             onSelect: (currency) {
               onSelect(currency);
-              // Defer pop so sync setState (expense form) or async start (group) runs before sheet closes.
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (ctx.mounted) {
-                  Navigator.of(ctx, rootNavigator: true).pop();
-                }
-              });
+              // Do not pop here: AppCurrencyPickerList already calls Navigator.pop(context)
+              // when a row is tapped. A second pop (e.g. rootNavigator: true) would pop
+              // the route under the dialog (e.g. settings) and cause "popped the last page".
             },
             favorite: favorite,
             currencyFilter: currencyFilter,

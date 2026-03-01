@@ -1,10 +1,12 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../settings_definitions.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/auth/auth_user_profile.dart';
 import '../../../core/constants/supabase_config.dart';
+import '../../../core/theme/flex_theme_builder.dart' show defaultThemeSchemeId;
 
 part 'settings_framework_providers.g.dart';
 
@@ -13,11 +15,75 @@ part 'settings_framework_providers.g.dart';
 @riverpod
 SettingsProviders? hisabSettingsProviders(Ref ref) => null;
 
+/// Maps legacy theme_color (int) to theme_scheme id for migration.
+String themeSchemeFromLegacyColor(int themeColorValue) {
+  switch (themeColorValue) {
+    case 0xFF2E7D32:
+      return 'green';
+    case 0xFF1565C0:
+      return 'blue';
+    case 0xFF00897B:
+      return 'tealM3';
+    case 0xFF6A1B9A:
+      return 'deepPurple';
+    case 0xFFC62828:
+      return 'red';
+    case 0xFFE65100:
+      return 'amber';
+    default:
+      return 'custom';
+  }
+}
+
+/// One-time migration: derive theme_scheme from theme_color when upgrading.
+Future<void> runThemeSchemeMigration(SettingsProviders settings) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('theme_scheme_migrated') == true) return;
+    final themeColor =
+        settings.controller.get(themeColorSettingDef) as int? ?? 0xFF2E7D32;
+    final scheme = themeSchemeFromLegacyColor(themeColor);
+    settings.controller.set(themeSchemeSettingDef, scheme);
+    await prefs.setBool('theme_scheme_migrated', true);
+  } catch (e, stackTrace) {
+    Log.warning(
+      'theme_scheme migration failed',
+      error: e,
+      stackTrace: stackTrace,
+    );
+  }
+}
+
+/// One-time migration: fix invalid "teal" scheme id to "tealM3" (FlexScheme enum name).
+Future<void> runThemeSchemeTealMigration(SettingsProviders settings) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('theme_scheme_teal_fixed') == true) return;
+    final current = settings.controller.get(themeSchemeSettingDef) as String?;
+    if (current == 'teal') {
+      settings.controller.set(themeSchemeSettingDef, 'tealM3');
+    }
+    await prefs.setBool('theme_scheme_teal_fixed', true);
+  } catch (e, stackTrace) {
+    Log.warning(
+      'theme_scheme teal migration failed',
+      error: e,
+      stackTrace: stackTrace,
+    );
+  }
+}
+
 Future<SettingsProviders?> initializeHisabSettings() async {
   try {
     final registry = createHisabSettingsRegistry();
     final storage = SharedPreferencesStorage();
-    return await initializeSettings(registry: registry, storage: storage);
+    final providers = await initializeSettings(registry: registry, storage: storage);
+    // ignore: unnecessary_null_comparison -- initializeSettings may return null on failure
+    if (providers != null) {
+      await runThemeSchemeMigration(providers);
+      await runThemeSchemeTealMigration(providers);
+    }
+    return providers;
   } catch (e, stackTrace) {
     Log.warning(
       'Settings init failed, using defaults',
@@ -164,6 +230,22 @@ String themeMode(Ref ref) {
 }
 
 @riverpod
+String themeScheme(Ref ref) {
+  try {
+    final settings = ref.watch(hisabSettingsProvidersProvider);
+    if (settings == null) return defaultThemeSchemeId;
+    return ref.watch(settings.provider(themeSchemeSettingDef));
+  } catch (e, stackTrace) {
+    Log.warning(
+      'themeScheme read failed, defaulting to green',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return defaultThemeSchemeId;
+  }
+}
+
+@riverpod
 int themeColor(Ref ref) {
   try {
     final settings = ref.watch(hisabSettingsProvidersProvider);
@@ -204,6 +286,22 @@ String favoriteCurrencies(Ref ref) {
   } catch (e, stackTrace) {
     Log.warning(
       'favoriteCurrencies read failed, defaulting to empty',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return '';
+  }
+}
+
+@riverpod
+String displayCurrency(Ref ref) {
+  try {
+    final settings = ref.watch(hisabSettingsProvidersProvider);
+    if (settings == null) return '';
+    return ref.watch(settings.provider(displayCurrencySettingDef)).trim();
+  } catch (e, stackTrace) {
+    Log.warning(
+      'displayCurrency read failed, defaulting to empty',
       error: e,
       stackTrace: stackTrace,
     );
