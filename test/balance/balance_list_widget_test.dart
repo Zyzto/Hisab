@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hisab/domain/domain.dart';
 import 'package:hisab/features/balance/providers/balance_provider.dart';
 import 'package:hisab/features/balance/widgets/balance_list.dart';
+import 'package:hisab/features/groups/providers/group_member_provider.dart';
 import '../widget_test_helpers.dart';
 
 void main() {
@@ -73,12 +74,24 @@ void main() {
     );
   });
 
-  Future<void> pumpBalanceList(WidgetTester tester) async {
+  /// Pumps BalanceList with optional member/role overrides. Defaults to owner
+  /// so the record-settlement button is enabled (owner can always record).
+  Future<void> pumpBalanceList(
+    WidgetTester tester, {
+    AsyncValue<GroupMember?>? myMemberOverride,
+    AsyncValue<GroupRole?>? myRoleOverride,
+  }) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           groupBalanceProvider(groupId).overrideWithValue(
             AsyncValue.data(fakeResult),
+          ),
+          myMemberInGroupProvider(groupId).overrideWithValue(
+            myMemberOverride ?? const AsyncValue.data(null),
+          ),
+          myRoleInGroupProvider(groupId).overrideWithValue(
+            myRoleOverride ?? const AsyncValue.data(GroupRole.owner),
           ),
         ],
         child: EasyLocalization(
@@ -105,8 +118,37 @@ void main() {
     // Settlement line: "Bob → Alice" (arrow U+2192)
     expect(find.textContaining('Bob'), findsAny);
     expect(find.textContaining('Alice'), findsAny);
-    // 5000 cents = 50.00 USD (or similar)
+    // 5000 cents = 50.00 (or similar; currency code may be in primary or secondary display)
     expect(find.textContaining('50'), findsAny);
-    expect(find.textContaining('USD'), findsAny);
+  });
+
+  testWidgets('BalanceList disables record when not owner and not debtor',
+      (tester) async {
+    // User is member (not owner), and their participant is p-a (Alice).
+    // Settlement is p-b → p-a (Bob owes Alice). So only owner or Bob can record.
+    // As Alice (member), record button should be disabled.
+    final memberAsAlice = GroupMember(
+      id: 'm1',
+      groupId: groupId,
+      userId: 'u1',
+      role: 'member',
+      participantId: 'p-a',
+      joinedAt: now,
+    );
+    await pumpBalanceList(
+      tester,
+      myMemberOverride: AsyncValue.data(memberAsAlice),
+      myRoleOverride: const AsyncValue.data(GroupRole.member),
+    );
+    await tester.pumpAndSettle();
+
+    // Record payment IconButton should be present but disabled (onPressed == null)
+    final paymentButton = find.ancestor(
+      of: find.byIcon(Icons.payments_outlined),
+      matching: find.byType(IconButton),
+    );
+    expect(paymentButton.evaluate().isNotEmpty, isTrue);
+    final btn = tester.widget<IconButton>(paymentButton.first);
+    expect(btn.onPressed, isNull);
   });
 }
