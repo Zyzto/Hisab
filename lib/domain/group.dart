@@ -20,6 +20,7 @@ class Group {
   final bool allowMemberAddExpense;
   final bool allowMemberChangeSettings;
   final bool allowExpenseAsOtherParticipant;
+  final bool allowMemberSettleForOthers;
   final String? icon;
   final int? color;
   final DateTime? archivedAt;
@@ -42,6 +43,7 @@ class Group {
     this.allowMemberAddExpense = true,
     this.allowMemberChangeSettings = true,
     this.allowExpenseAsOtherParticipant = true,
+    this.allowMemberSettleForOthers = false,
     this.icon,
     this.color,
     this.archivedAt,
@@ -66,6 +68,7 @@ class Group {
     bool? allowMemberAddExpense,
     bool? allowMemberChangeSettings,
     bool? allowExpenseAsOtherParticipant,
+    bool? allowMemberSettleForOthers,
     String? icon,
     int? color,
     DateTime? archivedAt,
@@ -92,6 +95,8 @@ class Group {
           allowMemberChangeSettings ?? this.allowMemberChangeSettings,
       allowExpenseAsOtherParticipant:
           allowExpenseAsOtherParticipant ?? this.allowExpenseAsOtherParticipant,
+      allowMemberSettleForOthers:
+          allowMemberSettleForOthers ?? this.allowMemberSettleForOthers,
       icon: icon ?? this.icon,
       color: color ?? this.color,
       archivedAt: archivedAt ?? this.archivedAt,
@@ -117,6 +122,7 @@ class Group {
     allowMemberAddExpense: allowMemberAddExpense,
     allowMemberChangeSettings: allowMemberChangeSettings,
     allowExpenseAsOtherParticipant: allowExpenseAsOtherParticipant,
+    allowMemberSettleForOthers: allowMemberSettleForOthers,
     icon: icon,
     color: color,
     archivedAt: archivedAt,

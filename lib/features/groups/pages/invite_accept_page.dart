@@ -232,6 +232,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
     final result = await showSignInSheet(context, ref);
     switch (result) {
       case SignInResult.success:
+        await ref.read(dataSyncServiceProvider.notifier).syncNow();
         // Page will rebuild; invite content or accept button will show
         break;
       case SignInResult.pendingRedirect:
@@ -247,6 +248,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
       final result = await showSignInSheet(context, ref);
       switch (result) {
         case SignInResult.success:
+          await ref.read(dataSyncServiceProvider.notifier).syncNow();
           break;
         case SignInResult.pendingRedirect:
           return;

@@ -212,6 +212,18 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                                         allowExpenseAsOtherParticipant: v,
                                       ),
                               ),
+                              SwitchListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: Text('allow_settle_for_others'.tr()),
+                                value: group.allowMemberSettleForOthers,
+                                onChanged: _saving
+                                    ? null
+                                    : (v) => _onPermissionChanged(
+                                        ref,
+                                        group,
+                                        allowMemberSettleForOthers: v,
+                                      ),
+                              ),
                             ],
                           ),
                         ],
@@ -315,6 +327,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     final avatarColor = group.color != null
         ? Color(group.color!)
         : colorScheme.primary;
+    final avatarFg = group.color != null
+        ? ThemeConfig.foregroundOnBackground(avatarColor)
+        : colorScheme.onPrimary;
     final iconData = groupIconFromKey(group.icon);
 
     return Card(
@@ -340,13 +355,13 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                     radius: 30,
                     backgroundColor: avatarColor,
                     child: iconData != null
-                        ? Icon(iconData, size: 30, color: Colors.white)
+                        ? Icon(iconData, size: 30, color: avatarFg)
                         : Text(
                             group.name.isNotEmpty
                                 ? group.name[0].toUpperCase()
                                 : '?',
                             style: theme.textTheme.titleLarge?.copyWith(
-                              color: Colors.white,
+                              color: avatarFg,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -1618,6 +1633,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     bool? allowMemberAddExpense,
     bool? allowMemberChangeSettings,
     bool? allowExpenseAsOtherParticipant,
+    bool? allowMemberSettleForOthers,
   }) async {
     try {
       await _withSaving(() async {
@@ -1633,6 +1649,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                 allowExpenseAsOtherParticipant:
                     allowExpenseAsOtherParticipant ??
                     group.allowExpenseAsOtherParticipant,
+                allowMemberSettleForOthers:
+                    allowMemberSettleForOthers ??
+                    group.allowMemberSettleForOthers,
                 updatedAt: DateTime.now(),
               ),
             );
@@ -1979,7 +1998,7 @@ class _InvitePreviewTile extends StatelessWidget {
     String statusText;
     switch (invite.status) {
       case InviteStatus.active:
-        statusColor = Colors.green;
+        statusColor = theme.colorScheme.primary;
         statusText = 'invite_status_active'.tr();
         break;
       case InviteStatus.expired:
@@ -1987,7 +2006,7 @@ class _InvitePreviewTile extends StatelessWidget {
         statusText = 'invite_status_expired'.tr();
         break;
       case InviteStatus.maxedOut:
-        statusColor = Colors.orange;
+        statusColor = theme.colorScheme.tertiary;
         statusText = 'invite_status_maxed'.tr();
         break;
       case InviteStatus.revoked:

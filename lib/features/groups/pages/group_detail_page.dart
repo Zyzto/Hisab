@@ -16,6 +16,7 @@ import '../../../core/repository/repository_providers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/widgets/amount_with_secondary_display.dart';
 import '../../../core/widgets/async_value_builder.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/sheet_helpers.dart';
@@ -142,6 +143,9 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
     final iconData = groupIconFromKey(widget.group.icon);
     final hasCustomColor = widget.group.color != null;
 
+    final avatarFg = hasCustomColor
+        ? ThemeConfig.foregroundOnBackground(groupColor)
+        : theme.colorScheme.onSurface;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -149,15 +153,13 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
           radius: 18,
           backgroundColor: groupColor,
           child: iconData != null
-              ? Icon(iconData, size: 20, color: Colors.white)
+              ? Icon(iconData, size: 20, color: avatarFg)
               : Text(
                   widget.group.name.isNotEmpty
                       ? widget.group.name[0].toUpperCase()
                       : '?',
                   style: theme.textTheme.titleMedium?.copyWith(
-                    color: hasCustomColor
-                        ? Colors.white
-                        : theme.colorScheme.onSurface,
+                    color: avatarFg,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -543,9 +545,10 @@ class _PersonalBudgetHeader extends ConsumerWidget {
                           color: colorScheme.onSurfaceVariant,
                         ),
                       ),
-                      Text(
-                        '${CurrencyFormatter.formatCompactCents(totalSpentCents)} $currencyCode',
-                        style: theme.textTheme.bodyMedium?.copyWith(
+                      AmountWithSecondaryDisplay(
+                        amountCents: totalSpentCents,
+                        groupCurrencyCode: currencyCode,
+                        primaryStyle: theme.textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                           color: attentionColor ?? colorScheme.onSurface,
                         ),
@@ -679,6 +682,10 @@ class _ExpensesTab extends ConsumerWidget {
                                 value:
                                     '${CurrencyFormatter.formatCompactCents(item.totalCents)} $currencyCode',
                                 theme: theme,
+                                valueWidget: AmountWithSecondaryDisplay(
+                                  amountCents: item.totalCents,
+                                  groupCurrencyCode: currencyCode,
+                                ),
                               )
                             : Row(
                                 children: [
@@ -688,6 +695,10 @@ class _ExpensesTab extends ConsumerWidget {
                                       value:
                                           '${CurrencyFormatter.formatCompactCents(item.myExpensesCents)} $currencyCode',
                                       theme: theme,
+                                      valueWidget: AmountWithSecondaryDisplay(
+                                        amountCents: item.myExpensesCents,
+                                        groupCurrencyCode: currencyCode,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(width: 12),
@@ -697,6 +708,10 @@ class _ExpensesTab extends ConsumerWidget {
                                       value:
                                           '${CurrencyFormatter.formatCompactCents(item.totalCents)} $currencyCode',
                                       theme: theme,
+                                      valueWidget: AmountWithSecondaryDisplay(
+                                        amountCents: item.totalCents,
+                                        groupCurrencyCode: currencyCode,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -726,6 +741,7 @@ class _ExpensesTab extends ConsumerWidget {
                               expense.payerParticipantId,
                           icon: iconForExpenseTag(expense.tag, customTags),
                           showPaidBy: !group.isPersonal,
+                          groupCurrencyCode: group.currencyCode,
                         ),
                       );
                   }
@@ -1468,11 +1484,14 @@ class _ExpenseSummaryCard extends StatelessWidget {
     required this.label,
     required this.value,
     required this.theme,
+    this.valueWidget,
   });
 
   final String label;
   final String value;
   final ThemeData theme;
+  /// When set, shown instead of [value] (e.g. [AmountWithSecondaryDisplay]).
+  final Widget? valueWidget;
 
   @override
   Widget build(BuildContext context) {
@@ -1490,12 +1509,13 @@ class _ExpenseSummaryCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            Text(
-              value,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            valueWidget ??
+                Text(
+                  value,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
           ],
         ),
       ),
@@ -1540,7 +1560,7 @@ class _FABWithLabel extends StatelessWidget {
               child: SizedBox(
                 width: 56,
                 height: 56,
-                child: Icon(icon, color: Colors.white, size: 28),
+                child: Icon(icon, color: theme.colorScheme.onPrimary, size: 28),
               ),
             ),
           ),
@@ -1570,8 +1590,21 @@ Future<void> _showAddParticipant(
     centerInFullViewport: true,
   );
   if (name != null && name.isNotEmpty && context.mounted) {
-    await ref
-        .read(participantRepositoryProvider)
-        .create(groupId, name, currentCount);
+    // Defer create to the next frame so the sheet overlay is fully disposed
+    // before any provider/stream updates. Otherwise Flutter can hit
+    // _dependents.isEmpty when the Directionality is deactivated while the
+    // overlay still has dependents. Deferring keeps tests and production
+    // consistent.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) return;
+      ref
+          .read(participantRepositoryProvider)
+          .create(groupId, name, currentCount)
+          .catchError((Object e, StackTrace st) {
+        Log.warning('Add participant failed', error: e, stackTrace: st);
+        if (context.mounted) context.showError('generic_error'.tr());
+        throw e;
+      });
+    });
   }
 }

@@ -300,13 +300,14 @@ class _InviteResultViewState extends State<_InviteResultView> {
           const SizedBox(height: 20),
           LayoutBuilder(
             builder: (context, constraints) {
+              final colorScheme = Theme.of(context).colorScheme;
               final qrSize = (constraints.maxWidth - 64).clamp(0.0, 250.0);
               return RepaintBoundary(
                 key: _qrKey,
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: colorScheme.surface,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: SizedBox(
@@ -315,9 +316,9 @@ class _InviteResultViewState extends State<_InviteResultView> {
                     child: PrettyQrView.data(
                       data: url,
                       errorCorrectLevel: QrErrorCorrectLevel.M,
-                      decoration: const PrettyQrDecoration(
-                        shape: PrettyQrSmoothSymbol(color: Colors.black),
-                        background: Colors.white,
+                      decoration: PrettyQrDecoration(
+                        shape: PrettyQrSmoothSymbol(color: colorScheme.onSurface),
+                        background: colorScheme.surface,
                         quietZone: PrettyQrQuietZone.zero,
                       ),
                     ),
