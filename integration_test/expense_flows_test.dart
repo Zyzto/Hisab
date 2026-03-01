@@ -56,12 +56,15 @@ void main() {
         await tapAndSettle(tester, find.text('Next'));
         await tester.pump(const Duration(milliseconds: 400));
 
-        // Add Alice & Bob
+        // Add Alice & Bob via onSubmitted (keyboard done action)
+        // to avoid hit-test issues with the Add button inside PageView.
         await waitForWidget(tester, find.text('Add'));
         await enterTextAndPump(tester, find.byType(TextField).last, 'Alice');
-        await tapAndSettle(tester, find.text('Add'));
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
         await enterTextAndPump(tester, find.byType(TextField).last, 'Bob');
-        await tapAndSettle(tester, find.text('Add'));
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
 
         // Step 2 → Step 3 → Step 4
         await tapAndSettle(tester, find.text('Next'));
@@ -176,13 +179,14 @@ void main() {
             await tapAndSettle(tester, find.text('Add item'));
             await pumpAndSettleWithTimeout(tester);
 
-            // Fill in descriptions and amounts for each line item
-            // Fields: [Title(0), Amount(1), Item1Desc(2), Item1Amt(3), Item2Desc(4), Item2Amt(5)]
+            // ListView disposes off-screen widgets; use relative indices
+            // within the visible breakdown fields (0=desc1, 1=amt1, 2=desc2, 3=amt2).
             final fields = find.byType(TextFormField);
-            await enterTextAndPump(tester, fields.at(2), 'Appetizers');
-            await enterTextAndPump(tester, fields.at(3), '35');
-            await enterTextAndPump(tester, fields.at(4), 'Main Course');
-            await enterTextAndPump(tester, fields.at(5), '50');
+            await tester.ensureVisible(fields.at(0));
+            await enterTextAndPump(tester, fields.at(0), 'Appetizers');
+            await enterTextAndPump(tester, fields.at(1), '35');
+            await enterTextAndPump(tester, fields.at(2), 'Main Course');
+            await enterTextAndPump(tester, fields.at(3), '50');
           }
         }
 
