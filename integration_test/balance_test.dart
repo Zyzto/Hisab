@@ -33,9 +33,11 @@ void main() {
 
         await waitForWidget(tester, find.text('Add'));
         await enterTextAndPump(tester, find.byType(TextField).last, 'Alice');
-        await tapAndSettle(tester, find.text('Add'));
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
         await enterTextAndPump(tester, find.byType(TextField).last, 'Bob');
-        await tapAndSettle(tester, find.text('Add'));
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
 
         await tapAndSettle(tester, find.text('Next'));
         await tester.pump(const Duration(milliseconds: 400));
