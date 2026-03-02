@@ -13,6 +13,7 @@ import 'core/services/notification_service.dart';
 import 'core/debug/debug_menu.dart';
 import 'core/debug/integration_test_mode.dart';
 import 'core/update/app_update_helper.dart';
+import 'core/update/hisab_upgrader.dart';
 import 'core/update/update_check_providers.dart';
 import 'core/update/upgrader_messages.dart';
 import 'features/settings/providers/settings_framework_providers.dart';
@@ -35,7 +36,7 @@ class App extends ConsumerStatefulWidget {
 
 class _AppState extends ConsumerState<App>
     with WidgetsBindingObserver {
-  late final Upgrader _upgrader;
+  late final HisabUpgrader _upgrader;
   /// In release, defer UpgradeAlert until after first frame to avoid any
   /// upgrader work blocking the first paint (splash can disappear).
   bool _showUpgradeAlert = kDebugMode;
@@ -47,7 +48,7 @@ class _AppState extends ConsumerState<App>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _upgrader = Upgrader(
+    _upgrader = HisabUpgrader(
       durationUntilAlertAgain: const Duration(days: 3),
       debugLogging: false, // use app-level aggregated log instead of package prints
       messages: HisabUpgraderMessages(context: context),
@@ -103,11 +104,15 @@ class _AppState extends ConsumerState<App>
     _updateTriggerRegistered = true;
     ref.read(updateCheckTriggerProvider).callback = (BuildContext context) {
       Future<void>(() async {
-        Upgrader.clearSavedSettings();
         await _upgrader.updateVersionInfo();
         if (!mounted) return;
         final vi = _upgrader.versionInfo;
         final pkg = _upgrader.state.packageInfo;
+        // When HisabUpgrader cleared versionInfo (store ≤ installed), show toast.
+        if (vi == null && _upgrader.lastCheckStoreNotNewer) {
+          if (context.mounted) context.showToast('no_update_available'.tr());
+          return;
+        }
         // Don't show update dialog when store version is same or older (e.g. Play
         // Store internal/closed/open testing returning same version).
         if (vi != null &&
