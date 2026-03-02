@@ -118,7 +118,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
       final name = _nameController.text.trim();
       final currencyCode = _selectedCurrency.code;
       final repo = ref.read(groupRepositoryProvider);
-      final id = await runGuardedAsync<String>(
+      final id = await       runGuardedAsync<String>(
         repo.create(
           name,
           currencyCode,
@@ -130,6 +130,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
         'Group create failed',
         context: context,
         errorToastMessage: 'create_group_failed'.tr(),
+        ref: ref,
       );
       if (id == null) return;
       Log.info(

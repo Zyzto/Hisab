@@ -27,6 +27,7 @@ import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/utils/currency_helpers.dart';
+import '../../../core/utils/error_report_helper.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/expandable_section.dart';
 import '../../../core/widgets/sheet_helpers.dart';
@@ -1470,32 +1471,50 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           },
           loading: () =>
               const Scaffold(body: Center(child: CircularProgressIndicator())),
-          error: (e, _) => Scaffold(
-            body: Center(
-              child: ErrorContentWidget(
-                message: e.toString(),
-                onRetry: () {
-                  ref.invalidate(futureGroupProvider(widget.groupId));
-                  ref.invalidate(participantsByGroupProvider(widget.groupId));
-                },
+          error: (e, st) {
+            sendErrorTelemetryIfOnline(
+              ref,
+              message: e.toString(),
+              details: e.toString(),
+            );
+            return Scaffold(
+              body: Center(
+                child: ErrorContentWidget(
+                  message: e.toString(),
+                  details: e.toString(),
+                  stackTrace: st,
+                  onRetry: () {
+                    ref.invalidate(futureGroupProvider(widget.groupId));
+                    ref.invalidate(participantsByGroupProvider(widget.groupId));
+                  },
+                ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (e, _) => Scaffold(
-        body: Center(
-          child: ErrorContentWidget(
-            message: e.toString(),
-            onRetry: () {
-              ref.invalidate(futureGroupProvider(widget.groupId));
-              ref.invalidate(participantsByGroupProvider(widget.groupId));
-            },
+      error: (e, st) {
+        sendErrorTelemetryIfOnline(
+          ref,
+          message: e.toString(),
+          details: e.toString(),
+        );
+        return Scaffold(
+          body: Center(
+            child: ErrorContentWidget(
+              message: e.toString(),
+              details: e.toString(),
+              stackTrace: st,
+              onRetry: () {
+                ref.invalidate(futureGroupProvider(widget.groupId));
+                ref.invalidate(participantsByGroupProvider(widget.groupId));
+              },
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 

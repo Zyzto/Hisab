@@ -12,6 +12,7 @@ import '../../../core/layout/constrained_content.dart';
 import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/theme/theme_config.dart';
+import '../../../core/utils/error_report_helper.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/toast.dart';
@@ -159,13 +160,22 @@ class _InviteManagementPageState extends ConsumerState<InviteManagementPage> {
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(
-            child: ErrorContentWidget(
+          error: (e, st) {
+            sendErrorTelemetryIfOnline(
+              ref,
               message: e.toString(),
-              onRetry: () =>
-                  ref.invalidate(invitesByGroupProvider(widget.groupId)),
-            ),
-          ),
+              details: e.toString(),
+            );
+            return Center(
+              child: ErrorContentWidget(
+                message: e.toString(),
+                details: e.toString(),
+                stackTrace: st,
+                onRetry: () =>
+                    ref.invalidate(invitesByGroupProvider(widget.groupId)),
+              ),
+            );
+          },
         ),
       ),
     );

@@ -10,6 +10,7 @@ import '../../../core/database/database_providers.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/utils/error_report_helper.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../core/repository/repository_providers.dart';
@@ -142,13 +143,22 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
             return _buildInviteContent(context, data.invite, data.group);
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(
-            child: ErrorContentWidget(
+          error: (e, st) {
+            sendErrorTelemetryIfOnline(
+              ref,
               message: e.toString(),
-              onRetry: () =>
-                  ref.invalidate(inviteByTokenProvider(widget.token)),
-            ),
-          ),
+              details: e.toString(),
+            );
+            return Center(
+              child: ErrorContentWidget(
+                message: e.toString(),
+                details: e.toString(),
+                stackTrace: st,
+                onRetry: () =>
+                    ref.invalidate(inviteByTokenProvider(widget.token)),
+              ),
+            );
+          },
         ),
       ),
         );

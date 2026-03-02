@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/error_report_helper.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/widgets/amount_with_secondary_display.dart';
 import '../../../core/widgets/error_content.dart';
@@ -253,12 +254,21 @@ class BalanceList extends ConsumerWidget {
         return listView;
       },
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(
-        child: ErrorContentWidget(
+      error: (e, st) {
+        sendErrorTelemetryIfOnline(
+          ref,
           message: e.toString(),
-          onRetry: () => ref.invalidate(groupBalanceProvider(groupId)),
-        ),
-      ),
+          details: e.toString(),
+        );
+        return Center(
+          child: ErrorContentWidget(
+            message: e.toString(),
+            details: e.toString(),
+            stackTrace: st,
+            onRetry: () => ref.invalidate(groupBalanceProvider(groupId)),
+          ),
+        );
+      },
     );
   }
 }
