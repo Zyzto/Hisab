@@ -1313,6 +1313,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
     CurrencyHelpers.showPicker(
       context: context,
+      title: 'display_currency'.tr(),
       centerInFullViewport: false,
       favorite: favorites,
       onSelect: (currency) {

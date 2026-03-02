@@ -24,6 +24,7 @@ import '../../../core/telemetry/telemetry_service.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/currency_helpers.dart';
+import '../../../core/utils/error_report_helper.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/toast.dart';
@@ -294,26 +295,36 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
       },
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (e, _) => LayoutBuilder(
-        builder: (context, layoutConstraints) {
-          return Scaffold(
-            appBar: ContentAlignedAppBar(
-              contentAreaWidth: layoutConstraints.maxWidth,
-              title: Text('list_settings'.tr()),
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => context.pop(),
+      error: (e, st) {
+        sendErrorTelemetryIfOnline(
+          ref,
+          message: e.toString(),
+          details: e.toString(),
+        );
+        return LayoutBuilder(
+          builder: (context, layoutConstraints) {
+            return Scaffold(
+              appBar: ContentAlignedAppBar(
+                contentAreaWidth: layoutConstraints.maxWidth,
+                title: Text('list_settings'.tr()),
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => context.pop(),
+                ),
               ),
-            ),
-            body: Center(
-          child: ErrorContentWidget(
-            message: e.toString(),
-            onRetry: () => ref.invalidate(futureGroupProvider(widget.groupId)),
-          ),
-        ),
-          );
-        },
-      ),
+              body: Center(
+                child: ErrorContentWidget(
+                  message: e.toString(),
+                  details: e.toString(),
+                  stackTrace: st,
+                  onRetry: () =>
+                      ref.invalidate(futureGroupProvider(widget.groupId)),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -890,7 +901,17 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
       loading: () => const CircularProgressIndicator(),
       error: (e, st) {
         Log.warning('Group settings load error', error: e, stackTrace: st);
-        return const ErrorContentWidget(titleKey: 'generic_error');
+        sendErrorTelemetryIfOnline(
+          ref,
+          message: e.toString(),
+          details: e.toString(),
+        );
+        return ErrorContentWidget(
+          titleKey: 'generic_error',
+          message: e.toString(),
+          details: e.toString(),
+          stackTrace: st,
+        );
       },
     );
   }

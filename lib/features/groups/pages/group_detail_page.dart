@@ -16,6 +16,7 @@ import '../../../core/repository/repository_providers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/error_report_helper.dart';
 import '../../../core/widgets/amount_with_secondary_display.dart';
 import '../../../core/widgets/async_value_builder.dart';
 import '../../../core/widgets/error_content.dart';
@@ -586,16 +587,23 @@ class _ExpensesTab extends ConsumerWidget {
 
   static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
-  static Widget _buildError(WidgetRef ref, String groupId, Object error) =>
-      Center(
-        child: ErrorContentWidget(
-          message: error.toString(),
-          onRetry: () {
-            ref.invalidate(expensesByGroupProvider(groupId));
-            ref.invalidate(participantsByGroupProvider(groupId));
-          },
-        ),
-      );
+  static Widget _buildError(WidgetRef ref, String groupId, Object error) {
+    sendErrorTelemetryIfOnline(
+      ref,
+      message: error.toString(),
+      details: error.toString(),
+    );
+    return Center(
+      child: ErrorContentWidget(
+        message: error.toString(),
+        details: error.toString(),
+        onRetry: () {
+          ref.invalidate(expensesByGroupProvider(groupId));
+          ref.invalidate(participantsByGroupProvider(groupId));
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -977,22 +985,40 @@ class _PeopleTab extends ConsumerWidget {
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(
-            child: ErrorContentWidget(
+          error: (e, st) {
+            sendErrorTelemetryIfOnline(
+              ref,
               message: e.toString(),
-              onRetry: () =>
-                  ref.invalidate(participantsByGroupProvider(groupId)),
-            ),
-          ),
+              details: e.toString(),
+            );
+            return Center(
+              child: ErrorContentWidget(
+                message: e.toString(),
+                details: e.toString(),
+                stackTrace: st,
+                onRetry: () =>
+                    ref.invalidate(participantsByGroupProvider(groupId)),
+              ),
+            );
+          },
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(
-        child: ErrorContentWidget(
+      error: (e, st) {
+        sendErrorTelemetryIfOnline(
+          ref,
           message: e.toString(),
-          onRetry: () => ref.invalidate(participantsByGroupProvider(groupId)),
-        ),
-      ),
+          details: e.toString(),
+        );
+        return Center(
+          child: ErrorContentWidget(
+            message: e.toString(),
+            details: e.toString(),
+            stackTrace: st,
+            onRetry: () => ref.invalidate(participantsByGroupProvider(groupId)),
+          ),
+        );
+      },
     );
   }
 

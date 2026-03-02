@@ -61,24 +61,24 @@ class CurrencyHelpers {
   /// [centerInFullViewport]: when true (e.g. from group settings), the dialog
   /// is centered in the full viewport on tablet+; when false (e.g. from app
   /// settings), it is centered in the content area to the right of the nav rail.
+  /// [title]: when set (e.g. from app settings), used as the sheet title;
+  /// otherwise uses 'select_currency'.tr().
   static void showPicker({
     required BuildContext context,
     required ValueChanged<Currency> onSelect,
     List<String>? favorite,
     List<String>? currencyFilter,
     bool centerInFullViewport = true,
+    String? title,
   }) {
     final maxHeight = MediaQuery.of(context).size.height * 0.75;
     showResponsiveSheet<void>(
       context: context,
-      title: 'select_currency'.tr(),
+      title: title ?? 'select_currency'.tr(),
       maxHeight: maxHeight,
       isScrollControlled: true,
       useSafeArea: true,
       centerInFullViewport: centerInFullViewport,
-      sheetShape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
       child: Builder(
         builder: (ctx) => Padding(
           padding: EdgeInsets.only(

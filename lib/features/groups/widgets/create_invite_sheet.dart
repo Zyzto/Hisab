@@ -103,6 +103,7 @@ class _CreateInviteSheetState extends ConsumerState<_CreateInviteSheet> {
       'Create invite failed',
       context: context,
       errorToastMessage: 'generic_error'.tr(),
+      ref: ref,
     );
     if (result == null) {
       setState(() => _creating = false);
