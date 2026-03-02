@@ -100,6 +100,19 @@ jobs:
       - name: Reset database (migrations + seed)
         run: supabase db reset
 
+      - name: Wait for Supabase API
+        run: |
+          API_URL=$(supabase status --output json | jq -r '.API_URL')
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/rest/v1/" || true)
+            if [ "$code" = "200" ] || [ "$code" = "401" ] || [ "$code" = "404" ]; then
+              echo "Supabase API ready (HTTP $code)"
+              break
+            fi
+            echo "Waiting for Supabase API... ($i/30)"
+            sleep 2
+          done
+
       - name: Extract Supabase credentials
         id: supabase
         run: |
@@ -138,6 +151,7 @@ jobs:
   # ──────────────────────────────────────────────
   build-android:
     name: Build Android
+    needs: [test]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
