@@ -33,7 +33,11 @@ class AsyncValueBuilder<T> extends StatelessWidget {
           loading?.call(context) ?? LoadingContent,
       error: (error, stack) =>
           this.error?.call(context, error, stack) ??
-          ErrorContentWidget(message: error.toString()),
+          ErrorContentWidget(
+            message: error.toString(),
+            details: error.toString(),
+            stackTrace: stack,
+          ),
     );
   }
 }

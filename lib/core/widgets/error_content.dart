@@ -1,20 +1,27 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
+import '../utils/error_report_helper.dart';
+import 'toast.dart';
+
 /// Shared loading content for async/loading states.
 /// Use for consistent loading UI (e.g. with [AsyncValueBuilder]).
 // ignore: constant_identifier_names
 const LoadingContent = Center(child: CircularProgressIndicator());
 
 /// Shared error content for async/error states. Shows icon, optional title,
-/// message, and optional retry button. Use with [AsyncValue.when] error builder
-/// or anywhere a consistent error UI is needed.
+/// message, optional retry button, and Share/Report issue actions.
+/// Use with [AsyncValue.when] error builder or anywhere a consistent error UI is needed.
+/// Parents that build this with [message]/[details] should call [sendErrorTelemetryIfOnline]
+/// once when showing the error if telemetry when online is desired.
 class ErrorContentWidget extends StatelessWidget {
   const ErrorContentWidget({
     super.key,
     this.message,
     this.titleKey = 'generic_error',
     this.onRetry,
+    this.details,
+    this.stackTrace,
   });
 
   /// Optional detail message (e.g. error.toString()). When null, only title is shown.
@@ -26,9 +33,16 @@ class ErrorContentWidget extends StatelessWidget {
   /// When non-null, a retry button is shown.
   final VoidCallback? onRetry;
 
+  /// Optional raw details for Share/Report payload (e.g. full error.toString()).
+  final String? details;
+
+  /// Optional stack trace for Report issue body.
+  final StackTrace? stackTrace;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final displayMessage = message ?? titleKey.tr();
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Column(
@@ -61,6 +75,38 @@ class ErrorContentWidget extends StatelessWidget {
               label: Text('retry'.tr()),
             ),
           ],
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextButton.icon(
+                onPressed: () => shareErrorReport(
+                  context,
+                  message: displayMessage,
+                  details: details,
+                  stackTrace: stackTrace,
+                ),
+                icon: const Icon(Icons.share, size: 20),
+                label: Text('share'.tr()),
+              ),
+              const SizedBox(width: 12),
+              FilledButton.tonalIcon(
+                onPressed: () => openErrorReportGitHubIssue(
+                  context,
+                  message: displayMessage,
+                  details: details,
+                  stackTrace: stackTrace,
+                  onCopied: () {
+                    if (context.mounted) {
+                      context.showSuccess('logs_copied_paste'.tr());
+                    }
+                  },
+                ),
+                icon: const Icon(Icons.bug_report_outlined, size: 20),
+                label: Text('report_issue'.tr()),
+              ),
+            ],
+          ),
         ],
       ),
     );
