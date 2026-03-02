@@ -23,6 +23,9 @@ void main() {
       await stage('verify signed-in state', () async {
         await waitForWidget(tester, find.text('Groups'),
             timeout: const Duration(seconds: 20));
+        // UI-based check: signed-in shell shows Settings in nav (not shown on login screen)
+        await waitForWidget(tester, find.text('Settings'),
+            timeout: const Duration(seconds: 10));
 
         final client = Supabase.instance.client;
         expect(client.auth.currentUser, isNotNull,
@@ -84,6 +87,9 @@ void main() {
       await stage('verify User B signed in', () async {
         await waitForWidget(tester, find.text('Groups'),
             timeout: const Duration(seconds: 20));
+        // UI-based check: signed-in shell shows Settings in nav (not shown on login screen)
+        await waitForWidget(tester, find.text('Settings'),
+            timeout: const Duration(seconds: 10));
 
         final client = Supabase.instance.client;
         expect(client.auth.currentUser, isNotNull);

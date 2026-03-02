@@ -94,15 +94,20 @@ void main() {
       await stage('people tab shows participants', () async {
         await tapAndSettle(tester, find.text('People'));
         await pumpAndSettleWithTimeout(tester);
-        // Allow async participant list to load (Web can be slower)
-        for (var i = 0; i < 15; i++) {
+        // Wait for at least one participant name (order may vary on web/release)
+        final end = DateTime.now().add(const Duration(seconds: 30));
+        while (DateTime.now().isBefore(end)) {
           await tester.pump(const Duration(milliseconds: 500));
-          if (find.text('Alice').evaluate().isNotEmpty) break;
+          if (find.text('Alice').evaluate().isNotEmpty ||
+              find.text('Bob').evaluate().isNotEmpty ||
+              find.text('Charlie').evaluate().isNotEmpty) {
+            break;
+          }
         }
         await waitForWidget(
           tester,
           find.text('Alice'),
-          timeout: const Duration(seconds: 25),
+          timeout: const Duration(seconds: 30),
         );
         await scrollUntilVisible(tester, find.text('Alice'));
         expect(find.text('Alice'), findsWidgets);
