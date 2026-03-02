@@ -12,6 +12,8 @@
 - Supabase (optional): Auth, Postgres, RPCs, Edge Functions
 - Firebase Cloud Messaging for push notifications (Android/iOS/Web)
 
+**Platform support:** Run/build/release targets are Android, iOS, and web. Linux is **not** supported as an app target (no launch option, no `flutter build linux`, no Linux release). On a Linux host you can still use test tooling: `flutter test`, integration tests (e.g. `flutter drive -d web-server` or with another device), and CI runs unit/widget/integration tests on `ubuntu-latest`.
+
 ## Repository Layout
 
 | Path | Purpose |

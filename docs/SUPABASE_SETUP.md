@@ -2151,15 +2151,39 @@ The "Current schema reference" table above can be re-verified with `list_tables`
   - **No device tokens:** Recipients must be signed in with notifications enabled and permission granted; tokens are stored in `device_tokens`. On web, `FCM_VAPID_KEY` must be set at build time or the web token is never registered.
 - **Verify FCM separately:** Send a test message to a token from `device_tokens` via Firebase Console (Cloud Messaging) or the FCM API. If that works but expense-triggered notifications do not, the problem is the Supabase pipeline (trigger/Vault/edge function).
 
-### "Could not find the 'archived_at' column of 'groups'" (PGRST204)
+### Group settings change fails (PGRST204 or "column ... does not exist")
 
-- **Cause:** PostgREST’s schema cache doesn’t include `archived_at` because [Migration 12](#migration-12-groups-archive-archived_at) has not been applied.
-- **Fix:** In the Supabase **SQL Editor**, run Migration 12:
+- **Cause:** PostgREST’s schema cache is missing columns added in later migrations. The app **omits** `archived_at`, `is_personal`, `budget_amount_cents`, and `allow_member_settle_for_others` from the generic group update so that name, icon, color, settlement method, and permission changes succeed even when Migrations 12, 16, or 20 are not applied. If you still see PGRST204, the failure may be for another column (e.g. `icon`/`color` from Migration 7).
+- **Fix:** Apply the missing migrations in the Supabase **SQL Editor** so the `groups` table has all columns:
+
+  **Migration 12 (archive):**
   ```sql
   ALTER TABLE public.groups
     ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
   ```
-- After this, group name/icon/color changes and archive/unarchive will work. The app also omits `archived_at` from group updates when the column is missing so that name/icon/color changes can succeed before the migration.
+
+  **Migration 16 (personal + budget):**
+  ```sql
+  ALTER TABLE public.groups
+    ADD COLUMN IF NOT EXISTS is_personal BOOLEAN DEFAULT false NOT NULL;
+  ALTER TABLE public.groups
+    ADD COLUMN IF NOT EXISTS budget_amount_cents INT;
+  ```
+
+  **Migration 20 (allow member settle for others):**
+  ```sql
+  ALTER TABLE public.groups
+    ADD COLUMN IF NOT EXISTS allow_member_settle_for_others BOOLEAN DEFAULT false NOT NULL;
+  ```
+
+  **Migration 7** (if `icon`/`color` are missing):
+  ```sql
+  ALTER TABLE public.groups
+    ADD COLUMN IF NOT EXISTS icon TEXT,
+    ADD COLUMN IF NOT EXISTS color INT;
+  ```
+
+- After applying these, group settings will persist to Supabase. You can verify with **Database > Table Editor > groups** that the columns exist.
 
 ---
 
