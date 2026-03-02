@@ -101,7 +101,7 @@ Map<String, List<String>> _parseInsertColumns(String content) {
   final result = <String, List<String>>{};
   // INSERT INTO table (col1, col2, ...) VALUES - column list can span lines
   final insertRegex = RegExp(
-    r"INSERT\s+INTO\s+(\w+)\s*\(\s*([^)]+)\s*\)\s+VALUES",
+    r'INSERT\s+INTO\s+(\w+)\s*\(\s*([^)]+)\s*\)\s+VALUES',
     caseSensitive: false,
     multiLine: true,
     dotAll: true,

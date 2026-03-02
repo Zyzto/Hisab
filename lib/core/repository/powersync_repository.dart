@@ -517,11 +517,15 @@ class PowerSyncGroupRepository implements IGroupRepository {
     };
 
     if (!_isLocalOnly && _isOnline && _client != null) {
-      // Omit archived_at for Supabase in case Migration 12 not applied (PGRST204).
+      // Omit columns that may not exist so group settings update succeeds without Migrations 12/16/20.
       // Omit id from PATCH body to avoid primary-key update restrictions.
+      // See SUPABASE_SETUP.md: apply Migrations 12, 16, 20 to add these columns and get full sync.
       final supabaseData = Map<String, dynamic>.from(data)
         ..remove('archived_at')
-        ..remove('id');
+        ..remove('id')
+        ..remove('is_personal')
+        ..remove('budget_amount_cents')
+        ..remove('allow_member_settle_for_others');
       await _client.from('groups').update(supabaseData).eq('id', group.id);
     }
 
