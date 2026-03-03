@@ -76,8 +76,10 @@ class ErrorContentWidget extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 12,
+            runSpacing: 8,
             children: [
               TextButton.icon(
                 onPressed: () => shareErrorReport(
@@ -89,7 +91,6 @@ class ErrorContentWidget extends StatelessWidget {
                 icon: const Icon(Icons.share, size: 20),
                 label: Text('share'.tr()),
               ),
-              const SizedBox(width: 12),
               FilledButton.tonalIcon(
                 onPressed: () => openErrorReportGitHubIssue(
                   context,
