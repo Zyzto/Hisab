@@ -81,11 +81,9 @@ class OnboardingConnectPage extends ConsumerWidget {
                         settings.provider(localOnlySettingDef).notifier,
                       )
                       .set(selection.first);
-                  if (!selection.first) {
-                    Log.info(
-                      'User selected online mode at onboarding',
-                    );
-                  }
+                  Log.info(
+                    'Setting changed: ${localOnlySettingDef.key}=${selection.first}',
+                  );
                 }
               },
             ),

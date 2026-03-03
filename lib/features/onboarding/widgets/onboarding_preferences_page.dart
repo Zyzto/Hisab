@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 
 import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/theme/theme_config.dart';
@@ -125,6 +126,9 @@ List<Widget> _buildPreferencesTiles(
                       settings.provider(displayCurrencySettingDef).notifier,
                     )
                     .set('');
+                Log.info(
+                  'Setting changed: ${displayCurrencySettingDef.key}=(none)',
+                );
               },
             )
           : null,
@@ -139,6 +143,9 @@ List<Widget> _buildPreferencesTiles(
                   settings.provider(displayCurrencySettingDef).notifier,
                 )
                 .set(currency.code);
+            Log.info(
+              'Setting changed: ${displayCurrencySettingDef.key}=${currency.code}',
+            );
           },
         );
       },
@@ -161,6 +168,9 @@ List<Widget> _buildPreferencesTiles(
                 settings.provider(use24HourFormatSettingDef).notifier,
               )
               .set(v);
+          Log.info(
+            'Setting changed: ${use24HourFormatSettingDef.key}=$v',
+          );
         },
       ),
     ),
@@ -227,6 +237,9 @@ List<Widget> _buildPreferencesTiles(
                   settings.provider(fontSizeScaleSettingDef).notifier,
                 )
                 .set(chosen);
+            Log.info(
+              'Setting changed: ${fontSizeScaleSettingDef.key}=$chosen',
+            );
           }
         });
       },
@@ -333,6 +346,9 @@ List<Widget> _buildPreferencesTiles(
                   settings.provider(themeSchemeSettingDef).notifier,
                 )
                 .set(chosen);
+            Log.info(
+              'Setting changed: ${themeSchemeSettingDef.key}=$chosen',
+            );
           }
         });
       },

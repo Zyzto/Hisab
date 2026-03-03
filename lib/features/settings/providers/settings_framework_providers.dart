@@ -44,6 +44,9 @@ Future<void> runThemeSchemeMigration(SettingsProviders settings) async {
         settings.controller.get(themeColorSettingDef) as int? ?? 0xFF2E7D32;
     final scheme = themeSchemeFromLegacyColor(themeColor);
     settings.controller.set(themeSchemeSettingDef, scheme);
+    Log.info(
+      'Setting changed: ${themeSchemeSettingDef.key}=$scheme (migration)',
+    );
     await prefs.setBool('theme_scheme_migrated', true);
   } catch (e, stackTrace) {
     Log.warning(
@@ -62,6 +65,9 @@ Future<void> runThemeSchemeTealMigration(SettingsProviders settings) async {
     final current = settings.controller.get(themeSchemeSettingDef) as String?;
     if (current == 'teal') {
       settings.controller.set(themeSchemeSettingDef, 'tealM3');
+      Log.info(
+        'Setting changed: ${themeSchemeSettingDef.key}=tealM3 (migration)',
+      );
     }
     await prefs.setBool('theme_scheme_teal_fixed', true);
   } catch (e, stackTrace) {
