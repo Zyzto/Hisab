@@ -529,7 +529,7 @@ class _PersonalBudgetHeader extends ConsumerWidget {
                       Expanded(
                         child: Text(
                           hasBudget
-                              ? CurrencyFormatter.formatCompactCents(
+                              ? CurrencyFormatter.formatCentsAsWholeUnits(
                                   budgetCents,
                                   currencyCode,
                                 )

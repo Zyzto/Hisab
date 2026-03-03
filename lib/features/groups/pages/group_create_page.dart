@@ -10,6 +10,7 @@ import '../../../core/repository/repository_providers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/telemetry/telemetry_service.dart';
 import '../../../core/theme/theme_config.dart';
+import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/currency_helpers.dart';
 import '../../../core/utils/form_validators.dart';
 import '../../../core/utils/run_guarded_async.dart';
@@ -31,6 +32,12 @@ class GroupCreatePage extends ConsumerStatefulWidget {
 }
 
 class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
+  static const _kPageAnimationDuration = Duration(milliseconds: 300);
+  static const _kPageAnimationCurve = Curves.easeInOut;
+  static const _kIndicatorActiveWidth = 24.0;
+  static const _kIndicatorInactiveWidth = 8.0;
+  static const _kIndicatorMargin = 4.0;
+
   int get _pageCount => widget.isPersonal ? 3 : 4;
 
   late final PageController _pageController;
@@ -39,6 +46,9 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
   // ── Step 1 state ──
   final _nameFormKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _nameFocusNode = FocusNode();
+  final _budgetController = TextEditingController();
+  final _budgetFocusNode = FocusNode();
   late Currency _selectedCurrency;
 
   // ── Step 2 state ──
@@ -64,6 +74,9 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
   void dispose() {
     _pageController.dispose();
     _nameController.dispose();
+    _nameFocusNode.dispose();
+    _budgetController.dispose();
+    _budgetFocusNode.dispose();
     _participantController.dispose();
     _participantFocusNode.dispose();
     super.dispose();
@@ -72,21 +85,34 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
   // ── Navigation ──────────────────────────────────────────────────────────
 
   void _goNext() {
+    if (_currentPage == 0) {
+      // Unfocus both step-0 fields so the keyboard reliably dismisses.
+      _nameFocusNode.unfocus();
+      _budgetFocusNode.unfocus();
+    }
+    FocusManager.instance.primaryFocus?.unfocus();
     // Validate before advancing from step 1
-    if (_currentPage == 0 && !_nameFormKey.currentState!.validate()) return;
+    if (_currentPage == 0 &&
+        (_nameFormKey.currentState?.validate() ?? false) != true) {
+      return;
+    }
     if (_currentPage < _pageCount - 1) {
       _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
+        duration: _kPageAnimationDuration,
+        curve: _kPageAnimationCurve,
       );
     }
   }
 
   void _goBack() {
     if (_currentPage > 0) {
+      FocusManager.instance.primaryFocus?.unfocus();
+      _nameFocusNode.unfocus();
+      _budgetFocusNode.unfocus();
+      _participantFocusNode.unfocus();
       _pageController.previousPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
+        duration: _kPageAnimationDuration,
+        curve: _kPageAnimationCurve,
       );
     } else {
       context.pop();
@@ -111,6 +137,18 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
 
   // ── Create ──────────────────────────────────────────────────────────────
 
+  int? _budgetAmountCentsFromField() {
+    final trimmed = _budgetController.text.trim();
+    if (trimmed.isEmpty) return null;
+    final value = int.tryParse(trimmed.replaceAll(',', ''));
+    if (value == null || value < 0) return null;
+    final decimals =
+        CurrencyHelpers.fromCode(_selectedCurrency.code)?.decimalDigits ?? 2;
+    final divisor =
+        CurrencyHelpers.divisorForDecimalDigits(decimals);
+    return value * divisor;
+  }
+
   Future<void> _createGroup() async {
     if (_saving) return;
     setState(() => _saving = true);
@@ -118,7 +156,8 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
       final name = _nameController.text.trim();
       final currencyCode = _selectedCurrency.code;
       final repo = ref.read(groupRepositoryProvider);
-      final id = await       runGuardedAsync<String>(
+      final budgetAmountCents = widget.isPersonal ? _budgetAmountCentsFromField() : null;
+      final id = await runGuardedAsync<String>(
         repo.create(
           name,
           currencyCode,
@@ -126,6 +165,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
           color: _selectedColor.toARGB32(),
           initialParticipants: widget.isPersonal ? [] : _participants,
           isPersonal: widget.isPersonal,
+          budgetAmountCents: budgetAmountCents,
         ),
         'Group create failed',
         context: context,
@@ -158,46 +198,65 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
 
     return LayoutBuilder(
       builder: (context, layoutConstraints) {
-        return Scaffold(
-          appBar: ContentAlignedAppBar(
-            contentAreaWidth: layoutConstraints.maxWidth,
+        return PopScope(
+          canPop: _currentPage == 0,
+          onPopInvokedWithResult: (didPop, result) {
+            if (!didPop && _currentPage > 0) _goBack();
+          },
+          child: Scaffold(
+            appBar: ContentAlignedAppBar(
+              contentAreaWidth: layoutConstraints.maxWidth,
             leading: IconButton(
               icon: const Icon(Icons.arrow_back),
               onPressed: _goBack,
+              tooltip: MaterialLocalizations.of(context).backButtonTooltip,
             ),
-            title: Text(
-              widget.isPersonal ? 'create_personal'.tr() : 'create_group'.tr(),
+              title: Text(
+                widget.isPersonal ? 'create_personal'.tr() : 'create_group'.tr(),
+              ),
             ),
-          ),
-          body: ConstrainedContent(
-        child: SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: PageView(
-                  controller: _pageController,
-                  physics: const NeverScrollableScrollPhysics(),
-                  onPageChanged: (i) => setState(() => _currentPage = i),
-                  children: widget.isPersonal
-                      ? [
-                          _buildStep1NameCurrency(context),
-                          _buildStep3IconColor(context),
-                          _buildStep4Summary(context),
-                        ]
-                      : [
-                          _buildStep1NameCurrency(context),
-                          _buildStep2Participants(context),
-                          _buildStep3IconColor(context),
-                          _buildStep4Summary(context),
-                        ],
+            body: ConstrainedContent(
+              child: SafeArea(
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: PageView(
+                        controller: _pageController,
+                        physics: const NeverScrollableScrollPhysics(),
+                        onPageChanged: (i) {
+                          final fromPage = _currentPage;
+                          setState(() => _currentPage = i);
+                          // Clear focus after returning to step 0 so keyboard does not reopen.
+                          if (i == 0 && fromPage > 0) {
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (!mounted) return;
+                              _nameFocusNode.unfocus();
+                              _budgetFocusNode.unfocus();
+                              FocusManager.instance.primaryFocus?.unfocus();
+                            });
+                          }
+                        },
+                        children: widget.isPersonal
+                            ? [
+                                _buildStep1NameCurrency(context),
+                                _buildStep3IconColor(context),
+                                _buildStep4Summary(context),
+                              ]
+                            : [
+                                _buildStep1NameCurrency(context),
+                                _buildStep2Participants(context),
+                                _buildStep3IconColor(context),
+                                _buildStep4Summary(context),
+                              ],
+                      ),
+                    ),
+                    _buildPageIndicator(context),
+                    _buildBottomBar(context, colorScheme),
+                  ],
                 ),
               ),
-              _buildPageIndicator(context),
-              _buildBottomBar(context, colorScheme),
-            ],
+            ),
           ),
-        ),
-      ),
         );
       },
     );
@@ -215,9 +274,9 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
           final isActive = index == _currentPage;
           return AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            margin: const EdgeInsets.symmetric(horizontal: 4),
-            width: isActive ? 24 : 8,
-            height: 8,
+            margin: const EdgeInsets.symmetric(horizontal: _kIndicatorMargin),
+            width: isActive ? _kIndicatorActiveWidth : _kIndicatorInactiveWidth,
+            height: _kIndicatorInactiveWidth,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(4),
               color: isActive
@@ -252,11 +311,14 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
           Expanded(
             child: Align(
               alignment: AlignmentDirectional.centerStart,
-              child: TextButton.icon(
-                onPressed: _goBack,
-                icon: const Icon(Icons.arrow_back),
-                label: Text(
-                  _currentPage == 0 ? 'cancel'.tr() : 'wizard_back'.tr(),
+              child: Tooltip(
+                message: _currentPage == 0 ? 'cancel'.tr() : 'wizard_back'.tr(),
+                child: TextButton.icon(
+                  onPressed: _goBack,
+                  icon: const Icon(Icons.arrow_back),
+                  label: Text(
+                    _currentPage == 0 ? 'cancel'.tr() : 'wizard_back'.tr(),
+                  ),
                 ),
               ),
             ),
@@ -272,38 +334,45 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
           Expanded(
             child: Align(
               alignment: AlignmentDirectional.centerEnd,
-              child: isLastPage
-                  ? FilledButton.icon(
-                      key: const Key('wizard_create_button'),
-                      onPressed: _saving ? null : _createGroup,
-                      icon: _saving
-                          ? SizedBox(
-                              height: 18,
-                              width: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: colorScheme.onPrimary,
-                              ),
-                            )
-                          : const Icon(Icons.check),
-                      label: Text(
-                        widget.isPersonal
-                            ? 'create_personal'.tr()
-                            : 'create_group'.tr(),
+              child: Tooltip(
+                message: isLastPage
+                    ? (widget.isPersonal
+                        ? 'create_personal'.tr()
+                        : 'create_group'.tr())
+                    : 'wizard_next'.tr(),
+                child: isLastPage
+                    ? FilledButton.icon(
+                        key: const Key('wizard_create_button'),
+                        onPressed: _saving ? null : _createGroup,
+                        icon: _saving
+                            ? SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: colorScheme.onPrimary,
+                                ),
+                              )
+                            : const Icon(Icons.check),
+                        label: Text(
+                          widget.isPersonal
+                              ? 'create_personal'.tr()
+                              : 'create_group'.tr(),
+                        ),
+                      )
+                    : FilledButton.icon(
+                        key: const Key('wizard_next_button'),
+                        onPressed: _goNext,
+                        icon: const Icon(Icons.arrow_forward),
+                        label: Text(
+                          _currentPage == 1 && !widget.isPersonal
+                              ? (_participants.isEmpty
+                                    ? 'wizard_skip'.tr()
+                                    : 'wizard_next'.tr())
+                              : 'wizard_next'.tr(),
+                        ),
                       ),
-                    )
-                  : FilledButton.icon(
-                      key: const Key('wizard_next_button'),
-                      onPressed: _goNext,
-                      icon: const Icon(Icons.arrow_forward),
-                      label: Text(
-                        _currentPage == 1 && !widget.isPersonal
-                            ? (_participants.isEmpty
-                                  ? 'wizard_skip'.tr()
-                                  : 'wizard_next'.tr())
-                            : 'wizard_next'.tr(),
-                      ),
-                    ),
+              ),
             ),
           ),
         ],
@@ -341,7 +410,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
             TextFormField(
               key: const Key('wizard_name_field'),
               controller: _nameController,
-              autofocus: true,
+              focusNode: _nameFocusNode,
               decoration: InputDecoration(
                 labelText: (widget.isPersonal ? 'list_name' : 'group_name')
                     .tr(),
@@ -394,6 +463,32 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                 ),
               ),
             ),
+            if (widget.isPersonal) ...[
+              const SizedBox(height: ThemeConfig.spacingL),
+              Text(
+                'my_budget'.tr(),
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: ThemeConfig.spacingS),
+              TextFormField(
+                key: const Key('wizard_budget_field'),
+                controller: _budgetController,
+                focusNode: _budgetFocusNode,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'budget_amount'.tr(),
+                  hintText: CurrencyHelpers.fromCode(_selectedCurrency.code)
+                          ?.symbol ??
+                      _selectedCurrency.code,
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
+                ),
+                textInputAction: TextInputAction.next,
+                onChanged: (_) => setState(() {}),
+              ),
+            ],
           ],
         ),
       ),
@@ -401,6 +496,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
   }
 
   void _openCurrencyPicker() {
+    FocusManager.instance.primaryFocus?.unfocus();
     final stored = ref.read(favoriteCurrenciesProvider);
     final favorites = CurrencyHelpers.getEffectiveFavorites(stored);
     CurrencyHelpers.showPicker(
@@ -477,7 +573,9 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
               leading: CircleAvatar(
                 backgroundColor: colorScheme.surfaceContainerHighest,
                 child: Text(
-                  _participants[i][0].toUpperCase(),
+                  _participants[i].isNotEmpty
+                      ? _participants[i][0].toUpperCase()
+                      : '?',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     color: colorScheme.onSurface,
@@ -734,6 +832,25 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                   value: CurrencyHelpers.shortLabel(_selectedCurrency),
                   onEdit: () => _goToPage(0),
                 ),
+                if (widget.isPersonal) ...[
+                  const SizedBox(height: ThemeConfig.spacingM),
+                  Builder(
+                    builder: (_) {
+                      final budgetCents = _budgetAmountCentsFromField();
+                      return _SummaryRow(
+                        icon: Icons.account_balance_wallet_outlined,
+                        label: 'my_budget'.tr(),
+                        value: budgetCents != null
+                            ? CurrencyFormatter.formatCentsAsWholeUnits(
+                                budgetCents,
+                                _selectedCurrency.code,
+                              )
+                            : '—',
+                        onEdit: () => _goToPage(0),
+                      );
+                    },
+                  ),
+                ],
                 const SizedBox(height: ThemeConfig.spacingM),
 
                 // Participants row (when personal, only "1"; edit goes to step 0)
@@ -806,8 +923,8 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
   void _goToPage(int page) {
     _pageController.animateToPage(
       page,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
+      duration: _kPageAnimationDuration,
+      curve: _kPageAnimationCurve,
     );
   }
 }
