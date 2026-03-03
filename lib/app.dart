@@ -21,6 +21,7 @@ import 'features/settings/settings_definitions.dart';
 import 'core/theme/app_scroll_behavior.dart';
 import 'core/theme/theme_providers.dart';
 import 'package:toastification/toastification.dart';
+import 'core/layout/layout_breakpoints.dart';
 import 'core/navigation/app_router.dart';
 import 'core/navigation/invite_link_handler.dart';
 import 'core/services/connectivity_service.dart';
@@ -88,6 +89,9 @@ class _AppState extends ConsumerState<App>
     final settings = ref.read(hisabSettingsProvidersProvider);
     if (settings != null) {
       ref.read(settings.provider(lastRoutePathSettingDef).notifier).set(path);
+      Log.info(
+        'Setting changed: ${lastRoutePathSettingDef.key}=$path',
+      );
     }
   }
 
@@ -96,6 +100,9 @@ class _AppState extends ConsumerState<App>
     final settings = ref.read(hisabSettingsProvidersProvider);
     if (settings != null) {
       ref.read(settings.provider(lastRoutePathSettingDef).notifier).set('');
+      Log.info(
+        'Setting changed: ${lastRoutePathSettingDef.key}=(cleared)',
+      );
     }
   }
 
@@ -196,7 +203,13 @@ class _AppState extends ConsumerState<App>
       child: InviteLinkHandler(
         ref: ref,
         child: ToastificationWrapper(
-          config: const ToastificationConfig(alignment: Alignment.bottomCenter),
+          config: ToastificationConfig(
+            alignment: Alignment.bottomCenter,
+            itemWidth: LayoutBreakpoints.isTabletOrWider(context)
+                ? LayoutBreakpoints.sheetDialogMaxWidth
+                : (MediaQuery.sizeOf(context).width - 32)
+                    .clamp(0.0, LayoutBreakpoints.sheetDialogMaxWidth),
+          ),
           child: MaterialApp.router(
         title: 'app_name'.tr(),
         debugShowCheckedModeBanner: false,

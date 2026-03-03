@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'route_paths.dart';
 import '../../features/home/routes.dart';
 import '../../features/settings/routes.dart';
@@ -58,6 +59,15 @@ class _ShellWithShortcutsState extends State<_ShellWithShortcuts> {
   void initState() {
     super.initState();
     _focusNode = FocusNode();
+  }
+
+  @override
+  void deactivate() {
+    // Unfocus before the Focus widget is torn down so InheritedElement
+    // can deactivate without _dependents.isEmpty asserting (e.g. when
+    // navigating away from the shell to onboarding or a full-screen route).
+    _focusNode.unfocus();
+    super.deactivate();
   }
 
   @override
@@ -139,6 +149,9 @@ GoRouter router(Ref ref) {
           ref
               .read(settings.provider(lastRoutePathSettingDef).notifier)
               .set('');
+          Log.info(
+            'Setting changed: ${lastRoutePathSettingDef.key}=(cleared for redirect)',
+          );
           return lastPath;
         }
         // Pending invite from deep link: send to invite page and clear
@@ -149,6 +162,9 @@ GoRouter router(Ref ref) {
           ref
               .read(settings.provider(pendingInviteTokenSettingDef).notifier)
               .set('');
+          Log.info(
+            'Setting changed: ${pendingInviteTokenSettingDef.key}=(cleared for redirect)',
+          );
           return RoutePaths.inviteAccept(pendingToken);
         }
       }
