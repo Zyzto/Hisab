@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/navigation/route_paths.dart';
@@ -45,12 +46,18 @@ List<Widget> buildPrivacySectionTiles(
             final ok =
                 await ref.read(notificationServiceProvider.notifier).initialize(context);
             notifier.set(ok);
+            Log.info(
+              'Setting changed: ${notificationsEnabledSettingDef.key}=$ok',
+            );
             if (!ok && context.mounted) {
               context.showToast('notifications_unavailable'.tr());
             }
           } else {
             ref.read(notificationServiceProvider.notifier).unregisterToken();
             notifier.set(false);
+            Log.info(
+              'Setting changed: ${notificationsEnabledSettingDef.key}=false',
+            );
           }
         },
       ),

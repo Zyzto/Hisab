@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
@@ -126,6 +127,9 @@ class HomePage extends ConsumerWidget {
                                     .notifier,
                               )
                               .set(v);
+                          Log.info(
+                            'Setting changed: ${homeListDisplaySettingDef.key}=$v',
+                          );
                         }
                       },
                     ),
@@ -157,6 +161,9 @@ class HomePage extends ConsumerWidget {
                                     .notifier,
                               )
                               .set(v);
+                          Log.info(
+                            'Setting changed: ${homeListSortSettingDef.key}=$v',
+                          );
                         }
                       },
                     ),
@@ -172,6 +179,9 @@ class HomePage extends ConsumerWidget {
                                 .notifier,
                           )
                           .set(v);
+                      Log.info(
+                        'Setting changed: ${homeListShowCreatedAtSettingDef.key}=$v',
+                      );
                     },
                   ),
                 ],
@@ -246,6 +256,9 @@ class HomePage extends ConsumerWidget {
       ref
           .read(settings.provider(homeListPinnedIdsSettingDef).notifier)
           .set(list.join(','));
+      Log.info(
+        'Setting changed: ${homeListPinnedIdsSettingDef.key}=${list.length} items',
+      );
       clearSelection();
     }
 
@@ -260,6 +273,9 @@ class HomePage extends ConsumerWidget {
       ref
           .read(settings.provider(homeListPinnedIdsSettingDef).notifier)
           .set(list.join(','));
+      Log.info(
+        'Setting changed: ${homeListPinnedIdsSettingDef.key}=${list.length} items',
+      );
       clearSelection();
     }
 
@@ -454,6 +470,10 @@ class HomePage extends ConsumerWidget {
                           settings.provider(homeListSortSettingDef).notifier,
                         )
                         .set('custom');
+                    Log.info(
+                      'Setting changed: ${homeListCustomOrderSettingDef.key}=${newOrderIds.length} items, '
+                      '${homeListSortSettingDef.key}=custom',
+                    );
                     SchedulerBinding.instance.addPostFrameCallback((_) {
                       ref.read(homeListPendingOrderIdsProvider.notifier).state =
                           null;

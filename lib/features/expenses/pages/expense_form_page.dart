@@ -1228,8 +1228,10 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                     ListenableBuilder(
                       listenable: _amountController,
                       builder: (context, _) {
-                        // Trigger base amount recalc when amount changes
-                        _onAmountChangedForExchangeRate();
+                        // Defer recalc to avoid setState/markNeedsBuild during build
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted) _onAmountChangedForExchangeRate();
+                        });
                         return ExpenseAmountSection(
                           controller: _amountController,
                           currencyCode: _currencyCode,
@@ -1432,17 +1434,21 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                 ),
               ),
             ),
-            bottomNavigationBar: SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: ListenableBuilder(
+            bottomNavigationBar: SizedBox(
+              height: _kSubmitBarHeight + MediaQuery.of(context).padding.bottom,
+              child: ConstrainedContent(
+                child: SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: ListenableBuilder(
                   listenable: _amountController,
                   builder: (context, _) {
                     final amountCentsInt =
                         ((double.tryParse(_amountController.text.trim()) ?? 0) * 100).toInt();
                     return SizedBox(
                       height: 52,
+                      width: double.infinity,
                       child: FilledButton(
                         onPressed:
                             (_saving ||
@@ -1464,6 +1470,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                   },
                 ),
               ),
+            ),
+            ),
             ),
             );
               },

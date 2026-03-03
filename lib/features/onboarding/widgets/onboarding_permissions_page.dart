@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 
 import '../../../core/services/notification_service.dart';
 import '../../../core/widgets/toast.dart';
@@ -182,6 +183,9 @@ class _NotificationsAppToggle extends ConsumerWidget {
                       .read(notificationServiceProvider.notifier)
                       .initialize(context);
                   notifier.set(ok);
+                  Log.info(
+                    'Setting changed: ${notificationsEnabledSettingDef.key}=$ok',
+                  );
                   if (!ok && context.mounted) {
                     context.showToast('notifications_unavailable'.tr());
                   }
@@ -190,6 +194,9 @@ class _NotificationsAppToggle extends ConsumerWidget {
                       .read(notificationServiceProvider.notifier)
                       .unregisterToken();
                   notifier.set(false);
+                  Log.info(
+                    'Setting changed: ${notificationsEnabledSettingDef.key}=false',
+                  );
                 }
               }
             : null,
@@ -226,6 +233,9 @@ class _TelemetryToggle extends ConsumerWidget {
           ref
               .read(settings.provider(telemetryEnabledSettingDef).notifier)
               .set(v);
+          Log.info(
+            'Setting changed: ${telemetryEnabledSettingDef.key}=$v',
+          );
         },
       ),
     );

@@ -326,6 +326,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                     await ref
                         .read(settings.provider(languageSettingDef).notifier)
                         .set(chosen.languageCode);
+                    Log.info(
+                      'Setting changed: ${languageSettingDef.key}=${chosen.languageCode}',
+                    );
                   }
                 },
                 customBorder: const CircleBorder(),
@@ -404,6 +407,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                 ref
                     .read(settings.provider(themeModeSettingDef).notifier)
                     .set(next);
+                Log.info(
+                  'Setting changed: ${themeModeSettingDef.key}=$next',
+                );
               },
               customBorder: const CircleBorder(),
               child: AnimatedContainer(
@@ -581,7 +587,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                   settings.provider(onboardingOnlinePendingSettingDef).notifier,
                 )
                 .set(true);
-            Log.info('Onboarding OAuth redirect pending (web)');
+            Log.info(
+              'Setting changed: ${onboardingOnlinePendingSettingDef.key}=true',
+            );
             return;
           case SignInResult.cancelled:
             if (mounted) {
@@ -595,7 +603,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
     ref
         .read(settings.provider(onboardingCompletedSettingDef).notifier)
         .set(true);
-    Log.info('Onboarding completed');
+    Log.info(
+      'Setting changed: ${onboardingCompletedSettingDef.key}=true',
+    );
     if (!mounted) return;
     final pendingToken = ref.read(
       settings.provider(pendingInviteTokenSettingDef),
@@ -604,6 +614,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
       ref
           .read(settings.provider(pendingInviteTokenSettingDef).notifier)
           .set('');
+      Log.info(
+        'Setting changed: ${pendingInviteTokenSettingDef.key}=(cleared)',
+      );
       context.go(RoutePaths.inviteAccept(pendingToken));
     } else {
       context.go(RoutePaths.home);

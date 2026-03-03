@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
@@ -141,6 +142,9 @@ Widget _receiptAiProviderTile(
         ref
             .read(settings.provider(receiptAiProviderSettingDef).notifier)
             .set(chosen);
+        Log.info(
+          'Setting changed: ${receiptAiProviderSettingDef.key}=$chosen',
+        );
       }
     },
   );

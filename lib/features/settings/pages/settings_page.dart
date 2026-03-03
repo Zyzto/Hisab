@@ -491,8 +491,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ref
           .read(settings.provider(localDataFromOnlineUserIdSettingDef).notifier)
           .set(currentUser.id);
+      Log.info(
+        'Setting changed: ${localDataFromOnlineUserIdSettingDef.key}=${currentUser.id}',
+      );
     }
     ref.read(settings.provider(localOnlySettingDef).notifier).set(true);
+    Log.info('Setting changed: ${localOnlySettingDef.key}=true');
     try {
       await ref.read(authServiceProvider).signOut();
     } catch (e, st) {
@@ -539,6 +543,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ref
           .read(settings.provider(onboardingCompletedSettingDef).notifier)
           .set(false);
+      Log.info(
+        'Setting changed: ${onboardingCompletedSettingDef.key}=false',
+      );
       if (context.mounted) {
         context.go(RoutePaths.onboarding);
       }
@@ -558,6 +565,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
     if (confirmed != true || !context.mounted) return;
     await settings.controller.resetAll();
+    Log.info('Setting changed: reset_all');
     if (!context.mounted) return;
     // _LocaleSync handles locale sync automatically via languageProvider
     context.showSuccess('reset_all_settings_done'.tr());
@@ -599,6 +607,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ref
                 .read(settings.provider(onboardingCompletedSettingDef).notifier)
                 .set(false);
+            Log.info(
+              'Setting changed: ${onboardingCompletedSettingDef.key}=false',
+            );
           }
           context.showSuccess('delete_local_data_done'.tr());
           context.go(RoutePaths.onboarding);
@@ -691,6 +702,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ref
               .read(settings.provider(onboardingCompletedSettingDef).notifier)
               .set(false);
+          Log.info(
+            'Setting changed: ${onboardingCompletedSettingDef.key}=false',
+          );
         }
         if (context.mounted) {
           context.showSuccess('delete_local_data_done'.tr());
@@ -727,6 +741,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ref
           .read(settings.provider(settingsOnlinePendingSettingDef).notifier)
           .set(false);
+      Log.info(
+        'Setting changed: ${localOnlySettingDef.key}=true, '
+        '${settingsOnlinePendingSettingDef.key}=false',
+      );
       // Record that local data was from online so we can skip migration when switching back with same user
       final currentUser = ref.read(currentUserProvider);
       if (currentUser != null) {
@@ -735,6 +753,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               settings.provider(localDataFromOnlineUserIdSettingDef).notifier,
             )
             .set(currentUser.id);
+        Log.info(
+          'Setting changed: ${localDataFromOnlineUserIdSettingDef.key}=${currentUser.id}',
+        );
       }
       return;
     }
@@ -749,6 +770,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ref
           .read(settings.provider(localDataFromOnlineUserIdSettingDef).notifier)
           .set('');
+      Log.info(
+        'Setting changed: ${localOnlySettingDef.key}=false, '
+        '${localDataFromOnlineUserIdSettingDef.key}=(cleared)',
+      );
       await ref.read(dataSyncServiceProvider.notifier).syncNow();
       return;
     }
@@ -774,6 +799,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               )
               .set('');
           Log.info(
+            'Setting changed: ${localOnlySettingDef.key}=false, '
+            '${localDataFromOnlineUserIdSettingDef.key}=(cleared)',
+          );
+          Log.info(
             'Switched to online (data was from server, skipping migration)',
           );
           await ref.read(dataSyncServiceProvider.notifier).syncNow();
@@ -789,7 +818,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ref
             .read(settings.provider(settingsOnlinePendingSettingDef).notifier)
             .set(true);
-        Log.info('Settings OAuth redirect pending (web)');
+        Log.info(
+          'Setting changed: ${settingsOnlinePendingSettingDef.key}=true '
+          '(OAuth redirect pending)',
+        );
       case SignInResult.cancelled:
         // User cancelled, keep localOnly as-is
         break;
@@ -814,6 +846,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ref
           .read(settings.provider(localDataFromOnlineUserIdSettingDef).notifier)
           .set('');
+      Log.info(
+        'Setting changed: ${localOnlySettingDef.key}=false, '
+        '${localDataFromOnlineUserIdSettingDef.key}=(cleared)',
+      );
       Log.info('Switched to online mode (no data to migrate)');
       await ref.read(dataSyncServiceProvider.notifier).syncNow();
       return;
@@ -841,6 +877,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               settings.provider(localDataFromOnlineUserIdSettingDef).notifier,
             )
             .set('');
+        Log.info(
+          'Setting changed: ${localOnlySettingDef.key}=false, '
+          '${localDataFromOnlineUserIdSettingDef.key}=(cleared)',
+        );
         Log.info('Switched to online mode after migration');
         await ref.read(dataSyncServiceProvider.notifier).syncNow();
         if (!context.mounted) return;
@@ -929,6 +969,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           await ref
               .read(settings.provider(languageSettingDef).notifier)
               .set(langCode);
+          Log.info('Setting changed: ${languageSettingDef.key}=$langCode');
           // _LocaleSync will call setLocale when it sees provider != context.locale
         }
       },
@@ -986,6 +1027,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         );
         if (chosen != null && context.mounted) {
           ref.read(settings.provider(themeModeSettingDef).notifier).set(chosen);
+          Log.info('Setting changed: ${themeModeSettingDef.key}=$chosen');
         }
       },
     );
@@ -1094,6 +1136,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ref
               .read(settings.provider(themeSchemeSettingDef).notifier)
               .set(chosenScheme);
+          Log.info(
+            'Setting changed: ${themeSchemeSettingDef.key}=$chosenScheme',
+          );
           if (chosenScheme == 'custom') {
             final chosenColor = await showResponsiveSheet<int>(
               context: context,
@@ -1146,6 +1191,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ref
                   .read(settings.provider(themeColorSettingDef).notifier)
                   .set(chosenColor);
+              Log.info(
+                'Setting changed: ${themeColorSettingDef.key}=$chosenColor',
+              );
             }
           }
         }
@@ -1206,6 +1254,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ref
               .read(settings.provider(fontSizeScaleSettingDef).notifier)
               .set(chosen);
+          Log.info('Setting changed: ${fontSizeScaleSettingDef.key}=$chosen');
         }
       },
     );
@@ -1246,6 +1295,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       settings.provider(favoriteCurrenciesSettingDef).notifier,
                     )
                     .set('');
+                Log.info(
+                  'Setting changed: ${favoriteCurrenciesSettingDef.key}=(reset)',
+                );
               },
             )
           : null,
@@ -1295,6 +1347,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ref
                     .read(settings.provider(displayCurrencySettingDef).notifier)
                     .set('');
+                Log.info(
+                  'Setting changed: ${displayCurrencySettingDef.key}=(none)',
+                );
               },
             ),
         ],
@@ -1320,6 +1375,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ref
             .read(settings.provider(displayCurrencySettingDef).notifier)
             .set(currency.code);
+        Log.info(
+          'Setting changed: ${displayCurrencySettingDef.key}=${currency.code}',
+        );
       },
     );
   }
@@ -1346,6 +1404,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ref
               .read(settings.provider(favoriteCurrenciesSettingDef).notifier)
               .set(encoded);
+          Log.info(
+            'Setting changed: ${favoriteCurrenciesSettingDef.key}=${updated.length} items',
+          );
         },
       ),
     );
@@ -1444,9 +1505,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         final settings = ref.read(hisabSettingsProvidersProvider);
         if (settings != null) {
           ref.read(settings.provider(settingDef).notifier).set(value);
+          Log.info('Setting changed: ${settingDef.key}=(set)');
         }
-      } catch (e) {
-        Log.warning('Failed to set API key', error: e);
+      } catch (e, st) {
+        Log.warning('Failed to set API key', error: e, stackTrace: st);
       }
     }
   }
@@ -1509,7 +1571,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     if (scaffoldContext.mounted) {
                       scaffoldContext.showSuccess('logs_cleared'.tr());
                     }
-                  } catch (e) {
+                  } catch (e, st) {
+                    Log.warning(
+                      'Clear logs failed',
+                      error: e,
+                      stackTrace: st,
+                    );
                     if (scaffoldContext.mounted) {
                       scaffoldContext.showToast('logs_not_available'.tr());
                     }
@@ -1557,7 +1624,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               : 'logs_copied'.tr(),
         );
       }
-    } catch (e) {
+    } catch (e, st) {
+      Log.warning('Report issue / copy logs failed', error: e, stackTrace: st);
       if (scaffoldContext.mounted) {
         scaffoldContext.showToast('logs_not_available'.tr());
       }
@@ -1721,7 +1789,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final uri = Uri.parse(githubDonateUrl);
     try {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (e) {
+    } catch (e, st) {
+      Log.warning('Open donate link failed', error: e, stackTrace: st);
       if (context.mounted) {
         context.showToast('donate'.tr());
       }
