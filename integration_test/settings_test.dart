@@ -54,17 +54,17 @@ void main() {
 
       // ── Stage: change font size ──
       await stage('change font size', () async {
-        await scrollUntilVisible(tester, find.text('Font size'));
-        await tapAndSettle(tester, find.text('Font size'));
+        await scrollUntilVisible(tester, find.text('Font Size'));
+        await tapAndSettle(tester, find.text('Font Size'));
 
         await waitForWidget(tester, find.text('Large'));
         await tapAndSettle(tester, find.text('Large'));
 
-        await scrollUntilVisible(tester, find.text('Font size'));
+        await scrollUntilVisible(tester, find.text('Font Size'));
         expect(find.text('Large'), findsWidgets);
 
         // Revert to Normal
-        await tapAndSettle(tester, find.text('Font size'));
+        await tapAndSettle(tester, find.text('Font Size'));
         await waitForWidget(tester, find.text('Normal'));
         await tapAndSettle(tester, find.text('Normal'));
       });
@@ -82,14 +82,14 @@ void main() {
         // Do NOT tap Export data on mobile: FilePicker.platform.saveFile()
         // opens a native Android save dialog that blocks the test.
         // Just verify the tile is present.
-        await scrollUntilVisible(tester, find.text('Import data'));
-        expect(find.text('Import data'), findsOneWidget);
+        await scrollUntilVisible(tester, find.text('Import Data'));
+        expect(find.text('Import Data'), findsOneWidget);
       });
 
       // ── Stage: test import data ──
       await stage('test import data', () async {
-        await scrollUntilVisible(tester, find.text('Import data'));
-        await tapAndSettle(tester, find.text('Import data'));
+        await scrollUntilVisible(tester, find.text('Import Data'));
+        await tapAndSettle(tester, find.text('Import Data'));
         await pumpAndSettleWithTimeout(tester);
 
         // Confirmation dialog should appear

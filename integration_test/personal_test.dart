@@ -27,6 +27,12 @@ void main() {
           find.byKey(const Key('wizard_name_field')),
           'My Budget',
         );
+        // Optional budget (integer): enter 500
+        await enterTextAndPump(
+          tester,
+          find.byKey(const Key('wizard_budget_field')),
+          '500',
+        );
 
         // Step 1 → Step 2 (icon/color for personal)
         await tapAndSettle(tester, find.text('Next'));
@@ -52,19 +58,18 @@ void main() {
         expect(find.text('My Budget'), findsWidgets);
         expect(find.text('Balance'), findsNothing);
         expect(find.text('People'), findsNothing);
+        // Budget set on create (500) is displayed in the header
+        expect(find.textContaining('500'), findsWidgets);
       });
 
       // ── Stage: add expense ──
       await stage('add expense', () async {
-        await tapAndSettle(tester, find.byIcon(Icons.add));
+        await tapAndSettle(tester, find.byIcon(Icons.add).first);
         await pumpAndSettleWithTimeout(tester);
+        await ensureExpenseFormReady(tester);
 
-        final titleFields = find.byType(TextField);
-        await enterTextAndPump(tester, titleFields.first, 'Coffee');
-
-        final amountField = find.byType(TextField).at(1);
-        await enterTextAndPump(tester, amountField, '5.50');
-
+        await enterTextAndPump(tester, find.byType(TextField).first, 'Coffee');
+        await enterTextAndPump(tester, find.byType(TextField).at(1), '5.50');
         await tapSubmitExpenseButton(tester);
         await ensureFormClosed(tester);
 
@@ -74,8 +79,9 @@ void main() {
 
       // ── Stage: add personal income ──
       await stage('add personal income', () async {
-        await tapAndSettle(tester, find.byIcon(Icons.add));
+        await tapAndSettle(tester, find.byIcon(Icons.add).first);
         await pumpAndSettleWithTimeout(tester);
+        await ensureExpenseFormReady(tester);
 
         final incomeTab = find.text('Income');
         if (incomeTab.evaluate().isNotEmpty) {
@@ -105,14 +111,14 @@ void main() {
 
       // ── Stage: delete personal budget ──
       await stage('delete personal budget', () async {
-        await scrollUntilVisible(tester, find.text('Delete list'));
-        await tapAndSettle(tester, find.text('Delete list'));
+        await scrollUntilVisible(tester, find.text('Delete List'));
+        await tapAndSettle(tester, find.text('Delete List'));
 
         // Timed confirm dialog with 10-second countdown
         await tester.pump(const Duration(seconds: 11));
         await pumpAndSettleWithTimeout(tester);
 
-        final confirmDelete = find.text('Delete list');
+        final confirmDelete = find.text('Delete List');
         if (confirmDelete.evaluate().isNotEmpty) {
           await tapAndSettle(tester, confirmDelete.last);
         }

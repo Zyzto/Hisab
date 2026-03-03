@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -50,6 +51,30 @@ Future<void> tapAndPump(
   await tester.tap(finder);
   for (var i = 0; i < pumps; i++) {
     await tester.pump(interval);
+  }
+}
+
+/// Add a participant in the group create wizard (Step 2: people). Scrolls the
+/// Add button into view before tapping (fixes Android hit-test when button is
+/// off-screen or obscured), uses a longer settle timeout, and on Android an
+/// extra pump after each Add so the list and next text field are ready.
+Future<void> addWizardParticipant(WidgetTester tester, String name) async {
+  await enterTextAndPump(tester, find.byType(TextField).last, name);
+  // Use the actual FilledButton so hit-test lands on the tappable widget; find.text('Add')
+  // can resolve to a Text whose center hits an offstage or non-hit-testable ancestor.
+  final addButton = find.widgetWithText(FilledButton, 'Add');
+  if (addButton.evaluate().isNotEmpty) {
+    await tester.ensureVisible(addButton.first);
+    await tester.pump(const Duration(milliseconds: 300));
+    await pumpAndSettleWithTimeout(tester, timeout: const Duration(seconds: 3));
+  }
+  await tapAndSettle(
+    tester,
+    find.widgetWithText(FilledButton, 'Add'),
+    timeout: const Duration(seconds: 15),
+  );
+  if (defaultTargetPlatform == TargetPlatform.android) {
+    await tester.pump(const Duration(milliseconds: 1200));
   }
 }
 
@@ -110,7 +135,12 @@ Future<void> scrollUntilVisible(
     await tester.pumpAndSettle();
     return;
   }
-  final scrollFinder = scrollable ?? find.byType(Scrollable).first;
+  final scrollCandidates = scrollable ?? find.byType(Scrollable);
+  if (scrollCandidates.evaluate().isEmpty) {
+    expect(finder, findsWidgets, reason: 'Could not scroll to $finder (no Scrollable found)');
+    return;
+  }
+  final scrollFinder = scrollCandidates.first;
   for (var i = 0; i < maxScrolls; i++) {
     await tester.drag(scrollFinder, Offset(0, delta));
     await tester.pumpAndSettle();
@@ -136,6 +166,17 @@ Future<void> tapSubmitExpenseButton(WidgetTester tester) async {
         timeout: const Duration(seconds: 15));
   }
   await tester.pump(const Duration(seconds: 1));
+}
+
+/// Wait until the expense form has at least title and amount fields (2 TextFields).
+/// Call after opening the expense form (tap add FAB) to avoid "No element" when using .at(1).
+Future<void> ensureExpenseFormReady(WidgetTester tester, {Duration timeout = const Duration(seconds: 8)}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (DateTime.now().isBefore(deadline)) {
+    await tester.pump(const Duration(milliseconds: 200));
+    if (find.byType(TextField).evaluate().length >= 2) return;
+  }
+  throw TestFailure('Expense form did not show title and amount fields within ${timeout.inSeconds}s');
 }
 
 /// After calling [tapSubmitExpenseButton], call this to ensure we're not

@@ -61,31 +61,38 @@ Future<bool> runIntegrationTestApp({bool skipOnboarding = true}) async {
       : const Locale('en');
 
   isIntegrationTestMode = true;
-  runApp(
-    EasyLocalization(
-      supportedLocales: const [Locale('en'), Locale('ar')],
-      path: 'assets/translations',
-      fallbackLocale: const Locale('en'),
-      startLocale: startLocale,
-      saveLocale: false,
-      child: ProviderScope(
-        overrides: [
-          powerSyncDatabaseProvider.overrideWithValue(db),
-          if (settingsProviders != null) ...[
-            settingsControllerProvider.overrideWithValue(
-              settingsProviders.controller,
-            ),
-            settingsSearchIndexProvider.overrideWithValue(
-              settingsProviders.searchIndex,
-            ),
-            settingsProvidersProvider.overrideWithValue(settingsProviders),
-            hisabSettingsProvidersProvider.overrideWithValue(settingsProviders),
-          ],
+  final appWidget = EasyLocalization(
+    supportedLocales: const [Locale('en'), Locale('ar')],
+    path: 'assets/translations',
+    fallbackLocale: const Locale('en'),
+    startLocale: startLocale,
+    saveLocale: false,
+    child: ProviderScope(
+      overrides: [
+        powerSyncDatabaseProvider.overrideWithValue(db),
+        if (settingsProviders != null) ...[
+          settingsControllerProvider.overrideWithValue(
+            settingsProviders.controller,
+          ),
+          settingsSearchIndexProvider.overrideWithValue(
+            settingsProviders.searchIndex,
+          ),
+          settingsProvidersProvider.overrideWithValue(settingsProviders),
+          hisabSettingsProvidersProvider.overrideWithValue(settingsProviders),
         ],
-        child: const App(),
-      ),
+      ],
+      child: const App(),
     ),
   );
+
+  // Defer runApp so any previous test's widget tree and overlay can finish
+  // tearing down. Brief delays were not enough on Android (Toastification
+  // lifecycle and duplicate GlobalKey). 250ms lets the old tree fully tear down.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    Future<void>.delayed(const Duration(milliseconds: 250), () {
+      runApp(appWidget);
+    });
+  });
 
   return true;
 }
