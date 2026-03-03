@@ -88,17 +88,19 @@ Future<bool?> showConfirmSheet(
         actions: [
           if (!isTablet)
             TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
+              onPressed: () {
+                final navigator = Navigator.of(ctx, rootNavigator: true);
+                if (navigator.canPop()) navigator.pop(false);
+              },
               child: Text(cancelLabel ?? 'cancel'.tr()),
             ),
-          FilledButton(
-            style: isDestructive
-                ? FilledButton.styleFrom(
-                    backgroundColor: Theme.of(ctx).colorScheme.error,
-                  )
-                : null,
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(confirmLabel),
+          _ConfirmSheetButton(
+            label: confirmLabel,
+            isDestructive: isDestructive,
+            onConfirm: () {
+              final navigator = Navigator.of(ctx, rootNavigator: true);
+              if (navigator.canPop()) navigator.pop(true);
+            },
           ),
         ],
         showTitleInBody: !isTablet,
@@ -146,11 +148,17 @@ Future<String?> showTextInputSheet(
         actions: [
           if (!isTablet)
             TextButton(
-              onPressed: () => Navigator.pop(ctx, null),
+              onPressed: () {
+                final navigator = Navigator.of(ctx, rootNavigator: true);
+                if (navigator.canPop()) navigator.pop(null);
+              },
               child: Text('cancel'.tr()),
             ),
           FilledButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            onPressed: () {
+              final navigator = Navigator.of(ctx, rootNavigator: true);
+              if (navigator.canPop()) navigator.pop(controller.text.trim());
+            },
             child: Text('done'.tr()),
           ),
         ],
@@ -161,10 +169,54 @@ Future<String?> showTextInputSheet(
   // Defer dispose until the sheet route is fully removed from the tree.
   // Disposing when the future completes can run while the TextField is still
   // in the tree (e.g. during close animation), causing "used after being disposed".
+  // Use a time-based delay so exit animation and overlay updates are done (Android/integration).
   future.then((_) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    Future<void>.delayed(const Duration(milliseconds: 300), () {
       controller.dispose();
     });
   });
   return future;
+}
+
+/// Confirm button that uses [InkWell] with [canRequestFocus: false] so taps
+/// reliably fire when the sheet is shown on top of other modals (same fix as
+/// currency picker list row).
+class _ConfirmSheetButton extends StatelessWidget {
+  const _ConfirmSheetButton({
+    required this.label,
+    required this.isDestructive,
+    required this.onConfirm,
+  });
+
+  final String label;
+  final bool isDestructive;
+  final VoidCallback onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final backgroundColor = isDestructive ? colorScheme.error : colorScheme.primary;
+    final foregroundColor = isDestructive ? colorScheme.onError : colorScheme.onPrimary;
+
+    return Material(
+      color: backgroundColor,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        canRequestFocus: false,
+        onTap: onConfirm,
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+          child: Text(
+            label,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: foregroundColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

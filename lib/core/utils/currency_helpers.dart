@@ -55,6 +55,21 @@ class CurrencyHelpers {
     return '$flag ${c.code}';
   }
 
+  /// Divisor to convert whole units to smallest unit (cents).
+  /// Aligns with [CurrencyFormatter]: 0 -> 1, 1 -> 10, 2 -> 100, 3 -> 1000.
+  static int divisorForDecimalDigits(int decimalDigits) {
+    switch (decimalDigits) {
+      case 0:
+        return 1;
+      case 1:
+        return 10;
+      case 3:
+        return 1000;
+      default:
+        return 100;
+    }
+  }
+
   /// Show a currency picker bottom sheet with 75% max height.
   /// Drop-in replacement for [showCurrencyPicker] with consistent UX.
   ///

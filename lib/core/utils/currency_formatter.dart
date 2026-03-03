@@ -33,6 +33,16 @@ class CurrencyFormatter {
     return _formatNumber(amountCents, decimalDigits);
   }
 
+  /// Format as whole units only (no decimals), with symbol. Used for budget display.
+  static String formatCentsAsWholeUnits(int amountCents, String currencyCode) {
+    final p = _currencyParams(currencyCode);
+    final divisor = _divisor(p.$1);
+    final wholeUnits = (amountCents / divisor).round();
+    final formatted =
+        NumberFormat.currency(symbol: '', decimalDigits: 0).format(wholeUnits);
+    return p.$3 ? '${p.$2} $formatted' : '$formatted ${p.$2}';
+  }
+
   /// (decimalDigits, symbol, onLeft) from one fromCode lookup.
   static (int, String, bool) _currencyParams(String currencyCode) {
     final currency = CurrencyHelpers.fromCode(currencyCode);

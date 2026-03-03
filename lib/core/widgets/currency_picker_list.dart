@@ -177,9 +177,11 @@ class _AppCurrencyPickerListState extends State<AppCurrencyPickerList> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
+        canRequestFocus: false,
         onTap: () {
           widget.onSelect(currency);
-          Navigator.pop(context);
+          final navigator = Navigator.of(context, rootNavigator: true);
+          if (navigator.canPop()) navigator.pop();
         },
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 9.0, horizontal: 8.0),
