@@ -47,10 +47,8 @@ void main() {
 
         // Participants
         await waitForWidget(tester, find.text('Add'));
-        await enterTextAndPump(tester, find.byType(TextField).last, 'Alice');
-        await tapAndSettle(tester, find.text('Add'));
-        await enterTextAndPump(tester, find.byType(TextField).last, 'Bob');
-        await tapAndSettle(tester, find.text('Add'));
+        await addWizardParticipant(tester, 'Alice');
+        await addWizardParticipant(tester, 'Bob');
 
         await tapAndSettle(tester, find.text('Next'));
         await tester.pump(const Duration(milliseconds: 400));

@@ -33,12 +33,8 @@ void main() {
         await tester.pump(const Duration(milliseconds: 400));
 
         await waitForWidget(tester, find.text('Add'));
-        await enterTextAndPump(tester, find.byType(TextField).last, 'Alice');
-        await tester.testTextInput.receiveAction(TextInputAction.done);
-        await tester.pumpAndSettle();
-        await enterTextAndPump(tester, find.byType(TextField).last, 'Bob');
-        await tester.testTextInput.receiveAction(TextInputAction.done);
-        await tester.pumpAndSettle();
+        await addWizardParticipant(tester, 'Alice');
+        await addWizardParticipant(tester, 'Bob');
 
         await waitForWidget(tester, find.byKey(const Key('wizard_next_button')));
         await tapAndSettle(tester, find.byKey(const Key('wizard_next_button')));
@@ -60,8 +56,9 @@ void main() {
 
       // ── Stage: add first expense (You pays 100, equal split) ──
       await stage('add first expense', () async {
-        await tapAndSettle(tester, find.byIcon(Icons.add));
+        await tapAndSettle(tester, find.byIcon(Icons.add).first);
         await pumpAndSettleWithTimeout(tester);
+        await ensureExpenseFormReady(tester);
         await enterTextAndPump(
             tester, find.byType(TextField).first, 'Group Dinner');
         await enterTextAndPump(tester, find.byType(TextField).at(1), '150');
@@ -73,9 +70,9 @@ void main() {
 
       // ── Stage: add second expense ──
       await stage('add second expense', () async {
-        await tapAndSettle(tester, find.byIcon(Icons.add));
+        await tapAndSettle(tester, find.byIcon(Icons.add).first);
         await pumpAndSettleWithTimeout(tester);
-
+        await ensureExpenseFormReady(tester);
         await enterTextAndPump(
             tester, find.byType(TextField).first, 'Movie Tickets');
         await enterTextAndPump(tester, find.byType(TextField).at(1), '75');
@@ -88,9 +85,9 @@ void main() {
 
       // ── Stage: add third expense ──
       await stage('add third expense', () async {
-        await tapAndSettle(tester, find.byIcon(Icons.add));
+        await tapAndSettle(tester, find.byIcon(Icons.add).first);
         await pumpAndSettleWithTimeout(tester);
-
+        await ensureExpenseFormReady(tester);
         await enterTextAndPump(
             tester, find.byType(TextField).first, 'Snacks');
         await enterTextAndPump(tester, find.byType(TextField).at(1), '30');
@@ -121,13 +118,20 @@ void main() {
 
       // ── Stage: verify settlement arrows exist ──
       await stage('verify settlement arrows', () async {
-        // Settlement section has "Settle up" title and "From → To" rows; may need scroll on Web
-        await waitForWidget(
-          tester,
-          find.textContaining('\u2192'), // arrow in "From → To"
-          timeout: const Duration(seconds: 25),
-        );
-        await scrollUntilVisible(tester, find.textContaining('\u2192'));
+        await tester.pump(const Duration(milliseconds: 1500));
+        // Wait for "Settle Up" section title (balance list builds in stages).
+        await waitForWidget(tester, find.text('Settle Up'), timeout: const Duration(seconds: 15));
+        // Scroll down to reveal settlement rows below the title.
+        final scrollable = find.byType(Scrollable).first;
+        for (var i = 0; i < 12; i++) {
+          if (scrollable.evaluate().isEmpty) break;
+          await tester.drag(scrollable, const Offset(0, -220));
+          await tester.pumpAndSettle();
+          if (find.textContaining('\u2192').evaluate().isNotEmpty ||
+              find.byIcon(Icons.payments_outlined).evaluate().isNotEmpty) {
+            break;
+          }
+        }
         final hasArrows = find.textContaining('\u2192').evaluate().isNotEmpty;
         final hasPaymentIcons = find.byIcon(Icons.payments_outlined).evaluate().isNotEmpty;
         expect(

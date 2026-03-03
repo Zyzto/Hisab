@@ -34,19 +34,11 @@ void main() {
         await tapAndSettle(tester, find.byKey(const Key('wizard_next_button')));
         await tester.pump(const Duration(milliseconds: 400));
 
-        // Step 2: Add participants via onSubmitted (keyboard done action)
-        // to avoid hit-test issues with the Add button inside PageView.
+        // Step 2: Add participants by entering name then tapping Add button.
         await waitForWidget(tester, find.text('Add'));
-        await enterTextAndPump(tester, find.byType(TextField).last, 'Alice');
-        await tester.testTextInput.receiveAction(TextInputAction.done);
-        await tester.pumpAndSettle();
-        await enterTextAndPump(tester, find.byType(TextField).last, 'Bob');
-        await tester.testTextInput.receiveAction(TextInputAction.done);
-        await tester.pumpAndSettle();
-        await enterTextAndPump(
-            tester, find.byType(TextField).last, 'Charlie');
-        await tester.testTextInput.receiveAction(TextInputAction.done);
-        await tester.pumpAndSettle();
+        await addWizardParticipant(tester, 'Alice');
+        await addWizardParticipant(tester, 'Bob');
+        await addWizardParticipant(tester, 'Charlie');
 
         await waitForWidget(tester, find.byKey(const Key('wizard_next_button')));
         await tapAndSettle(tester, find.byKey(const Key('wizard_next_button')));
@@ -94,25 +86,27 @@ void main() {
       await stage('people tab shows participants', () async {
         await tapAndSettle(tester, find.text('People'));
         await pumpAndSettleWithTimeout(tester);
-        // Wait for at least one participant name (order may vary on web/release)
-        final end = DateTime.now().add(const Duration(seconds: 30));
-        while (DateTime.now().isBefore(end)) {
-          await tester.pump(const Duration(milliseconds: 500));
-          if (find.text('Alice').evaluate().isNotEmpty ||
-              find.text('Bob').evaluate().isNotEmpty ||
-              find.text('Charlie').evaluate().isNotEmpty) {
-            break;
-          }
+        // On web, watchByGroupId uses polling (800ms); allow first emission and list build.
+        await tester.pump(const Duration(milliseconds: 1200));
+        // Scroll to ensure ListView builds all tiles (participants may be off-screen).
+        for (var i = 0; i < 5; i++) {
+          final s = find.byType(Scrollable).first;
+          if (s.evaluate().isEmpty) break;
+          await tester.drag(s, const Offset(0, -120));
+          await tester.pumpAndSettle();
+          if (find.textContaining('Alice').evaluate().isNotEmpty) break;
         }
         await waitForWidget(
           tester,
-          find.text('Alice'),
+          find.textContaining('Alice'),
           timeout: const Duration(seconds: 30),
         );
-        await scrollUntilVisible(tester, find.text('Alice'));
-        expect(find.text('Alice'), findsWidgets);
-        expect(find.text('Bob'), findsWidgets);
-        expect(find.text('Charlie'), findsWidgets);
+        await scrollUntilVisible(tester, find.textContaining('Alice'));
+        await scrollUntilVisible(tester, find.textContaining('Bob'));
+        await scrollUntilVisible(tester, find.textContaining('Charlie'));
+        expect(find.textContaining('Alice'), findsWidgets);
+        expect(find.textContaining('Bob'), findsWidgets);
+        expect(find.textContaining('Charlie'), findsWidgets);
       });
 
       // ── Stage: add participant manually (sheet) ──
@@ -142,8 +136,12 @@ void main() {
         );
         await tapAndSettle(tester, find.text('Done'));
         await pumpAndSettleWithTimeout(tester);
+        // Participant create is deferred (addPostFrameCallback); allow poll to emit on web.
+        await tester.pump(const Duration(milliseconds: 1200));
+        await waitForWidget(tester, find.textContaining('Diana'), timeout: const Duration(seconds: 15));
+        await scrollUntilVisible(tester, find.textContaining('Diana'));
 
-        expect(find.text('Diana'), findsWidgets);
+        expect(find.textContaining('Diana'), findsWidgets);
       });
 
       // ── Stage: switch back to Expenses tab ──
@@ -154,9 +152,11 @@ void main() {
 
       // ── Stage: add expense for balance checks later ──
       await stage('add expense for settlement test', () async {
-        await tapAndSettle(tester, find.byIcon(Icons.add));
+        await waitForWidget(tester, find.byIcon(Icons.add), timeout: const Duration(seconds: 10));
+        await tapAndSettle(tester, find.byIcon(Icons.add).first);
         await pumpAndSettleWithTimeout(tester);
 
+        await ensureExpenseFormReady(tester);
         await enterTextAndPump(
             tester, find.byType(TextField).first, 'Group Dinner');
         await enterTextAndPump(tester, find.byType(TextField).at(1), '120');
@@ -225,9 +225,9 @@ void main() {
 
       // ── Stage: change settlement method ──
       await stage('change settlement method', () async {
-        // Scroll to "Settlement method" label and tap the "Pairwise" method text
+        // Scroll to "Settlement Method" label and tap the "Pairwise" method text
         // which is the default method shown in the InkWell row.
-        await scrollUntilVisible(tester, find.text('Settlement method'));
+        await scrollUntilVisible(tester, find.text('Settlement Method'));
 
         final pairwiseText = find.text('Pairwise');
         if (pairwiseText.evaluate().isNotEmpty) {

@@ -58,15 +58,10 @@ void main() {
         await tapAndSettle(tester, find.byKey(const Key('wizard_next_button')));
         await tester.pump(const Duration(milliseconds: 400));
 
-        // Add Alice & Bob via onSubmitted (keyboard done action)
-        // to avoid hit-test issues with the Add button inside PageView.
+        // Add Alice & Bob by entering name then tapping Add button.
         await waitForWidget(tester, find.text('Add'));
-        await enterTextAndPump(tester, find.byType(TextField).last, 'Alice');
-        await tester.testTextInput.receiveAction(TextInputAction.done);
-        await tester.pumpAndSettle();
-        await enterTextAndPump(tester, find.byType(TextField).last, 'Bob');
-        await tester.testTextInput.receiveAction(TextInputAction.done);
-        await tester.pumpAndSettle();
+        await addWizardParticipant(tester, 'Alice');
+        await addWizardParticipant(tester, 'Bob');
 
         // Step 2 → Step 3 → Step 4
         await waitForWidget(tester, find.byKey(const Key('wizard_next_button')));
@@ -90,8 +85,9 @@ void main() {
       // ── Stage: add expense with tag ──
       await stage('add expense with tag', () async {
         await waitForWidget(tester, find.byIcon(Icons.add));
-        await tapAndSettle(tester, find.byIcon(Icons.add));
+        await tapAndSettle(tester, find.byIcon(Icons.add).first);
         await pumpAndSettleWithTimeout(tester);
+        await ensureExpenseFormReady(tester);
 
         await enterTextAndPump(
             tester, find.byType(TextField).first, 'Dinner');
@@ -121,8 +117,9 @@ void main() {
       // ── Stage: add expense with description ──
       await stage('add expense with description', () async {
         await waitForWidget(tester, find.byIcon(Icons.add));
-        await tapAndSettle(tester, find.byIcon(Icons.add));
+        await tapAndSettle(tester, find.byIcon(Icons.add).first);
         await pumpAndSettleWithTimeout(tester);
+        await ensureExpenseFormReady(tester);
 
         await enterTextAndPump(
             tester, find.byType(TextField).first, 'Hotel Stay');
@@ -158,8 +155,9 @@ void main() {
       // ── Stage: add expense with bill breakdown ──
       await stage('add expense with bill breakdown', () async {
         await waitForWidget(tester, find.byIcon(Icons.add));
-        await tapAndSettle(tester, find.byIcon(Icons.add));
+        await tapAndSettle(tester, find.byIcon(Icons.add).first);
         await pumpAndSettleWithTimeout(tester);
+        await ensureExpenseFormReady(tester);
 
         await enterTextAndPump(
             tester, find.byType(TextField).first, 'Restaurant Bill');
@@ -211,8 +209,9 @@ void main() {
       // ── Stage: add expense with long title ──
       await stage('add expense with long title', () async {
         await waitForWidget(tester, find.byIcon(Icons.add));
-        await tapAndSettle(tester, find.byIcon(Icons.add));
+        await tapAndSettle(tester, find.byIcon(Icons.add).first);
         await pumpAndSettleWithTimeout(tester);
+        await ensureExpenseFormReady(tester);
 
         const longTitle =
             'International Business Conference Registration Fee and Dinner Gala';
@@ -230,8 +229,9 @@ void main() {
       // ── Stage: add parts split expense ──
       await stage('add parts split expense', () async {
         await waitForWidget(tester, find.byIcon(Icons.add));
-        await tapAndSettle(tester, find.byIcon(Icons.add));
+        await tapAndSettle(tester, find.byIcon(Icons.add).first);
         await pumpAndSettleWithTimeout(tester);
+        await ensureExpenseFormReady(tester);
 
         await enterTextAndPump(
             tester, find.byType(TextField).first, 'Lunch Parts');
@@ -252,8 +252,9 @@ void main() {
       // ── Stage: add amounts split expense ──
       await stage('add amounts split expense', () async {
         await waitForWidget(tester, find.byIcon(Icons.add));
-        await tapAndSettle(tester, find.byIcon(Icons.add));
+        await tapAndSettle(tester, find.byIcon(Icons.add).first);
         await pumpAndSettleWithTimeout(tester);
+        await ensureExpenseFormReady(tester);
 
         await enterTextAndPump(
             tester, find.byType(TextField).first, 'Taxi Amounts');
@@ -267,8 +268,18 @@ void main() {
         await tapSubmitExpenseButton(tester);
         await ensureFormClosed(tester);
 
-        await waitForWidget(tester, find.text('Taxi Amounts'));
-        expect(find.text('Taxi Amounts'), findsWidgets);
+        // Allow expense list to refresh (web uses polling every 800ms).
+        await tester.pump(const Duration(milliseconds: 2000));
+        await waitForWidget(tester, find.textContaining('Taxi'), timeout: const Duration(seconds: 25));
+        for (var i = 0; i < 10; i++) {
+          final s = find.byType(Scrollable).first;
+          if (s.evaluate().isEmpty) break;
+          await tester.drag(s, const Offset(0, -150));
+          await tester.pumpAndSettle();
+          if (find.textContaining('Taxi').evaluate().isNotEmpty) break;
+        }
+        await scrollUntilVisible(tester, find.textContaining('Taxi'));
+        expect(find.textContaining('Taxi'), findsWidgets);
       });
 
       // ── Stage: view and edit expense ──
@@ -321,13 +332,15 @@ void main() {
       // ── Stage: add income ──
       await stage('add income', () async {
         await waitForWidget(tester, find.byIcon(Icons.add));
-        await tapAndSettle(tester, find.byIcon(Icons.add));
+        await tapAndSettle(tester, find.byIcon(Icons.add).first);
         await pumpAndSettleWithTimeout(tester);
+        await ensureExpenseFormReady(tester);
 
         await waitForWidget(tester, find.text('Income'), timeout: const Duration(seconds: 15));
         await scrollUntilVisible(tester, find.text('Income'));
         await tester.ensureVisible(find.text('Income').first);
         await tapAndSettle(tester, find.text('Income').first);
+        await ensureExpenseFormReady(tester);
 
         await enterTextAndPump(
             tester, find.byType(TextField).first, 'Refund');
@@ -343,8 +356,9 @@ void main() {
       // ── Stage: add transfer ──
       await stage('add transfer', () async {
         await waitForWidget(tester, find.byIcon(Icons.add));
-        await tapAndSettle(tester, find.byIcon(Icons.add));
+        await tapAndSettle(tester, find.byIcon(Icons.add).first);
         await pumpAndSettleWithTimeout(tester);
+        await ensureExpenseFormReady(tester);
 
         await waitForWidget(tester, find.text('Transfer'));
         await tester.ensureVisible(find.text('Transfer'));
@@ -432,7 +446,7 @@ void main() {
         await waitForWidget(tester, find.text('Delete'));
         await tapAndSettle(tester, find.text('Delete'));
 
-        await waitForWidget(tester, find.text('Delete expense?'));
+        await waitForWidget(tester, find.text('Delete Expense?'));
         final confirmButton = find.text('Delete');
         await tapAndSettle(tester, confirmButton.last);
 

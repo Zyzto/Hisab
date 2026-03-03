@@ -124,8 +124,9 @@ void main() {
 
       // ── Stage: add expense (group currency SAR by default) ──
       await stage('add expense in group currency', () async {
-        await tapAndSettle(tester, find.byIcon(Icons.add));
+        await tapAndSettle(tester, find.byIcon(Icons.add).first);
         await pumpAndSettleWithTimeout(tester);
+        await ensureExpenseFormReady(tester);
 
         await enterTextAndPump(
             tester, find.byType(TextField).first, 'Coffee');
