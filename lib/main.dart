@@ -183,14 +183,18 @@ void main() {
         );
         settingsProviders.controller.set(localOnlySettingDef, false);
         settingsProviders.controller.set(onboardingCompletedSettingDef, true);
-        Log.info('Completed pending onboarding OAuth redirect');
+        Log.info(
+          'Setting changed: onboarding OAuth flags and local_only, onboarding_completed=true',
+        );
       } else if (onboardingPending && session == null) {
         // OAuth was started but failed/cancelled
         settingsProviders.controller.set(
           onboardingOnlinePendingSettingDef,
           false,
         );
-        Log.info('Cleared failed onboarding OAuth redirect');
+        Log.info(
+          'Setting changed: ${onboardingOnlinePendingSettingDef.key}=false',
+        );
       }
 
       if (settingsPending && session != null) {
@@ -200,14 +204,19 @@ void main() {
           false,
         );
         settingsProviders.controller.set(localOnlySettingDef, false);
-        Log.info('Completed pending settings OAuth redirect');
+        Log.info(
+          'Setting changed: ${settingsOnlinePendingSettingDef.key}=false, '
+          '${localOnlySettingDef.key}=false',
+        );
       } else if (settingsPending && session == null) {
         // OAuth was started but failed/cancelled
         settingsProviders.controller.set(
           settingsOnlinePendingSettingDef,
           false,
         );
-        Log.info('Cleared failed settings OAuth redirect');
+        Log.info(
+          'Setting changed: ${settingsOnlinePendingSettingDef.key}=false',
+        );
       }
 
       // If previously online but no session on startup, do NOT force
@@ -280,6 +289,9 @@ void main() {
     ]);
     if (resolved != null) {
       settingsProviders.controller.set(languageSettingDef, resolved.languageCode);
+      Log.info(
+        'Setting changed: ${languageSettingDef.key}=${resolved.languageCode} (platform)',
+      );
     }
   }
   final startLocale = easyLocalizationReady && settingsProviders != null

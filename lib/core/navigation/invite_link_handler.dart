@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 
 import 'app_router.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
@@ -70,6 +71,9 @@ class _InviteLinkHandlerState extends ConsumerState<InviteLinkHandler> {
     final initialToken = extractInviteTokenFromUri(initialUri);
     if (initialToken != null) {
       notifier.set(initialToken);
+      Log.info(
+        'Setting changed: ${pendingInviteTokenSettingDef.key}=(set from link)',
+      );
       final onboardingCompleted = ref.read(onboardingCompletedProvider);
       if (onboardingCompleted) {
         // Let router redirect handle navigation (it reads pending token and redirects).
@@ -86,6 +90,9 @@ class _InviteLinkHandlerState extends ConsumerState<InviteLinkHandler> {
       final token = extractInviteTokenFromUri(uri);
       if (token != null) {
         notifier.set(token);
+        Log.info(
+          'Setting changed: ${pendingInviteTokenSettingDef.key}=(set from stream)',
+        );
         if (mounted && ref.read(onboardingCompletedProvider)) {
           ref.read(routerProvider).refresh();
         }

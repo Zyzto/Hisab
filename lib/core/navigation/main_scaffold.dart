@@ -51,7 +51,6 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
   }
 
   bool _onBackInterceptor(bool stopDefaultButtonEvent, RouteInfo info) {
-    if (info.ifRouteChanged(context)) return false;
     // Use the actual top route from GoRouter so we only intercept when the user
     // is really on home/settings, not when they are on group/expense (pushed on top).
     final currentPath = GoRouter.of(
@@ -60,8 +59,13 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     final isAtSettings =
         currentPath == RoutePaths.settings ||
         currentPath.startsWith('${RoutePaths.settings}/');
+    final isAtArchived = currentPath == RoutePaths.archivedGroups;
     final isAtHome = currentPath == RoutePaths.home;
     if (isAtSettings) {
+      context.go(RoutePaths.home);
+      return true;
+    }
+    if (isAtArchived) {
       context.go(RoutePaths.home);
       return true;
     }
