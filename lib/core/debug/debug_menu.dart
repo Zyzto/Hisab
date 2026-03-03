@@ -8,6 +8,7 @@ import 'package:upgrader/upgrader.dart';
 import '../database/database_providers.dart';
 import '../layout/responsive_sheet.dart';
 import '../navigation/route_paths.dart';
+import '../widgets/error_content.dart';
 import '../widgets/sheet_helpers.dart';
 import '../services/connectivity_service.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
@@ -149,6 +150,24 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
     }
   }
 
+  void _showErrorUI() {
+    showResponsiveSheet<void>(
+      context: context,
+      title: 'Error (debug)',
+      isScrollControlled: true,
+      child: Builder(
+        builder: (sheetContext) => SingleChildScrollView(
+          child: ErrorContentWidget(
+            message:
+                'Sample error for testing the error UI. Use Share/Report to verify actions.',
+            onRetry: () => Navigator.of(sheetContext).pop(),
+            details: 'Debug-triggered sample error.\nStack trace omitted.',
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -231,6 +250,12 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
               label: 'Open invite by token',
               subtitle: 'Paste token to test invite flow in debug',
               onTap: _openInviteByToken,
+            ),
+            _DebugAction(
+              icon: Icons.error_outline,
+              label: 'Show error UI',
+              subtitle: 'Opens error content (Share/Report) for testing',
+              onTap: _showErrorUI,
             ),
 
             // Sync status override (for testing chip/banner)
