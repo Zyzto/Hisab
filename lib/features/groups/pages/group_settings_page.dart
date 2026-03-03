@@ -491,7 +491,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     final currencyCode = group.currencyCode;
     final budgetCents = group.budgetAmountCents;
     final display = budgetCents != null && budgetCents > 0
-        ? CurrencyFormatter.formatCents(budgetCents, currencyCode)
+        ? CurrencyFormatter.formatCentsAsWholeUnits(budgetCents, currencyCode)
         : '—';
 
     return InkWell(
@@ -522,17 +522,18 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     Group group,
     WidgetRef ref,
   ) async {
-    final controller = TextEditingController();
     final budgetCents = group.budgetAmountCents;
+    String initialValue = '';
     if (budgetCents != null && budgetCents > 0) {
       final currency = CurrencyHelpers.fromCode(group.currencyCode);
       final decimals = currency?.decimalDigits ?? 2;
-      final divisor = decimals == 0 ? 1.0 : (decimals == 1 ? 10.0 : 100.0);
-      controller.text = (budgetCents / divisor).toStringAsFixed(decimals);
+      final divisor = CurrencyHelpers.divisorForDecimalDigits(decimals);
+      initialValue = (budgetCents / divisor).round().toString();
     }
     final hint =
         CurrencyHelpers.fromCode(group.currencyCode)?.symbol ??
         group.currencyCode;
+    final bodyKey = GlobalKey<_BudgetSheetBodyState>();
     final result = await showResponsiveSheet<String?>(
       context: context,
       title: 'my_budget'.tr(),
@@ -544,15 +545,10 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
           ctx,
           title: 'my_budget'.tr(),
           showTitleInBody: !LayoutBreakpoints.isTabletOrWider(context),
-          body: TextField(
-            controller: controller,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(
-              labelText: 'budget_amount'.tr(),
-              hintText: hint,
-              border: const OutlineInputBorder(),
-            ),
-            autofocus: true,
+          body: _BudgetSheetBody(
+            key: bodyKey,
+            initialValue: initialValue,
+            hint: hint,
           ),
           actions: [
             TextButton(
@@ -565,24 +561,27 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                 child: Text('cancel'.tr()),
               ),
             FilledButton(
-              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+              onPressed: () {
+                final text =
+                    bodyKey.currentState?.controller.text.trim() ?? '';
+                Navigator.pop(ctx, text);
+              },
               child: Text('done'.tr()),
             ),
           ],
         ),
       ),
     );
-    controller.dispose();
     if (result == null || !mounted) return;
 
     int? newBudgetCents;
     if (result.isNotEmpty) {
-      final value = double.tryParse(result.replaceAll(',', '.'));
+      final value = int.tryParse(result.replaceAll(',', '').trim());
       if (value != null && value >= 0) {
         final currency = CurrencyHelpers.fromCode(group.currencyCode);
         final decimals = currency?.decimalDigits ?? 2;
-        final divisor = decimals == 0 ? 1 : (decimals == 1 ? 10 : 100);
-        newBudgetCents = (value * divisor).round();
+        final divisor = CurrencyHelpers.divisorForDecimalDigits(decimals);
+        newBudgetCents = value * divisor;
       }
     }
 
@@ -603,6 +602,10 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                       updatedAt: DateTime.now(),
                     ),
             );
+        Log.info(
+          'Group setting: budget_updated groupId=${widget.groupId} '
+          'budgetCents=${newBudgetCents ?? "cleared"}',
+        );
         ref.invalidate(futureGroupProvider(widget.groupId));
         if (context.mounted) {
           context.showSuccess('budget_updated'.tr());
@@ -627,75 +630,68 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     final theme = Theme.of(context);
     final currency = CurrencyHelpers.fromCode(group.currencyCode);
 
-    return InkWell(
-      onTap: _saving ? null : () => _onCurrencyTap(group, expensesAsync, ref),
-      borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          border: Border.all(color: theme.colorScheme.outline),
-          borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
-        ),
-        child: Row(
-          children: [
-            if (currency != null) ...[
-              Text(
-                CurrencyUtils.currencyToEmoji(currency),
-                style: const TextStyle(fontSize: 24),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  CurrencyHelpers.displayLabel(currency),
-                  style: theme.textTheme.bodyLarge,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _saving
+            ? null
+            : () => _onCurrencyTap(context, group, expensesAsync, ref),
+        borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            border: Border.all(color: theme.colorScheme.outline),
+            borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
+          ),
+          child: Row(
+            children: [
+              if (currency != null) ...[
+                Text(
+                  CurrencyUtils.currencyToEmoji(currency),
+                  style: const TextStyle(fontSize: 24),
                 ),
-              ),
-            ] else ...[
-              Expanded(
-                child: Text(
-                  group.currencyCode,
-                  style: theme.textTheme.bodyLarge,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    CurrencyHelpers.displayLabel(currency),
+                    style: theme.textTheme.bodyLarge,
+                  ),
                 ),
+              ] else ...[
+                Expanded(
+                  child: Text(
+                    group.currencyCode,
+                    style: theme.textTheme.bodyLarge,
+                  ),
+                ),
+              ],
+              Icon(
+                Icons.arrow_drop_down,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ],
-            Icon(
-              Icons.arrow_drop_down,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
   Future<void> _onCurrencyTap(
+    BuildContext sheetContext,
     Group group,
     AsyncValue<List<Expense>> expensesAsync,
     WidgetRef ref,
   ) async {
+    if (!sheetContext.mounted) return;
     final stored = ref.read(favoriteCurrenciesProvider);
     final favorites = CurrencyHelpers.getEffectiveFavorites(stored);
     CurrencyHelpers.showPicker(
-      context: context,
+      context: sheetContext,
       favorite: favorites,
       centerInFullViewport: true,
       onSelect: (Currency currency) async {
         if (currency.code == group.currencyCode) return;
-        if (!mounted) return;
-
-        // Warn if expenses exist
-        final expenses = expensesAsync.value;
-        if (expenses != null && expenses.isNotEmpty) {
-          final pageContext = context;
-          final ok = await showConfirmSheet(
-            pageContext,
-            title: 'change_currency'.tr(),
-            content: 'currency_change_warning'.tr(),
-            confirmLabel: 'change_currency'.tr(),
-            centerInFullViewport: true,
-          );
-          if (ok != true || !mounted) return;
-        }
+        if (!sheetContext.mounted) return;
 
         try {
           await _withSaving(() async {
@@ -711,11 +707,13 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
               'Currency changed: groupId=${widget.groupId} currency=${currency.code}',
             );
             ref.invalidate(futureGroupProvider(widget.groupId));
-            if (mounted) context.showSuccess('group_currency_updated'.tr());
+            if (sheetContext.mounted) {
+              sheetContext.showSuccess('group_currency_updated'.tr());
+            }
           });
         } catch (e, st) {
           Log.warning('Currency change failed', error: e, stackTrace: st);
-          if (mounted) context.showError('generic_error'.tr());
+          if (sheetContext.mounted) sheetContext.showError('generic_error'.tr());
         }
       },
     );
@@ -733,41 +731,44 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return InkWell(
-      onTap: _saving
-          ? null
-          : () => _showSettlementMethodPicker(context, group, ref),
-      borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          border: Border.all(color: colorScheme.outline),
-          borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _methodLabel(group.settlementMethod),
-                    style: theme.textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _methodDescription(group.settlementMethod),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _saving
+            ? null
+            : () => _showSettlementMethodPicker(context, group, ref),
+        borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            border: Border.all(color: colorScheme.outline),
+            borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _methodLabel(group.settlementMethod),
+                      style: theme.textTheme.titleMedium,
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                    const SizedBox(height: 2),
+                    Text(
+                      _methodDescription(group.settlementMethod),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Icon(Icons.arrow_drop_down, color: colorScheme.onSurfaceVariant),
-          ],
+              Icon(Icons.arrow_drop_down, color: colorScheme.onSurfaceVariant),
+            ],
+          ),
         ),
       ),
     );
@@ -1325,6 +1326,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
         await ref
             .read(groupRepositoryProvider)
             .update(group.copyWith(name: newName, updatedAt: DateTime.now()));
+        Log.info(
+          'Group setting: name_updated groupId=${widget.groupId} name="$newName"',
+        );
         ref.invalidate(futureGroupProvider(widget.groupId));
         if (context.mounted) {
           context.showSuccess(
@@ -1519,6 +1523,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                 updatedAt: DateTime.now(),
               ),
             );
+        Log.info(
+          'Group setting: icon_color_updated groupId=${widget.groupId}',
+        );
         ref.invalidate(futureGroupProvider(widget.groupId));
         if (context.mounted) {
           context.showSuccess('group_icon_color_updated'.tr());
@@ -1676,6 +1683,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                 updatedAt: DateTime.now(),
               ),
             );
+        Log.info(
+          'Group setting: permissions_updated groupId=${widget.groupId}',
+        );
         ref.invalidate(futureGroupProvider(widget.groupId));
       });
     } catch (e, st) {
@@ -1703,6 +1713,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
             .update(
               group.copyWith(isPersonal: false, updatedAt: DateTime.now()),
             );
+        Log.info(
+          'Group setting: share_as_group groupId=${widget.groupId}',
+        );
         ref.invalidate(futureGroupProvider(widget.groupId));
         if (context.mounted) {
           context.showSuccess('share_as_group_done'.tr());
@@ -1742,6 +1755,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
             .update(
               group.copyWith(isPersonal: true, updatedAt: DateTime.now()),
             );
+        Log.info(
+          'Group setting: use_as_personal groupId=${widget.groupId}',
+        );
         ref.invalidate(futureGroupProvider(widget.groupId));
         if (context.mounted) {
           context.showSuccess('use_as_personal_done'.tr());
@@ -1838,6 +1854,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     try {
       await _withSaving(() async {
         await ref.read(groupRepositoryProvider).archive(widget.groupId);
+        Log.info(
+          'Group setting: archived groupId=${widget.groupId}',
+        );
         if (context.mounted) {
           context.showSuccess(
             (isPersonal ? 'list_archived' : 'group_archived').tr(),
@@ -1862,6 +1881,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     try {
       await _withSaving(() async {
         await ref.read(groupRepositoryProvider).unarchive(widget.groupId);
+        Log.info(
+          'Group setting: unarchived groupId=${widget.groupId}',
+        );
         if (context.mounted) {
           context.showSuccess(
             (isPersonal ? 'list_unarchived' : 'group_unarchived').tr(),
@@ -1890,6 +1912,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
         await ref
             .read(groupRepositoryProvider)
             .setLocalArchived(widget.groupId);
+        Log.info(
+          'Group setting: hide_from_list groupId=${widget.groupId}',
+        );
         if (context.mounted) {
           context.showSuccess('group_hidden_from_list'.tr());
           context.pop();
@@ -1912,6 +1937,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
         await ref
             .read(groupRepositoryProvider)
             .clearLocalArchived(widget.groupId);
+        Log.info(
+          'Group setting: unhide_from_list groupId=${widget.groupId}',
+        );
         if (context.mounted) {
           context.showSuccess('group_unhidden_from_list'.tr());
         }
@@ -2168,6 +2196,52 @@ class _TimedConfirmSheetContentState extends State<_TimedConfirmSheetContent> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Sheet body that owns a [TextEditingController] so it is disposed when
+/// the route is removed (avoids "used after being disposed").
+class _BudgetSheetBody extends StatefulWidget {
+  const _BudgetSheetBody({
+    super.key,
+    required this.initialValue,
+    required this.hint,
+  });
+
+  final String initialValue;
+  final String hint;
+
+  @override
+  State<_BudgetSheetBody> createState() => _BudgetSheetBodyState();
+}
+
+class _BudgetSheetBodyState extends State<_BudgetSheetBody> {
+  late final TextEditingController controller;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = TextEditingController(text: widget.initialValue);
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      keyboardType: TextInputType.number,
+      decoration: InputDecoration(
+        labelText: 'budget_amount'.tr(),
+        hintText: widget.hint,
+        border: const OutlineInputBorder(),
+      ),
+      autofocus: true,
     );
   }
 }
