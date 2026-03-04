@@ -27,7 +27,9 @@ import '../widgets/onboarding_preferences_page.dart';
 import '../widgets/onboarding_welcome_page.dart';
 
 class OnboardingPage extends ConsumerStatefulWidget {
-  const OnboardingPage({super.key});
+  const OnboardingPage({super.key, this.forceBusyForTest = false});
+
+  final bool forceBusyForTest;
 
   @override
   ConsumerState<OnboardingPage> createState() => _OnboardingPageState();
@@ -65,10 +67,12 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
 
   static const int _lastPageIndex = 3;
   int _currentPage = 0;
+  bool _isCompleting = false;
 
   @override
   void initState() {
     super.initState();
+    _isCompleting = widget.forceBusyForTest;
     _pageController = PageController(initialPage: 0);
     _languagePulseController = AnimationController(
       vsync: this,
@@ -151,61 +155,106 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      body: SafeArea(
-        child: ConstrainedContent(
-          child: Column(
-            children: [
-              Expanded(
-                child: PageView(
-                  controller: _pageController,
-                  onPageChanged: (i) {
-                    setState(() {
-                      _currentPage = i;
-                      if (i == 2 && _permissionStatusFuture == null) {
-                        _permissionStatusFuture = _loadPermissionStatus();
-                      }
-                    });
-                  },
+      body: Stack(
+        children: [
+          SafeArea(
+            child: AbsorbPointer(
+              absorbing: _isCompleting,
+              child: ConstrainedContent(
+                child: Column(
                   children: [
-                    const RepaintBoundary(child: OnboardingWelcomePage()),
-                    const RepaintBoundary(child: OnboardingPreferencesPage()),
-                    RepaintBoundary(
-                      child: OnboardingPermissionsPage(
-                        settings: settings,
-                        onlineAvailable: onlineAvailable,
-                        cameraGranted: _cameraGranted,
-                        notificationGranted: _notificationGranted,
-                        permissionStatusFuture: _permissionStatusFuture,
-                        onRequestCamera: () async {
-                          final result = await PermissionService
-                              .requestCameraPermission(context);
-                          if (mounted) {
-                            setState(() => _cameraGranted = result);
-                          }
+                    Expanded(
+                      child: PageView(
+                        controller: _pageController,
+                        physics: _isCompleting
+                            ? const NeverScrollableScrollPhysics()
+                            : null,
+                        onPageChanged: (i) {
+                          setState(() {
+                            _currentPage = i;
+                            if (i == 2 && _permissionStatusFuture == null) {
+                              _permissionStatusFuture = _loadPermissionStatus();
+                            }
+                          });
                         },
-                        onRequestNotification: () async {
-                          final result = await PermissionService
-                              .requestNotificationPermission(context);
-                          if (mounted) {
-                            setState(() => _notificationGranted = result);
-                          }
-                        },
+                        children: [
+                          const RepaintBoundary(child: OnboardingWelcomePage()),
+                          const RepaintBoundary(
+                            child: OnboardingPreferencesPage(),
+                          ),
+                          RepaintBoundary(
+                            child: OnboardingPermissionsPage(
+                              settings: settings,
+                              onlineAvailable: onlineAvailable,
+                              cameraGranted: _cameraGranted,
+                              notificationGranted: _notificationGranted,
+                              permissionStatusFuture: _permissionStatusFuture,
+                              onRequestCamera: () async {
+                                final result = await PermissionService
+                                    .requestCameraPermission(context);
+                                if (mounted) {
+                                  setState(() => _cameraGranted = result);
+                                }
+                              },
+                              onRequestNotification: () async {
+                                final result = await PermissionService
+                                    .requestNotificationPermission(context);
+                                if (mounted) {
+                                  setState(() => _notificationGranted = result);
+                                }
+                              },
+                            ),
+                          ),
+                          RepaintBoundary(
+                            child: OnboardingConnectPage(
+                              settings: settings,
+                              onlineAvailable: onlineAvailable,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    RepaintBoundary(
-                      child: OnboardingConnectPage(
-                        settings: settings,
-                        onlineAvailable: onlineAvailable,
-                      ),
-                    ),
+                    _buildPageIndicator(context),
+                    _buildNavigationBar(context, colorScheme, settings),
                   ],
                 ),
               ),
-              _buildPageIndicator(context),
-              _buildNavigationBar(context, colorScheme, settings),
-            ],
+            ),
           ),
-        ),
+          if (_isCompleting)
+            Positioned.fill(
+              child: ColoredBox(
+                color: colorScheme.scrim.withValues(alpha: 0.24),
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: ThemeConfig.spacingL,
+                      vertical: ThemeConfig.spacingM,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surface,
+                      borderRadius: BorderRadius.circular(ThemeConfig.radiusM),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        const SizedBox(width: ThemeConfig.spacingM),
+                        Text(
+                          'services_status_loading'.tr(),
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -276,7 +325,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
               color: colorScheme.surfaceContainerHighest,
               shape: const CircleBorder(),
               child: InkWell(
-                onTap: () async {
+                onTap: _isCompleting
+                    ? null
+                    : () async {
                   if (!_languagePulseStopped) {
                     _languagePulseStopped = true;
                     _languagePulseController.stop();
@@ -395,7 +446,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: () {
+              onTap: _isCompleting
+                  ? null
+                  : () {
                 if (_themeDemoRunning) {
                   _themeDemoTimer?.cancel();
                   _themeDemoTimer = null;
@@ -493,7 +546,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                             button: true,
                             label: 'onboarding_back'.tr(),
                             child: TextButton.icon(
-                              onPressed: () {
+                              onPressed: _isCompleting
+                                  ? null
+                                  : () {
                                 _pageController.previousPage(
                                   duration: ThemeConfig.animationMedium,
                                   curve: Curves.easeInOut,
@@ -522,7 +577,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                             button: true,
                             label: 'onboarding_next'.tr(),
                             child: FilledButton.icon(
-                              onPressed: () {
+                              onPressed: _isCompleting
+                                  ? null
+                                  : () {
                                 _pageController.nextPage(
                                   duration: ThemeConfig.animationMedium,
                                   curve: Curves.easeInOut,
@@ -536,8 +593,10 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                             button: true,
                             label: 'onboarding_complete'.tr(),
                             child: FilledButton.icon(
-                              onPressed: () async => await _completeOnboarding(
-                                  ref, settings),
+                              onPressed: _isCompleting
+                                  ? null
+                                  : () async =>
+                                      await _completeOnboarding(ref, settings),
                               icon: const Icon(Icons.check),
                               label: Text('onboarding_complete'.tr()),
                             ),
@@ -569,57 +628,67 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
     WidgetRef ref,
     SettingsProviders settings,
   ) async {
+    if (_isCompleting) return;
+    setState(() => _isCompleting = true);
+
     final isLocalOnly = ref.read(settings.provider(localOnlySettingDef));
     final onlineAvailable = supabaseConfigAvailable;
 
-    if (!isLocalOnly && onlineAvailable) {
-      final authService = ref.read(authServiceProvider);
-      if (!authService.isAuthenticated) {
-        if (!mounted) return;
-        final result = await showSignInSheet(context, ref);
-        switch (result) {
-          case SignInResult.success:
-            await ref.read(dataSyncServiceProvider.notifier).syncNow();
-            break;
-          case SignInResult.pendingRedirect:
-            ref
-                .read(
-                  settings.provider(onboardingOnlinePendingSettingDef).notifier,
-                )
-                .set(true);
-            Log.info(
-              'Setting changed: ${onboardingOnlinePendingSettingDef.key}=true',
-            );
-            return;
-          case SignInResult.cancelled:
-            if (mounted) {
-              context.showToast('onboarding_online_requires_sign_in'.tr());
-            }
-            return;
+    try {
+      if (!isLocalOnly && onlineAvailable) {
+        final authService = ref.read(authServiceProvider);
+        if (!authService.isAuthenticated) {
+          if (!mounted) return;
+          final result = await showSignInSheet(context, ref);
+          switch (result) {
+            case SignInResult.success:
+              await ref.read(dataSyncServiceProvider.notifier).syncNow();
+              break;
+            case SignInResult.pendingRedirect:
+              ref
+                  .read(
+                    settings.provider(onboardingOnlinePendingSettingDef)
+                        .notifier,
+                  )
+                  .set(true);
+              Log.info(
+                'Setting changed: ${onboardingOnlinePendingSettingDef.key}=true',
+              );
+              return;
+            case SignInResult.cancelled:
+              if (mounted) {
+                context.showToast('onboarding_online_requires_sign_in'.tr());
+              }
+              return;
+          }
         }
       }
-    }
 
-    ref
-        .read(settings.provider(onboardingCompletedSettingDef).notifier)
-        .set(true);
-    Log.info(
-      'Setting changed: ${onboardingCompletedSettingDef.key}=true',
-    );
-    if (!mounted) return;
-    final pendingToken = ref.read(
-      settings.provider(pendingInviteTokenSettingDef),
-    );
-    if (pendingToken.isNotEmpty) {
       ref
-          .read(settings.provider(pendingInviteTokenSettingDef).notifier)
-          .set('');
+          .read(settings.provider(onboardingCompletedSettingDef).notifier)
+          .set(true);
       Log.info(
-        'Setting changed: ${pendingInviteTokenSettingDef.key}=(cleared)',
+        'Setting changed: ${onboardingCompletedSettingDef.key}=true',
       );
-      context.go(RoutePaths.inviteAccept(pendingToken));
-    } else {
-      context.go(RoutePaths.home);
+      if (!mounted) return;
+      final pendingToken = ref.read(
+        settings.provider(pendingInviteTokenSettingDef),
+      );
+      if (pendingToken.isNotEmpty) {
+        ref
+            .read(settings.provider(pendingInviteTokenSettingDef).notifier)
+            .set('');
+        Log.info(
+          'Setting changed: ${pendingInviteTokenSettingDef.key}=(cleared)',
+        );
+        context.go(RoutePaths.inviteAccept(pendingToken));
+      } else {
+        context.go(RoutePaths.home);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isCompleting = false);
+      }
     }
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:hisab/app.dart';
 
@@ -7,5 +8,9 @@ import 'package:hisab/app.dart';
 void main() {
   test('App widget can be instantiated', () {
     expect(const App(), isNotNull);
+  });
+
+  test('App stays a ConsumerStatefulWidget root', () {
+    expect(const App(), isA<ConsumerStatefulWidget>());
   });
 }

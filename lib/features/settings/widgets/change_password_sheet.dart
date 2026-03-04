@@ -175,16 +175,13 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final viewInsetsBottom = MediaQuery.of(context).viewInsets.bottom;
 
     return Padding(
       padding: EdgeInsets.only(
         left: 24,
         right: 24,
         top: 16,
-        bottom: MediaQuery.of(context).padding.bottom +
-            viewInsetsBottom +
-            24,
+        bottom: MediaQuery.of(context).padding.bottom + 24,
       ),
       child: SingleChildScrollView(
         child: Column(
