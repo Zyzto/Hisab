@@ -82,6 +82,12 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
             body: Center(child: CircularProgressIndicator()),
           );
         }
+        final myRole = myRoleAsync.asData?.value;
+        final isOwnerOrAdmin =
+            localOnly ||
+            myRole == GroupRole.owner ||
+            myRole == GroupRole.admin;
+        final canEditSettings = isOwnerOrAdmin || group.allowMemberChangeSettings;
         return LayoutBuilder(
           builder: (context, layoutConstraints) {
             return Scaffold(
@@ -109,7 +115,11 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
               ),
               children: [
                 // ── Group Profile Header ──
-                _buildProfileHeader(context, group),
+                _buildProfileHeader(
+                  context,
+                  group,
+                  canEditSettings: canEditSettings,
+                ),
                 const SizedBox(height: ThemeConfig.spacingL),
 
                 // ── Currency Section ──
@@ -118,7 +128,13 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                   title: (group.isPersonal ? 'currency' : 'group_currency')
                       .tr(),
                   children: [
-                    _buildCurrencyRow(context, group, expensesAsync, ref),
+                    _buildCurrencyRow(
+                      context,
+                      group,
+                      expensesAsync,
+                      ref,
+                      canEditSettings: canEditSettings,
+                    ),
                   ],
                 ),
                 const SizedBox(height: ThemeConfig.spacingL),
@@ -128,7 +144,14 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                   _buildSection(
                     context,
                     title: 'my_budget'.tr(),
-                    children: [_buildMyBudgetRow(context, group, ref)],
+                    children: [
+                      _buildMyBudgetRow(
+                        context,
+                        group,
+                        ref,
+                        canEditSettings: canEditSettings,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: ThemeConfig.spacingL),
                 ],
@@ -139,13 +162,19 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                     context,
                     title: 'settlement_method'.tr(),
                     children: [
-                      _buildSettlementMethodContent(context, group, ref),
+                      _buildSettlementMethodContent(
+                        context,
+                        group,
+                        ref,
+                        canEditSettings: canEditSettings,
+                      ),
                       if (group.settlementMethod == SettlementMethod.treasurer)
                         _buildTreasurerContent(
                           context,
                           group,
                           participantsAsync,
                           ref,
+                          canEditSettings: canEditSettings,
                         ),
                       _buildFreezeContent(
                         context,
@@ -153,6 +182,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                         participantsAsync,
                         expensesAsync,
                         ref,
+                        canEditSettings: canEditSettings,
                       ),
                     ],
                   ),
@@ -332,7 +362,11 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
   // Profile Header
   // ═══════════════════════════════════════════════════════════════════════════
 
-  Widget _buildProfileHeader(BuildContext context, Group group) {
+  Widget _buildProfileHeader(
+    BuildContext context,
+    Group group, {
+    required bool canEditSettings,
+  }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final avatarColor = group.color != null
@@ -358,7 +392,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
           children: [
             // Avatar – tap to change icon/color
             GestureDetector(
-              onTap: () => _showIconColorPicker(context, group),
+              onTap: canEditSettings
+                  ? () => _showIconColorPicker(context, group)
+                  : null,
               child: Stack(
                 alignment: AlignmentDirectional.bottomEnd,
                 children: [
@@ -377,21 +413,22 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                             ),
                           ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.all(3),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surface,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: colorScheme.outline.withValues(alpha: 0.3),
+                  if (canEditSettings)
+                    Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surface,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: colorScheme.outline.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.edit,
+                        size: 12,
+                        color: colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    child: Icon(
-                      Icons.edit,
-                      size: 12,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -403,7 +440,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                 children: [
                   // Name – tap to edit
                   GestureDetector(
-                    onTap: () => _showEditNameDialog(context, group),
+                    onTap: canEditSettings
+                        ? () => _showEditNameDialog(context, group)
+                        : null,
                     child: Row(
                       children: [
                         Flexible(
@@ -416,11 +455,12 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                           ),
                         ),
                         const SizedBox(width: ThemeConfig.spacingXS),
-                        Icon(
-                          Icons.edit_outlined,
-                          size: 16,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
+                        if (canEditSettings)
+                          Icon(
+                            Icons.edit_outlined,
+                            size: 16,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
                       ],
                     ),
                   ),
@@ -486,7 +526,12 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
   // My budget (personal only)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  Widget _buildMyBudgetRow(BuildContext context, Group group, WidgetRef ref) {
+  Widget _buildMyBudgetRow(
+    BuildContext context,
+    Group group,
+    WidgetRef ref, {
+    required bool canEditSettings,
+  }) {
     final theme = Theme.of(context);
     final currencyCode = group.currencyCode;
     final budgetCents = group.budgetAmountCents;
@@ -495,7 +540,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
         : '—';
 
     return InkWell(
-      onTap: _saving ? null : () => _showMyBudgetDialog(context, group, ref),
+      onTap: _saving || !canEditSettings
+          ? null
+          : () => _showMyBudgetDialog(context, group, ref),
       borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -626,6 +673,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     Group group,
     AsyncValue<List<Expense>> expensesAsync,
     WidgetRef ref,
+    {
+    required bool canEditSettings,
+  }
   ) {
     final theme = Theme.of(context);
     final currency = CurrencyHelpers.fromCode(group.currencyCode);
@@ -633,7 +683,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: _saving
+        onTap: _saving || !canEditSettings
             ? null
             : () => _onCurrencyTap(context, group, expensesAsync, ref),
         borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
@@ -727,6 +777,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     BuildContext context,
     Group group,
     WidgetRef ref,
+    {
+    required bool canEditSettings,
+  }
   ) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -734,7 +787,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: _saving
+        onTap: _saving || !canEditSettings
             ? null
             : () => _showSettlementMethodPicker(context, group, ref),
         borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
@@ -863,6 +916,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     Group group,
     AsyncValue<List<Participant>> participantsAsync,
     WidgetRef ref,
+    {
+    required bool canEditSettings,
+  }
   ) {
     final theme = Theme.of(context);
     return participantsAsync.when(
@@ -892,7 +948,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                     (p) => DropdownMenuItem(value: p.id, child: Text(p.name)),
                   )
                   .toList(),
-              onChanged: _saving
+              onChanged: _saving || !canEditSettings
                   ? null
                   : (v) => _onTreasurerChanged(ref, group, v),
             ),
@@ -923,6 +979,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     AsyncValue<List<Participant>> participantsAsync,
     AsyncValue<List<Expense>> expensesAsync,
     WidgetRef ref,
+    {
+    required bool canEditSettings,
+  }
   ) {
     final isFrozen = group.isSettlementFrozen;
 
@@ -940,7 +999,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
       title: Text('settlement_freeze'.tr()),
       subtitle: Text(subtitle),
       value: isFrozen,
-      onChanged: _saving
+      onChanged: _saving || !canEditSettings
           ? null
           : (v) {
               if (v) {

@@ -332,9 +332,16 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     if (!mounted || group == null) return;
     final localOnly = ref.read(effectiveLocalOnlyProvider);
     final myRole = await ref.read(myRoleInGroupProvider(widget.groupId).future);
+    if (!mounted) return;
+    final isOwnerOrAdmin =
+        localOnly || myRole == GroupRole.owner || myRole == GroupRole.admin;
+    final canAddExpense = isOwnerOrAdmin || group.allowMemberAddExpense;
+    if (!canAddExpense) {
+      context.showToast('add_expense_restricted'.tr());
+      return;
+    }
     final restrictPayerToSelf = !group.allowExpenseAsOtherParticipant &&
-        (localOnly ||
-            (myRole != GroupRole.owner && myRole != GroupRole.admin));
+        !isOwnerOrAdmin;
     final currentUserId = ref.read(authServiceProvider).currentUser?.id;
     var myParticipantId = participants
         .where((p) => p.userId == currentUserId)

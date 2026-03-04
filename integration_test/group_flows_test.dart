@@ -243,6 +243,56 @@ void main() {
         }
       });
 
+      // ── Stage: verify permission toggles in settings (online only) ──
+      await stage('verify group permission toggles (online only)', () async {
+        final permissionsTitle = find.text('Group Permissions');
+        if (permissionsTitle.evaluate().isEmpty) {
+          // Local-only runs do not render online group permission controls.
+          return;
+        }
+
+        await scrollUntilVisible(tester, permissionsTitle);
+        final allowAddExpenseText = find.text('Members can add expenses');
+        await scrollUntilVisible(tester, allowAddExpenseText);
+
+        final addExpenseTile = find.ancestor(
+          of: allowAddExpenseText,
+          matching: find.byType(SwitchListTile),
+        );
+        expect(addExpenseTile, findsOneWidget);
+
+        Finder addExpenseSwitchInTile() => find.descendant(
+              of: addExpenseTile,
+              matching: find.byType(Switch),
+            );
+        bool addExpenseSwitchValue() =>
+            tester.widget<Switch>(addExpenseSwitchInTile().first).value;
+
+        // Turn off "members can add expenses", verify + FAB disappears on detail,
+        // then turn it back on to keep the rest of this lifecycle test stable.
+        if (addExpenseSwitchValue()) {
+          await tapAndSettle(tester, addExpenseSwitchInTile().first);
+          await pumpAndSettleWithTimeout(tester);
+          await tester.pump(const Duration(milliseconds: 1200));
+        }
+
+        final backIcon = find.byIcon(Icons.arrow_back);
+        if (backIcon.evaluate().isNotEmpty) {
+          await tapAndSettle(tester, backIcon.first);
+        }
+        await waitForWidget(tester, find.text('Expenses'));
+        expect(find.byIcon(Icons.add), findsNothing);
+
+        await tapAndSettle(tester, find.byIcon(Icons.settings).last);
+        await waitForWidget(tester, find.text('Group Settings'));
+        await scrollUntilVisible(tester, allowAddExpenseText);
+        if (!addExpenseSwitchValue()) {
+          await tapAndSettle(tester, addExpenseSwitchInTile().first);
+          await pumpAndSettleWithTimeout(tester);
+          await tester.pump(const Duration(milliseconds: 1200));
+        }
+      });
+
       // ── Stage: navigate back to group detail ──
       await stage('navigate back to group detail', () async {
         // We should be on the settings page; navigate back
