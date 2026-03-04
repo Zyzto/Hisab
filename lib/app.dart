@@ -1,10 +1,13 @@
 import 'dart:ui' as ui;
+import 'dart:async';
 import 'package:feedback/feedback.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
+import 'package:go_router/go_router.dart';
 import 'package:upgrader/upgrader.dart';
 import 'package:version/version.dart';
 import 'core/auth/auth_providers.dart';
@@ -44,11 +47,16 @@ class _AppState extends ConsumerState<App>
   /// Hide debug FAB while the debug menu sheet is open so it doesn't obstruct it.
   bool _debugFabVisible = true;
   bool _updateTriggerRegistered = false;
+  bool _manualUpdateCheckInFlight = false;
+  ProviderSubscription<bool>? _authSubscription;
+  void Function(BuildContext context)? _updateCheckCallback;
+  VoidCallback? _clearOwnedUpdateCheckTrigger;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _scheduleStartupKeyboardDismiss();
     _upgrader = HisabUpgrader(
       durationUntilAlertAgain: const Duration(days: 3),
       debugLogging: false, // use app-level aggregated log instead of package prints
@@ -59,6 +67,7 @@ class _AppState extends ConsumerState<App>
         );
       },
     );
+    _registerAuthListener();
     if (!kDebugMode) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _showUpgradeAlert = true);
@@ -66,14 +75,37 @@ class _AppState extends ConsumerState<App>
     }
   }
 
+  void _scheduleStartupKeyboardDismiss() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _dismissKeyboardIfVisible();
+      // Some emulators/dev builds can restore IME visibility shortly after
+      // first frame (especially after restart). Retry once after a short delay.
+      Future<void>.delayed(const Duration(milliseconds: 250), () {
+        if (!mounted) return;
+        _dismissKeyboardIfVisible();
+      });
+    });
+  }
+
   @override
   void dispose() {
+    _clearOwnedUpdateCheckTrigger?.call();
+    _clearOwnedUpdateCheckTrigger = null;
+    _authSubscription?.close();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.resumed) {
+      _dismissKeyboardIfVisible();
+    }
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       _saveCurrentRoute();
@@ -82,12 +114,40 @@ class _AppState extends ConsumerState<App>
     }
   }
 
+  @override
+  void reassemble() {
+    super.reassemble();
+    _dismissKeyboardIfVisible();
+  }
+
+  void _dismissKeyboardIfVisible() {
+    final focus = FocusManager.instance.primaryFocus;
+    final hadFocus = focus != null && focus.hasFocus;
+    if (focus != null && focus.hasFocus) {
+      focus.unfocus();
+    }
+    if (!hadFocus && !_hasVisibleImeInsets()) return;
+    // Hot reload keeps state by design; explicitly ask the platform to hide
+    // the IME so keyboards do not remain visible after reload/lifecycle hops.
+    unawaited(SystemChannels.textInput.invokeMethod<void>('TextInput.hide'));
+  }
+
+  bool _hasVisibleImeInsets() {
+    final views = WidgetsBinding.instance.platformDispatcher.views;
+    for (final view in views) {
+      if (view.viewInsets.bottom > 0) return true;
+    }
+    return false;
+  }
+
   void _saveCurrentRoute() {
     if (!mounted) return;
     final path = ref.read(routerProvider).routerDelegate.currentConfiguration.uri.path;
     if (path.isEmpty || path == '/') return;
     final settings = ref.read(hisabSettingsProvidersProvider);
     if (settings != null) {
+      final current = ref.read(settings.provider(lastRoutePathSettingDef));
+      if (current == path) return;
       ref.read(settings.provider(lastRoutePathSettingDef).notifier).set(path);
       Log.info(
         'Setting changed: ${lastRoutePathSettingDef.key}=$path',
@@ -99,6 +159,8 @@ class _AppState extends ConsumerState<App>
     if (!mounted) return;
     final settings = ref.read(hisabSettingsProvidersProvider);
     if (settings != null) {
+      final current = ref.read(settings.provider(lastRoutePathSettingDef));
+      if (current.isEmpty) return;
       ref.read(settings.provider(lastRoutePathSettingDef).notifier).set('');
       Log.info(
         'Setting changed: ${lastRoutePathSettingDef.key}=(cleared)',
@@ -106,55 +168,164 @@ class _AppState extends ConsumerState<App>
     }
   }
 
+  void _registerAuthListener() {
+    _authSubscription?.close();
+    _authSubscription = ref.listenManual<bool>(
+      isAuthenticatedProvider,
+      (prev, isAuth) {
+        if (!mounted) return;
+        if (isAuth && prev != true) {
+          if (ref.read(notificationsEnabledProvider)) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              unawaited(
+                ref.read(notificationServiceProvider.notifier).initialize(context),
+              );
+            });
+          }
+        } else if (!isAuth && prev == true) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            unawaited(
+              ref.read(notificationServiceProvider.notifier).unregisterToken(),
+            );
+          });
+        }
+      },
+      fireImmediately: true,
+    );
+  }
+
   void _registerUpdateCheckTrigger() {
     if (_updateTriggerRegistered) return;
     _updateTriggerRegistered = true;
-    ref.read(updateCheckTriggerProvider).callback = (BuildContext context) {
+    _updateCheckCallback = (BuildContext context) {
+      if (_manualUpdateCheckInFlight) return;
+      _manualUpdateCheckInFlight = true;
       Future<void>(() async {
-        await _upgrader.updateVersionInfo();
-        if (!mounted) return;
-        final vi = _upgrader.versionInfo;
-        final pkg = _upgrader.state.packageInfo;
-        // When HisabUpgrader cleared versionInfo (store ≤ installed), show toast.
-        if (vi == null && _upgrader.lastCheckStoreNotNewer) {
-          if (context.mounted) context.showToast('no_update_available'.tr());
-          return;
-        }
-        // Don't show update dialog when store version is same or older (e.g. Play
-        // Store internal/closed/open testing returning same version).
-        if (vi != null &&
-            vi.appStoreVersion != null &&
-            pkg != null &&
-            pkg.version.isNotEmpty) {
-          try {
-            final installed = Version.parse(pkg.version);
-            if (vi.appStoreVersion! <= installed) {
-              if (context.mounted) {
-                context.showToast('no_update_available'.tr());
-              }
-              return;
-            }
-          } catch (_) {
-            // Continue and let upgrader decide if parse failed.
+        try {
+          await _upgrader.updateVersionInfo();
+          if (!mounted) return;
+          final vi = _upgrader.versionInfo;
+          final pkg = _upgrader.state.packageInfo;
+          // When HisabUpgrader cleared versionInfo (store ≤ installed), show toast.
+          if (vi == null && _upgrader.lastCheckStoreNotNewer) {
+            if (context.mounted) context.showToast('no_update_available'.tr());
+            return;
           }
-        }
-        _upgrader.updateState(
-          _upgrader.state.copyWith(debugDisplayAlways: true),
-        );
-        await Future.delayed(const Duration(milliseconds: 400));
-        if (!mounted) return;
-        final shouldShow = _upgrader.shouldDisplayUpgrade();
-        Log.debug(
-          'Upgrader (manual): store=${vi?.appStoreVersion}, installed=${vi?.installedVersion}, showDialog=$shouldShow',
-        );
-        if (!shouldShow && context.mounted) {
-          final msg = _upgrader.versionInfo == null
-              ? 'could_not_check_for_updates'.tr()
-              : 'no_update_available'.tr();
-          context.showToast(msg);
+          // Don't show update dialog when store version is same or older (e.g. Play
+          // Store internal/closed/open testing returning same version).
+          if (vi != null &&
+              vi.appStoreVersion != null &&
+              pkg != null &&
+              pkg.version.isNotEmpty) {
+            try {
+              final installed = Version.parse(pkg.version);
+              if (vi.appStoreVersion! <= installed) {
+                if (context.mounted) {
+                  context.showToast('no_update_available'.tr());
+                }
+                return;
+              }
+            } catch (_) {
+              // Continue and let upgrader decide if parse failed.
+            }
+          }
+          _upgrader.updateState(
+            _upgrader.state.copyWith(debugDisplayAlways: true),
+          );
+          await Future.delayed(const Duration(milliseconds: 400));
+          if (!mounted) return;
+          final shouldShow = _upgrader.shouldDisplayUpgrade();
+          Log.debug(
+            'Upgrader (manual): store=${vi?.appStoreVersion}, installed=${vi?.installedVersion}, showDialog=$shouldShow',
+          );
+          if (!shouldShow && context.mounted) {
+            final msg = _upgrader.versionInfo == null
+                ? 'could_not_check_for_updates'.tr()
+                : 'no_update_available'.tr();
+            context.showToast(msg);
+          }
+        } catch (e, st) {
+          Log.warning(
+            'Upgrader (manual): failed to check for updates',
+            error: e,
+            stackTrace: st,
+          );
+          if (context.mounted) {
+            context.showToast('could_not_check_for_updates'.tr());
+          }
+        } finally {
+          _manualUpdateCheckInFlight = false;
         }
       });
     };
+    final dynamic triggerHolder = ref.read(updateCheckTriggerProvider);
+    triggerHolder.callback = _updateCheckCallback;
+    _clearOwnedUpdateCheckTrigger = () {
+      if (identical(triggerHolder.callback, _updateCheckCallback)) {
+        triggerHolder.callback = null;
+      }
+    };
+  }
+
+  Widget _buildDebugFab({
+    required bool isDebug,
+    required bool isRtl,
+    required BuildContext context,
+    required GoRouter router,
+  }) {
+    if (!isDebug || isIntegrationTestMode || !_debugFabVisible) {
+      return const SizedBox.shrink();
+    }
+    return Positioned(
+      bottom: 96,
+      left: isRtl ? null : 8,
+      right: isRtl ? 8 : null,
+      child: DebugMenuFab(
+        upgrader: _upgrader,
+        navigatorContext: router.routerDelegate.navigatorKey.currentContext,
+        localeContext: context,
+        onBeforeOpen: () => setState(() => _debugFabVisible = false),
+        whenSheetClosed: () => setState(() => _debugFabVisible = true),
+      ),
+    );
+  }
+
+  Widget _buildRootContent({
+    required BuildContext context,
+    required Widget contentWithSyncIndicator,
+    required bool isDebug,
+    required bool isRtl,
+    required GoRouter router,
+  }) {
+    final debugFab = _buildDebugFab(
+      isDebug: isDebug,
+      isRtl: isRtl,
+      context: context,
+      router: router,
+    );
+    final rootChild = _showUpgradeAlert
+        ? UpgradeAlert(
+            navigatorKey: router.routerDelegate.navigatorKey,
+            upgrader: _upgrader,
+            onUpdate: () {
+              if (!kIsWeb &&
+                  defaultTargetPlatform == TargetPlatform.android) {
+                handleAndroidUpdateThenStore(_upgrader);
+                return false;
+              }
+              return true;
+            },
+            child: contentWithSyncIndicator,
+          )
+        : contentWithSyncIndicator;
+    return Stack(
+      children: [
+        rootChild,
+        debugFab,
+      ],
+    );
   }
 
   @override
@@ -166,20 +337,6 @@ class _AppState extends ConsumerState<App>
 
     // Watch DataSyncService to reactively fetch/push data
     ref.watch(dataSyncServiceProvider);
-
-    // Initialize push notifications when user authenticates and setting is enabled.
-    // listen handles sign-in/sign-out transitions; watch handles initial state.
-    // Context is passed so the notification service can show a non-blocking
-    // dialog when the user denies notification permission.
-    ref.listen(isAuthenticatedProvider, (prev, isAuth) {
-      if (isAuth && prev != true) {
-        if (ref.read(notificationsEnabledProvider)) {
-          ref.read(notificationServiceProvider.notifier).initialize(context);
-        }
-      } else if (!isAuth && prev == true) {
-        ref.read(notificationServiceProvider.notifier).unregisterToken();
-      }
-    });
 
     // Locale is read exclusively from EasyLocalization (context.locale) so that
     // locale: and localizationsDelegates always come from the same frame.
@@ -245,61 +402,12 @@ class _AppState extends ConsumerState<App>
           );
           // In release, first frame paints without UpgradeAlert to avoid
           // any upgrader init blocking splash removal.
-          if (!_showUpgradeAlert) {
-            return Stack(
-              children: [
-                contentWithSyncIndicator,
-                if (isDebug && !isIntegrationTestMode && _debugFabVisible)
-                  Positioned(
-                    bottom: 96,
-                    left: isRtl ? null : 8,
-                    right: isRtl ? 8 : null,
-                    child: DebugMenuFab(
-                      upgrader: _upgrader,
-                      navigatorContext:
-                          router.routerDelegate.navigatorKey.currentContext,
-                      localeContext: context,
-                      onBeforeOpen: () =>
-                          setState(() => _debugFabVisible = false),
-                      whenSheetClosed: () =>
-                          setState(() => _debugFabVisible = true),
-                    ),
-                  ),
-              ],
-            );
-          }
-          return Stack(
-            children: [
-              UpgradeAlert(
-                navigatorKey: router.routerDelegate.navigatorKey,
-                upgrader: _upgrader,
-                onUpdate: () {
-                  if (!kIsWeb &&
-                      defaultTargetPlatform == TargetPlatform.android) {
-                    handleAndroidUpdateThenStore(_upgrader);
-                    return false;
-                  }
-                  return true;
-                },
-                child: contentWithSyncIndicator,
-              ),
-              if (isDebug && !isIntegrationTestMode && _debugFabVisible)
-                Positioned(
-                  bottom: 96,
-                  left: isRtl ? null : 8,
-                  right: isRtl ? 8 : null,
-                  child: DebugMenuFab(
-                    upgrader: _upgrader,
-                    navigatorContext:
-                        router.routerDelegate.navigatorKey.currentContext,
-                    localeContext: context,
-                    onBeforeOpen: () =>
-                        setState(() => _debugFabVisible = false),
-                    whenSheetClosed: () =>
-                        setState(() => _debugFabVisible = true),
-                  ),
-                ),
-            ],
+          return _buildRootContent(
+            context: context,
+            contentWithSyncIndicator: contentWithSyncIndicator,
+            isDebug: isDebug,
+            isRtl: isRtl,
+            router: router,
           );
         },
         theme: themes.light,

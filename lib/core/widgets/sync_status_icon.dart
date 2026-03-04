@@ -12,7 +12,9 @@ import 'services_status_sheet.dart';
 /// Connected state auto-collapses to icon-only after 2 seconds.
 /// Hidden in Local-Only mode.
 class SyncStatusChip extends ConsumerStatefulWidget {
-  const SyncStatusChip({super.key});
+  const SyncStatusChip({super.key, this.onTap});
+
+  final VoidCallback? onTap;
 
   @override
   ConsumerState<SyncStatusChip> createState() => _SyncStatusChipState();
@@ -60,76 +62,81 @@ class _SyncStatusChipState extends ConsumerState<SyncStatusChip> {
     return Semantics(
       label: data.label,
       button: true,
-      child: GestureDetector(
-        onTap: () => showServicesStatusSheet(context, ref),
-        child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final showLabel =
-                _showLabel && constraints.maxWidth >= _minWidthForLabel;
-            final isCompact = !showLabel;
-            // Fit circle in the leading slot (e.g. some AppBars give only 32px height).
-            final compactSize = isCompact
-                ? _compactSize
-                    .clamp(0.0, constraints.maxWidth)
-                    .clamp(0.0, constraints.maxHeight)
-                : _compactSize;
+      child: Align(
+        alignment: AlignmentDirectional.centerStart,
+        widthFactor: 1,
+        child: GestureDetector(
+          onTap: widget.onTap ?? () => showServicesStatusSheet(context, ref),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final showLabel =
+                    _showLabel && constraints.maxWidth >= _minWidthForLabel;
+                final isCompact = !showLabel;
+                // Fit circle in the leading slot (e.g. some AppBars give only 32px height).
+                final compactSize = isCompact
+                    ? _compactSize
+                        .clamp(0.0, constraints.maxWidth)
+                        .clamp(0.0, constraints.maxHeight)
+                    : _compactSize;
 
-            final chip = AnimatedContainer(
-              key: ValueKey('${status.name}_$showLabel'),
-              duration: _duration,
-              curve: Curves.easeInOut,
-              width: isCompact ? compactSize : null,
-              height: isCompact ? compactSize : null,
-              padding: isCompact
-                  ? EdgeInsets.all(compactSize > 28 ? 6 : 4)
-                  : const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: data.backgroundColor,
-                borderRadius: BorderRadius.circular(
-                  isCompact ? compactSize / 2 : _roundedRectRadius,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildIcon(status, data),
-                  if (showLabel) ...[
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        data.label,
-                        style: Theme.of(context).textTheme.labelSmall!.copyWith(
-                          color: data.foregroundColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
-                      ),
+                final chip = AnimatedContainer(
+                  key: ValueKey('${status.name}_$showLabel'),
+                  duration: _duration,
+                  curve: Curves.easeInOut,
+                  width: isCompact ? compactSize : null,
+                  height: isCompact ? compactSize : null,
+                  padding: isCompact
+                      ? EdgeInsets.all(compactSize > 28 ? 6 : 4)
+                      : const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: data.backgroundColor,
+                    borderRadius: BorderRadius.circular(
+                      isCompact ? compactSize / 2 : _roundedRectRadius,
                     ),
-                  ],
-                ],
-              ),
-            );
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildIcon(status, data),
+                      if (showLabel) ...[
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            data.label,
+                            style: Theme.of(context).textTheme.labelSmall!
+                                .copyWith(
+                                  color: data.foregroundColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                );
 
-            return AnimatedSize(
-              duration: _duration,
-              curve: Curves.easeInOut,
-              child: isCompact
-                  ? UnconstrainedBox(
-                      child: SizedBox(
-                        width: compactSize,
-                        height: compactSize,
-                        child: chip,
-                      ),
-                    )
-                  : chip,
-            );
-          },
+                return AnimatedSize(
+                  duration: _duration,
+                  curve: Curves.easeInOut,
+                  child: isCompact
+                      ? UnconstrainedBox(
+                          child: SizedBox(
+                            width: compactSize,
+                            height: compactSize,
+                            child: chip,
+                          ),
+                        )
+                      : chip,
+                );
+              },
+            ),
+          ),
         ),
-      ),
       ),
     );
   }

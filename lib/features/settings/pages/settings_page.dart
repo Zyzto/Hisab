@@ -1369,7 +1369,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     CurrencyHelpers.showPicker(
       context: context,
       title: 'display_currency'.tr(),
-      centerInFullViewport: false,
+      centerInFullViewport: true,
       favorite: favorites,
       onSelect: (currency) {
         ref

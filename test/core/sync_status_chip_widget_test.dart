@@ -96,4 +96,52 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(SyncStatusChip), findsOneWidget);
   });
+
+  testWidgets(
+    'SyncStatusChip only triggers tap on visible chip area in wide leading slot',
+    (tester) async {
+      var tapCount = 0;
+      const leadingSlotKey = Key('leading-slot');
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            syncStatusForDisplayProvider.overrideWithValue(SyncStatus.connected),
+          ],
+          child: EasyLocalization(
+            path: 'assets/translations',
+            supportedLocales: testSupportedLocales,
+            fallbackLocale: const Locale('en'),
+            startLocale: const Locale('en'),
+            child: MaterialApp(
+              home: Scaffold(
+                appBar: AppBar(
+                  leadingWidth: 220,
+                  leading: SizedBox(
+                    key: leadingSlotKey,
+                    width: 220,
+                    child: SyncStatusChip(onTap: () => tapCount++),
+                  ),
+                  title: const Text('Test'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final chipRect = tester.getRect(find.byType(SyncStatusChip));
+      final leadingRect = tester.getRect(find.byKey(leadingSlotKey));
+
+      await tester.tapAt(chipRect.center);
+      await tester.pumpAndSettle();
+      expect(tapCount, 1);
+
+      final emptySpaceTap = Offset(leadingRect.right - 8, leadingRect.center.dy);
+      await tester.tapAt(emptySpaceTap);
+      await tester.pumpAndSettle();
+      expect(tapCount, 1);
+    },
+  );
 }

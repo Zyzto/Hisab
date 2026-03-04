@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/theme/theme_config.dart';
 
 /// Shared scroll + padding wrapper for all onboarding page bodies.
-/// Keeps title at top; centers content horizontally in a max-width band and
-/// vertically in the viewport for easier reach.
+/// Keeps title at top and content vertically balanced in the viewport.
+/// Horizontal sizing is handled by the parent onboarding shell via
+/// `ConstrainedContent` so onboarding matches main-page sizing.
 Widget onboardingPageBody(BuildContext context, Widget child) {
-  final maxWidth = LayoutBreakpoints.contentMaxWidth(context);
   const padding = ThemeConfig.spacingM;
   return LayoutBuilder(
     builder: (context, constraints) {
@@ -17,10 +16,7 @@ Widget onboardingPageBody(BuildContext context, Widget child) {
         child: ConstrainedBox(
           constraints: BoxConstraints(minHeight: minHeight),
           child: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: maxWidth),
-              child: child,
-            ),
+            child: child,
           ),
         ),
       );
@@ -38,7 +34,6 @@ Widget onboardingPageBodyWithFixedTitle(
   required Widget content,
   AlignmentGeometry contentAlignment = Alignment.center,
 }) {
-  final maxWidth = LayoutBreakpoints.contentMaxWidth(context);
   const padding = ThemeConfig.spacingM;
   return LayoutBuilder(
     builder: (context, constraints) {
@@ -58,12 +53,9 @@ Widget onboardingPageBodyWithFixedTitle(
               SizedBox(
                 height: topThirdHeight,
                 child: Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: maxWidth),
-                    child: Align(
-                      alignment: Alignment.bottomLeft,
-                      child: title,
-                    ),
+                  child: Align(
+                    alignment: Alignment.bottomLeft,
+                    child: title,
                   ),
                 ),
               ),
@@ -72,10 +64,7 @@ Widget onboardingPageBodyWithFixedTitle(
                 constraints: BoxConstraints(minHeight: contentAreaHeight),
                 child: Align(
                   alignment: contentAlignment,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: maxWidth),
-                    child: content,
-                  ),
+                  child: content,
                 ),
               ),
             ],

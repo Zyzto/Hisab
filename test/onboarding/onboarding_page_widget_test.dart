@@ -15,7 +15,10 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  Future<void> pumpOnboardingPage(WidgetTester tester) async {
+  Future<void> pumpOnboardingPage(
+    WidgetTester tester, {
+    bool forceBusyForTest = false,
+  }) async {
     final settings = await initializeHisabSettings();
     if (settings == null) {
       throw Exception('initializeHisabSettings returned null');
@@ -30,8 +33,8 @@ void main() {
           supportedLocales: testSupportedLocales,
           fallbackLocale: const Locale('en'),
           startLocale: const Locale('en'),
-          child: const MaterialApp(
-            home: OnboardingPage(),
+          child: MaterialApp(
+            home: OnboardingPage(forceBusyForTest: forceBusyForTest),
           ),
         ),
       ),
@@ -71,5 +74,26 @@ void main() {
 
     expect(find.byType(PageView), findsOneWidget);
     expect(find.byIcon(Icons.arrow_forward), findsOneWidget);
+  });
+
+  testWidgets(
+      'OnboardingPage disables next action while completion lock is active',
+      (tester) async {
+    await pumpOnboardingPage(tester, forceBusyForTest: true);
+    // Onboarding owns periodic demo timers, so pumpAndSettle can hang forever.
+    // A bounded pair of pumps is enough to build the first frame deterministically.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    final nextIconFinder = find.byIcon(Icons.arrow_forward);
+    expect(nextIconFinder, findsOneWidget);
+    final welcomeFinder = find.text('onboarding_welcome'.tr());
+    expect(welcomeFinder, findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    // When completion lock is active, navigation should not advance.
+    await tester.tap(nextIconFinder, warnIfMissed: false);
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(welcomeFinder, findsOneWidget);
   });
 }

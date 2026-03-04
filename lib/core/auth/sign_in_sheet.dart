@@ -327,20 +327,20 @@ class _SignInSheetState extends State<_SignInSheet> {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 24,
-        right: 24,
-        top: 16,
-        bottom: MediaQuery.of(context).padding.bottom +
-            MediaQuery.of(context).viewInsets.bottom +
-            24,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+    return PopScope(
+      canPop: !_loading,
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 24,
+          right: 24,
+          top: 16,
+          bottom: MediaQuery.of(context).padding.bottom + 24,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
             if (!LayoutBreakpoints.isTabletOrWider(context)) ...[
               Center(
                 child: Container(
@@ -684,7 +684,8 @@ class _SignInSheetState extends State<_SignInSheet> {
                 ),
               ],
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );
