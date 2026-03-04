@@ -133,9 +133,7 @@ class _CreateInviteSheetState extends ConsumerState<_CreateInviteSheet> {
         left: ThemeConfig.spacingL,
         right: ThemeConfig.spacingL,
         top: ThemeConfig.spacingL,
-        bottom: MediaQuery.of(context).padding.bottom +
-            MediaQuery.of(context).viewInsets.bottom +
-            ThemeConfig.spacingL,
+        bottom: MediaQuery.of(context).padding.bottom + ThemeConfig.spacingL,
       ),
       child: SingleChildScrollView(
         child: Column(
@@ -249,6 +247,7 @@ class _InviteResultView extends StatefulWidget {
 
 class _InviteResultViewState extends State<_InviteResultView> {
   final GlobalKey _qrKey = GlobalKey();
+  static const String _qrCenterLogoAsset = 'assets/Hisab.png';
 
   @override
   Widget build(BuildContext context) {
@@ -303,6 +302,7 @@ class _InviteResultViewState extends State<_InviteResultView> {
             builder: (context, constraints) {
               final colorScheme = Theme.of(context).colorScheme;
               final qrSize = (constraints.maxWidth - 64).clamp(0.0, 250.0);
+              final logoSize = (qrSize * 0.22).clamp(32.0, 56.0);
               return RepaintBoundary(
                 key: _qrKey,
                 child: Container(
@@ -314,14 +314,36 @@ class _InviteResultViewState extends State<_InviteResultView> {
                   child: SizedBox(
                     width: qrSize,
                     height: qrSize,
-                    child: PrettyQrView.data(
-                      data: url,
-                      errorCorrectLevel: QrErrorCorrectLevel.M,
-                      decoration: PrettyQrDecoration(
-                        shape: PrettyQrSmoothSymbol(color: colorScheme.onSurface),
-                        background: colorScheme.surface,
-                        quietZone: PrettyQrQuietZone.zero,
-                      ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        PrettyQrView.data(
+                          data: url,
+                          errorCorrectLevel: QrErrorCorrectLevel.H,
+                          decoration: PrettyQrDecoration(
+                            shape: PrettyQrSmoothSymbol(
+                              color: colorScheme.onSurface,
+                            ),
+                            background: colorScheme.surface,
+                            quietZone: PrettyQrQuietZone.zero,
+                          ),
+                        ),
+                        IgnorePointer(
+                          child: Container(
+                            width: logoSize,
+                            height: logoSize,
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: colorScheme.surface,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Image.asset(
+                              _qrCenterLogoAsset,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),

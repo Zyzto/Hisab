@@ -18,7 +18,9 @@ import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../domain/domain.dart';
 import '../providers/group_invite_provider.dart';
+import '../providers/group_member_provider.dart';
 import '../providers/groups_provider.dart';
+import '../../settings/providers/settings_framework_providers.dart';
 import '../utils/invite_share_helper.dart';
 import '../widgets/create_invite_sheet.dart';
 
@@ -38,6 +40,10 @@ class _InviteManagementPageState extends ConsumerState<InviteManagementPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final invitesAsync = ref.watch(invitesByGroupProvider(widget.groupId));
+    final localOnly = ref.watch(effectiveLocalOnlyProvider);
+    final myRoleAsync = localOnly
+        ? const AsyncValue<GroupRole?>.data(null)
+        : ref.watch(myRoleInGroupProvider(widget.groupId));
 
     return LayoutBuilder(
       builder: (context, layoutConstraints) {
@@ -55,8 +61,22 @@ class _InviteManagementPageState extends ConsumerState<InviteManagementPage> {
         tooltip: 'create_invite'.tr(),
         child: const Icon(Icons.add),
       ),
-      body: ConstrainedContent(
-        child: invitesAsync.when(
+      body: myRoleAsync.when(
+        data: (myRole) {
+          final canManageInvites = localOnly ||
+              myRole == GroupRole.owner ||
+              myRole == GroupRole.admin;
+          if (!canManageInvites) {
+            return Center(
+              child: ErrorContentWidget(
+                titleKey: 'generic_error',
+                message: 'invite_manage_restricted'.tr(),
+                details: 'invite_manage_restricted'.tr(),
+              ),
+            );
+          }
+          return ConstrainedContent(
+            child: invitesAsync.when(
           data: (invites) {
             // Sort: active first, then by created_at desc
             invites.sort((a, b) {
@@ -160,22 +180,32 @@ class _InviteManagementPageState extends ConsumerState<InviteManagementPage> {
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, st) {
-            sendErrorTelemetryIfOnline(
-              ref,
-              message: e.toString(),
-              details: e.toString(),
-            );
-            return Center(
-              child: ErrorContentWidget(
-                message: e.toString(),
-                details: e.toString(),
-                stackTrace: st,
-                onRetry: () =>
-                    ref.invalidate(invitesByGroupProvider(widget.groupId)),
-              ),
-            );
-          },
+              error: (e, st) {
+                sendErrorTelemetryIfOnline(
+                  ref,
+                  message: e.toString(),
+                  details: e.toString(),
+                );
+                return Center(
+                  child: ErrorContentWidget(
+                    message: e.toString(),
+                    details: e.toString(),
+                    stackTrace: st,
+                    onRetry: () =>
+                        ref.invalidate(invitesByGroupProvider(widget.groupId)),
+                  ),
+                );
+              },
+            ),
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, st) => Center(
+          child: ErrorContentWidget(
+            message: e.toString(),
+            details: e.toString(),
+            stackTrace: st,
+          ),
         ),
       ),
     );
@@ -660,6 +690,7 @@ class _InviteQrSheetContent extends StatefulWidget {
 
 class _InviteQrSheetContentState extends State<_InviteQrSheetContent> {
   final GlobalKey _qrKey = GlobalKey();
+  static const String _qrCenterLogoAsset = 'assets/Hisab.png';
 
   @override
   Widget build(BuildContext context) {
@@ -679,6 +710,8 @@ class _InviteQrSheetContentState extends State<_InviteQrSheetContent> {
               child: Builder(
                 builder: (context) {
                   final colorScheme = Theme.of(context).colorScheme;
+                  const qrSize = 200.0;
+                  final logoSize = (qrSize * 0.22).clamp(32.0, 56.0);
                   return Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -686,16 +719,38 @@ class _InviteQrSheetContentState extends State<_InviteQrSheetContent> {
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: SizedBox(
-                      width: 200,
-                      height: 200,
-                      child: PrettyQrView.data(
-                        data: widget.url,
-                        errorCorrectLevel: QrErrorCorrectLevel.M,
-                        decoration: PrettyQrDecoration(
-                          shape: PrettyQrSmoothSymbol(color: colorScheme.onSurface),
-                          background: colorScheme.surface,
-                          quietZone: PrettyQrQuietZone.zero,
-                        ),
+                      width: qrSize,
+                      height: qrSize,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          PrettyQrView.data(
+                            data: widget.url,
+                            errorCorrectLevel: QrErrorCorrectLevel.H,
+                            decoration: PrettyQrDecoration(
+                              shape: PrettyQrSmoothSymbol(
+                                color: colorScheme.onSurface,
+                              ),
+                              background: colorScheme.surface,
+                              quietZone: PrettyQrQuietZone.zero,
+                            ),
+                          ),
+                          IgnorePointer(
+                            child: Container(
+                              width: logoSize,
+                              height: logoSize,
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: colorScheme.surface,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Image.asset(
+                                _qrCenterLogoAsset,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   );
