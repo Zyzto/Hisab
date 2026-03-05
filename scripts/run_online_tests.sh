@@ -15,6 +15,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_DIR"
 
+echo "==> Verifying Supabase config-as-code invariants..."
+bash ./scripts/verify_supabase_config_as_code.sh
+
 echo "==> Starting local Supabase..."
 supabase start
 

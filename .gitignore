@@ -11,12 +11,10 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
-/supabase/*
 /supabase/.temp/
 /supabase/.branches/
 /supabase/.migrations/
 /supabase/.migrations/**
-/supabase/migrations/
 
 # IDEs
 *.iml

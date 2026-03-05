@@ -63,7 +63,10 @@ Future<void> _run(List<String> args) async {
   try {
     // ----- Prerequisites -----
     tee('==> Checking prerequisites...');
-    if (!await _checkDocker()) {
+    final configAsCodeError = await _verifySupabaseConfigAsCode(projectRoot);
+    if (configAsCodeError != null) {
+      tee('ERROR: $configAsCodeError');
+    } else if (!await _checkDocker()) {
       tee('ERROR: Docker is not running or not installed. Run "docker info" to check.');
     } else if (!await _checkSupabaseCli()) {
       tee('ERROR: Supabase CLI not found. Install: https://supabase.com/docs/guides/cli');
@@ -364,5 +367,51 @@ Future<String?> _getAndroidDeviceId(String projectRoot) async {
       }
     }
   } catch (_) {}
+  return null;
+}
+
+Future<String?> _verifySupabaseConfigAsCode(String projectRoot) async {
+  final config = File(p.join(projectRoot, 'supabase', 'config.toml'));
+  final seed = File(p.join(projectRoot, 'supabase', 'seed.sql'));
+  final migrationDir = Directory(p.join(projectRoot, 'supabase', 'migrations'));
+
+  if (!config.existsSync()) return 'Missing supabase/config.toml';
+  if (!seed.existsSync()) return 'Missing supabase/seed.sql';
+  if (!migrationDir.existsSync()) return 'Missing supabase/migrations directory';
+
+  final migrations = migrationDir
+      .listSync()
+      .whereType<File>()
+      .where((f) => f.path.endsWith('.sql'))
+      .map((f) => p.basename(f.path))
+      .toList()
+    ..sort();
+
+  if (migrations.isEmpty) return 'No SQL files found in supabase/migrations/';
+
+  final nameRegex = RegExp(r'^\d{14}_[a-z0-9_]+\.sql$');
+  for (final name in migrations) {
+    if (!nameRegex.hasMatch(name)) {
+      return 'Invalid migration filename: $name';
+    }
+  }
+
+  final trackedTargets = <String>[
+    'supabase/config.toml',
+    'supabase/seed.sql',
+    ...migrations.map((m) => p.join('supabase', 'migrations', m)),
+  ];
+  for (final target in trackedTargets) {
+    final result = await Process.run(
+      'git',
+      ['ls-files', '--error-unmatch', target],
+      workingDirectory: projectRoot,
+      runInShell: true,
+    );
+    if (result.exitCode != 0) {
+      return '$target is not tracked in git';
+    }
+  }
+
   return null;
 }
