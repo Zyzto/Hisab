@@ -32,7 +32,7 @@
 | `docs/` | Setup and architecture documentation; see [docs/README.md](README.md) for an index |
 | `test/` | Tests mirroring `lib/` layout; see [test/README.md](test/README.md) |
 | `integration_test/` | Full-app integration tests (local-only + online); see [test/README.md](test/README.md) |
-| `supabase/` | Local Supabase config, 19 migrations, seed data for online integration tests |
+| `supabase/` | Local Supabase config, migrations, seed data for online integration tests |
 | `scripts/` | Helper scripts (`run_online_tests.sh` for online tests) |
 | `.github/workflows/release.yml` | CI/CD for Android builds/releases + web deploy + online integration tests |
 
@@ -324,7 +324,7 @@ iOS declarations are present in `ios/Runner/Info.plist`, including:
 - optional Play Store internal deploy
 - builds/deploys Flutter web to Firebase Hosting (copies privacy page to build output)
 
-The `test-online` job requires no additional secrets — it uses the local Supabase instance's auto-generated credentials. It sets up the Supabase CLI, starts Docker containers, resets the database (19 migrations + seed), and runs `flutter drive` with the online test barrel.
+The `test-online` job requires no additional secrets — it uses the local Supabase instance's auto-generated credentials. It sets up the Supabase CLI, starts Docker containers, resets the database (migrations + seed), and runs `flutter drive` with the online test barrel.
 
 ## Key Dependencies (Selected)
 
@@ -382,7 +382,8 @@ The following improvements are reflected in the codebase and docs:
 - **App bar title aligned with content:** All pages with a constrained body use **ContentAlignedAppBar** so the app bar title sits in the same horizontal band as the body (same `contentBandMetrics` as `ConstrainedContent`). The title is absolutely positioned in the app bar so it is not affected by leading/actions. Wrap the scaffold in `LayoutBuilder` and pass `layoutConstraints.maxWidth` as `contentAreaWidth`. See `lib/core/layout/content_aligned_app_bar.dart` and the “Layout (core/layout)” section above.
 
 - **Settlement permission:** By default only the group owner or the debtor (participant who owes) can record a settlement. Group setting **Members can record settlements for others** (`Group.allowMemberSettleForOthers`, default false) allows any member to record. Schema: `groups.allow_member_settle_for_others`; sync, repository, backup, and Migration 20 in `docs/SUPABASE_SETUP.md`; local Supabase migration `20250101000019_groups_allow_member_settle_for_others.sql`. Balance list and group settings UI enforce the rule. See `lib/features/balance/widgets/balance_list.dart`, `lib/features/groups/pages/group_settings_page.dart`, `lib/domain/group.dart`.
-- **Online integration tests:** Full end-to-end tests against a local Supabase Docker instance — auth, sync, and invite flows. Local Supabase setup (config, 19 migrations, seed) lives in `supabase/`. Run with `./scripts/run_online_tests.sh`. CI runs them in the `test-online` GitHub Actions job. See [test/README.md](test/README.md) for full setup, prerequisites, and troubleshooting.
+- **Online integration tests:** Full end-to-end tests against a local Supabase Docker instance — auth, sync, and invite flows. Local Supabase setup (config, migrations, seed) lives in `supabase/`. Run with `./scripts/run_online_tests.sh`. CI runs them in the `test-online` GitHub Actions job. See [test/README.md](test/README.md) for full setup, prerequisites, and troubleshooting.
+- **Invite RPC null-expiry fix:** `accept_invite` treats `expires_at IS NULL` as valid (never-expiring invites) and pre-filters inactive/maxed invites. Apply migration `20260306120000_fix_accept_invite_null_expiry_validation.sql` in local/dev environments so invite acceptance matches production behavior.
 
 ## Related Docs
 

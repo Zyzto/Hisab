@@ -17,11 +17,19 @@ const String _inviteHost = 'invite';
 String? extractInviteTokenFromUri(Uri? uri) {
   if (uri == null) return null;
   final token = uri.queryParameters['token'];
-  if (token == null || token.isEmpty) return null;
+  if (token == null) return null;
+  final normalizedToken = token.trim();
+  if (normalizedToken.isEmpty) return null;
   // Deep link: io.supabase.hisab://invite?token=...
-  if (uri.scheme == _inviteScheme && uri.host == _inviteHost) return token;
-  // Web: https://domain/invite?token=...
-  if (uri.path.contains('invite')) return token;
+  if (uri.scheme == _inviteScheme) {
+    if (uri.host != _inviteHost) return null;
+    return normalizedToken;
+  }
+  // Web: https://domain/invite?token=... or /invite/:token
+  final pathSegments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
+  if (pathSegments.isNotEmpty && pathSegments.first == 'invite') {
+    return normalizedToken;
+  }
   return null;
 }
 

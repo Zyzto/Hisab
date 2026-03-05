@@ -25,6 +25,7 @@ void main() {
 
       final client = Supabase.instance.client;
       String? groupId;
+      String? inviteId;
       String? inviteToken;
 
       // ── Stage: User A creates a group ──
@@ -94,7 +95,9 @@ void main() {
         expect(result, isNotNull);
         final rows = result as List;
         expect(rows, isNotEmpty, reason: 'create_invite should return a row');
+        inviteId = rows.first['id'] as String;
         inviteToken = rows.first['token'] as String;
+        expect(inviteId, isNotNull);
         expect(inviteToken, isNotNull);
         expect(inviteToken!.isNotEmpty, isTrue);
       });
@@ -121,8 +124,11 @@ void main() {
           'p_new_participant_name': 'User B',
         });
 
-        expect(acceptResult, isNotNull,
-            reason: 'accept_invite should return group_id');
+        expect(
+          acceptResult,
+          equals(groupId),
+          reason: 'accept_invite should return the created group id',
+        );
       });
 
       // ── Stage: verify User B is a member ──
@@ -152,6 +158,22 @@ void main() {
         // in the old function, but the latest keeps it). Either way is fine.
         // Just verify no error occurred.
         expect(invites, isNotNull);
+      });
+
+      // ── Stage: verify invite usage recorded ──
+      await stage('verify invite usage recorded', () async {
+        final userBId = client.auth.currentUser!.id;
+        final usages = await client
+            .from('invite_usages')
+            .select()
+            .eq('invite_id', inviteId!)
+            .eq('user_id', userBId);
+
+        expect(
+          usages,
+          isNotEmpty,
+          reason: 'invite_usages should contain User B acceptance row',
+        );
       });
 
       // ── Stage: User B signs out, User A verifies member list ──

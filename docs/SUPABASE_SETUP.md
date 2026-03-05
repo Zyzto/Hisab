@@ -32,6 +32,7 @@ This guide walks you through setting up the Supabase backend for Hisab from scra
    - [Migration 18: Anonymize only on account delete](#migration-18-anonymize-only-on-account-delete)
    - [Migration 19: Receipt image paths (multiple photos)](#migration-19-receipt-image-paths-multiple-photos)
    - [Migration 20: Groups allow_member_settle_for_others](#migration-20-groups-allow_member_settle_for_others)
+   - [Migration 21: Fix accept_invite null-expiry validation](#migration-21-fix-accept_invite-null-expiry-validation)
 4. [Configure Authentication](#4-configure-authentication)
 5. [Deploy Edge Functions](#5-deploy-edge-functions)
    - [Push notifications: end-to-end flow and verification](#push-notifications-end-to-end-flow-and-verification)
@@ -67,6 +68,30 @@ This guide walks you through setting up the Supabase backend for Hisab from scra
 ## 3. Apply Database Migrations
 
 Go to the **SQL Editor** in your Supabase dashboard and run each migration in order. You can also use the Supabase CLI or MCP tools.
+
+### Config-as-Code workflow (recommended)
+
+Treat `supabase/` as the source of truth for backend config and schema:
+
+- `supabase/config.toml` — local Supabase runtime config
+- `supabase/migrations/*.sql` — ordered schema/RPC/RLS changes
+- `supabase/seed.sql` — local seed data for reproducible tests
+
+Run this repo-level guard before opening a PR (and in CI):
+
+```bash
+bash ./scripts/verify_supabase_config_as_code.sh
+```
+
+For local reproducibility and drift detection:
+
+```bash
+supabase start
+supabase db reset
+supabase status
+```
+
+If `supabase db reset` fails or requires manual SQL not present in `supabase/migrations/*.sql`, your local/live state has drifted from config-as-code and should be fixed by adding a migration.
 
 ### Migration 1: Tables, Indexes, and Triggers
 
@@ -470,7 +495,8 @@ BEGIN
   END IF;
 
   SELECT * INTO v_invite FROM public.group_invites
-  WHERE group_invites.token = p_token AND expires_at > now();
+  WHERE group_invites.token = p_token
+    AND (expires_at IS NULL OR expires_at > now());
 
   IF v_invite IS NULL THEN
     RAISE EXCEPTION 'Invalid or expired invite';
@@ -1123,7 +1149,8 @@ BEGIN
   END IF;
 
   SELECT * INTO v_invite FROM public.group_invites
-  WHERE group_invites.token = p_token AND expires_at > now();
+  WHERE group_invites.token = p_token
+    AND (expires_at IS NULL OR expires_at > now());
 
   IF v_invite IS NULL THEN
     RAISE EXCEPTION 'Invalid or expired invite';
@@ -1552,7 +1579,8 @@ BEGIN
   END IF;
 
   SELECT * INTO v_invite FROM public.group_invites
-  WHERE group_invites.token = p_token AND expires_at > now();
+  WHERE group_invites.token = p_token
+    AND (expires_at IS NULL OR expires_at > now());
 
   IF v_invite IS NULL THEN
     RAISE EXCEPTION 'Invalid or expired invite';
@@ -1700,6 +1728,22 @@ Adds `allow_member_settle_for_others` to `groups`. When false (default), only th
 ```sql
 ALTER TABLE public.groups
   ADD COLUMN IF NOT EXISTS allow_member_settle_for_others BOOLEAN DEFAULT false NOT NULL;
+```
+
+### Migration 21: Fix accept_invite null-expiry validation
+
+Aligns `accept_invite` with `get_invite_by_token` so invites with `expires_at IS NULL` ("Never" expiry) are accepted. Also pre-filters inactive or max-used invites in the token lookup.
+
+Use the exact SQL from `supabase/migrations/20260306120000_fix_accept_invite_null_expiry_validation.sql` (source of truth). It matches production and redefines both overloads:
+
+- `accept_invite(TEXT)` (legacy signature)
+- `accept_invite(TEXT, UUID, TEXT)` (current app signature)
+
+This migration preserves participant reuse (`left_at` restoration), invite usage tracking, and max-use handling while applying null-expiry-safe invite validation.
+
+```sql
+-- Run the exact SQL in:
+-- supabase/migrations/20260306120000_fix_accept_invite_null_expiry_validation.sql
 ```
 
 ---
@@ -2127,7 +2171,7 @@ The "Current schema reference" table above can be re-verified with `list_tables`
 
 ### "Function not found" errors
 
-- Ensure all 4 migrations were applied in order.
+- Ensure all migrations in `supabase/migrations/*.sql` were applied in order.
 - Check that the function exists in **Database > Functions**.
 - Verify the function signature matches (parameter types matter).
 

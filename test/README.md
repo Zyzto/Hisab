@@ -254,8 +254,16 @@ All configuration lives under `supabase/`:
 | File | Purpose |
 |---|---|
 | `supabase/config.toml` | Supabase project config: ports, auth settings, storage buckets, rate limits |
-| `supabase/migrations/20250101000001_*.sql` – `…000019_*.sql` | 19 ordered migrations covering schema, RLS, RPCs, indexes, and features |
+| `supabase/migrations/*.sql` | Ordered migrations covering schema, RLS, RPCs, indexes, and features |
 | `supabase/seed.sql` | Seeds two test users into `auth.users` + `auth.identities` |
+
+Before running online tests (or in CI), verify config-as-code invariants:
+
+```bash
+bash ./scripts/verify_supabase_config_as_code.sh
+```
+
+This check fails if required files are missing/untracked or if migration filenames do not follow the expected timestamp naming convention.
 
 **Test users** (seeded automatically by `supabase db reset`):
 
@@ -271,7 +279,7 @@ All configuration lives under `supabase/`:
 - `auth.rate_limit.*` = `1000` — high limits to prevent throttling during test runs
 - `storage.buckets.receipt-images` — pre-created bucket for receipt image uploads
 
-**Migrations:** The 19 migration files consolidate the complete Supabase schema from `docs/SUPABASE_SETUP.md`:
+**Migrations:** The migration files consolidate the complete Supabase schema from `docs/SUPABASE_SETUP.md`:
 
 1. `core_schema` — tables (groups, participants, expenses, etc.)
 2. `rls_policies` — row-level security
@@ -292,6 +300,7 @@ All configuration lives under `supabase/`:
 17. `anonymize_on_delete` — name anonymization on account delete
 18. `receipt_image_paths` — receipt image path columns
 19. `groups_allow_member_settle_for_others` — settlement permission (owner or debtor only by default)
+20. `fix_accept_invite_null_expiry_validation` — invite acceptance supports never-expiring links (`expires_at IS NULL`) and aligns token validation with `get_invite_by_token` (corresponds to Migration 21 in `docs/SUPABASE_SETUP.md`; local numbering differs because notification-trigger migration is intentionally skipped in local Docker setup)
 
 > **Note:** Migration 6 from the original setup (pg_net notification triggers) is intentionally skipped — `pg_net` is not available in the local Supabase environment.
 
@@ -301,17 +310,18 @@ All configuration lives under `supabase/`:
 |---|---|---|
 | **Auth** | `integration_test/online/auth_online_test.dart` | Sign in User A → verify session → navigate to Settings → sign out → re-sign-in → sign in User B |
 | **Sync** | `integration_test/online/sync_online_test.dart` | Create group via UI → verify in Supabase DB → add expense → verify synced → delete group → verify removed |
-| **Invite** | `integration_test/online/invite_online_test.dart` | User A creates group + invite token → User B accepts → verify membership → User A verifies member list |
+| **Invite** | `integration_test/online/invite_online_test.dart` | User A creates group + invite token → User B accepts (group_id assertion) → verify membership + `invite_usages` row → User A verifies member list |
 
 ### CI (GitHub Actions)
 
 The `test-online` job in `.github/workflows/release.yml` runs online tests automatically:
 1. Sets up Flutter and Supabase CLI
-2. Starts local Supabase (Docker is available on `ubuntu-latest`)
-3. Resets the database
-4. Extracts credentials
-5. Runs `flutter drive` with the online test barrel
-6. Stops Supabase in an `always()` cleanup step
+2. Verifies config-as-code files (`bash ./scripts/verify_supabase_config_as_code.sh`)
+3. Starts local Supabase (Docker is available on `ubuntu-latest`)
+4. Resets the database
+5. Extracts credentials
+6. Runs `flutter drive` with the online test barrel
+7. Stops Supabase in an `always()` cleanup step
 
 No additional GitHub secrets are needed — the local Supabase instance generates its own URL and anon key.
 
