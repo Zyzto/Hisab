@@ -315,18 +315,32 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
       }
     } catch (e, st) {
       Log.warning('Invite accept or sync failed', error: e, stackTrace: st);
+      final errorText = e.toString();
+      final isInvalidOrExpired =
+          errorText.contains('Invalid or expired invite') ||
+          errorText.contains('Invite is not active') ||
+          errorText.contains('Invite has reached max uses');
       if (mounted) {
-        final isAlreadyMember = e.toString().contains(
+        final isAlreadyMember = errorText.contains(
           'Already a member of this group',
         );
+        final isUnauthenticated =
+            errorText.contains('Unauthenticated') ||
+            errorText.contains('Not authenticated');
+        if (isInvalidOrExpired) {
+          // The invite may have been consumed/revoked after initial preview.
+          ref.invalidate(inviteByTokenProvider(widget.token));
+        }
         setState(() {
           if (isAlreadyMember) {
             _error = 'invite_already_member'.tr();
             _alreadyMemberGroupId = group.id;
+          } else if (isInvalidOrExpired) {
+            _error = 'invite_expired'.tr();
           } else {
-            _error = e.toString().contains('Unauthenticated')
+            _error = isUnauthenticated
                 ? 'sign_in_required'.tr()
-                : e.toString();
+                : errorText;
           }
         });
       }

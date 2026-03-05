@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:hisab/core/constants/supabase_config.dart';
 import 'package:hisab/core/repository/group_invite_repository.dart';
 import 'package:hisab/core/repository/repository_providers.dart';
 import 'package:hisab/domain/domain.dart';
@@ -95,10 +96,60 @@ void main() {
 
     expect(find.byIcon(Icons.add_link), findsOneWidget);
   });
+
+  testWidgets(
+    'Create action closes form sheet and shows offline notice when Supabase is not configured',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(400, 1200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(buildTestApp());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Open sheet'));
+      await tester.pumpAndSettle();
+
+      final createButtonIcon = find.byIcon(Icons.add_link).first;
+      await tester.ensureVisible(createButtonIcon);
+      await tester.tap(createButtonIcon);
+      await tester.pumpAndSettle();
+
+      expect(fakeInviteRepo.createCalls, 1);
+      expect(find.byIcon(Icons.label_outline), findsNothing);
+      final hasOnlineNotice = find.textContaining('online').evaluate().isNotEmpty;
+      expect(hasOnlineNotice, isTrue);
+      expect(find.byIcon(Icons.add_link), findsNothing);
+    },
+    skip: supabaseConfigAvailable,
+  );
+
+  testWidgets(
+    'Create action opens QR share actions when Supabase is configured',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(400, 1200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(buildTestApp());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Open sheet'));
+      await tester.pumpAndSettle();
+
+      final createButtonIcon = find.byIcon(Icons.add_link).first;
+      await tester.ensureVisible(createButtonIcon);
+      await tester.tap(createButtonIcon);
+      await tester.pumpAndSettle();
+
+      expect(fakeInviteRepo.createCalls, 1);
+      expect(find.byIcon(Icons.check_circle_outline), findsOneWidget);
+      expect(find.byIcon(Icons.share), findsOneWidget);
+      expect(find.byIcon(Icons.copy), findsOneWidget);
+      expect(find.byIcon(Icons.add_link), findsNothing);
+    },
+    skip: !supabaseConfigAvailable,
+  );
 }
 
 /// Minimal fake for [IGroupInviteRepository] so the sheet builds and Create returns a token.
 class FakeGroupInviteRepository implements IGroupInviteRepository {
+  int createCalls = 0;
+
   @override
   Future<({GroupInvite invite, Group group})?> getByToken(String token) async =>
       null;
@@ -111,8 +162,10 @@ class FakeGroupInviteRepository implements IGroupInviteRepository {
     String? label,
     int? maxUses,
     Duration? expiresIn,
-  }) async =>
-      (id: 'fake-invite-id', token: 'fake-token');
+  }) async {
+    createCalls += 1;
+    return (id: 'fake-invite-id', token: 'fake-token');
+  }
 
   @override
   Future<String> accept(String token, {String? newParticipantName}) async =>

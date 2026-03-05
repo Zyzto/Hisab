@@ -54,7 +54,7 @@ Future<String?> showCreateInviteSheet(
   WidgetRef ref,
   String groupId,
 ) async {
-  return showResponsiveSheet<String>(
+  final createdToken = await showResponsiveSheet<String>(
     context: context,
     title: 'create_invite'.tr(),
     isScrollControlled: true,
@@ -62,6 +62,20 @@ Future<String?> showCreateInviteSheet(
     centerInFullViewport: true,
     child: _CreateInviteSheet(groupId: groupId),
   );
+
+  if (createdToken == null) return null;
+  if (!context.mounted) return createdToken;
+
+  await showResponsiveSheet<void>(
+    context: context,
+    title: 'show_qr_code'.tr(),
+    isScrollControlled: true,
+    useSafeArea: true,
+    centerInFullViewport: true,
+    child: _InviteResultView(token: createdToken),
+  );
+
+  return createdToken;
 }
 
 class _CreateInviteSheet extends ConsumerStatefulWidget {
@@ -78,7 +92,6 @@ class _CreateInviteSheetState extends ConsumerState<_CreateInviteSheet> {
   int _expiryIndex = 2; // default: 7 days
   int _maxUsesIndex = 5; // default: unlimited
   bool _creating = false;
-  String? _createdToken;
 
   @override
   void dispose() {
@@ -114,19 +127,14 @@ class _CreateInviteSheetState extends ConsumerState<_CreateInviteSheet> {
       {'groupId': widget.groupId},
       enabled: ref.read(telemetryEnabledProvider),
     );
-    setState(() {
-      _createdToken = result.token;
-      _creating = false;
-    });
+    if (!mounted) return;
+    setState(() => _creating = false);
+    Navigator.of(context).pop(result.token);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
-    if (_createdToken != null) {
-      return _InviteResultView(token: _createdToken!);
-    }
 
     return Padding(
       padding: EdgeInsets.only(
@@ -378,7 +386,7 @@ class _InviteResultViewState extends State<_InviteResultView> {
                 label: Text('share'.tr()),
               ),
               OutlinedButton(
-                onPressed: () => Navigator.of(context).pop(widget.token),
+                onPressed: () => Navigator.of(context).pop(),
                 child: Text('done'.tr()),
               ),
             ],
