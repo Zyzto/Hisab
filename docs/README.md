@@ -8,6 +8,7 @@ Quick links to setup, backend, product, and UI docs.
 - [SUPABASE_SETUP.md](SUPABASE_SETUP.md) — Full Supabase backend: project, migrations, auth, Edge Functions
 - [RELEASE_SETUP.md](RELEASE_SETUP.md) — One-time release setup (keystore, Play, Firebase Hosting, GitHub secrets)
 - [GITHUB_ACTIONS_SECRETS.md](GITHUB_ACTIONS_SECRETS.md) — Secret names and where to get them
+- [../SECURITY.md](../SECURITY.md) — Public repo secret policy (safe to commit vs never commit)
 
 ## Backend
 

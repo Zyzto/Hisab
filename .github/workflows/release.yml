@@ -89,6 +89,9 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
+      - name: Verify Supabase config as code files
+        run: bash ./scripts/verify_supabase_config_as_code.sh
+
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v1
         with:

@@ -136,6 +136,8 @@ Full configuration reference: [CONFIGURATION.md](docs/CONFIGURATION.md).
 
 All secrets are provided at build time via `--dart-define` — nothing is committed to the repository. The only gitignored file for local secrets is `lib/core/constants/app_secrets.dart` (copy from `app_secrets_example.dart`); it holds the report-issue URL. All Supabase and Firebase values are provided via `--dart-define` only.
 
+See [SECURITY.md](SECURITY.md) for the full commit policy (safe-to-commit vs never-commit) for this public repository.
+
 ## Testing
 
 ```bash
