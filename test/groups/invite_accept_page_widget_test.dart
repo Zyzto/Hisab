@@ -108,12 +108,12 @@ void main() {
   Future<void> pump(
     WidgetTester tester,
     _FakeGroupInviteRepository repo,
-    {bool authenticated = true}
+    {bool authenticated = true, bool localOnly = false}
   ) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          effectiveLocalOnlyProvider.overrideWith((ref) => false),
+          effectiveLocalOnlyProvider.overrideWith((ref) => localOnly),
           isAuthenticatedProvider.overrideWith((ref) => authenticated),
           authServiceProvider.overrideWith((ref) => _FakeAuthService()),
           groupInviteRepositoryProvider.overrideWithValue(repo),
@@ -271,6 +271,46 @@ void main() {
     expect(find.text('بيت لحم'), findsOneWidget);
     // Preview button remains, accept action is disabled.
     expect(find.byType(OutlinedButton), findsAtLeastNWidgets(1));
+  });
+
+  testWidgets('local-only standard invite still shows online required message', (
+    tester,
+  ) async {
+    final repo = _FakeGroupInviteRepository(
+      invite: makeInvite().copyWith(accessMode: InviteAccessMode.standard),
+      group: makeGroup(),
+    );
+    await pump(tester, repo, authenticated: false, localOnly: true);
+
+    expect(
+      find.byWidgetPredicate(
+        (w) =>
+            w is Text &&
+            ((w.data ?? '').contains('Invites require online mode') ||
+                (w.data ?? '').contains('invite_requires_online')),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('local-only readonly invite is blocked when backend is missing', (
+    tester,
+  ) async {
+    final repo = _FakeGroupInviteRepository(
+      invite: makeInvite().copyWith(accessMode: InviteAccessMode.readonlyOnly),
+      group: makeGroup(),
+    );
+    await pump(tester, repo, authenticated: false, localOnly: true);
+
+    expect(
+      find.byWidgetPredicate(
+        (w) =>
+            w is Text &&
+            ((w.data ?? '').contains('Invites require online mode') ||
+                (w.data ?? '').contains('invite_requires_online')),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('unauthenticated readonly_join routes directly to preview', (

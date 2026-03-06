@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/auth/auth_providers.dart';
+import '../../../core/constants/supabase_config.dart';
 import '../../../core/auth/sign_in_sheet.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
@@ -100,7 +101,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
     final isAuthenticated = ref.watch(isAuthenticatedProvider);
     final inviteAsync = ref.watch(inviteByTokenProvider(widget.token));
 
-    // Native app in local-only: show generic online-required message
+    // Local-only without backend configuration cannot resolve invites at all.
     if (localOnly) {
       return LayoutBuilder(
         builder: (context, layoutConstraints) {
@@ -109,16 +110,79 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
               contentAreaWidth: layoutConstraints.maxWidth,
               title: Text('invite'.tr()),
             ),
-            body: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  'invite_requires_online'.tr(),
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-              ),
-            ),
+            body: !supabaseConfigAvailable
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        'invite_requires_online'.tr(),
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                    ),
+                  )
+                : inviteAsync.when(
+                    data: (data) {
+                      if (data == null) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.link_off,
+                                size: 64,
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'invite_expired'.tr(),
+                                style: Theme.of(context).textTheme.bodyLarge,
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                      if (data.invite.accessMode == InviteAccessMode.standard) {
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Text(
+                              'invite_requires_online'.tr(),
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodyLarge,
+                            ),
+                          ),
+                        );
+                      }
+                      if (kIsWeb) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (!mounted) return;
+                          context.go(RoutePaths.invitePreview(widget.token));
+                        });
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      return ConstrainedContent(
+                        child: _buildInviteContent(context, data.invite, data.group),
+                      );
+                    },
+                    loading: () => const Center(child: CircularProgressIndicator()),
+                    error: (e, st) {
+                      sendErrorTelemetryIfOnline(
+                        ref,
+                        message: e.toString(),
+                        details: e.toString(),
+                      );
+                      return Center(
+                        child: ErrorContentWidget(
+                          message: e.toString(),
+                          details: e.toString(),
+                          stackTrace: st,
+                          onRetry: () =>
+                              ref.invalidate(inviteByTokenProvider(widget.token)),
+                        ),
+                      );
+                    },
+                  ),
           );
         },
       );
