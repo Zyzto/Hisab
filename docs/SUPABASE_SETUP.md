@@ -28,11 +28,10 @@ This guide walks you through setting up the Supabase backend for Hisab from scra
    - [Migration 14: Participants left/archived (left_at) and re-join reuse](#migration-14-participants-leftarchived-left_at-and-re-join-reuse)
    - [Migration 15: Receipt images Storage bucket](#migration-15-receipt-images-storage-bucket)
    - [Migration 16: Groups personal and budget (is_personal, budget_amount_cents)](#migration-16-groups-personal-and-budget-is_personal-budget_amount_cents)
-   - [Migration 17: Anonymize participant name on leave/remove](#migration-17-anonymize-participant-name-on-leaveremove)
-   - [Migration 18: Anonymize only on account delete](#migration-18-anonymize-only-on-account-delete)
-   - [Migration 19: Receipt image paths (multiple photos)](#migration-19-receipt-image-paths-multiple-photos)
-   - [Migration 20: Groups allow_member_settle_for_others](#migration-20-groups-allow_member_settle_for_others)
-   - [Migration 21: Fix accept_invite null-expiry validation](#migration-21-fix-accept_invite-null-expiry-validation)
+   - [Migration 17: Anonymize only on account delete](#migration-17-anonymize-only-on-account-delete)
+   - [Migration 18: Receipt image paths (multiple photos)](#migration-18-receipt-image-paths-multiple-photos)
+   - [Migration 19: Groups allow_member_settle_for_others](#migration-19-groups-allow_member_settle_for_others)
+   - [Migration 20: Fix accept_invite null-expiry validation](#migration-20-fix-accept_invite-null-expiry-validation)
 4. [Configure Authentication](#4-configure-authentication)
 5. [Deploy Edge Functions](#5-deploy-edge-functions)
    - [Push notifications: end-to-end flow and verification](#push-notifications-end-to-end-flow-and-verification)
@@ -1679,7 +1678,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 Expense receipt images are uploaded to Supabase Storage so all group members can see them. The app stores the public URL in `expenses.receipt_image_path`.
 
 1. **Create the bucket in the Dashboard**: Go to **Storage** → **New bucket**. Name: `receipt-images`. Set **Public bucket** to **Yes** (so `getPublicUrl()` works without signed URLs). Optionally set file size limit (e.g. 10 MB) and allowed MIME types (e.g. `image/jpeg`, `image/png`, `image/webp`, `image/heic`).
-2. **Apply the migration** (run the SQL in `supabase/migrations/20250224100000_receipt_images_storage_bucket.sql`) to add RLS policies on `storage.objects`:
+2. **Apply the migration** (run the SQL in `supabase/migrations/20250101000015_receipt_images_bucket.sql`) to add RLS policies on `storage.objects`:
    - **INSERT**: Authenticated users can upload only into paths whose first folder is a group they belong to (`group_id/expense_id/filename`).
    - **SELECT**: Authenticated users can read objects in groups they belong to.
 
@@ -1699,29 +1698,23 @@ ALTER TABLE public.groups
 
 No new RPC or RLS change: existing `groups_update_owner_admin` allows owner/admin to update any column.
 
-### Migration 17: Anonymize participant name on leave/remove
-
-When a user leaves a group, is kicked, or is archived (removed from the people list), their participant display name in that group is replaced with a neutral placeholder (e.g. "Former member a3f2b1") and `avatar_id` is cleared. Re-joining via invite restores name and avatar from the auth profile. **Migration 18** below reverts this so anonymization happens only on account deletion; apply Migration 18 to get that behaviour.
-
-Apply the migration file `supabase/migrations/20250225200000_anonymize_participant_name_on_leave.sql`. It replaces `leave_group`, `kick_member`, and `archive_participant` with versions that set the placeholder name and clear avatar when setting `participants.left_at`.
-
-### Migration 18: Anonymize only on account delete
+### Migration 17: Anonymize only on account delete
 
 Reverts anonymization from leave/kick/archive. Names are anonymized **only when the auth user is deleted** (account deletion), via a trigger on `auth.users` BEFORE DELETE that updates all `public.participants` rows for that `user_id` with a placeholder name and clears `avatar_id`.
 
-Apply the migration file `supabase/migrations/20250226000000_anonymize_only_on_account_delete.sql`. It restores `leave_group`, `kick_member`, and `archive_participant` to only set `left_at` (no name/avatar change), and adds `public.anonymize_participants_on_user_delete()` plus trigger `trigger_anonymize_participants_on_user_delete` on `auth.users`.
+Apply the migration file `supabase/migrations/20250101000017_anonymize_on_delete.sql`. It keeps `leave_group`, `kick_member`, and `archive_participant` focused on membership state (`left_at`) and adds `public.anonymize_participants_on_user_delete()` plus trigger `trigger_anonymize_participants_on_user_delete` on `auth.users`.
 
-### Migration 19: Receipt image paths (multiple photos)
+### Migration 18: Receipt image paths (multiple photos)
 
 Adds `receipt_image_paths` (TEXT, JSON array of URLs) to `expenses` for up to 5 photos per expense. `receipt_image_path` remains for backward compatibility (first image).
 
 **Apply:**
 
-- **SQL Editor:** Run the contents of `supabase/migrations/20250227100000_receipt_image_paths.sql`.
+- **SQL Editor:** Run the contents of `supabase/migrations/20250101000018_receipt_image_paths.sql`.
 - **Supabase MCP:** `apply_migration` with `project_id`, `name`: `receipt_image_paths`, and `query` from that file (or the one-liner: `ALTER TABLE public.expenses ADD COLUMN IF NOT EXISTS receipt_image_paths TEXT;`).
 - **CLI:** From repo root, `supabase db push` (or link project and run migrations).
 
-### Migration 20: Groups allow_member_settle_for_others
+### Migration 19: Groups allow_member_settle_for_others
 
 Adds `allow_member_settle_for_others` to `groups`. When false (default), only the group owner or the debtor (participant who owes) can record a settlement in the app; when true, any member can record any settlement. Enforcement is client-side (UI); recording creates an expense, so existing expense RLS applies.
 
@@ -1730,7 +1723,7 @@ ALTER TABLE public.groups
   ADD COLUMN IF NOT EXISTS allow_member_settle_for_others BOOLEAN DEFAULT false NOT NULL;
 ```
 
-### Migration 21: Fix accept_invite null-expiry validation
+### Migration 20: Fix accept_invite null-expiry validation
 
 Aligns `accept_invite` with `get_invite_by_token` so invites with `expires_at IS NULL` ("Never" expiry) are accepted. Also pre-filters inactive or max-used invites in the token lookup.
 
@@ -2076,7 +2069,7 @@ After completing all steps:
    - `handle_updated_at`, `get_user_role`, `is_group_member`, `get_my_participant_id`
    - `get_invite_by_token`, `accept_invite`, `create_invite`, `revoke_invite`, `toggle_invite_active`
    - `transfer_ownership`, `leave_group`, `kick_member`, `update_member_role`, `assign_participant`, `merge_participant_with_member`
-   - `get_delete_my_data_preview`, `delete_my_data` (for Settings > Delete cloud data; see migration `20250222100000_delete_my_data_and_leave_group_updates.sql`. `leave_group` is updated in that migration to clear treasurer when the leaving member is treasurer and to delete the group when the leaving member is the only member.) Migration `20250226000000_anonymize_only_on_account_delete.sql` configures anonymization only when the auth user is deleted (trigger on auth.users); leave/kick/archive do not change names.)
+  - `get_delete_my_data_preview`, `delete_my_data` (for Settings > Delete cloud data; see migration `20250101000007_schema_additions.sql` for related sync/schema additions and migration `20250101000017_anonymize_on_delete.sql` for account-delete anonymization behavior.)
 
 4. **Edge Functions**: Go to **Edge Functions** and verify `invite-redirect`, `telemetry`, and `send-notification` are deployed and active (for push notifications, also set `FCM_PROJECT_ID` and `FCM_SERVICE_ACCOUNT_KEY` secrets; see Section 5).
 
@@ -2214,7 +2207,7 @@ The "Current schema reference" table above can be re-verified with `list_tables`
     ADD COLUMN IF NOT EXISTS budget_amount_cents INT;
   ```
 
-  **Migration 20 (allow member settle for others):**
+  **Migration 19 (allow member settle for others):**
   ```sql
   ALTER TABLE public.groups
     ADD COLUMN IF NOT EXISTS allow_member_settle_for_others BOOLEAN DEFAULT false NOT NULL;

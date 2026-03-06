@@ -14,7 +14,7 @@ This repository is public. Follow these rules for all contributions.
 
 - Supabase `service_role` key
 - Supabase JWT signing keys / `signing_keys.json`
-- Real `anon`/publishable keys for production projects
+- Environment-specific `anon` keys (even though they are public/client keys) unless intentionally documented for a public demo
 - Firebase service account JSON private keys
 - OAuth client secrets (Google, GitHub, Apple, etc.)
 - SMTP/API tokens and any `.env*` files with real values

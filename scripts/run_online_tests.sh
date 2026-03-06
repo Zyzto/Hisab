@@ -15,11 +15,23 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_DIR"
 
+SUPABASE_STARTED=0
+cleanup() {
+  local exit_code=$?
+  if [ "$SUPABASE_STARTED" -eq 1 ]; then
+    echo "==> Stopping local Supabase..."
+    supabase stop || echo "WARN: supabase stop failed"
+  fi
+  exit "$exit_code"
+}
+trap cleanup EXIT
+
 echo "==> Verifying Supabase config-as-code invariants..."
 bash ./scripts/verify_supabase_config_as_code.sh
 
 echo "==> Starting local Supabase..."
 supabase start
+SUPABASE_STARTED=1
 
 # Extract credentials from the running instance
 SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')
@@ -49,10 +61,3 @@ else
     --dart-define="SUPABASE_URL=$SUPABASE_URL" \
     --dart-define="SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"
 fi
-
-RESULT=$?
-
-echo "==> Stopping local Supabase..."
-supabase stop
-
-exit $RESULT

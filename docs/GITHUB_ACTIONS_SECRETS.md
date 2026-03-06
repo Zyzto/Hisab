@@ -13,8 +13,8 @@ Add these in **GitHub → Your repo → Settings → Secrets and variables → A
 | `FCM_VAPID_KEY` | Web push VAPID key (optional for Android; used if you build web too) | Firebase Console → Project Settings → Cloud Messaging → Web Push certificates → Key pair |
 | `KEYSTORE_BASE64` | Android release keystore, base64-encoded | `base64 -w 0 android/app/release-keystore.jks | pbcopy` (or equivalent) |
 | `KEYSTORE_PASSWORD` | Keystore password | The password you set when creating the keystore |
-| `KEY_ALIAS_VAL` | Key alias in the keystore | e.g. `upload` |
-| `KEY_PASSWORD_VAL` | Key password | The password for the key entry |
+| `KEY_ALIAS` | Key alias in the keystore | e.g. `upload` |
+| `KEY_PASSWORD` | Key password | The password for the key entry |
 | `GOOGLE_SERVICES_JSON` | Firebase config for Android (base64) | Firebase Console → Project Settings → Your apps → Android app → Download `google-services.json`, then `base64 -w 0 google-services.json` |
 | `PLAY_STORE_SERVICE_ACCOUNT_JSON` | Google Play API service account JSON (for uploading AAB) | Google Play Console → Setup → API access → Create service account, download JSON |
 
@@ -48,7 +48,7 @@ The `test-online` job in `.github/workflows/release.yml` runs end-to-end tests a
 What the job does:
 1. Sets up Flutter and Supabase CLI
 2. Starts local Supabase containers (`supabase start`)
-3. Resets the database — applies 18 migrations from `supabase/migrations/` and seeds test users from `supabase/seed.sql`
+3. Resets the database — applies all migrations from `supabase/migrations/` (currently 20 SQL files) and seeds test users from `supabase/seed.sql`
 4. Extracts `SUPABASE_URL` and `SUPABASE_ANON_KEY` from the running instance
 5. Runs `flutter drive` with the online test barrel (`integration_test/online_app_test.dart`)
 6. Stops Supabase in an `always()` cleanup step
@@ -73,7 +73,7 @@ Docker is available by default on GitHub Actions `ubuntu-latest` runners.
 - [ ] `FIREBASE_SERVICE_ACCOUNT` (full JSON string)
 - [ ] `KEYSTORE_BASE64`
 - [ ] `KEYSTORE_PASSWORD`
-- [ ] `KEY_ALIAS_VAL`
-- [ ] `KEY_PASSWORD_VAL`
+- [ ] `KEY_ALIAS`
+- [ ] `KEY_PASSWORD`
 - [ ] `GOOGLE_SERVICES_JSON` (base64)
 - [ ] `PLAY_STORE_SERVICE_ACCOUNT_JSON` (only if you deploy to Play)

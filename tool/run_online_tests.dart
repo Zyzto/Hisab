@@ -67,11 +67,17 @@ Future<void> _run(List<String> args) async {
     if (configAsCodeError != null) {
       tee('ERROR: $configAsCodeError');
     } else if (!await _checkDocker()) {
-      tee('ERROR: Docker is not running or not installed. Run "docker info" to check.');
+      tee(
+        'ERROR: Docker is not running or not installed. Run "docker info" to check.',
+      );
     } else if (!await _checkSupabaseCli()) {
-      tee('ERROR: Supabase CLI not found. Install: https://supabase.com/docs/guides/cli');
+      tee(
+        'ERROR: Supabase CLI not found. Install: https://supabase.com/docs/guides/cli',
+      );
     } else if (platform == 'web' && !await _checkChromeDriver()) {
-      tee('ERROR: ChromeDriver not on PATH (required for web). Version must match Chrome.');
+      tee(
+        'ERROR: ChromeDriver not on PATH (required for web). Version must match Chrome.',
+      );
     } else {
       // ----- Start Supabase -----
       tee('==> Starting local Supabase...');
@@ -104,12 +110,17 @@ Future<void> _run(List<String> args) async {
         } else {
           Map<String, dynamic>? status;
           try {
-            status = jsonDecode(statusBuffer.toString()) as Map<String, dynamic>;
+            status =
+                jsonDecode(statusBuffer.toString()) as Map<String, dynamic>;
           } catch (_) {}
           final supabaseUrl = status?['API_URL'] as String?;
           final supabaseAnonKey = status?['ANON_KEY'] as String?;
-          if (supabaseUrl == null || supabaseUrl.isEmpty || supabaseAnonKey == null) {
-            tee('ERROR: Could not get SUPABASE_URL/ANON_KEY from supabase status');
+          if (supabaseUrl == null ||
+              supabaseUrl.isEmpty ||
+              supabaseAnonKey == null) {
+            tee(
+              'ERROR: Could not get SUPABASE_URL/ANON_KEY from supabase status',
+            );
           } else {
             tee('    SUPABASE_URL=$supabaseUrl');
 
@@ -143,7 +154,9 @@ Future<void> _run(List<String> args) async {
               }
 
               // ----- Run tests -----
-              tee('==> Running online integration tests (platform=$platform)...');
+              tee(
+                '==> Running online integration tests (platform=$platform)...',
+              );
               if (platform == 'web') {
                 exitCode = await _runProcessTee(
                   'flutter',
@@ -166,7 +179,9 @@ Future<void> _run(List<String> args) async {
               } else {
                 final deviceId = await _getAndroidDeviceId(projectRoot);
                 if (deviceId == null) {
-                  tee('ERROR: No Android device found. Run "flutter devices" to list.');
+                  tee(
+                    'ERROR: No Android device found. Run "flutter devices" to list.',
+                  );
                 } else {
                   exitCode = await _runProcessTee(
                     'flutter',
@@ -248,7 +263,11 @@ Future<bool> _checkChromeDriver() async {
 
 Future<bool> _isPortInUse(int port) async {
   try {
-    final socket = await Socket.connect('localhost', port, timeout: const Duration(seconds: 1));
+    final socket = await Socket.connect(
+      'localhost',
+      port,
+      timeout: const Duration(seconds: 1),
+    );
     socket.destroy();
     return true;
   } catch (_) {
@@ -278,6 +297,7 @@ Future<int> _runProcessTeeWithTimeout(
     tee(safe);
     collectStdout?.writeln(safe);
   }
+
   final stdoutDone = process.stdout
       .transform(utf8.decoder)
       .transform(const LineSplitter())
@@ -298,7 +318,8 @@ Future<int> _runProcessTeeWithTimeout(
         await exitCodeFuture;
       } catch (_) {}
       tee(
-          'Process timed out after ${timeout.inMinutes} minutes and was killed.');
+        'Process timed out after ${timeout.inMinutes} minutes and was killed.',
+      );
       return _exitTimeout;
     }),
   ]);
@@ -359,7 +380,8 @@ Future<String?> _getAndroidDeviceId(String projectRoot) async {
     for (final d in list) {
       final map = d as Map<String, dynamic>;
       final id = map['id'] as String?;
-      final targetPlatform = map['targetPlatform'] as String? ?? map['platform'] as String?;
+      final targetPlatform =
+          map['targetPlatform'] as String? ?? map['platform'] as String?;
       if (id != null &&
           targetPlatform != null &&
           targetPlatform.toLowerCase().contains('android')) {
@@ -377,15 +399,18 @@ Future<String?> _verifySupabaseConfigAsCode(String projectRoot) async {
 
   if (!config.existsSync()) return 'Missing supabase/config.toml';
   if (!seed.existsSync()) return 'Missing supabase/seed.sql';
-  if (!migrationDir.existsSync()) return 'Missing supabase/migrations directory';
+  if (!migrationDir.existsSync()) {
+    return 'Missing supabase/migrations directory';
+  }
 
-  final migrations = migrationDir
-      .listSync()
-      .whereType<File>()
-      .where((f) => f.path.endsWith('.sql'))
-      .map((f) => p.basename(f.path))
-      .toList()
-    ..sort();
+  final migrations =
+      migrationDir
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.sql'))
+          .map((f) => p.basename(f.path))
+          .toList()
+        ..sort();
 
   if (migrations.isEmpty) return 'No SQL files found in supabase/migrations/';
 
