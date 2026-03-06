@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
+import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/navigation/route_paths.dart';
@@ -125,106 +126,101 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
       }
     }
 
-    // Single app bar for all states to avoid flash when async updates.
-    final appBar = AppBar(
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back),
-        onPressed: () => context.pop(),
-      ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.chevron_left),
-          onPressed: prevId != null
-              ? () {
-                  ref.read(expenseNavigationDirectionProvider.notifier).state =
-                      -1;
-                  if (widget.readOnlyPreview && widget.previewToken != null) {
-                    context.pushReplacement(
-                      RoutePaths.invitePreviewExpenseDetail(
-                        widget.previewToken!,
-                        prevId!,
-                      ),
-                    );
-                  } else {
-                    context.pushReplacement(
-                      RoutePaths.groupExpenseDetail(widget.groupId, prevId!),
-                    );
-                  }
-                }
-              : null,
-        ),
-        IconButton(
-          icon: const Icon(Icons.chevron_right),
-          onPressed: nextId != null
-              ? () {
-                  ref.read(expenseNavigationDirectionProvider.notifier).state =
-                      1;
-                  if (widget.readOnlyPreview && widget.previewToken != null) {
-                    context.pushReplacement(
-                      RoutePaths.invitePreviewExpenseDetail(
-                        widget.previewToken!,
-                        nextId!,
-                      ),
-                    );
-                  } else {
-                    context.pushReplacement(
-                      RoutePaths.groupExpenseDetail(widget.groupId, nextId!),
-                    );
-                  }
-                }
-              : null,
-        ),
-        if (!widget.readOnlyPreview)
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            enabled: expense != null,
-            onSelected: expense != null
-                ? (value) async {
-                    if (value == 'edit') {
-                      await context.push(
-                        RoutePaths.groupExpenseEdit(
-                          widget.groupId,
-                          widget.expenseId,
-                        ),
-                      );
-                      if (context.mounted) {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (context.mounted) {
-                            ref.invalidate(
-                              futureExpenseProvider(widget.expenseId),
-                            );
-                            ref.invalidate(
-                              expensesByGroupProvider(widget.groupId),
-                            );
-                          }
-                        });
-                      }
-                    } else if (value == 'delete') {
-                      _confirmDelete(context, ref, expense);
-                    }
-                  }
-                : (_) {},
-            itemBuilder: (context) => expense != null
-                ? [
-                    PopupMenuItem(value: 'edit', child: Text('edit'.tr())),
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Text(
-                        'delete'.tr(),
-                        style: TextStyle(color: theme.colorScheme.error),
-                      ),
-                    ),
-                  ]
-                : [
-                    const PopupMenuItem<String>(
-                      value: '',
-                      enabled: false,
-                      child: SizedBox.shrink(),
-                    ),
-                  ],
-          ),
-      ],
+    final appBarLeading = IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () => context.pop(),
     );
+    final appBarTitle = expense != null
+        ? Text(
+            expense.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          )
+        : const SizedBox.shrink();
+    final appBarActions = <Widget>[
+      IconButton(
+        icon: const Icon(Icons.chevron_left),
+        onPressed: prevId != null
+            ? () {
+                ref.read(expenseNavigationDirectionProvider.notifier).state = -1;
+                if (widget.readOnlyPreview && widget.previewToken != null) {
+                  context.pushReplacement(
+                    RoutePaths.invitePreviewExpenseDetail(
+                      widget.previewToken!,
+                      prevId!,
+                    ),
+                  );
+                } else {
+                  context.pushReplacement(
+                    RoutePaths.groupExpenseDetail(widget.groupId, prevId!),
+                  );
+                }
+              }
+            : null,
+      ),
+      IconButton(
+        icon: const Icon(Icons.chevron_right),
+        onPressed: nextId != null
+            ? () {
+                ref.read(expenseNavigationDirectionProvider.notifier).state = 1;
+                if (widget.readOnlyPreview && widget.previewToken != null) {
+                  context.pushReplacement(
+                    RoutePaths.invitePreviewExpenseDetail(
+                      widget.previewToken!,
+                      nextId!,
+                    ),
+                  );
+                } else {
+                  context.pushReplacement(
+                    RoutePaths.groupExpenseDetail(widget.groupId, nextId!),
+                  );
+                }
+              }
+            : null,
+      ),
+      if (!widget.readOnlyPreview)
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert),
+          enabled: expense != null,
+          onSelected: expense != null
+              ? (value) async {
+                  if (value == 'edit') {
+                    await context.push(
+                      RoutePaths.groupExpenseEdit(widget.groupId, widget.expenseId),
+                    );
+                    if (context.mounted) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (context.mounted) {
+                          ref.invalidate(futureExpenseProvider(widget.expenseId));
+                          ref.invalidate(expensesByGroupProvider(widget.groupId));
+                        }
+                      });
+                    }
+                  } else if (value == 'delete') {
+                    _confirmDelete(context, ref, expense);
+                  }
+                }
+              : (_) {},
+          itemBuilder: (context) => expense != null
+              ? [
+                  PopupMenuItem(value: 'edit', child: Text('edit'.tr())),
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: Text(
+                      'delete'.tr(),
+                      style: TextStyle(color: theme.colorScheme.error),
+                    ),
+                  ),
+                ]
+              : [
+                  const PopupMenuItem<String>(
+                    value: '',
+                    enabled: false,
+                    child: SizedBox.shrink(),
+                  ),
+                ],
+        ),
+    ];
 
     final body = expenseAsync.when(
       data: (e) {
@@ -252,9 +248,16 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
       error: (_, _) => const Center(child: CircularProgressIndicator()),
     );
 
-    return Scaffold(
-      appBar: appBar,
-      body: ConstrainedContent(child: body),
+    return LayoutBuilder(
+      builder: (context, layoutConstraints) => Scaffold(
+        appBar: ContentAlignedAppBar(
+          contentAreaWidth: layoutConstraints.maxWidth,
+          leading: appBarLeading,
+          title: appBarTitle,
+          actions: appBarActions,
+        ),
+        body: ConstrainedContent(child: body),
+      ),
     );
   }
 

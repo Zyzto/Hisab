@@ -277,7 +277,7 @@ void main() {
           expect(find.textContaining('International'), findsWidgets);
         });
 
-        // ── Stage: add parts split expense ──
+        // ── Stage: add parts split expense (+/- controls) ──
         await stage('add parts split expense', () async {
           await waitForWidget(tester, find.byIcon(Icons.add));
           await tapAndSettle(tester, find.byIcon(Icons.add).first);
@@ -295,6 +295,12 @@ void main() {
           await tapAndSettle(tester, find.text('Equal'));
           await waitForWidget(tester, find.text('Parts'));
           await tapAndSettle(tester, find.text('Parts'));
+
+          // Verify parts stepper controls are tappable in integration flow.
+          await waitForWidget(tester, find.byTooltip('Increase part'));
+          await waitForWidget(tester, find.byTooltip('Decrease part'));
+          await tapAndSettle(tester, find.byTooltip('Increase part').first);
+          await tapAndSettle(tester, find.byTooltip('Decrease part').first);
 
           await tapSubmitExpenseButton(tester);
           await ensureFormClosed(tester);
