@@ -279,8 +279,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
     final isReadonlyJoin = invite.accessMode == InviteAccessMode.readonlyJoin;
     final isReadonlyOnly = invite.accessMode == InviteAccessMode.readonlyOnly;
     final showReadonlyBanner = isReadonlyJoin || isReadonlyOnly;
-    final canAcceptInvite =
-        !isReadonlyOnly && (isAuthenticated || invite.accessMode != InviteAccessMode.standard);
+    final canAcceptInvite = !isReadonlyOnly;
     final showJoinOnboardingCta = isReadonlyJoin && !isAuthenticated;
 
     return SingleChildScrollView(

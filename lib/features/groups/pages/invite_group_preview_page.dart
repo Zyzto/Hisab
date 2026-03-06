@@ -2,8 +2,10 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/services/settle_up_service.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../../domain/domain.dart';
+import '../../balance/providers/balance_provider.dart';
 import '../../expenses/pages/expense_detail_shell.dart';
 import '../../expenses/widgets/expense_detail_body.dart';
 import '../providers/group_member_provider.dart';
@@ -45,9 +47,9 @@ class InviteGroupPreviewPage extends ConsumerWidget {
       error: (e, st) => Scaffold(
         body: Center(
           child: ErrorContentWidget(
-            message: e.toString(),
-            details: e.toString(),
-            stackTrace: st,
+            message: null,
+            details: null,
+            stackTrace: null,
             onRetry: () => ref.invalidate(invitePreviewDataProvider(token)),
           ),
         ),
@@ -82,8 +84,8 @@ class InvitePreviewExpenseDetailPage extends ConsumerWidget {
           );
         }
         final groupId = preview.group.id;
-        final found = preview.expenses.any((e) => e.id == expenseId);
-        if (!found) {
+        final previewExpense = _previewExpenseById(preview, expenseId);
+        if (previewExpense == null) {
           return Scaffold(
             body: Center(
               child: Text(
@@ -94,7 +96,12 @@ class InvitePreviewExpenseDetailPage extends ConsumerWidget {
           );
         }
         return ProviderScope(
-          overrides: [..._buildPreviewOverrides(preview)],
+          overrides: [
+            ..._buildPreviewOverrides(preview),
+            futureExpenseProvider(
+              expenseId,
+            ).overrideWith((ref) async => previewExpense),
+          ],
           child: ExpenseDetailShell(
             groupId: groupId,
             expenseId: expenseId,
@@ -109,9 +116,9 @@ class InvitePreviewExpenseDetailPage extends ConsumerWidget {
       error: (e, st) => Scaffold(
         body: Center(
           child: ErrorContentWidget(
-            message: e.toString(),
-            details: e.toString(),
-            stackTrace: st,
+            message: null,
+            details: null,
+            stackTrace: null,
             onRetry: () => ref.invalidate(invitePreviewDataProvider(token)),
           ),
         ),
@@ -120,11 +127,31 @@ class InvitePreviewExpenseDetailPage extends ConsumerWidget {
   }
 }
 
+Expense? _previewExpenseById(InvitePreviewData preview, String expenseId) {
+  for (final expense in preview.expenses) {
+    if (expense.id == expenseId) return expense;
+  }
+  return null;
+}
+
 Iterable<dynamic> _buildPreviewOverrides(InvitePreviewData preview) {
   final groupId = preview.group.id;
   final activeParticipants = preview.participants
       .where((p) => p.leftAt == null)
       .toList();
+  final balances = computeBalances(
+    activeParticipants,
+    preview.expenses,
+    preview.group.currencyCode,
+  );
+  final settlements = computeSettlements(
+    preview.group.settlementMethod,
+    balances,
+    activeParticipants,
+    preview.expenses,
+    preview.group.currencyCode,
+    preview.group.treasurerParticipantId,
+  );
   final members = <GroupMember>[];
   preview.participantRoles.forEach((participantId, role) {
     if (role == null || role.isEmpty) return;
@@ -148,6 +175,16 @@ Iterable<dynamic> _buildPreviewOverrides(InvitePreviewData preview) {
     activeParticipantsByGroupProvider(
       groupId,
     ).overrideWith((ref) => Stream.value(activeParticipants)),
+    groupBalanceProvider(groupId).overrideWithValue(
+      AsyncValue.data(
+        GroupBalanceResult(
+          group: preview.group,
+          participants: activeParticipants,
+          balances: balances,
+          settlements: settlements,
+        ),
+      ),
+    ),
     expensesByGroupProvider(
       groupId,
     ).overrideWith((ref) => Stream.value(preview.expenses)),
