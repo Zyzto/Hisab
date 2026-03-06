@@ -24,5 +24,8 @@ class RoutePaths {
   static String groupInvites(String groupId) => '/groups/$groupId/invites';
 
   static String inviteAccept(String token) => '/invite/$token';
+  static String invitePreview(String token) => '/invite/$token/preview';
+  static String invitePreviewExpenseDetail(String token, String expenseId) =>
+      '/invite/$token/preview/expenses/$expenseId';
   static const String scanInvite = '/scan-invite';
 }

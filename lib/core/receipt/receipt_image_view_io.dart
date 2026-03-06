@@ -50,6 +50,7 @@ Widget buildReceiptImageView(
 }) {
   if (imagePath == null || imagePath.isEmpty) return const SizedBox.shrink();
   final effectiveMaxHeight = maxHeight ?? 200;
+  final unavailablePlaceholder = _buildUnavailablePlaceholder(context);
 
   if (isReceiptImageUrl(imagePath)) {
     return Padding(
@@ -72,8 +73,7 @@ Widget buildReceiptImageView(
                 ),
               );
             },
-            errorBuilder: (context, _, _) =>
-                _buildUnavailablePlaceholder(context),
+            errorBuilder: (_, _, _) => unavailablePlaceholder,
           ),
         ),
       ),
@@ -96,8 +96,7 @@ Widget buildReceiptImageView(
         child: Image.file(
           file,
           fit: fit,
-          errorBuilder: (context, error, stackTrace) =>
-              _buildUnavailablePlaceholder(context),
+          errorBuilder: (_, _, _) => unavailablePlaceholder,
         ),
       ),
     ),
@@ -120,10 +119,12 @@ Widget _buildUnavailablePlaceholder(BuildContext context) {
             color: colorScheme.onSurfaceVariant,
           ),
           const SizedBox(width: 12),
-          Text(
-            'receipt_image_unavailable'.tr(),
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
+          Expanded(
+            child: Text(
+              'receipt_image_unavailable'.tr(),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
         ],

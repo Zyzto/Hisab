@@ -16,12 +16,16 @@ class ExpenseDetailShell extends ConsumerStatefulWidget {
   final String groupId;
   final String expenseId;
   final Widget child;
+  final bool readOnlyPreview;
+  final String? previewToken;
 
   const ExpenseDetailShell({
     super.key,
     required this.groupId,
     required this.expenseId,
     required this.child,
+    this.readOnlyPreview = false,
+    this.previewToken,
   });
 
   @override
@@ -116,8 +120,9 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
         ..sort((a, b) => b.date.compareTo(a.date));
       final index = sorted.indexWhere((e) => e.id == expense.id);
       if (index > 0) prevId = sorted[index - 1].id;
-      if (index >= 0 && index < sorted.length - 1)
+      if (index >= 0 && index < sorted.length - 1) {
         nextId = sorted[index + 1].id;
+      }
     }
 
     // Single app bar for all states to avoid flash when async updates.
@@ -133,9 +138,18 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
               ? () {
                   ref.read(expenseNavigationDirectionProvider.notifier).state =
                       -1;
-                  context.pushReplacement(
-                    RoutePaths.groupExpenseDetail(widget.groupId, prevId!),
-                  );
+                  if (widget.readOnlyPreview && widget.previewToken != null) {
+                    context.pushReplacement(
+                      RoutePaths.invitePreviewExpenseDetail(
+                        widget.previewToken!,
+                        prevId!,
+                      ),
+                    );
+                  } else {
+                    context.pushReplacement(
+                      RoutePaths.groupExpenseDetail(widget.groupId, prevId!),
+                    );
+                  }
                 }
               : null,
         ),
@@ -145,60 +159,70 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
               ? () {
                   ref.read(expenseNavigationDirectionProvider.notifier).state =
                       1;
-                  context.pushReplacement(
-                    RoutePaths.groupExpenseDetail(widget.groupId, nextId!),
-                  );
+                  if (widget.readOnlyPreview && widget.previewToken != null) {
+                    context.pushReplacement(
+                      RoutePaths.invitePreviewExpenseDetail(
+                        widget.previewToken!,
+                        nextId!,
+                      ),
+                    );
+                  } else {
+                    context.pushReplacement(
+                      RoutePaths.groupExpenseDetail(widget.groupId, nextId!),
+                    );
+                  }
                 }
               : null,
         ),
-        PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert),
-          enabled: expense != null,
-          onSelected: expense != null
-              ? (value) async {
-                  if (value == 'edit') {
-                    await context.push(
-                      RoutePaths.groupExpenseEdit(
-                        widget.groupId,
-                        widget.expenseId,
-                      ),
-                    );
-                    if (context.mounted) {
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (context.mounted) {
-                          ref.invalidate(
-                            futureExpenseProvider(widget.expenseId),
-                          );
-                          ref.invalidate(
-                            expensesByGroupProvider(widget.groupId),
-                          );
-                        }
-                      });
+        if (!widget.readOnlyPreview)
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            enabled: expense != null,
+            onSelected: expense != null
+                ? (value) async {
+                    if (value == 'edit') {
+                      await context.push(
+                        RoutePaths.groupExpenseEdit(
+                          widget.groupId,
+                          widget.expenseId,
+                        ),
+                      );
+                      if (context.mounted) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (context.mounted) {
+                            ref.invalidate(
+                              futureExpenseProvider(widget.expenseId),
+                            );
+                            ref.invalidate(
+                              expensesByGroupProvider(widget.groupId),
+                            );
+                          }
+                        });
+                      }
+                    } else if (value == 'delete') {
+                      _confirmDelete(context, ref, expense);
                     }
-                  } else if (value == 'delete') {
-                    _confirmDelete(context, ref, expense);
                   }
-                }
-              : (_) {},
-          itemBuilder: (context) => expense != null
-              ? [
-                  PopupMenuItem(value: 'edit', child: Text('edit'.tr())),
-                  PopupMenuItem(
-                    value: 'delete',
-                    child: Text(
-                      'delete'.tr(),
-                      style: TextStyle(color: theme.colorScheme.error),
+                : (_) {},
+            itemBuilder: (context) => expense != null
+                ? [
+                    PopupMenuItem(value: 'edit', child: Text('edit'.tr())),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Text(
+                        'delete'.tr(),
+                        style: TextStyle(color: theme.colorScheme.error),
+                      ),
                     ),
-                  ),
-                ]
-              : [
-                  const PopupMenuItem<String>(
-                    value: '',
-                    enabled: false,
-                    child: SizedBox.shrink(),
-                  ),
-                ],
-        ),
+                  ]
+                : [
+                    const PopupMenuItem<String>(
+                      value: '',
+                      enabled: false,
+                      child: SizedBox.shrink(),
+                    ),
+                  ],
+          ),
       ],
     );
 
