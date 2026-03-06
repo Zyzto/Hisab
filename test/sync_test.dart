@@ -117,153 +117,206 @@ void main() {
       expect(groups.first['name'], 'Test Group');
       expect(groups.first['currency_code'], 'USD');
 
-      final members = await db!.getAll('SELECT * FROM group_members WHERE group_id = ?', [groupId]);
+      final members = await db!.getAll(
+        'SELECT * FROM group_members WHERE group_id = ?',
+        [groupId],
+      );
       expect(members.length, 1);
-      final participants = await db!.getAll('SELECT * FROM participants WHERE group_id = ?', [groupId]);
+      final participants = await db!.getAll(
+        'SELECT * FROM participants WHERE group_id = ?',
+        [groupId],
+      );
       expect(participants.length, 1);
       expect(participants.first['name'], 'Owner');
     });
 
-    test('inserts all synced table columns without missing-column errors', () async {
+    test(
+      'inserts all synced table columns without missing-column errors',
+      () async {
+        if (!_powerSyncAvailable || db == null) return;
+        const gid = 'g-full';
+        const uid = 'u-full';
+        const pid = 'p-full';
+        const eid = 'e-full';
+        const tagId = 't-full';
+        const invId = 'inv-full';
+        const usageId = 'usage-full';
+        final now = '2025-01-02T12:00:00Z';
+        final backend = _FakeSyncBackend(
+          userId: uid,
+          groupIds: [gid],
+          groups: [
+            {
+              'id': gid,
+              'name': 'Full Group',
+              'currency_code': 'EUR',
+              'owner_id': uid,
+              'settlement_method': 'greedy',
+              'treasurer_participant_id': pid,
+              'settlement_freeze_at': null,
+              'settlement_snapshot_json': null,
+              'allow_member_add_expense': true,
+              'allow_member_add_participant': true,
+              'allow_member_change_settings': true,
+              'require_participant_assignment': false,
+              'allow_expense_as_other_participant': true,
+              'allow_member_settle_for_others': false,
+              'icon': 'home',
+              'color': 0xFF2196F3,
+              'archived_at': null,
+              'is_personal': false,
+              'budget_amount_cents': 10000,
+              'created_at': now,
+              'updated_at': now,
+            },
+          ],
+          members: [
+            {
+              'id': 'm-full',
+              'group_id': gid,
+              'user_id': uid,
+              'role': 'owner',
+              'participant_id': pid,
+              'joined_at': now,
+            },
+          ],
+          participants: [
+            {
+              'id': pid,
+              'group_id': gid,
+              'name': 'Me',
+              'sort_order': 0,
+              'user_id': uid,
+              'avatar_id': null,
+              'left_at': null,
+              'created_at': now,
+              'updated_at': now,
+            },
+          ],
+          expenses: [
+            {
+              'id': eid,
+              'group_id': gid,
+              'payer_participant_id': pid,
+              'amount_cents': 500,
+              'currency_code': 'EUR',
+              'exchange_rate': 1.0,
+              'base_amount_cents': 500,
+              'title': 'Lunch',
+              'description': null,
+              'date': now,
+              'split_type': 'equal',
+              'split_shares_json': '{}',
+              'type': 'expense',
+              'to_participant_id': null,
+              'tag': null,
+              'line_items_json': null,
+              'receipt_image_path': null,
+              'receipt_image_paths': null,
+              'created_at': now,
+              'updated_at': now,
+            },
+          ],
+          tags: [
+            {
+              'id': tagId,
+              'group_id': gid,
+              'label': 'Food',
+              'icon_name': 'restaurant',
+              'created_at': now,
+              'updated_at': now,
+            },
+          ],
+          invites: [
+            {
+              'id': invId,
+              'group_id': gid,
+              'token': 'token-full',
+              'invitee_email': null,
+              'role': 'member',
+              'created_at': now,
+              'expires_at': now,
+              'created_by': uid,
+              'label': null,
+              'max_uses': 5,
+              'use_count': 0,
+              'is_active': true,
+            },
+          ],
+          inviteUsages: [
+            {
+              'id': usageId,
+              'invite_id': invId,
+              'user_id': uid,
+              'accepted_at': now,
+            },
+          ],
+        );
+        await SyncEngine().fetchAllWithBackend(db!, backend);
+
+        final groups = await db!.getAll('SELECT * FROM groups WHERE id = ?', [
+          gid,
+        ]);
+        expect(groups.length, 1);
+        expect(groups.first['budget_amount_cents'], 10000);
+        expect(groups.first['is_personal'], 0);
+
+        final members = await db!.getAll(
+          'SELECT * FROM group_members WHERE group_id = ?',
+          [gid],
+        );
+        expect(members.length, 1);
+        final participants = await db!.getAll(
+          'SELECT * FROM participants WHERE group_id = ?',
+          [gid],
+        );
+        expect(participants.length, 1);
+        final expenses = await db!.getAll(
+          'SELECT * FROM expenses WHERE group_id = ?',
+          [gid],
+        );
+        expect(expenses.length, 1);
+        expect(expenses.first['title'], 'Lunch');
+        final tags = await db!.getAll(
+          'SELECT * FROM expense_tags WHERE group_id = ?',
+          [gid],
+        );
+        expect(tags.length, 1);
+        final invs = await db!.getAll(
+          'SELECT * FROM group_invites WHERE group_id = ?',
+          [gid],
+        );
+        expect(invs.length, 1);
+        final usages = await db!.getAll(
+          'SELECT * FROM invite_usages WHERE invite_id = ?',
+          [invId],
+        );
+        expect(usages.length, 1);
+      },
+    );
+
+    test('throws when pending writes exist before fetch', () async {
       if (!_powerSyncAvailable || db == null) return;
-      const gid = 'g-full';
-      const uid = 'u-full';
-      const pid = 'p-full';
-      const eid = 'e-full';
-      const tagId = 't-full';
-      const invId = 'inv-full';
-      const usageId = 'usage-full';
-      final now = '2025-01-02T12:00:00Z';
-      final backend = _FakeSyncBackend(
-        userId: uid,
-        groupIds: [gid],
-        groups: [
-          {
-            'id': gid,
-            'name': 'Full Group',
-            'currency_code': 'EUR',
-            'owner_id': uid,
-            'settlement_method': 'greedy',
-            'treasurer_participant_id': pid,
-            'settlement_freeze_at': null,
-            'settlement_snapshot_json': null,
-            'allow_member_add_expense': true,
-            'allow_member_add_participant': true,
-            'allow_member_change_settings': true,
-            'require_participant_assignment': false,
-            'allow_expense_as_other_participant': true,
-            'allow_member_settle_for_others': false,
-            'icon': 'home',
-            'color': 0xFF2196F3,
-            'archived_at': null,
-            'is_personal': false,
-            'budget_amount_cents': 10000,
-            'created_at': now,
-            'updated_at': now,
-          },
-        ],
-        members: [
-          {
-            'id': 'm-full',
-            'group_id': gid,
-            'user_id': uid,
-            'role': 'owner',
-            'participant_id': pid,
-            'joined_at': now,
-          },
-        ],
-        participants: [
-          {
-            'id': pid,
-            'group_id': gid,
-            'name': 'Me',
-            'sort_order': 0,
-            'user_id': uid,
-            'avatar_id': null,
-            'left_at': null,
-            'created_at': now,
-            'updated_at': now,
-          },
-        ],
-        expenses: [
-          {
-            'id': eid,
-            'group_id': gid,
-            'payer_participant_id': pid,
-            'amount_cents': 500,
-            'currency_code': 'EUR',
-            'exchange_rate': 1.0,
-            'base_amount_cents': 500,
-            'title': 'Lunch',
-            'description': null,
-            'date': now,
-            'split_type': 'equal',
-            'split_shares_json': '{}',
-            'type': 'expense',
-            'to_participant_id': null,
-            'tag': null,
-            'line_items_json': null,
-            'receipt_image_path': null,
-            'receipt_image_paths': null,
-            'created_at': now,
-            'updated_at': now,
-          },
-        ],
-        tags: [
-          {
-            'id': tagId,
-            'group_id': gid,
-            'label': 'Food',
-            'icon_name': 'restaurant',
-            'created_at': now,
-            'updated_at': now,
-          },
-        ],
-        invites: [
-          {
-            'id': invId,
-            'group_id': gid,
-            'token': 'token-full',
-            'invitee_email': null,
-            'role': 'member',
-            'created_at': now,
-            'expires_at': now,
-            'created_by': uid,
-            'label': null,
-            'max_uses': 5,
-            'use_count': 0,
-            'is_active': true,
-          },
-        ],
-        inviteUsages: [
-          {
-            'id': usageId,
-            'invite_id': invId,
-            'user_id': uid,
-            'accepted_at': now,
-          },
+      await db!.execute(
+        '''INSERT INTO pending_writes (table_name, operation, row_id, data_json, created_at)
+          VALUES (?, ?, ?, ?, ?)''',
+        [
+          'groups',
+          'insert',
+          'g-pending',
+          jsonEncode(<String, dynamic>{'id': 'g-pending', 'name': 'Pending'}),
+          DateTime.now().toUtc().toIso8601String(),
         ],
       );
-      await SyncEngine().fetchAllWithBackend(db!, backend);
 
-      final groups = await db!.getAll('SELECT * FROM groups WHERE id = ?', [gid]);
-      expect(groups.length, 1);
-      expect(groups.first['budget_amount_cents'], 10000);
-      expect(groups.first['is_personal'], 0);
-
-      final members = await db!.getAll('SELECT * FROM group_members WHERE group_id = ?', [gid]);
-      expect(members.length, 1);
-      final participants = await db!.getAll('SELECT * FROM participants WHERE group_id = ?', [gid]);
-      expect(participants.length, 1);
-      final expenses = await db!.getAll('SELECT * FROM expenses WHERE group_id = ?', [gid]);
-      expect(expenses.length, 1);
-      expect(expenses.first['title'], 'Lunch');
-      final tags = await db!.getAll('SELECT * FROM expense_tags WHERE group_id = ?', [gid]);
-      expect(tags.length, 1);
-      final invs = await db!.getAll('SELECT * FROM group_invites WHERE group_id = ?', [gid]);
-      expect(invs.length, 1);
-      final usages = await db!.getAll('SELECT * FROM invite_usages WHERE invite_id = ?', [invId]);
-      expect(usages.length, 1);
+      final backend = _FakeSyncBackend(userId: 'u-pending', groupIds: []);
+      await expectLater(
+        () => SyncEngine().fetchAllWithBackend(db!, backend),
+        throwsA(isA<StateError>()),
+      );
+      await db!.execute('DELETE FROM pending_writes WHERE row_id = ?', [
+        'g-pending',
+      ]);
     });
   });
 
@@ -271,23 +324,92 @@ void main() {
     test('removes pending_writes row after successful push', () async {
       if (!_powerSyncAvailable || db == null) return;
       final captured = <Map<String, dynamic>>[];
-      final backend = _FakeSyncBackend(userId: 'u', groupIds: [], capture: captured);
+      final backend = _FakeSyncBackend(
+        userId: 'u',
+        groupIds: [],
+        capture: captured,
+      );
       final rowId = 'row-${DateTime.now().millisecondsSinceEpoch}';
       final data = {'id': rowId, 'name': 'A Group', 'currency_code': 'USD'};
       await db!.execute(
         '''INSERT INTO pending_writes (table_name, operation, row_id, data_json, created_at)
           VALUES (?, ?, ?, ?, ?)''',
-        ['groups', 'insert', rowId, jsonEncode(data), DateTime.now().toUtc().toIso8601String()],
+        [
+          'groups',
+          'insert',
+          rowId,
+          jsonEncode(data),
+          DateTime.now().toUtc().toIso8601String(),
+        ],
       );
 
       await SyncEngine().pushPendingWritesWithBackend(db!, backend);
 
-      final remaining = await db!.getAll('SELECT * FROM pending_writes WHERE row_id = ?', [rowId]);
+      final remaining = await db!.getAll(
+        'SELECT * FROM pending_writes WHERE row_id = ?',
+        [rowId],
+      );
       expect(remaining, isEmpty);
       expect(captured.length, 1);
       expect(captured.first['table'], 'groups');
       expect(captured.first['operation'], 'insert');
       expect(captured.first['data']!['name'], 'A Group');
+    });
+
+    test('pushes queued insert, update, and delete in created order', () async {
+      if (!_powerSyncAvailable || db == null) return;
+      final captured = <Map<String, dynamic>>[];
+      final backend = _FakeSyncBackend(
+        userId: 'u',
+        groupIds: [],
+        capture: captured,
+      );
+      final baseTime = DateTime.now().toUtc();
+
+      await db!.execute(
+        '''INSERT INTO pending_writes (table_name, operation, row_id, data_json, created_at)
+          VALUES (?, ?, ?, ?, ?)''',
+        [
+          'groups',
+          'insert',
+          'group-1',
+          jsonEncode(<String, dynamic>{'id': 'group-1', 'name': 'One'}),
+          baseTime.toIso8601String(),
+        ],
+      );
+      await db!.execute(
+        '''INSERT INTO pending_writes (table_name, operation, row_id, data_json, created_at)
+          VALUES (?, ?, ?, ?, ?)''',
+        [
+          'groups',
+          'update',
+          'group-1',
+          jsonEncode(<String, dynamic>{'name': 'One Updated'}),
+          baseTime.add(const Duration(milliseconds: 10)).toIso8601String(),
+        ],
+      );
+      await db!.execute(
+        '''INSERT INTO pending_writes (table_name, operation, row_id, data_json, created_at)
+          VALUES (?, ?, ?, ?, ?)''',
+        [
+          'groups',
+          'delete',
+          'group-1',
+          null,
+          baseTime.add(const Duration(milliseconds: 20)).toIso8601String(),
+        ],
+      );
+
+      await SyncEngine().pushPendingWritesWithBackend(db!, backend);
+
+      final remaining = await db!.getAll('SELECT * FROM pending_writes');
+      expect(remaining, isEmpty);
+      expect(captured.length, 3);
+      expect(captured[0]['operation'], 'insert');
+      expect(captured[1]['operation'], 'update');
+      expect(captured[2]['operation'], 'delete');
+      expect(captured[1]['id'], 'group-1');
+      expect(captured[2]['id'], 'group-1');
     });
   });
 }
@@ -366,8 +488,17 @@ class _FakeSyncBackend implements SyncBackend {
   }
 
   @override
-  Future<void> update(String table, Map<String, dynamic> data, String id) async {
-    _captured?.add({'table': table, 'operation': 'update', 'data': data, 'id': id});
+  Future<void> update(
+    String table,
+    Map<String, dynamic> data,
+    String id,
+  ) async {
+    _captured?.add({
+      'table': table,
+      'operation': 'update',
+      'data': data,
+      'id': id,
+    });
   }
 
   @override
