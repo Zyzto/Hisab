@@ -227,8 +227,8 @@ class SyncEngine {
       for (final inv in invites) {
         await tx.execute(
           '''INSERT INTO group_invites (id, group_id, token, invitee_email, role,
-            created_at, expires_at, created_by, label, max_uses, use_count, is_active)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            created_at, expires_at, created_by, label, max_uses, use_count, is_active, access_mode)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
           [
             inv['id'],
             inv['group_id'],
@@ -242,6 +242,7 @@ class SyncEngine {
             inv['max_uses'],
             inv['use_count'] ?? 0,
             inv['is_active'] == true ? 1 : 0,
+            inv['access_mode'] as String? ?? 'standard',
           ],
         );
       }

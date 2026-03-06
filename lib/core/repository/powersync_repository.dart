@@ -266,6 +266,7 @@ GroupInvite _inviteFromRow(Map<String, dynamic> row) => GroupInvite(
   maxUses: (row['max_uses'] as num?)?.toInt(),
   useCount: (row['use_count'] as num?)?.toInt() ?? 0,
   isActive: _parseBool(row['is_active']),
+  accessMode: InviteAccessMode.fromValue(row['access_mode'] as String?),
 );
 
 InviteUsage _inviteUsageFromRow(Map<String, dynamic> row) => InviteUsage(
@@ -1712,6 +1713,7 @@ class PowerSyncGroupInviteRepository implements IGroupInviteRepository {
       role: row['role'] as String? ?? 'member',
       createdAt: _parseDateTime(row['created_at']),
       expiresAt: _parseDateTimeNullable(row['expires_at']),
+      accessMode: InviteAccessMode.fromValue(row['access_mode'] as String?),
     );
     final group = Group(
       id: row['group_id'] as String,
@@ -1731,6 +1733,7 @@ class PowerSyncGroupInviteRepository implements IGroupInviteRepository {
     String? label,
     int? maxUses,
     Duration? expiresIn,
+    InviteAccessMode accessMode = InviteAccessMode.standard,
   }) async {
     final client = supabaseClient;
     if (client == null) {
@@ -1743,6 +1746,7 @@ class PowerSyncGroupInviteRepository implements IGroupInviteRepository {
       'p_role': effectiveRole,
       'p_label': label,
       'p_max_uses': maxUses,
+      'p_access_mode': accessMode.value,
     };
     // Convert Duration to PostgreSQL interval string, or null for never
     if (expiresIn == null) {
@@ -1765,8 +1769,8 @@ class PowerSyncGroupInviteRepository implements IGroupInviteRepository {
     await _db.execute(
       '''INSERT OR REPLACE INTO group_invites
         (id, group_id, token, invitee_email, role, created_at, expires_at,
-         created_by, label, max_uses, use_count, is_active)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1)''',
+         created_by, label, max_uses, use_count, is_active, access_mode)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1, ?)''',
       [
         id,
         groupId,
@@ -1778,6 +1782,7 @@ class PowerSyncGroupInviteRepository implements IGroupInviteRepository {
         createdBy,
         label,
         maxUses,
+        accessMode.value,
       ],
     );
 

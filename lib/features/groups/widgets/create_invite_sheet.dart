@@ -13,6 +13,7 @@ import '../../../core/repository/repository_providers.dart';
 import '../../../core/telemetry/telemetry_service.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/widgets/toast.dart';
+import '../../../domain/domain.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 import '../utils/invite_share_helper.dart';
 
@@ -91,6 +92,7 @@ class _CreateInviteSheetState extends ConsumerState<_CreateInviteSheet> {
   String _role = 'member';
   int _expiryIndex = 2; // default: 7 days
   int _maxUsesIndex = 5; // default: unlimited
+  InviteAccessMode _accessMode = InviteAccessMode.standard;
   bool _creating = false;
 
   @override
@@ -114,6 +116,7 @@ class _CreateInviteSheetState extends ConsumerState<_CreateInviteSheet> {
                 : _labelController.text.trim(),
             maxUses: maxUses.value,
             expiresIn: expiry.duration,
+            accessMode: _accessMode,
           ),
       'Create invite failed',
       context: context,
@@ -222,6 +225,46 @@ class _CreateInviteSheetState extends ConsumerState<_CreateInviteSheet> {
                   onSelected: (_) => setState(() => _maxUsesIndex = i),
                 );
               }),
+            ),
+            const SizedBox(height: ThemeConfig.spacingL),
+
+            // Access mode
+            Text(
+              'invite_access_mode_title'.tr(),
+              style: theme.textTheme.titleSmall,
+            ),
+            const SizedBox(height: ThemeConfig.spacingS),
+            SegmentedButton<InviteAccessMode>(
+              segments: [
+                ButtonSegment(
+                  value: InviteAccessMode.standard,
+                  label: Text('invite_access_mode_standard'.tr()),
+                ),
+                ButtonSegment(
+                  value: InviteAccessMode.readonlyJoin,
+                  label: Text('invite_access_mode_readonly_join'.tr()),
+                ),
+                ButtonSegment(
+                  value: InviteAccessMode.readonlyOnly,
+                  label: Text('invite_access_mode_readonly_only'.tr()),
+                ),
+              ],
+              selected: {_accessMode},
+              showSelectedIcon: false,
+              onSelectionChanged: (value) {
+                setState(() => _accessMode = value.first);
+              },
+            ),
+            const SizedBox(height: ThemeConfig.spacingS),
+            Text(
+              _accessMode == InviteAccessMode.standard
+                  ? 'invite_access_mode_standard_hint'.tr()
+                  : _accessMode == InviteAccessMode.readonlyJoin
+                  ? 'invite_access_mode_readonly_join_hint'.tr()
+                  : 'invite_access_mode_readonly_only_hint'.tr(),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: ThemeConfig.spacingL),
 

@@ -1,3 +1,24 @@
+enum InviteAccessMode {
+  standard('standard'),
+  readonlyJoin('readonly_join'),
+  readonlyOnly('readonly_only');
+
+  const InviteAccessMode(this.value);
+  final String value;
+
+  static InviteAccessMode fromValue(String? value) {
+    switch (value) {
+      case 'readonly_join':
+        return InviteAccessMode.readonlyJoin;
+      case 'readonly_only':
+        return InviteAccessMode.readonlyOnly;
+      case 'standard':
+      default:
+        return InviteAccessMode.standard;
+    }
+  }
+}
+
 /// Domain entity: a pending invite to join a group.
 class GroupInvite {
   final String id;
@@ -12,6 +33,7 @@ class GroupInvite {
   final int? maxUses;
   final int useCount;
   final bool isActive;
+  final InviteAccessMode accessMode;
 
   const GroupInvite({
     required this.id,
@@ -26,6 +48,7 @@ class GroupInvite {
     this.maxUses,
     this.useCount = 0,
     this.isActive = true,
+    this.accessMode = InviteAccessMode.standard,
   });
 
   /// Whether the invite has passed its expiry date.
@@ -58,6 +81,7 @@ class GroupInvite {
     int? maxUses,
     int? useCount,
     bool? isActive,
+    InviteAccessMode? accessMode,
   }) {
     return GroupInvite(
       id: id ?? this.id,
@@ -72,6 +96,7 @@ class GroupInvite {
       maxUses: maxUses ?? this.maxUses,
       useCount: useCount ?? this.useCount,
       isActive: isActive ?? this.isActive,
+      accessMode: accessMode ?? this.accessMode,
     );
   }
 }
