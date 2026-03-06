@@ -88,6 +88,17 @@ void main() {
     expect(find.byIcon(Icons.add_link), findsOneWidget);
   });
 
+  testWidgets('CreateInviteSheet passes selected access mode', (tester) async {
+    await openCreateInviteSheet(tester);
+
+    await tester.tap(find.text('Read-only only'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.add_link).first);
+    await tester.pumpAndSettle();
+
+    expect(fakeInviteRepo.lastAccessMode, InviteAccessMode.readonlyOnly);
+  }, skip: !supabaseConfigAvailable);
+
   testWidgets('CreateInviteSheet in Arabic shows key content', (tester) async {
     await setViewportForSheet(tester);
     await tester.pumpWidget(buildTestApp(locale: const Locale('ar')));
@@ -153,6 +164,7 @@ void main() {
 /// Minimal fake for [IGroupInviteRepository] so the sheet builds and Create returns a token.
 class FakeGroupInviteRepository implements IGroupInviteRepository {
   int createCalls = 0;
+  InviteAccessMode lastAccessMode = InviteAccessMode.standard;
 
   @override
   Future<({GroupInvite invite, Group group})?> getByToken(String token) async =>
@@ -166,8 +178,10 @@ class FakeGroupInviteRepository implements IGroupInviteRepository {
     String? label,
     int? maxUses,
     Duration? expiresIn,
+    InviteAccessMode accessMode = InviteAccessMode.standard,
   }) async {
     createCalls += 1;
+    lastAccessMode = accessMode;
     return (id: 'fake-invite-id', token: 'fake-token');
   }
 

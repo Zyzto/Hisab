@@ -7,6 +7,7 @@ import 'dart:io';
 
 import 'package:hisab/core/database/powersync_schema.dart' as ps;
 import 'package:hisab/core/repository/powersync_repository.dart';
+import 'package:hisab/domain/domain.dart';
 
 class MockSupabaseClient extends Mock implements SupabaseClient {}
 
@@ -106,6 +107,7 @@ void main() {
       expect(captured['p_label'], 'Family');
       expect(captured['p_max_uses'], 5);
       expect(captured['p_expires_in'], '3600 seconds');
+      expect(captured['p_access_mode'], 'standard');
     });
 
     test(
@@ -137,8 +139,70 @@ void main() {
         final captured = verification.captured.single as Map<String, dynamic>;
         expect(captured['p_group_id'], 'group-2');
         expect(captured['p_expires_in'], isNull);
+      expect(captured['p_access_mode'], 'standard');
       },
     );
+
+    test('getByToken maps access_mode and group timestamps', () async {
+      if (!powerSyncAvailable || db == null) return;
+      final repo = PowerSyncGroupInviteRepository(db!, supabaseClient: client);
+      when(
+        () => client.rpc('get_invite_by_token', params: any(named: 'params')),
+      ).thenReturn(
+        Future.value([
+              {
+                'invite_id': 'invite-1',
+                'group_id': 'group-1',
+                'token': 'tok-1',
+                'invitee_email': null,
+                'role': 'member',
+                'created_at': '2026-01-01T00:00:00Z',
+                'expires_at': '2026-12-31T00:00:00Z',
+                'access_mode': 'readonly_only',
+                'group_name': 'Test Group',
+                'group_currency_code': 'USD',
+                'group_created_at': '2026-01-01T00:00:00Z',
+                'group_updated_at': '2026-01-02T00:00:00Z',
+              },
+            ])
+            as dynamic,
+      );
+
+      final result = await repo.getByToken('tok-1');
+      expect(result, isNotNull);
+      expect(result!.invite.accessMode, InviteAccessMode.readonlyOnly);
+      expect(result.group.name, 'Test Group');
+      expect(result.group.updatedAt.toUtc(), DateTime.parse('2026-01-02T00:00:00Z'));
+    });
+
+    test('getByToken defaults missing access_mode to standard', () async {
+      if (!powerSyncAvailable || db == null) return;
+      final repo = PowerSyncGroupInviteRepository(db!, supabaseClient: client);
+      when(
+        () => client.rpc('get_invite_by_token', params: any(named: 'params')),
+      ).thenReturn(
+        Future.value([
+              {
+                'invite_id': 'invite-2',
+                'group_id': 'group-1',
+                'token': 'tok-2',
+                'invitee_email': null,
+                'role': 'member',
+                'created_at': '2026-01-01T00:00:00Z',
+                'expires_at': null,
+                'group_name': 'Test Group',
+                'group_currency_code': 'USD',
+                'group_created_at': '2026-01-01T00:00:00Z',
+                'group_updated_at': '2026-01-01T00:00:00Z',
+              },
+            ])
+            as dynamic,
+      );
+
+      final result = await repo.getByToken('tok-2');
+      expect(result, isNotNull);
+      expect(result!.invite.accessMode, InviteAccessMode.standard);
+    });
 
     test('accept sends expected params and returns group id', () async {
       if (!powerSyncAvailable || db == null) return;

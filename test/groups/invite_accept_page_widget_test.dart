@@ -46,6 +46,7 @@ class _FakeGroupInviteRepository implements IGroupInviteRepository {
     String? label,
     int? maxUses,
     Duration? expiresIn,
+    InviteAccessMode accessMode = InviteAccessMode.standard,
   }) async => (id: 'id', token: 'token');
 
   @override
@@ -105,12 +106,13 @@ void main() {
   Future<void> pump(
     WidgetTester tester,
     _FakeGroupInviteRepository repo,
+    {bool authenticated = true}
   ) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           effectiveLocalOnlyProvider.overrideWith((ref) => false),
-          isAuthenticatedProvider.overrideWith((ref) => true),
+          isAuthenticatedProvider.overrideWith((ref) => authenticated),
           authServiceProvider.overrideWith((ref) => _FakeAuthService()),
           groupInviteRepositoryProvider.overrideWithValue(repo),
         ],
@@ -198,5 +200,30 @@ void main() {
 
     expect(repo.acceptCalls, 2);
     expect(find.textContaining('Invite service unavailable'), findsOneWidget);
+  });
+
+  testWidgets('readonly_join unauthenticated shows preview actions', (tester) async {
+    final repo = _FakeGroupInviteRepository(
+      invite: makeInvite().copyWith(accessMode: InviteAccessMode.readonlyJoin),
+      group: makeGroup(),
+    );
+    await pump(tester, repo, authenticated: false);
+
+    expect(find.text('بيت لحم'), findsOneWidget);
+    expect(find.textContaining('preview'), findsWidgets);
+    expect(find.byType(FilledButton), findsOneWidget);
+    expect(find.byType(OutlinedButton), findsOneWidget);
+  });
+
+  testWidgets('readonly_only hides join action', (tester) async {
+    final repo = _FakeGroupInviteRepository(
+      invite: makeInvite().copyWith(accessMode: InviteAccessMode.readonlyOnly),
+      group: makeGroup(),
+    );
+    await pump(tester, repo, authenticated: true);
+
+    expect(find.text('بيت لحم'), findsOneWidget);
+    // Preview button remains, accept action is disabled.
+    expect(find.byType(OutlinedButton), findsAtLeastNWidgets(1));
   });
 }
