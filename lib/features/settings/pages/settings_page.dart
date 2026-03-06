@@ -118,106 +118,106 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             title: Text('settings'.tr()),
           ),
           body: ConstrainedContent(
-        child: ListView(
-          key: const PageStorageKey<String>('settings_list'),
-          children: [
-            _buildAccountSection(context, ref, settings),
-            // Appearance: merged General + old Appearance
-            _buildSection(context, ref, settings, appearanceSection, [
-              _languageTile(context, ref, settings),
-              _themeModeTile(context, ref, settings),
-              _themeSchemeTile(context, ref, settings),
-              _fontSizeTile(context, ref, settings),
-              _favoriteCurrenciesTile(context, ref, settings),
-              _displayCurrencyTile(context, ref, settings),
-              buildBoolSettingTile(
-                ref,
-                settings,
-                use24HourFormatSettingDef,
-                titleKey: 'use_24_hour_format',
-                subtitleKey: 'use_24_hour_format_description',
-              ),
-            ]),
-            // Functional: behavior toggles (expense form mode, etc.)
-            _buildSection(
-              context,
-              ref,
-              settings,
-              functionalSection,
-              buildFunctionalSectionTiles(context, ref, settings),
-            ),
-            // Data & Backup: merged Data + old Backup
-            _buildSection(
-              context,
-              ref,
-              settings,
-              dataBackupSection,
-              buildDataBackupSectionTiles(
-                context,
-                ref,
-                settings,
-                localOnlyTile: _buildLocalOnlyTile(context, ref, settings),
-                onExport: () => _exportData(context, ref),
-                onImport: () => _importData(context, ref),
-              ),
-            ),
-            _buildSection(
-              context,
-              ref,
-              settings,
-              receiptAiSection,
-              buildReceiptAiSectionTiles(
-                context,
-                ref,
-                settings,
-                ({
-                  required BuildContext context,
-                  required WidgetRef ref,
-                  required String titleKey,
-                  required String currentValue,
-                  required StringSetting settingDef,
-                }) => _showApiKeyDialog(
-                  context: context,
-                  ref: ref,
-                  titleKey: titleKey,
-                  currentValue: currentValue,
-                  settingDef: settingDef,
+            child: ListView(
+              key: const PageStorageKey<String>('settings_list'),
+              children: [
+                _buildAccountSection(context, ref, settings),
+                // Appearance: merged General + old Appearance
+                _buildSection(context, ref, settings, appearanceSection, [
+                  _languageTile(context, ref, settings),
+                  _themeModeTile(context, ref, settings),
+                  _themeSchemeTile(context, ref, settings),
+                  _fontSizeTile(context, ref, settings),
+                  _favoriteCurrenciesTile(context, ref, settings),
+                  _displayCurrencyTile(context, ref, settings),
+                  buildBoolSettingTile(
+                    ref,
+                    settings,
+                    use24HourFormatSettingDef,
+                    titleKey: 'use_24_hour_format',
+                    subtitleKey: 'use_24_hour_format_description',
+                  ),
+                ]),
+                // Functional: behavior toggles (expense form mode, etc.)
+                _buildSection(
+                  context,
+                  ref,
+                  settings,
+                  functionalSection,
+                  buildFunctionalSectionTiles(context, ref, settings),
                 ),
-              ),
+                // Data & Backup: merged Data + old Backup
+                _buildSection(
+                  context,
+                  ref,
+                  settings,
+                  dataBackupSection,
+                  buildDataBackupSectionTiles(
+                    context,
+                    ref,
+                    settings,
+                    localOnlyTile: _buildLocalOnlyTile(context, ref, settings),
+                    onExport: () => _exportData(context, ref),
+                    onImport: () => _importData(context, ref),
+                  ),
+                ),
+                _buildSection(
+                  context,
+                  ref,
+                  settings,
+                  receiptAiSection,
+                  buildReceiptAiSectionTiles(
+                    context,
+                    ref,
+                    settings,
+                    ({
+                      required BuildContext context,
+                      required WidgetRef ref,
+                      required String titleKey,
+                      required String currentValue,
+                      required StringSetting settingDef,
+                    }) => _showApiKeyDialog(
+                      context: context,
+                      ref: ref,
+                      titleKey: titleKey,
+                      currentValue: currentValue,
+                      settingDef: settingDef,
+                    ),
+                  ),
+                ),
+                // Privacy: renamed from Logging
+                _buildSection(
+                  context,
+                  ref,
+                  settings,
+                  privacySection,
+                  buildPrivacySectionTiles(context, ref, settings),
+                ),
+                _buildSection(
+                  context,
+                  ref,
+                  settings,
+                  advancedSection,
+                  buildAdvancedSectionTiles(
+                    context,
+                    ref,
+                    settings,
+                    onReturnToOnboarding: () =>
+                        _resetToOnboarding(context, ref, settings),
+                    onViewLogs: () => _showLogsDialog(context),
+                    onResetAllSettings: () =>
+                        _resetAllSettings(context, ref, settings),
+                    onDeleteLocalData: () => _showDeleteLocalData(context, ref),
+                    onDeleteCloudData: () => _showDeleteCloudData(context, ref),
+                    supabaseAvailable: supabaseConfigAvailable,
+                    isSignedIn: ref.watch(currentUserProvider) != null,
+                  ),
+                ),
+                _buildAboutSection(context, ref, settings),
+              ],
             ),
-            // Privacy: renamed from Logging
-            _buildSection(
-              context,
-              ref,
-              settings,
-              privacySection,
-              buildPrivacySectionTiles(context, ref, settings),
-            ),
-            _buildSection(
-              context,
-              ref,
-              settings,
-              advancedSection,
-              buildAdvancedSectionTiles(
-                context,
-                ref,
-                settings,
-                onReturnToOnboarding: () =>
-                    _resetToOnboarding(context, ref, settings),
-                onViewLogs: () => _showLogsDialog(context),
-                onResetAllSettings: () =>
-                    _resetAllSettings(context, ref, settings),
-                onDeleteLocalData: () => _showDeleteLocalData(context, ref),
-                onDeleteCloudData: () => _showDeleteCloudData(context, ref),
-                supabaseAvailable: supabaseConfigAvailable,
-                isSignedIn: ref.watch(currentUserProvider) != null,
-              ),
-            ),
-            _buildAboutSection(context, ref, settings),
-          ],
-        ),
-      ),
-    );
+          ),
+        );
       },
     );
   }
@@ -543,9 +543,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ref
           .read(settings.provider(onboardingCompletedSettingDef).notifier)
           .set(false);
-      Log.info(
-        'Setting changed: ${onboardingCompletedSettingDef.key}=false',
-      );
+      Log.info('Setting changed: ${onboardingCompletedSettingDef.key}=false');
       if (context.mounted) {
         context.go(RoutePaths.onboarding);
       }
@@ -1099,32 +1097,30 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                             style: Theme.of(ctx).textTheme.titleMedium,
                           ),
                         ),
-                      ...flexSchemeOptionIds.map(
-                        (schemeId) {
-                          final chipColor = schemeId == 'custom'
-                              ? Color(themeColorValue)
-                              : primaryColorForSchemeId(schemeId);
-                          return ListTile(
-                            leading: Container(
-                              width: 24,
-                              height: 24,
-                              decoration: BoxDecoration(
-                                color: chipColor != Colors.transparent
-                                    ? chipColor
-                                    : Theme.of(ctx)
-                                        .colorScheme
-                                        .surfaceContainerHighest,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Theme.of(ctx).colorScheme.outline,
-                                ),
+                      ...flexSchemeOptionIds.map((schemeId) {
+                        final chipColor = schemeId == 'custom'
+                            ? Color(themeColorValue)
+                            : primaryColorForSchemeId(schemeId);
+                        return ListTile(
+                          leading: Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              color: chipColor != Colors.transparent
+                                  ? chipColor
+                                  : Theme.of(
+                                      ctx,
+                                    ).colorScheme.surfaceContainerHighest,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Theme.of(ctx).colorScheme.outline,
                               ),
                             ),
-                            title: Text('theme_scheme_$schemeId'.tr()),
-                            onTap: () => Navigator.of(ctx).pop(schemeId),
-                          );
-                        },
-                      ),
+                          ),
+                          title: Text('theme_scheme_$schemeId'.tr()),
+                          onTap: () => Navigator.of(ctx).pop(schemeId),
+                        );
+                      }),
                     ],
                   ),
                 ),
@@ -1310,12 +1306,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     WidgetRef ref,
     SettingsProviders settings,
   ) {
-    final stored = ref.watch(settings.provider(displayCurrencySettingDef)).trim();
+    final stored = ref
+        .watch(settings.provider(displayCurrencySettingDef))
+        .trim();
     final label = stored.isEmpty
         ? 'display_currency_none'.tr()
         : (CurrencyHelpers.fromCode(stored) != null
-            ? CurrencyHelpers.shortLabel(CurrencyHelpers.fromCode(stored)!)
-            : stored);
+              ? CurrencyHelpers.shortLabel(CurrencyHelpers.fromCode(stored)!)
+              : stored);
 
     return ListTile(
       leading: const Icon(Icons.visibility_outlined),
@@ -1334,8 +1332,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               child: Text(
                 label,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+                  color: Theme.of(context).colorScheme.primary,
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -1440,8 +1438,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               onTap: isWeb
                   ? null
                   : () {
-                      final trigger =
-                          ref.read(updateCheckTriggerProvider).callback;
+                      final trigger = ref
+                          .read(updateCheckTriggerProvider)
+                          .callback;
                       if (trigger != null) {
                         if (context.mounted) {
                           context.showToast('checking_for_updates'.tr());
@@ -1572,11 +1571,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       scaffoldContext.showSuccess('logs_cleared'.tr());
                     }
                   } catch (e, st) {
-                    Log.warning(
-                      'Clear logs failed',
-                      error: e,
-                      stackTrace: st,
-                    );
+                    Log.warning('Clear logs failed', error: e, stackTrace: st);
                     if (scaffoldContext.mounted) {
                       scaffoldContext.showToast('logs_not_available'.tr());
                     }

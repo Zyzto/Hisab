@@ -9,31 +9,36 @@ void main() {
     EasyLocalization.logger.enableBuildModes = [];
   });
 
-  testWidgets('ExpandableSection shows title and when initiallyExpanded true shows child', (tester) async {
-    await tester.pumpWidget(
-      EasyLocalization(
-        path: 'assets/translations',
-        supportedLocales: const [Locale('en')],
-        fallbackLocale: const Locale('en'),
-        startLocale: const Locale('en'),
-        child: const MaterialApp(
-          home: Scaffold(
-            body: ExpandableSection(
-              title: 'Details',
-              initiallyExpanded: true,
-              child: Text('Child content'),
+  testWidgets(
+    'ExpandableSection shows title and when initiallyExpanded true shows child',
+    (tester) async {
+      await tester.pumpWidget(
+        EasyLocalization(
+          path: 'assets/translations',
+          supportedLocales: const [Locale('en')],
+          fallbackLocale: const Locale('en'),
+          startLocale: const Locale('en'),
+          child: const MaterialApp(
+            home: Scaffold(
+              body: ExpandableSection(
+                title: 'Details',
+                initiallyExpanded: true,
+                child: Text('Child content'),
+              ),
             ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('Details'), findsOneWidget);
-    expect(find.text('Child content'), findsOneWidget);
-    expect(find.byIcon(Icons.expand_less), findsOneWidget);
-  });
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Details'), findsOneWidget);
+      expect(find.text('Child content'), findsOneWidget);
+      expect(find.byIcon(Icons.expand_less), findsOneWidget);
+    },
+  );
 
-  testWidgets('ExpandableSection initiallyExpanded false hides child', (tester) async {
+  testWidgets('ExpandableSection initiallyExpanded false hides child', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       EasyLocalization(
         path: 'assets/translations',
@@ -85,7 +90,9 @@ void main() {
     expect(find.text('Content'), findsNothing);
   });
 
-  testWidgets('ExpandableSection shows trailingSummary when provided', (tester) async {
+  testWidgets('ExpandableSection shows trailingSummary when provided', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       EasyLocalization(
         path: 'assets/translations',
@@ -109,7 +116,9 @@ void main() {
     expect(find.text('3 items'), findsOneWidget);
   });
 
-  testWidgets('ExpandableSection with empty trailingSummary shows only title', (tester) async {
+  testWidgets('ExpandableSection with empty trailingSummary shows only title', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       EasyLocalization(
         path: 'assets/translations',

@@ -31,7 +31,11 @@ void main() {
       recordStage('smoke: back to Home', 'STARTED');
       await tapAndSettle(tester, find.text('Groups'));
       final hasFab = find.byIcon(Icons.add).evaluate().isNotEmpty;
-      expect(hasFab, isTrue, reason: 'FAB should be visible after returning to Home');
+      expect(
+        hasFab,
+        isTrue,
+        reason: 'FAB should be visible after returning to Home',
+      );
       recordStage('smoke: back to Home', 'PASSED');
     });
   });

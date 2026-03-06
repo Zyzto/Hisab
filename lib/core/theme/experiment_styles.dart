@@ -19,7 +19,9 @@ class ExperimentStyles {
     Color(0xFF1A237E), // 1 Finance Professional – Navy
     Color(0xFF00897B), // 2 Playful Bubble – Teal
     Color(0xFF5C6BC0), // 3 Elevated Surface – pastel-ish
-    Color(0xFF00E676), // 4 Tech Utility – Neon Lime accent (scheme uses this as seed)
+    Color(
+      0xFF00E676,
+    ), // 4 Tech Utility – Neon Lime accent (scheme uses this as seed)
     Color(0xFF6D4C41), // 5 Editorial List – Brown / earth
   ];
 
@@ -75,8 +77,8 @@ class ExperimentStyles {
     final base = brightness == Brightness.light
         ? AppTheme.lightTheme(seedColor: seedColor, fontSizeScale: null)
         : amoled
-            ? AppTheme.amoledTheme(seedColor: seedColor, fontSizeScale: null)
-            : AppTheme.darkTheme(seedColor: seedColor, fontSizeScale: null);
+        ? AppTheme.amoledTheme(seedColor: seedColor, fontSizeScale: null)
+        : AppTheme.darkTheme(seedColor: seedColor, fontSizeScale: null);
 
     final textTheme = _textThemeForStyle(styleIndex, brightness);
     final scaledTextTheme = _scaleTextTheme(textTheme, scale);
@@ -87,10 +89,7 @@ class ExperimentStyles {
         cardTheme = base.cardTheme.copyWith(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            side: BorderSide(
-              color: base.colorScheme.outlineVariant,
-              width: 1,
-            ),
+            side: BorderSide(color: base.colorScheme.outlineVariant, width: 1),
           ),
           elevation: 0,
           color: Colors.transparent,
@@ -139,10 +138,7 @@ class ExperimentStyles {
         break;
     }
 
-    return base.copyWith(
-      textTheme: scaledTextTheme,
-      cardTheme: cardTheme,
-    );
+    return base.copyWith(textTheme: scaledTextTheme, cardTheme: cardTheme);
   }
 
   static TextTheme _textThemeForStyle(int styleIndex, Brightness brightness) {

@@ -34,8 +34,8 @@ class FloatingNavBar extends ConsumerWidget {
     final barRadius = styleIndex == 2
         ? 28.0
         : styleIndex == 5
-            ? 4.0
-            : 24.0;
+        ? 4.0
+        : 24.0;
     final iconSize = styleIndex == 2 ? 28.0 : 24.0;
 
     return SafeArea(

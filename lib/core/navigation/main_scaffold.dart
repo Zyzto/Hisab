@@ -174,8 +174,9 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
                           'v${snapshot.data!.version}',
                           textAlign: TextAlign.center,
                           style: theme.textTheme.bodyMedium!.copyWith(
-                            color: theme.colorScheme.onSurface
-                                .withValues(alpha: 0.15),
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.15,
+                            ),
                             fontWeight: FontWeight.w500,
                             letterSpacing: 0.5,
                           ),
@@ -225,7 +226,9 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
                     'v${snapshot.data!.version}',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodyMedium!.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.15),
+                      color: theme.colorScheme.onSurface.withValues(
+                        alpha: 0.15,
+                      ),
                       fontWeight: FontWeight.w500,
                       letterSpacing: 0.5,
                     ),

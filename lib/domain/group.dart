@@ -24,8 +24,10 @@ class Group {
   final String? icon;
   final int? color;
   final DateTime? archivedAt;
+
   /// True for personal (my-expenses-only) groups; minimal UI, no invites.
   final bool isPersonal;
+
   /// Optional budget in group currency (cents); used when [isPersonal].
   final int? budgetAmountCents;
 

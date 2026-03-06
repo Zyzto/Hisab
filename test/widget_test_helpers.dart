@@ -23,9 +23,7 @@ Future<void> pumpApp(
       supportedLocales: testSupportedLocales,
       fallbackLocale: const Locale('en'),
       startLocale: locale,
-      child: MaterialApp(
-        home: Scaffold(body: child),
-      ),
+      child: MaterialApp(home: Scaffold(body: child)),
     ),
   );
   if (pumpAndSettle) {

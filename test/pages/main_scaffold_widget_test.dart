@@ -38,9 +38,7 @@ void main() {
           supportedLocales: const [Locale('en')],
           fallbackLocale: const Locale('en'),
           startLocale: const Locale('en'),
-          child: MaterialApp.router(
-            routerConfig: router,
-          ),
+          child: MaterialApp.router(routerConfig: router),
         ),
       ),
     );

@@ -38,8 +38,10 @@ class CurrencyFormatter {
     final p = _currencyParams(currencyCode);
     final divisor = _divisor(p.$1);
     final wholeUnits = (amountCents / divisor).round();
-    final formatted =
-        NumberFormat.currency(symbol: '', decimalDigits: 0).format(wholeUnits);
+    final formatted = NumberFormat.currency(
+      symbol: '',
+      decimalDigits: 0,
+    ).format(wholeUnits);
     return p.$3 ? '${p.$2} $formatted' : '$formatted ${p.$2}';
   }
 

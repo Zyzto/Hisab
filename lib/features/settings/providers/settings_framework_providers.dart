@@ -83,7 +83,10 @@ Future<SettingsProviders?> initializeHisabSettings() async {
   try {
     final registry = createHisabSettingsRegistry();
     final storage = SharedPreferencesStorage();
-    final providers = await initializeSettings(registry: registry, storage: storage);
+    final providers = await initializeSettings(
+      registry: registry,
+      storage: storage,
+    );
     // ignore: unnecessary_null_comparison -- initializeSettings may return null on failure
     if (providers != null) {
       await runThemeSchemeMigration(providers);
@@ -410,9 +413,7 @@ bool expenseFormExpandDescription(Ref ref) {
   try {
     final settings = ref.watch(hisabSettingsProvidersProvider);
     if (settings == null) return false;
-    return ref.watch(
-      settings.provider(expenseFormExpandDescriptionSettingDef),
-    );
+    return ref.watch(settings.provider(expenseFormExpandDescriptionSettingDef));
   } catch (e, stackTrace) {
     Log.warning(
       'expenseFormExpandDescription read failed, defaulting to false',

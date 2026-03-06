@@ -55,13 +55,17 @@ Future<T?> showResponsiveSheet<T>({
   bool useSafeArea = true,
   bool showDragHandle = true,
   ShapeBorder? sheetShape,
+
   /// When true (default), tapping/clicking the barrier closes the modal. Same behavior on mobile and desktop.
   bool barrierDismissible = true,
+
   /// When true (default), never add rail padding (center in full viewport). When false, center in content area (e.g. next to rail on shell routes).
   bool centerInFullViewport = true,
 }) async {
   if (LayoutBreakpoints.isTabletOrWider(context)) {
-    final pathWhenOpened = GoRouter.of(context).routerDelegate.currentConfiguration.uri.path;
+    final pathWhenOpened = GoRouter.of(
+      context,
+    ).routerDelegate.currentConfiguration.uri.path;
     final railWidth = _railWidthForDialog(
       path: pathWhenOpened,
       centerInFullViewport: centerInFullViewport,
@@ -119,7 +123,9 @@ Future<T?> showResponsiveSheet<T>({
                               child: Align(
                                 alignment: AlignmentDirectional.centerStart,
                                 child: Padding(
-                                  padding: const EdgeInsetsDirectional.only(start: 16),
+                                  padding: const EdgeInsetsDirectional.only(
+                                    start: 16,
+                                  ),
                                   child: Text(
                                     title,
                                     style: theme.textTheme.titleLarge?.copyWith(
@@ -134,14 +140,18 @@ Future<T?> showResponsiveSheet<T>({
                           // focusable; otherwise the focus manager can steal focus from
                           // sheet content (e.g. password fields) during applyFocusChangesIfNeeded.
                           Tooltip(
-                            message: MaterialLocalizations.of(ctx).closeButtonTooltip,
+                            message: MaterialLocalizations.of(
+                              ctx,
+                            ).closeButtonTooltip,
                             child: Material(
                               type: MaterialType.button,
                               color: Colors.transparent,
                               child: InkWell(
                                 canRequestFocus: false,
-                                onTap: () =>
-                                    Navigator.of(ctx, rootNavigator: true).pop(null),
+                                onTap: () => Navigator.of(
+                                  ctx,
+                                  rootNavigator: true,
+                                ).pop(null),
                                 customBorder: const CircleBorder(),
                                 child: Padding(
                                   padding: const EdgeInsets.all(12),
@@ -164,14 +174,12 @@ Future<T?> showResponsiveSheet<T>({
                       ),
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
-                          maxHeight: effectiveMaxHeight -
+                          maxHeight:
+                              effectiveMaxHeight -
                               topBarHeight -
                               topBarContentPadding,
                         ),
-                        child: FocusScope(
-                          autofocus: false,
-                          child: child,
-                        ),
+                        child: FocusScope(autofocus: false, child: child),
                       ),
                     ),
                   ],
@@ -207,15 +215,15 @@ Future<T?> showResponsiveSheet<T>({
               builder: (ctx, constraints) {
                 final cw = constraints.maxWidth.isFinite
                     ? (railWidth > 0
-                        ? constraints.maxWidth - railWidth
-                        : (constraints.maxWidth < viewportWidth
-                            ? constraints.maxWidth
-                            : viewportWidth))
+                          ? constraints.maxWidth - railWidth
+                          : (constraints.maxWidth < viewportWidth
+                                ? constraints.maxWidth
+                                : viewportWidth))
                     : viewportWidth - railWidth;
                 final ch = constraints.maxHeight.isFinite
                     ? (constraints.maxHeight < viewportHeight
-                        ? constraints.maxHeight
-                        : viewportHeight)
+                          ? constraints.maxHeight
+                          : viewportHeight)
                     : viewportHeight;
                 final centeringWrapper = SizedBox(
                   width: cw,
@@ -258,7 +266,8 @@ Future<T?> showResponsiveSheet<T>({
     useSafeArea: useSafeArea,
     showDragHandle: showDragHandle,
     isDismissible: barrierDismissible,
-    shape: sheetShape ??
+    shape:
+        sheetShape ??
         const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
@@ -293,7 +302,8 @@ Future<T?> _showWebBottomSheet<T>({
   final theme = Theme.of(context);
   final size = MediaQuery.sizeOf(context);
   final effectiveMaxHeight = maxHeight ?? size.height * 0.85;
-  final shape = sheetShape ??
+  final shape =
+      sheetShape ??
       const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       );
@@ -350,7 +360,10 @@ Future<T?> _showWebBottomSheet<T>({
                         ),
                       ConstrainedBox(
                         constraints: BoxConstraints(
-                          maxHeight: effectiveMaxHeight - (showDragHandle ? 24.0 : 0) - 24,
+                          maxHeight:
+                              effectiveMaxHeight -
+                              (showDragHandle ? 24.0 : 0) -
+                              24,
                         ),
                         child: Padding(
                           padding: EdgeInsets.only(
@@ -370,13 +383,10 @@ Future<T?> _showWebBottomSheet<T>({
     },
     transitionBuilder: (ctx, animation, secondaryAnimation, child) {
       return SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0, 1),
-          end: Offset.zero,
-        ).animate(CurvedAnimation(
-          parent: animation,
-          curve: Curves.easeOutCubic,
-        )),
+        position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+            .animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+            ),
         child: child,
       );
     },
@@ -395,11 +405,14 @@ Future<T?> showAppDialog<T>({
   required WidgetBuilder builder,
   bool barrierDismissible = true,
   Color? barrierColor,
+
   /// When true (default), center in full viewport (no rail padding). When false, center in content area (e.g. next to rail on shell routes).
   bool centerInFullViewport = true,
 }) async {
   if (LayoutBreakpoints.isTabletOrWider(context)) {
-    final pathWhenOpened = GoRouter.of(context).routerDelegate.currentConfiguration.uri.path;
+    final pathWhenOpened = GoRouter.of(
+      context,
+    ).routerDelegate.currentConfiguration.uri.path;
     final railWidth = _railWidthForDialog(
       path: pathWhenOpened,
       centerInFullViewport: centerInFullViewport,
@@ -432,8 +445,8 @@ Future<T?> showAppDialog<T>({
               builder: (ctx, constraints) {
                 final cw = constraints.maxWidth.isFinite
                     ? (railWidth > 0
-                        ? constraints.maxWidth - railWidth
-                        : constraints.maxWidth)
+                          ? constraints.maxWidth - railWidth
+                          : constraints.maxWidth)
                     : size.width - railWidth;
                 final ch = constraints.maxHeight.isFinite
                     ? constraints.maxHeight

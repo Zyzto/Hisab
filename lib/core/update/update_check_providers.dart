@@ -9,5 +9,6 @@ class _UpdateCheckTriggerHolder {
   void Function(BuildContext context)? callback;
 }
 
-final updateCheckTriggerProvider =
-    Provider<_UpdateCheckTriggerHolder>((ref) => _UpdateCheckTriggerHolder());
+final updateCheckTriggerProvider = Provider<_UpdateCheckTriggerHolder>(
+  (ref) => _UpdateCheckTriggerHolder(),
+);

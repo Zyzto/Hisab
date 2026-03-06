@@ -10,23 +10,23 @@ void main() {
     EasyLocalization.logger.enableBuildModes = [];
   });
 
-  testWidgets('BackButtonKeyboardDismiss builds and displays child', (tester) async {
+  testWidgets('BackButtonKeyboardDismiss builds and displays child', (
+    tester,
+  ) async {
     await pumpApp(
       tester,
-      child: const BackButtonKeyboardDismiss(
-        child: Text('child'),
-      ),
+      child: const BackButtonKeyboardDismiss(child: Text('child')),
     );
     expect(find.text('child'), findsOneWidget);
   });
 
-  testWidgets('BackButtonKeyboardDismiss displays complex child', (tester) async {
+  testWidgets('BackButtonKeyboardDismiss displays complex child', (
+    tester,
+  ) async {
     await pumpApp(
       tester,
       child: const BackButtonKeyboardDismiss(
-        child: Scaffold(
-          body: Center(child: Text('Page content')),
-        ),
+        child: Scaffold(body: Center(child: Text('Page content'))),
       ),
     );
     expect(find.text('Page content'), findsOneWidget);

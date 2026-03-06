@@ -84,12 +84,12 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          groupBalanceProvider(groupId).overrideWithValue(
-            AsyncValue.data(fakeResult),
-          ),
-          myMemberInGroupProvider(groupId).overrideWithValue(
-            myMemberOverride ?? const AsyncValue.data(null),
-          ),
+          groupBalanceProvider(
+            groupId,
+          ).overrideWithValue(AsyncValue.data(fakeResult)),
+          myMemberInGroupProvider(
+            groupId,
+          ).overrideWithValue(myMemberOverride ?? const AsyncValue.data(null)),
           myRoleInGroupProvider(groupId).overrideWithValue(
             myRoleOverride ?? const AsyncValue.data(GroupRole.owner),
           ),
@@ -100,16 +100,16 @@ void main() {
           fallbackLocale: const Locale('en'),
           startLocale: const Locale('en'),
           child: const MaterialApp(
-            home: Scaffold(
-              body: BalanceList(groupId: groupId),
-            ),
+            home: Scaffold(body: BalanceList(groupId: groupId)),
           ),
         ),
       ),
     );
   }
 
-  testWidgets('BalanceList shows participant names and settlement', (tester) async {
+  testWidgets('BalanceList shows participant names and settlement', (
+    tester,
+  ) async {
     await pumpBalanceList(tester);
     await tester.pumpAndSettle();
 
@@ -122,8 +122,9 @@ void main() {
     expect(find.textContaining('50'), findsAny);
   });
 
-  testWidgets('BalanceList disables record when not owner and not debtor',
-      (tester) async {
+  testWidgets('BalanceList disables record when not owner and not debtor', (
+    tester,
+  ) async {
     // User is member (not owner), and their participant is p-a (Alice).
     // Settlement is p-b → p-a (Bob owes Alice). So only owner or Bob can record.
     // As Alice (member), record button should be disabled.

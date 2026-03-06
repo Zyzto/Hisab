@@ -9,7 +9,10 @@ Future<String?> writeReceiptBytesToTempFile(Uint8List bytes) async {
   try {
     final dir = await getTemporaryDirectory();
     final file = File(
-      path.join(dir.path, 'receipt_scan_${DateTime.now().millisecondsSinceEpoch}.jpg'),
+      path.join(
+        dir.path,
+        'receipt_scan_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      ),
     );
     await file.writeAsBytes(bytes);
     return file.path;

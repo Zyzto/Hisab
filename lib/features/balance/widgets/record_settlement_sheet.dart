@@ -43,7 +43,9 @@ Future<bool> showRecordSettlementSheet(
         payerParticipantId: settlement.fromParticipantId,
         amountCents: settlement.amountCents,
         currencyCode: currencyCode,
-        title: 'settlement_expense_title'.tr(namedArgs: {'from': fromName, 'to': toName}),
+        title: 'settlement_expense_title'.tr(
+          namedArgs: {'from': fromName, 'to': toName},
+        ),
         date: DateTime.now(),
         splitType: SplitType.amounts,
         splitShares: {settlement.toParticipantId: settlement.amountCents},
@@ -131,7 +133,8 @@ class _RecordSettlementSheet extends StatelessWidget {
                   onPressed: () => Navigator.of(context).pop(false),
                   child: Text('cancel'.tr()),
                 ),
-              if (!LayoutBreakpoints.isTabletOrWider(context)) const SizedBox(width: 12),
+              if (!LayoutBreakpoints.isTabletOrWider(context))
+                const SizedBox(width: 12),
               FilledButton.icon(
                 onPressed: () => Navigator.of(context).pop(true),
                 icon: const Icon(Icons.check),

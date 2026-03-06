@@ -25,13 +25,10 @@ Stream<List<Group>> _combineExcludingLocalArchived(
   final ctrl = StreamController<List<Group>>(sync: true);
   void emit() {
     if (latestGroups != null) {
-      ctrl.add(
-        latestGroups!
-            .where((g) => !latestIds.contains(g.id))
-            .toList(),
-      );
+      ctrl.add(latestGroups!.where((g) => !latestIds.contains(g.id)).toList());
     }
   }
+
   final sub1 = allGroups.listen((v) {
     latestGroups = v;
     emit();
@@ -90,8 +87,7 @@ Stream<List<Participant>> activeParticipantsByGroup(Ref ref, String groupId) {
       .watch(participantRepositoryProvider)
       .watchByGroupId(groupId)
       .map(
-        (participants) =>
-            participants.where((p) => p.leftAt == null).toList(),
+        (participants) => participants.where((p) => p.leftAt == null).toList(),
       );
 }
 

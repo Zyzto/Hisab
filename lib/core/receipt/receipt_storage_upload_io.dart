@@ -25,7 +25,9 @@ Future<String?> uploadReceiptToStorage(
     return null;
   }
   final bytes = await file.readAsBytes();
-  final ext = path.extension(localPath).isEmpty ? 'jpg' : path.extension(localPath).replaceFirst('.', '');
+  final ext = path.extension(localPath).isEmpty
+      ? 'jpg'
+      : path.extension(localPath).replaceFirst('.', '');
   return uploadReceiptBytesToStorage(bytes, groupId, expenseId, fileExt: ext);
 }
 
@@ -42,7 +44,9 @@ Future<String?> uploadReceiptBytesToStorage(
   final ext = fileExt ?? 'jpg';
   final bucketKey = '$groupId/$expenseId/${const Uuid().v4()}.$ext';
   try {
-    await client.storage.from(_bucket).uploadBinary(
+    await client.storage
+        .from(_bucket)
+        .uploadBinary(
           bucketKey,
           bytes,
           fileOptions: const FileOptions(upsert: false),

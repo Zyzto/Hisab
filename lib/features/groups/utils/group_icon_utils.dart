@@ -16,11 +16,19 @@ class GroupIconOption {
 const groupIconLetterKey = 'letter';
 
 const groupIcons = [
-  GroupIconOption(groupIconLetterKey, Icons.sort_by_alpha, 'wizard_icon_initials'),
+  GroupIconOption(
+    groupIconLetterKey,
+    Icons.sort_by_alpha,
+    'wizard_icon_initials',
+  ),
   GroupIconOption('trip', Icons.flight, 'wizard_icon_trip'),
   GroupIconOption('home', Icons.home_outlined, 'wizard_icon_home'),
   GroupIconOption('food', Icons.restaurant_outlined, 'wizard_icon_food'),
-  GroupIconOption('shopping', Icons.shopping_cart_outlined, 'wizard_icon_shopping'),
+  GroupIconOption(
+    'shopping',
+    Icons.shopping_cart_outlined,
+    'wizard_icon_shopping',
+  ),
   GroupIconOption('event', Icons.celebration_outlined, 'wizard_icon_event'),
   GroupIconOption('camping', Icons.terrain_outlined, 'wizard_icon_camping'),
   GroupIconOption('work', Icons.work_outline, 'wizard_icon_work'),

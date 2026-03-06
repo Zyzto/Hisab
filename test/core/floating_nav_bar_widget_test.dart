@@ -9,7 +9,9 @@ void main() {
     EasyLocalization.logger.enableBuildModes = [];
   });
 
-  testWidgets('FloatingNavBar shows destinations and selected index', (tester) async {
+  testWidgets('FloatingNavBar shows destinations and selected index', (
+    tester,
+  ) async {
     var selectedIndex = 0;
     await tester.pumpWidget(
       ProviderScope(

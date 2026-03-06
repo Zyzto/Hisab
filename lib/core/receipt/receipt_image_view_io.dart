@@ -67,12 +67,13 @@ Widget buildReceiptImageView(
                 child: CircularProgressIndicator(
                   value: loadingProgress.expectedTotalBytes != null
                       ? loadingProgress.cumulativeBytesLoaded /
-                          loadingProgress.expectedTotalBytes!
+                            loadingProgress.expectedTotalBytes!
                       : null,
                 ),
               );
             },
-            errorBuilder: (context, _, _) => _buildUnavailablePlaceholder(context),
+            errorBuilder: (context, _, _) =>
+                _buildUnavailablePlaceholder(context),
           ),
         ),
       ),
@@ -95,7 +96,8 @@ Widget buildReceiptImageView(
         child: Image.file(
           file,
           fit: fit,
-          errorBuilder: (context, error, stackTrace) => _buildUnavailablePlaceholder(context),
+          errorBuilder: (context, error, stackTrace) =>
+              _buildUnavailablePlaceholder(context),
         ),
       ),
     ),

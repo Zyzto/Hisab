@@ -29,7 +29,9 @@ void main() {
     );
   });
 
-  testWidgets('ExpenseListTile renders title and formatted amount', (tester) async {
+  testWidgets('ExpenseListTile renders title and formatted amount', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       EasyLocalization(
         path: 'assets/translations',
@@ -38,10 +40,7 @@ void main() {
         startLocale: const Locale('en'),
         child: MaterialApp(
           home: Scaffold(
-            body: ExpenseListTile(
-              expense: testExpense,
-              payerName: 'Alice',
-            ),
+            body: ExpenseListTile(expense: testExpense, payerName: 'Alice'),
           ),
         ),
       ),
@@ -51,7 +50,9 @@ void main() {
     expect(find.textContaining('50'), findsOneWidget);
   });
 
-  testWidgets('ExpenseListTile when showPaidBy true builds with title', (tester) async {
+  testWidgets('ExpenseListTile when showPaidBy true builds with title', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       EasyLocalization(
         path: 'assets/translations',
@@ -74,7 +75,9 @@ void main() {
     expect(find.byType(ExpenseListTile), findsOneWidget);
   });
 
-  testWidgets('ExpenseListTile when showPaidBy false does not show paid by', (tester) async {
+  testWidgets('ExpenseListTile when showPaidBy false does not show paid by', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       EasyLocalization(
         path: 'assets/translations',
@@ -113,7 +116,9 @@ void main() {
     expect(find.byType(ExpenseListTile), findsOneWidget);
   });
 
-  testWidgets('ExpenseListTile zero amount shows formatted amount', (tester) async {
+  testWidgets('ExpenseListTile zero amount shows formatted amount', (
+    tester,
+  ) async {
     final zeroExpense = Expense(
       id: 'e2',
       groupId: 'g1',
@@ -135,7 +140,9 @@ void main() {
     expect(find.byType(ExpenseListTile), findsOneWidget);
   });
 
-  testWidgets('ExpenseListTile very long title builds and ellipsizes', (tester) async {
+  testWidgets('ExpenseListTile very long title builds and ellipsizes', (
+    tester,
+  ) async {
     final longTitleExpense = Expense(
       id: 'e3',
       groupId: 'g1',
@@ -156,7 +163,9 @@ void main() {
     expect(find.byType(ExpenseListTile), findsOneWidget);
   });
 
-  testWidgets('ExpenseListTile income transaction type renders', (tester) async {
+  testWidgets('ExpenseListTile income transaction type renders', (
+    tester,
+  ) async {
     final incomeExpense = Expense(
       id: 'e4',
       groupId: 'g1',

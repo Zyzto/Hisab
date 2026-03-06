@@ -37,7 +37,8 @@ class FirebaseStatusFailure extends FirebaseStatusResult {
   final String? message;
 }
 
-const _firebaseIncidentsUrl = 'https://status.firebase.google.com/incidents.json';
+const _firebaseIncidentsUrl =
+    'https://status.firebase.google.com/incidents.json';
 const _timeout = Duration(seconds: 10);
 const _recentHours = 6;
 
@@ -68,17 +69,18 @@ Future<FirebaseStatusResult> fetchFirebaseStatus() async {
       }
       if (modified != null && modified.isBefore(cutoff)) continue;
 
-      final desc = e['external_desc'] as String? ?? e['service_name'] as String? ?? 'Incident';
+      final desc =
+          e['external_desc'] as String? ??
+          e['service_name'] as String? ??
+          'Incident';
       final mostRecent = e['most_recent_update'] as Map<String, dynamic>?;
       final status = mostRecent?['status'] as String? ?? '';
       final active = status != 'AVAILABLE';
 
       if (active) hasActive = true;
-      recent.add(FirebaseIncident(
-        name: desc,
-        active: active,
-        updatedAt: modified,
-      ));
+      recent.add(
+        FirebaseIncident(name: desc, active: active, updatedAt: modified),
+      );
     }
 
     recent.sort((a, b) {

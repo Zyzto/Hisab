@@ -5,7 +5,8 @@ import 'package:upgrader/upgrader.dart';
 /// Upgrader messages from EasyLocalization (assets/translations) so the update
 /// dialog uses the same locale pipeline as the rest of the app.
 class HisabUpgraderMessages extends UpgraderMessages {
-  HisabUpgraderMessages({super.code, BuildContext? context}) : _context = context;
+  HisabUpgraderMessages({super.code, BuildContext? context})
+    : _context = context;
 
   final BuildContext? _context;
 

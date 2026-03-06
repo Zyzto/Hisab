@@ -10,7 +10,9 @@ void main() {
     EasyLocalization.logger.enableBuildModes = [];
   });
 
-  testWidgets('ArchivedGroupsPage shows app bar and empty state', (tester) async {
+  testWidgets('ArchivedGroupsPage shows app bar and empty state', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -22,9 +24,7 @@ void main() {
           supportedLocales: const [Locale('en')],
           fallbackLocale: const Locale('en'),
           startLocale: const Locale('en'),
-          child: const MaterialApp(
-            home: Scaffold(body: ArchivedGroupsPage()),
-          ),
+          child: const MaterialApp(home: Scaffold(body: ArchivedGroupsPage())),
         ),
       ),
     );

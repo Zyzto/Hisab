@@ -40,11 +40,13 @@ List<Widget> buildPrivacySectionTiles(
         titleKey: 'notifications_enabled',
         subtitleKey: 'notifications_enabled_description',
         onChanged: (v) async {
-          final notifier =
-              ref.read(settings.provider(notificationsEnabledSettingDef).notifier);
+          final notifier = ref.read(
+            settings.provider(notificationsEnabledSettingDef).notifier,
+          );
           if (v) {
-            final ok =
-                await ref.read(notificationServiceProvider.notifier).initialize(context);
+            final ok = await ref
+                .read(notificationServiceProvider.notifier)
+                .initialize(context);
             notifier.set(ok);
             Log.info(
               'Setting changed: ${notificationsEnabledSettingDef.key}=$ok',

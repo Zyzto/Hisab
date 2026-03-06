@@ -11,13 +11,14 @@ import '../providers/settings_framework_providers.dart';
 import '../widgets/setting_tile_helper.dart';
 
 /// Callback to show the API key dialog. Called when user taps a Gemini/OpenAI key tile.
-typedef ShowApiKeyDialogCallback = Future<void> Function({
-  required BuildContext context,
-  required WidgetRef ref,
-  required String titleKey,
-  required String currentValue,
-  required StringSetting settingDef,
-});
+typedef ShowApiKeyDialogCallback =
+    Future<void> Function({
+      required BuildContext context,
+      required WidgetRef ref,
+      required String titleKey,
+      required String currentValue,
+      required StringSetting settingDef,
+    });
 
 /// Returns the list of tiles for the Receipt AI section.
 List<Widget> buildReceiptAiSectionTiles(
@@ -142,9 +143,7 @@ Widget _receiptAiProviderTile(
         ref
             .read(settings.provider(receiptAiProviderSettingDef).notifier)
             .set(chosen);
-        Log.info(
-          'Setting changed: ${receiptAiProviderSettingDef.key}=$chosen',
-        );
+        Log.info('Setting changed: ${receiptAiProviderSettingDef.key}=$chosen');
       }
     },
   );

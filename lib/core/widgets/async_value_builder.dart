@@ -29,8 +29,7 @@ class AsyncValueBuilder<T> extends StatelessWidget {
         }
         return this.data(context, data);
       },
-      loading: () =>
-          loading?.call(context) ?? LoadingContent,
+      loading: () => loading?.call(context) ?? LoadingContent,
       error: (error, stack) =>
           this.error?.call(context, error, stack) ??
           ErrorContentWidget(

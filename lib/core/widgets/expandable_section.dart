@@ -95,10 +95,7 @@ class _ExpandableSectionState extends State<ExpandableSection> {
             ),
           ),
         ),
-        if (_expanded) ...[
-          const SizedBox(height: 12),
-          widget.child,
-        ],
+        if (_expanded) ...[const SizedBox(height: 12), widget.child],
       ],
     );
   }

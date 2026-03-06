@@ -9,8 +9,11 @@ void main() {
     EasyLocalization.logger.enableBuildModes = [];
   });
 
-  testWidgets('ExpenseBillBreakdownSection shows label and add button', (tester) async {
-    final controllers = <({TextEditingController desc, TextEditingController amount})>[];
+  testWidgets('ExpenseBillBreakdownSection shows label and add button', (
+    tester,
+  ) async {
+    final controllers =
+        <({TextEditingController desc, TextEditingController amount})>[];
     await tester.pumpWidget(
       EasyLocalization(
         path: 'assets/translations',
@@ -35,12 +38,12 @@ void main() {
     expect(find.byType(ExpenseBillBreakdownSection), findsOneWidget);
   });
 
-  testWidgets('ExpenseBillBreakdownSection shows line items when not empty', (tester) async {
+  testWidgets('ExpenseBillBreakdownSection shows line items when not empty', (
+    tester,
+  ) async {
     final desc1 = TextEditingController(text: 'Item 1');
     final amount1 = TextEditingController(text: '10');
-    final controllers = [
-      (desc: desc1, amount: amount1),
-    ];
+    final controllers = [(desc: desc1, amount: amount1)];
     addTearDown(() {
       desc1.dispose();
       amount1.dispose();

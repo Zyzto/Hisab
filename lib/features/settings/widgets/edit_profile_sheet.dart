@@ -22,10 +22,7 @@ Future<void> showEditProfileSheet(
     title: 'edit_profile'.tr(),
     isScrollControlled: true,
     useSafeArea: true,
-    child: _EditProfileSheet(
-      ref: ref,
-      profile: profile,
-    ),
+    child: _EditProfileSheet(ref: ref, profile: profile),
   );
 }
 
@@ -48,10 +45,9 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.profile.name ?? '');
-    _selectedAvatarId =
-        widget.profile.avatarId?.isNotEmpty == true
-            ? widget.profile.avatarId!
-            : defaultAvatarId;
+    _selectedAvatarId = widget.profile.avatarId?.isNotEmpty == true
+        ? widget.profile.avatarId!
+        : defaultAvatarId;
   }
 
   @override
@@ -140,7 +136,11 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.error_outline, size: 20, color: colorScheme.error),
+                    Icon(
+                      Icons.error_outline,
+                      size: 20,
+                      color: colorScheme.error,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -199,10 +199,7 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                       ),
                     ),
                     alignment: Alignment.center,
-                    child: Text(
-                      e.value,
-                      style: const TextStyle(fontSize: 22),
-                    ),
+                    child: Text(e.value, style: const TextStyle(fontSize: 22)),
                   ),
                 );
               }).toList(),

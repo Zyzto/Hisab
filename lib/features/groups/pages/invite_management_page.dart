@@ -57,160 +57,181 @@ class _InviteManagementPageState extends ConsumerState<InviteManagementPage> {
             ),
           ),
           floatingActionButton: FloatingActionButton(
-        onPressed: () => showCreateInviteSheet(context, ref, widget.groupId),
-        tooltip: 'create_invite'.tr(),
-        child: const Icon(Icons.add),
-      ),
-      body: myRoleAsync.when(
-        data: (myRole) {
-          final canManageInvites = localOnly ||
-              myRole == GroupRole.owner ||
-              myRole == GroupRole.admin;
-          if (!canManageInvites) {
-            return Center(
-              child: ErrorContentWidget(
-                titleKey: 'generic_error',
-                message: 'invite_manage_restricted'.tr(),
-                details: 'invite_manage_restricted'.tr(),
-              ),
-            );
-          }
-          return ConstrainedContent(
-            child: invitesAsync.when(
-          data: (invites) {
-            // Sort: active first, then by created_at desc
-            invites.sort((a, b) {
-              final aActive = a.status == InviteStatus.active ? 0 : 1;
-              final bActive = b.status == InviteStatus.active ? 0 : 1;
-              if (aActive != bActive) return aActive.compareTo(bActive);
-              return b.createdAt.compareTo(a.createdAt);
-            });
-
-            final filtered = _filter == null
-                ? invites
-                : invites.where((i) => i.status == _filter).toList();
-
-            return Column(
-              children: [
-                // Filter chips
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: ThemeConfig.spacingM,
-                    vertical: ThemeConfig.spacingS,
+            onPressed: () =>
+                showCreateInviteSheet(context, ref, widget.groupId),
+            tooltip: 'create_invite'.tr(),
+            child: const Icon(Icons.add),
+          ),
+          body: myRoleAsync.when(
+            data: (myRole) {
+              final canManageInvites =
+                  localOnly ||
+                  myRole == GroupRole.owner ||
+                  myRole == GroupRole.admin;
+              if (!canManageInvites) {
+                return Center(
+                  child: ErrorContentWidget(
+                    titleKey: 'generic_error',
+                    message: 'invite_manage_restricted'.tr(),
+                    details: 'invite_manage_restricted'.tr(),
                   ),
-                  child: Row(
-                    children: [
-                      _FilterChip(
-                        label: 'invite_filter_all'.tr(),
-                        count: invites.length,
-                        selected: _filter == null,
-                        onSelected: () => setState(() => _filter = null),
-                      ),
-                      const SizedBox(width: 8),
-                      _FilterChip(
-                        label: 'invite_filter_active'.tr(),
-                        count: invites
-                            .where((i) => i.status == InviteStatus.active)
-                            .length,
-                        selected: _filter == InviteStatus.active,
-                        onSelected: () =>
-                            setState(() => _filter = InviteStatus.active),
-                      ),
-                      const SizedBox(width: 8),
-                      _FilterChip(
-                        label: 'invite_filter_expired'.tr(),
-                        count: invites
-                            .where((i) => i.status == InviteStatus.expired)
-                            .length,
-                        selected: _filter == InviteStatus.expired,
-                        onSelected: () =>
-                            setState(() => _filter = InviteStatus.expired),
-                      ),
-                      const SizedBox(width: 8),
-                      _FilterChip(
-                        label: 'invite_filter_revoked'.tr(),
-                        count: invites
-                            .where((i) => i.status == InviteStatus.revoked)
-                            .length,
-                        selected: _filter == InviteStatus.revoked,
-                        onSelected: () =>
-                            setState(() => _filter = InviteStatus.revoked),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-                // List
-                Expanded(
-                  child: filtered.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
+                );
+              }
+              return ConstrainedContent(
+                child: invitesAsync.when(
+                  data: (invites) {
+                    // Sort: active first, then by created_at desc
+                    invites.sort((a, b) {
+                      final aActive = a.status == InviteStatus.active ? 0 : 1;
+                      final bActive = b.status == InviteStatus.active ? 0 : 1;
+                      if (aActive != bActive) return aActive.compareTo(bActive);
+                      return b.createdAt.compareTo(a.createdAt);
+                    });
+
+                    final filtered = _filter == null
+                        ? invites
+                        : invites.where((i) => i.status == _filter).toList();
+
+                    return Column(
+                      children: [
+                        // Filter chips
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: ThemeConfig.spacingM,
+                            vertical: ThemeConfig.spacingS,
+                          ),
+                          child: Row(
                             children: [
-                              Icon(
-                                Icons.link_off,
-                                size: 48,
-                                color: theme.colorScheme.onSurfaceVariant
-                                    .withAlpha(120),
+                              _FilterChip(
+                                label: 'invite_filter_all'.tr(),
+                                count: invites.length,
+                                selected: _filter == null,
+                                onSelected: () =>
+                                    setState(() => _filter = null),
                               ),
-                              const SizedBox(height: ThemeConfig.spacingM),
-                              Text(
-                                'invite_empty'.tr(),
-                                style: theme.textTheme.bodyLarge?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
+                              const SizedBox(width: 8),
+                              _FilterChip(
+                                label: 'invite_filter_active'.tr(),
+                                count: invites
+                                    .where(
+                                      (i) => i.status == InviteStatus.active,
+                                    )
+                                    .length,
+                                selected: _filter == InviteStatus.active,
+                                onSelected: () => setState(
+                                  () => _filter = InviteStatus.active,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              _FilterChip(
+                                label: 'invite_filter_expired'.tr(),
+                                count: invites
+                                    .where(
+                                      (i) => i.status == InviteStatus.expired,
+                                    )
+                                    .length,
+                                selected: _filter == InviteStatus.expired,
+                                onSelected: () => setState(
+                                  () => _filter = InviteStatus.expired,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              _FilterChip(
+                                label: 'invite_filter_revoked'.tr(),
+                                count: invites
+                                    .where(
+                                      (i) => i.status == InviteStatus.revoked,
+                                    )
+                                    .length,
+                                selected: _filter == InviteStatus.revoked,
+                                onSelected: () => setState(
+                                  () => _filter = InviteStatus.revoked,
                                 ),
                               ),
                             ],
                           ),
-                        )
-                      : ListView.builder(
-                          padding: const EdgeInsets.only(
-                            top: ThemeConfig.spacingS,
-                            bottom: 80,
-                          ),
-                          itemCount: filtered.length,
-                          itemBuilder: (context, i) => _InviteCard(
-                            invite: filtered[i],
-                            groupId: widget.groupId,
-                          ),
                         ),
+                        const Divider(height: 1),
+                        // List
+                        Expanded(
+                          child: filtered.isEmpty
+                              ? Center(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.link_off,
+                                        size: 48,
+                                        color: theme
+                                            .colorScheme
+                                            .onSurfaceVariant
+                                            .withAlpha(120),
+                                      ),
+                                      const SizedBox(
+                                        height: ThemeConfig.spacingM,
+                                      ),
+                                      Text(
+                                        'invite_empty'.tr(),
+                                        style: theme.textTheme.bodyLarge
+                                            ?.copyWith(
+                                              color: theme
+                                                  .colorScheme
+                                                  .onSurfaceVariant,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : ListView.builder(
+                                  padding: const EdgeInsets.only(
+                                    top: ThemeConfig.spacingS,
+                                    bottom: 80,
+                                  ),
+                                  itemCount: filtered.length,
+                                  itemBuilder: (context, i) => _InviteCard(
+                                    invite: filtered[i],
+                                    groupId: widget.groupId,
+                                  ),
+                                ),
+                        ),
+                      ],
+                    );
+                  },
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (e, st) {
+                    sendErrorTelemetryIfOnline(
+                      ref,
+                      message: e.toString(),
+                      details: e.toString(),
+                    );
+                    return Center(
+                      child: ErrorContentWidget(
+                        message: e.toString(),
+                        details: e.toString(),
+                        stackTrace: st,
+                        onRetry: () => ref.invalidate(
+                          invitesByGroupProvider(widget.groupId),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              ],
-            );
-          },
-          loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, st) {
-                sendErrorTelemetryIfOnline(
-                  ref,
-                  message: e.toString(),
-                  details: e.toString(),
-                );
-                return Center(
-                  child: ErrorContentWidget(
-                    message: e.toString(),
-                    details: e.toString(),
-                    stackTrace: st,
-                    onRetry: () =>
-                        ref.invalidate(invitesByGroupProvider(widget.groupId)),
-                  ),
-                );
-              },
+              );
+            },
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, st) => Center(
+              child: ErrorContentWidget(
+                message: e.toString(),
+                details: e.toString(),
+                stackTrace: st,
+              ),
             ),
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, st) => Center(
-          child: ErrorContentWidget(
-            message: e.toString(),
-            details: e.toString(),
-            stackTrace: st,
           ),
-        ),
-      ),
+        );
+      },
     );
-  },
-  );
   }
 }
 

@@ -27,10 +27,7 @@ class StatusPageFailure extends StatusPageResult {
 
 /// Overall status from Statuspage.io (status.status.indicator / description).
 class ServiceStatus {
-  const ServiceStatus({
-    required this.indicator,
-    required this.description,
-  });
+  const ServiceStatus({required this.indicator, required this.description});
 
   final String indicator; // none, minor, major, critical
   final String description;
@@ -67,8 +64,7 @@ Future<StatusPageResult> fetchSupabaseStatus() async {
 
     final statusObj = json['status'] as Map<String, dynamic>?;
     final indicator = statusObj?['indicator'] as String? ?? 'none';
-    final description =
-        statusObj?['description'] as String? ?? 'Unknown';
+    final description = statusObj?['description'] as String? ?? 'Unknown';
 
     final incidentsList = json['incidents'] as List<dynamic>? ?? [];
     final incidents = <StatusPageIncident>[];
@@ -77,23 +73,20 @@ Future<StatusPageResult> fetchSupabaseStatus() async {
       final name = e['name'] as String? ?? '';
       final status = e['status'] as String? ?? '';
       final updated = e['updated_at'];
-      final DateTime? updatedAt =
-          updated is String ? DateTime.tryParse(updated) : null;
-      incidents.add(StatusPageIncident(
-        name: name,
-        status: status,
-        updatedAt: updatedAt,
-      ));
+      final DateTime? updatedAt = updated is String
+          ? DateTime.tryParse(updated)
+          : null;
+      incidents.add(
+        StatusPageIncident(name: name, status: status, updatedAt: updatedAt),
+      );
     }
 
     final page = json['page'] as Map<String, dynamic>?;
-    final statusPageUrl = page?['url'] as String? ?? 'https://status.supabase.com';
+    final statusPageUrl =
+        page?['url'] as String? ?? 'https://status.supabase.com';
 
     return StatusPageSummary(
-      status: ServiceStatus(
-        indicator: indicator,
-        description: description,
-      ),
+      status: ServiceStatus(indicator: indicator, description: description),
       incidents: incidents,
       statusPageUrl: statusPageUrl,
     );

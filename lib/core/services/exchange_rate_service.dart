@@ -54,9 +54,7 @@ class ExchangeRateService {
       }
 
       if (kDebugMode) {
-        Log.debug(
-          'ExchangeRate API returned status ${response.statusCode}',
-        );
+        Log.debug('ExchangeRate API returned status ${response.statusCode}');
       }
     } catch (e) {
       if (kDebugMode) {

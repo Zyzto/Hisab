@@ -9,8 +9,9 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   group('Online auth flow', () {
-    testWidgets('sign-in → verify session → sign-out → sign-in again',
-        (tester) async {
+    testWidgets('sign-in → verify session → sign-out → sign-in again', (
+      tester,
+    ) async {
       final ready = await runOnlineTestApp(
         skipOnboarding: true,
         signInEmail: testUserAEmail,
@@ -21,15 +22,24 @@ void main() {
 
       // ── Stage: verify signed-in state ──
       await stage('verify signed-in state', () async {
-        await waitForWidget(tester, find.text('Groups'),
-            timeout: const Duration(seconds: 20));
+        await waitForWidget(
+          tester,
+          find.text('Groups'),
+          timeout: const Duration(seconds: 20),
+        );
         // UI-based check: signed-in shell shows Settings in nav (not shown on login screen)
-        await waitForWidget(tester, find.text('Settings'),
-            timeout: const Duration(seconds: 10));
+        await waitForWidget(
+          tester,
+          find.text('Settings'),
+          timeout: const Duration(seconds: 10),
+        );
 
         final client = Supabase.instance.client;
-        expect(client.auth.currentUser, isNotNull,
-            reason: 'User A should be signed in');
+        expect(
+          client.auth.currentUser,
+          isNotNull,
+          reason: 'User A should be signed in',
+        );
         expect(client.auth.currentUser!.email, equals(testUserAEmail));
       });
 
@@ -57,8 +67,11 @@ void main() {
         await tester.pump(const Duration(seconds: 2));
 
         final client = Supabase.instance.client;
-        expect(client.auth.currentSession, isNull,
-            reason: 'Session should be null after sign-out');
+        expect(
+          client.auth.currentSession,
+          isNull,
+          reason: 'Session should be null after sign-out',
+        );
       });
 
       // ── Stage: sign back in programmatically ──
@@ -85,11 +98,17 @@ void main() {
       await pumpAndSettleWithTimeout(tester);
 
       await stage('verify User B signed in', () async {
-        await waitForWidget(tester, find.text('Groups'),
-            timeout: const Duration(seconds: 20));
+        await waitForWidget(
+          tester,
+          find.text('Groups'),
+          timeout: const Duration(seconds: 20),
+        );
         // UI-based check: signed-in shell shows Settings in nav (not shown on login screen)
-        await waitForWidget(tester, find.text('Settings'),
-            timeout: const Duration(seconds: 10));
+        await waitForWidget(
+          tester,
+          find.text('Settings'),
+          timeout: const Duration(seconds: 10),
+        );
 
         final client = Supabase.instance.client;
         expect(client.auth.currentUser, isNotNull);

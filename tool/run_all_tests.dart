@@ -72,7 +72,9 @@ Future<void> _run(List<String> args) async {
         timeout: _unitTimeout,
       );
       if (unitExitCode != 0) {
-        print('Unit & widget tests failed (exit $unitExitCode). Continuing to integration phases.');
+        print(
+          'Unit & widget tests failed (exit $unitExitCode). Continuing to integration phases.',
+        );
       }
     }
 
@@ -88,7 +90,11 @@ Future<void> _run(List<String> args) async {
     }
     final webFuture = skipWeb
         ? Future<int>.value(-1)
-        : _runIntegrationWeb(projectRoot, logDir, (p) => chromedriverProcess = p);
+        : _runIntegrationWeb(
+            projectRoot,
+            logDir,
+            (p) => chromedriverProcess = p,
+          );
 
     final results = await Future.wait([androidFuture, webFuture]);
     if (!skipAndroid) androidExitCode = results[0];
@@ -107,7 +113,8 @@ Future<void> _run(List<String> args) async {
     webExitCode: skipWeb ? null : webExitCode,
   );
 
-  final failed = (!skipUnit && unitExitCode != 0) ||
+  final failed =
+      (!skipUnit && unitExitCode != 0) ||
       (!skipAndroid && androidExitCode != 0 && androidExitCode != -1) ||
       (!skipWeb && webExitCode != 0 && webExitCode != -1);
   exit(failed ? 1 : 0);
@@ -197,12 +204,20 @@ Future<int> _runProcess(
   return await exitCodeFuture;
 }
 
-Future<int> _runIntegrationAndroid(String projectRoot, Directory logDir, bool noAvd, bool useDrive) async {
-  print('==> Phase 2a: Android integration${useDrive ? ' (flutter drive)' : ''}');
+Future<int> _runIntegrationAndroid(
+  String projectRoot,
+  Directory logDir,
+  bool noAvd,
+  bool useDrive,
+) async {
+  print(
+    '==> Phase 2a: Android integration${useDrive ? ' (flutter drive)' : ''}',
+  );
   String? deviceId = await _getAndroidDeviceId(projectRoot);
   if (deviceId == null && !noAvd) {
     final launched = await _launchFirstEmulator(projectRoot);
-    if (launched) deviceId = await _waitForAndroidDevice(projectRoot, timeoutSeconds: 120);
+    if (launched)
+      deviceId = await _waitForAndroidDevice(projectRoot, timeoutSeconds: 120);
   }
   if (deviceId == null) {
     print('No Android device available. Skip Android integration.');
@@ -240,7 +255,8 @@ Future<String?> _getAndroidDeviceId(String projectRoot) async {
     for (final d in list) {
       final map = d as Map<String, dynamic>;
       final id = map['id'] as String?;
-      final targetPlatform = map['targetPlatform'] as String? ?? map['platform'] as String?;
+      final targetPlatform =
+          map['targetPlatform'] as String? ?? map['platform'] as String?;
       if (id != null &&
           targetPlatform != null &&
           targetPlatform.toLowerCase().contains('android')) {
@@ -276,7 +292,10 @@ Future<bool> _launchFirstEmulator(String projectRoot) async {
   }
 }
 
-Future<String?> _waitForAndroidDevice(String projectRoot, {int timeoutSeconds = 120}) async {
+Future<String?> _waitForAndroidDevice(
+  String projectRoot, {
+  int timeoutSeconds = 120,
+}) async {
   final deadline = DateTime.now().add(Duration(seconds: timeoutSeconds));
   while (DateTime.now().isBefore(deadline)) {
     final id = await _getAndroidDeviceId(projectRoot);
@@ -288,7 +307,11 @@ Future<String?> _waitForAndroidDevice(String projectRoot, {int timeoutSeconds = 
 
 Future<bool> _isPortInUse(int port) async {
   try {
-    final socket = await Socket.connect('localhost', port, timeout: const Duration(seconds: 1));
+    final socket = await Socket.connect(
+      'localhost',
+      port,
+      timeout: const Duration(seconds: 1),
+    );
     socket.destroy();
     return true;
   } catch (_) {
@@ -353,13 +376,22 @@ void _printSummary({
   print('=== Summary ===');
   print('Phase                 | Result | Log');
   print('----------------------|--------|---------------------------');
-  print('Unit & widget         | ${result(unitExitCode)}    | $rel/unit_widget.log');
-  print('Integration (Android) | ${result(androidExitCode)}    | $rel/integration_android.log');
-  print('Integration (Web)     | ${result(webExitCode)}    | $rel/integration_web.log');
+  print(
+    'Unit & widget         | ${result(unitExitCode)}    | $rel/unit_widget.log',
+  );
+  print(
+    'Integration (Android) | ${result(androidExitCode)}    | $rel/integration_android.log',
+  );
+  print(
+    'Integration (Web)     | ${result(webExitCode)}    | $rel/integration_web.log',
+  );
   print('');
 
-  final failed = (unitExitCode != null && unitExitCode != 0 && unitExitCode != -1) ||
-      (androidExitCode != null && androidExitCode != -1 && androidExitCode != 0) ||
+  final failed =
+      (unitExitCode != null && unitExitCode != 0 && unitExitCode != -1) ||
+      (androidExitCode != null &&
+          androidExitCode != -1 &&
+          androidExitCode != 0) ||
       (webExitCode != null && webExitCode != -1 && webExitCode != 0);
   if (failed) {
     print('Errors in: $rel');

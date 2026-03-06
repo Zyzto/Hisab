@@ -8,10 +8,8 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   group('Group lifecycle', () {
-    testWidgets(
-        'create (icon+color) → tabs → people → settings → currency → '
-        'settlement → freeze → delete',
-        (tester) async {
+    testWidgets('create (icon+color) → tabs → people → settings → currency → '
+        'settlement → freeze → delete', (tester) async {
       await ensureIntegrationTestReady(tester);
 
       // ── Stage: create group with custom icon and color ──
@@ -22,15 +20,17 @@ void main() {
         await pumpAndSettleWithTimeout(tester);
 
         // Step 1: Name
-        await waitForWidget(
-            tester, find.byKey(const Key('wizard_name_field')));
+        await waitForWidget(tester, find.byKey(const Key('wizard_name_field')));
         await enterTextAndPump(
           tester,
           find.byKey(const Key('wizard_name_field')),
           'Trip to Tokyo',
         );
 
-        await waitForWidget(tester, find.byKey(const Key('wizard_next_button')));
+        await waitForWidget(
+          tester,
+          find.byKey(const Key('wizard_next_button')),
+        );
         await tapAndSettle(tester, find.byKey(const Key('wizard_next_button')));
         await tester.pump(const Duration(milliseconds: 400));
 
@@ -40,7 +40,10 @@ void main() {
         await addWizardParticipant(tester, 'Bob');
         await addWizardParticipant(tester, 'Charlie');
 
-        await waitForWidget(tester, find.byKey(const Key('wizard_next_button')));
+        await waitForWidget(
+          tester,
+          find.byKey(const Key('wizard_next_button')),
+        );
         await tapAndSettle(tester, find.byKey(const Key('wizard_next_button')));
         await tester.pump(const Duration(milliseconds: 400));
 
@@ -58,7 +61,10 @@ void main() {
           await tapAndSettle(tester, animatedContainers.at(4));
         }
 
-        await waitForWidget(tester, find.byKey(const Key('wizard_next_button')));
+        await waitForWidget(
+          tester,
+          find.byKey(const Key('wizard_next_button')),
+        );
         await tapAndSettle(tester, find.byKey(const Key('wizard_next_button')));
         await tester.pump(const Duration(milliseconds: 400));
         await pumpAndSettleWithTimeout(tester);
@@ -129,16 +135,16 @@ void main() {
           find.byType(TextField),
           timeout: const Duration(seconds: 15),
         );
-        await enterTextAndPump(
-          tester,
-          find.byType(TextField).first,
-          'Diana',
-        );
+        await enterTextAndPump(tester, find.byType(TextField).first, 'Diana');
         await tapAndSettle(tester, find.text('Done'));
         await pumpAndSettleWithTimeout(tester);
         // Participant create is deferred (addPostFrameCallback); allow poll to emit on web.
         await tester.pump(const Duration(milliseconds: 1200));
-        await waitForWidget(tester, find.textContaining('Diana'), timeout: const Duration(seconds: 15));
+        await waitForWidget(
+          tester,
+          find.textContaining('Diana'),
+          timeout: const Duration(seconds: 15),
+        );
         await scrollUntilVisible(tester, find.textContaining('Diana'));
 
         expect(find.textContaining('Diana'), findsWidgets);
@@ -152,13 +158,20 @@ void main() {
 
       // ── Stage: add expense for balance checks later ──
       await stage('add expense for settlement test', () async {
-        await waitForWidget(tester, find.byIcon(Icons.add), timeout: const Duration(seconds: 10));
+        await waitForWidget(
+          tester,
+          find.byIcon(Icons.add),
+          timeout: const Duration(seconds: 10),
+        );
         await tapAndSettle(tester, find.byIcon(Icons.add).first);
         await pumpAndSettleWithTimeout(tester);
 
         await ensureExpenseFormReady(tester);
         await enterTextAndPump(
-            tester, find.byType(TextField).first, 'Group Dinner');
+          tester,
+          find.byType(TextField).first,
+          'Group Dinner',
+        );
         await enterTextAndPump(tester, find.byType(TextField).at(1), '120');
 
         await tapSubmitExpenseButton(tester);
@@ -261,10 +274,8 @@ void main() {
         );
         expect(addExpenseTile, findsOneWidget);
 
-        Finder addExpenseSwitchInTile() => find.descendant(
-              of: addExpenseTile,
-              matching: find.byType(Switch),
-            );
+        Finder addExpenseSwitchInTile() =>
+            find.descendant(of: addExpenseTile, matching: find.byType(Switch));
         bool addExpenseSwitchValue() =>
             tester.widget<Switch>(addExpenseSwitchInTile().first).value;
 
@@ -382,10 +393,13 @@ void main() {
         // When frozen, a banner should show "Settlement frozen"
         final frozenText = find.text('Settlement frozen');
         final pauseIcon = find.byIcon(Icons.pause_circle);
-        final isFrozen = frozenText.evaluate().isNotEmpty ||
-            pauseIcon.evaluate().isNotEmpty;
-        expect(isFrozen, isTrue,
-            reason: 'Balance tab should show frozen indicator');
+        final isFrozen =
+            frozenText.evaluate().isNotEmpty || pauseIcon.evaluate().isNotEmpty;
+        expect(
+          isFrozen,
+          isTrue,
+          reason: 'Balance tab should show frozen indicator',
+        );
       });
 
       // ── Stage: unfreeze settlements ──
@@ -394,8 +408,10 @@ void main() {
         // to Group Settings; we then toggle the Settlement freeze switch off.
         await waitForWidget(tester, find.text('Unfreeze settlement'));
         await scrollUntilVisible(tester, find.text('Unfreeze settlement'));
-        final unfreezeButton =
-            find.widgetWithText(TextButton, 'Unfreeze settlement');
+        final unfreezeButton = find.widgetWithText(
+          TextButton,
+          'Unfreeze settlement',
+        );
         await tapAndSettle(tester, unfreezeButton);
         await pumpAndSettleWithTimeout(tester);
 

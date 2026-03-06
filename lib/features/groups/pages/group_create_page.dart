@@ -144,8 +144,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
     if (value == null || value < 0) return null;
     final decimals =
         CurrencyHelpers.fromCode(_selectedCurrency.code)?.decimalDigits ?? 2;
-    final divisor =
-        CurrencyHelpers.divisorForDecimalDigits(decimals);
+    final divisor = CurrencyHelpers.divisorForDecimalDigits(decimals);
     return value * divisor;
   }
 
@@ -156,7 +155,9 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
       final name = _nameController.text.trim();
       final currencyCode = _selectedCurrency.code;
       final repo = ref.read(groupRepositoryProvider);
-      final budgetAmountCents = widget.isPersonal ? _budgetAmountCentsFromField() : null;
+      final budgetAmountCents = widget.isPersonal
+          ? _budgetAmountCentsFromField()
+          : null;
       final id = await runGuardedAsync<String>(
         repo.create(
           name,
@@ -206,13 +207,15 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
           child: Scaffold(
             appBar: ContentAlignedAppBar(
               contentAreaWidth: layoutConstraints.maxWidth,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: _goBack,
-              tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-            ),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: _goBack,
+                tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+              ),
               title: Text(
-                widget.isPersonal ? 'create_personal'.tr() : 'create_group'.tr(),
+                widget.isPersonal
+                    ? 'create_personal'.tr()
+                    : 'create_group'.tr(),
               ),
             ),
             body: ConstrainedContent(
@@ -337,8 +340,8 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
               child: Tooltip(
                 message: isLastPage
                     ? (widget.isPersonal
-                        ? 'create_personal'.tr()
-                        : 'create_group'.tr())
+                          ? 'create_personal'.tr()
+                          : 'create_group'.tr())
                     : 'wizard_next'.tr(),
                 child: isLastPage
                     ? FilledButton.icon(
@@ -479,8 +482,10 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
                   labelText: 'budget_amount'.tr(),
-                  hintText: CurrencyHelpers.fromCode(_selectedCurrency.code)
-                          ?.symbol ??
+                  hintText:
+                      CurrencyHelpers.fromCode(
+                        _selectedCurrency.code,
+                      )?.symbol ??
                       _selectedCurrency.code,
                   border: const OutlineInputBorder(),
                   prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
@@ -789,20 +794,18 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                 // Group avatar
                 Builder(
                   builder: (_) {
-                    final fgOnColor =
-                        ThemeConfig.foregroundOnBackground(_selectedColor);
+                    final fgOnColor = ThemeConfig.foregroundOnBackground(
+                      _selectedColor,
+                    );
                     return CircleAvatar(
                       radius: 36,
                       backgroundColor: _selectedColor,
-                      child: iconDef != null &&
-                              iconDef.key != groupIconLetterKey
+                      child:
+                          iconDef != null && iconDef.key != groupIconLetterKey
                           ? Icon(iconDef.icon, size: 36, color: fgOnColor)
                           : Text(
                               _nameController.text.trim().isNotEmpty
-                                  ? _nameController
-                                      .text
-                                      .trim()[0]
-                                      .toUpperCase()
+                                  ? _nameController.text.trim()[0].toUpperCase()
                                   : '?',
                               style: theme.textTheme.headlineMedium?.copyWith(
                                 color: fgOnColor,

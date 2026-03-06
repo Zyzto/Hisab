@@ -62,10 +62,7 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
       _incomingSlide = Tween<Offset>(
         begin: Offset(dx, 0),
         end: Offset.zero,
-      ).animate(CurvedAnimation(
-        parent: _controller!,
-        curve: Curves.easeInOut,
-      ));
+      ).animate(CurvedAnimation(parent: _controller!, curve: Curves.easeInOut));
       _controller!.forward().then((_) {
         if (mounted) {
           setState(() {
@@ -89,8 +86,9 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final expenseAsync = ref.watch(futureExpenseProvider(widget.expenseId));
-    final participantsAsync =
-        ref.watch(participantsByGroupProvider(widget.groupId));
+    final participantsAsync = ref.watch(
+      participantsByGroupProvider(widget.groupId),
+    );
     final expensesAsync = ref.watch(expensesByGroupProvider(widget.groupId));
 
     // Resolve prev/next and expense for app bar; null when loading or invalid.
@@ -99,7 +97,8 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
       loading: () => null,
       error: (_, _) => null,
     );
-    final hasValidExpense = expense != null && expense.groupId == widget.groupId;
+    final hasValidExpense =
+        expense != null && expense.groupId == widget.groupId;
     final participants = participantsAsync.when(
       data: (p) => p,
       loading: () => null,
@@ -117,7 +116,8 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
         ..sort((a, b) => b.date.compareTo(a.date));
       final index = sorted.indexWhere((e) => e.id == expense.id);
       if (index > 0) prevId = sorted[index - 1].id;
-      if (index >= 0 && index < sorted.length - 1) nextId = sorted[index + 1].id;
+      if (index >= 0 && index < sorted.length - 1)
+        nextId = sorted[index + 1].id;
     }
 
     // Single app bar for all states to avoid flash when async updates.
@@ -131,9 +131,8 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
           icon: const Icon(Icons.chevron_left),
           onPressed: prevId != null
               ? () {
-                  ref
-                      .read(expenseNavigationDirectionProvider.notifier)
-                      .state = -1;
+                  ref.read(expenseNavigationDirectionProvider.notifier).state =
+                      -1;
                   context.pushReplacement(
                     RoutePaths.groupExpenseDetail(widget.groupId, prevId!),
                   );
@@ -144,9 +143,8 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
           icon: const Icon(Icons.chevron_right),
           onPressed: nextId != null
               ? () {
-                  ref
-                      .read(expenseNavigationDirectionProvider.notifier)
-                      .state = 1;
+                  ref.read(expenseNavigationDirectionProvider.notifier).state =
+                      1;
                   context.pushReplacement(
                     RoutePaths.groupExpenseDetail(widget.groupId, nextId!),
                   );
@@ -184,10 +182,7 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
               : (_) {},
           itemBuilder: (context) => expense != null
               ? [
-                  PopupMenuItem(
-                    value: 'edit',
-                    child: Text('edit'.tr()),
-                  ),
+                  PopupMenuItem(value: 'edit', child: Text('edit'.tr())),
                   PopupMenuItem(
                     value: 'delete',
                     child: Text(

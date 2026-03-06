@@ -46,8 +46,10 @@ class _DateTimePickerSheetContent extends StatefulWidget {
       _DateTimePickerSheetContentState();
 }
 
-class _DateTimePickerSheetContentState extends State<_DateTimePickerSheetContent> {
+class _DateTimePickerSheetContentState
+    extends State<_DateTimePickerSheetContent> {
   late DateTime _selectedDate;
+
   /// Hour in 24h (0-23). Used for both 24h and 12h; in 12h we derive display from this.
   late int _hour24;
   late int _minute;
@@ -103,7 +105,10 @@ class _DateTimePickerSheetContentState extends State<_DateTimePickerSheetContent
                 _setToNow();
               },
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
@@ -152,7 +157,9 @@ class _DateTimePickerSheetContentState extends State<_DateTimePickerSheetContent
                               } else {
                                 _hour24 =
                                     _DateTimePickerSheetContentState._hour24From12h(
-                                        v, _isAm);
+                                      v,
+                                      _isAm,
+                                    );
                               }
                             }),
                             format: (v) => '$v',
@@ -241,7 +248,9 @@ class _TimeColumnState<T> extends State<_TimeColumn<T>> {
   @override
   void initState() {
     super.initState();
-    final index = widget.items.indexOf(widget.value).clamp(0, widget.items.length - 1);
+    final index = widget.items
+        .indexOf(widget.value)
+        .clamp(0, widget.items.length - 1);
     _controller = FixedExtentScrollController(initialItem: index);
   }
 
@@ -249,7 +258,9 @@ class _TimeColumnState<T> extends State<_TimeColumn<T>> {
   void didUpdateWidget(covariant _TimeColumn<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.value != widget.value) {
-      final newIndex = widget.items.indexOf(widget.value).clamp(0, widget.items.length - 1);
+      final newIndex = widget.items
+          .indexOf(widget.value)
+          .clamp(0, widget.items.length - 1);
       if (_controller.selectedItem != newIndex) {
         // Defer so we don't trigger onSelectedItemChanged (and parent setState) during build.
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -318,7 +329,9 @@ class _TimeColumnState<T> extends State<_TimeColumn<T>> {
                             : theme.colorScheme.onSurface.withValues(
                                 alpha: selected ? 1 : 0.6,
                               ),
-                        fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                        fontWeight: selected
+                            ? FontWeight.w600
+                            : FontWeight.w500,
                       ),
                     ),
                   );
@@ -336,8 +349,12 @@ class _TimeColumnState<T> extends State<_TimeColumn<T>> {
               child: Container(
                 decoration: BoxDecoration(
                   color: isDark
-                      ? theme.colorScheme.primaryContainer.withValues(alpha: 0.5)
-                      : theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
+                      ? theme.colorScheme.primaryContainer.withValues(
+                          alpha: 0.5,
+                        )
+                      : theme.colorScheme.primaryContainer.withValues(
+                          alpha: 0.4,
+                        ),
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),

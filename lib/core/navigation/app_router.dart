@@ -80,8 +80,7 @@ class _ShellWithShortcutsState extends State<_ShellWithShortcuts> {
   Widget build(BuildContext context) {
     return Shortcuts(
       shortcuts: const <ShortcutActivator, Intent>{
-        SingleActivator(LogicalKeyboardKey.digit1, alt: true):
-            GoHomeIntent(),
+        SingleActivator(LogicalKeyboardKey.digit1, alt: true): GoHomeIntent(),
         SingleActivator(LogicalKeyboardKey.digit2, alt: true):
             GoSettingsIntent(),
       },
@@ -135,20 +134,15 @@ GoRouter router(Ref ref) {
     initialLocation: RoutePaths.home,
     redirect: (context, state) {
       final onOnboarding = state.matchedLocation == RoutePaths.onboarding;
-      final onPrivacyPolicy =
-          state.matchedLocation == RoutePaths.privacyPolicy;
+      final onPrivacyPolicy = state.matchedLocation == RoutePaths.privacyPolicy;
       final settings = ref.read(hisabSettingsProvidersProvider);
       if (settings != null) {
         // Restore route after process kill (e.g. returning from camera)
-        final lastPath = ref.read(
-          settings.provider(lastRoutePathSettingDef),
-        );
+        final lastPath = ref.read(settings.provider(lastRoutePathSettingDef));
         if (lastPath.isNotEmpty &&
             lastPath != RoutePaths.home &&
             onboardingCompleted) {
-          ref
-              .read(settings.provider(lastRoutePathSettingDef).notifier)
-              .set('');
+          ref.read(settings.provider(lastRoutePathSettingDef).notifier).set('');
           Log.info(
             'Setting changed: ${lastRoutePathSettingDef.key}=(cleared for redirect)',
           );
@@ -268,7 +262,8 @@ GoRouter router(Ref ref) {
             builder: (context, state, child) {
               final groupId = state.pathParameters['id'] ?? '';
               final pathSegments = state.uri.pathSegments;
-              final expenseId = state.pathParameters['eid'] ??
+              final expenseId =
+                  state.pathParameters['eid'] ??
                   (pathSegments.length >= 4 ? pathSegments[3] : '');
               return ExpenseDetailShell(
                 groupId: groupId,

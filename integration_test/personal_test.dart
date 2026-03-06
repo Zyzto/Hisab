@@ -8,9 +8,9 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   group('Personal lifecycle', () {
-    testWidgets(
-        'create → verify UI → expense → income → settings → delete',
-        (tester) async {
+    testWidgets('create → verify UI → expense → income → settings → delete', (
+      tester,
+    ) async {
       await ensureIntegrationTestReady(tester);
 
       // ── Stage: create personal budget ──
@@ -20,8 +20,7 @@ void main() {
         await tapAndSettle(tester, find.text('Create Personal'));
         await pumpAndSettleWithTimeout(tester);
 
-        await waitForWidget(
-            tester, find.byKey(const Key('wizard_name_field')));
+        await waitForWidget(tester, find.byKey(const Key('wizard_name_field')));
         await enterTextAndPump(
           tester,
           find.byKey(const Key('wizard_name_field')),
@@ -89,8 +88,7 @@ void main() {
           await tapAndSettle(tester, incomeTab);
         }
 
-        await enterTextAndPump(
-            tester, find.byType(TextField).first, 'Salary');
+        await enterTextAndPump(tester, find.byType(TextField).first, 'Salary');
         await enterTextAndPump(tester, find.byType(TextField).at(1), '3000');
 
         await tapSubmitExpenseButton(tester);

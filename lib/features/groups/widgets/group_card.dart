@@ -41,8 +41,9 @@ class GroupCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final styleIndex = ref.watch(experimentStyleIndexProvider);
-    final groupColor =
-        group.color != null ? Color(group.color!) : theme.colorScheme.primary;
+    final groupColor = group.color != null
+        ? Color(group.color!)
+        : theme.colorScheme.primary;
     final iconData = groupIconFromKey(group.icon);
 
     final leadingWidget = _buildLeadingForStyle(
@@ -68,19 +69,13 @@ class GroupCard extends ConsumerWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
             side: isSelected
-                ? BorderSide(
-                    color: theme.colorScheme.primary,
-                    width: 2,
-                  )
+                ? BorderSide(color: theme.colorScheme.primary, width: 2)
                 : isPinned
-                    ? BorderSide(
-                        color: theme.colorScheme.primary.withValues(alpha: 0.5),
-                        width: 1,
-                      )
-                    : BorderSide(
-                        color: theme.colorScheme.outlineVariant,
-                        width: 1,
-                      ),
+                ? BorderSide(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.5),
+                    width: 1,
+                  )
+                : BorderSide(color: theme.colorScheme.outlineVariant, width: 1),
           ),
           child: InkWell(
             onTap: () {
@@ -94,7 +89,10 @@ class GroupCard extends ConsumerWidget {
                   }
                 : null,
             borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
-            child: _buildListContent(theme: theme, leadingWidget: leadingWidget),
+            child: _buildListContent(
+              theme: theme,
+              leadingWidget: leadingWidget,
+            ),
           ),
         ),
       ),
@@ -132,7 +130,9 @@ class GroupCard extends ConsumerWidget {
                 final hasBoundedHeight = constraints.maxHeight.isFinite;
                 if (hasBoundedHeight) {
                   return ConstrainedBox(
-                    constraints: BoxConstraints(maxHeight: constraints.maxHeight),
+                    constraints: BoxConstraints(
+                      maxHeight: constraints.maxHeight,
+                    ),
                     child: Column(
                       mainAxisSize: MainAxisSize.max,
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -143,7 +143,10 @@ class GroupCard extends ConsumerWidget {
                             group.name,
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
-                              fontSize: (theme.textTheme.titleMedium?.fontSize ?? 16) * (18 / 16),
+                              fontSize:
+                                  (theme.textTheme.titleMedium?.fontSize ??
+                                      16) *
+                                  (18 / 16),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -172,7 +175,9 @@ class GroupCard extends ConsumerWidget {
                       group.name,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
-                        fontSize: (theme.textTheme.titleMedium?.fontSize ?? 16) * (18 / 16),
+                        fontSize:
+                            (theme.textTheme.titleMedium?.fontSize ?? 16) *
+                            (18 / 16),
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -277,11 +282,7 @@ class GroupCard extends ConsumerWidget {
       case 4:
         // Tech Utility: outlined icon, no container; initials match with onSurface text, no circle
         return iconData != null
-            ? Icon(
-                iconData,
-                color: theme.colorScheme.onSurface,
-                size: 22,
-              )
+            ? Icon(iconData, color: theme.colorScheme.onSurface, size: 22)
             : Text(
                 groupName.isNotEmpty ? groupName[0].toUpperCase() : '?',
                 style: theme.textTheme.titleMedium?.copyWith(

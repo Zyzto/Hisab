@@ -25,9 +25,7 @@ void main() {
     }
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          hisabSettingsProvidersProvider.overrideWithValue(settings),
-        ],
+        overrides: [hisabSettingsProvidersProvider.overrideWithValue(settings)],
         child: EasyLocalization(
           path: 'assets/translations',
           supportedLocales: testSupportedLocales,
@@ -41,7 +39,9 @@ void main() {
     );
   }
 
-  testWidgets('OnboardingPage shows first page content and Next button', (tester) async {
+  testWidgets('OnboardingPage shows first page content and Next button', (
+    tester,
+  ) async {
     await pumpOnboardingPage(tester);
     await tester.pumpAndSettle();
 
@@ -56,17 +56,13 @@ void main() {
     }
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          hisabSettingsProvidersProvider.overrideWithValue(settings),
-        ],
+        overrides: [hisabSettingsProvidersProvider.overrideWithValue(settings)],
         child: EasyLocalization(
           path: 'assets/translations',
           supportedLocales: testSupportedLocales,
           fallbackLocale: const Locale('en'),
           startLocale: const Locale('ar'),
-          child: const MaterialApp(
-            home: OnboardingPage(),
-          ),
+          child: const MaterialApp(home: OnboardingPage()),
         ),
       ),
     );
@@ -77,23 +73,24 @@ void main() {
   });
 
   testWidgets(
-      'OnboardingPage disables next action while completion lock is active',
-      (tester) async {
-    await pumpOnboardingPage(tester, forceBusyForTest: true);
-    // Onboarding owns periodic demo timers, so pumpAndSettle can hang forever.
-    // A bounded pair of pumps is enough to build the first frame deterministically.
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+    'OnboardingPage disables next action while completion lock is active',
+    (tester) async {
+      await pumpOnboardingPage(tester, forceBusyForTest: true);
+      // Onboarding owns periodic demo timers, so pumpAndSettle can hang forever.
+      // A bounded pair of pumps is enough to build the first frame deterministically.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
-    final nextIconFinder = find.byIcon(Icons.arrow_forward);
-    expect(nextIconFinder, findsOneWidget);
-    final welcomeFinder = find.text('onboarding_welcome'.tr());
-    expect(welcomeFinder, findsOneWidget);
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      final nextIconFinder = find.byIcon(Icons.arrow_forward);
+      expect(nextIconFinder, findsOneWidget);
+      final welcomeFinder = find.text('onboarding_welcome'.tr());
+      expect(welcomeFinder, findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
-    // When completion lock is active, navigation should not advance.
-    await tester.tap(nextIconFinder, warnIfMissed: false);
-    await tester.pump(const Duration(milliseconds: 400));
-    expect(welcomeFinder, findsOneWidget);
-  });
+      // When completion lock is active, navigation should not advance.
+      await tester.tap(nextIconFinder, warnIfMissed: false);
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(welcomeFinder, findsOneWidget);
+    },
+  );
 }

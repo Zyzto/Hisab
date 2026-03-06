@@ -26,7 +26,10 @@ void main() {
 
   setUpAll(() async {
     try {
-      final p = path.join(Directory.systemTemp.path, 'hisab_supabase_repo_probe.db');
+      final p = path.join(
+        Directory.systemTemp.path,
+        'hisab_supabase_repo_probe.db',
+      );
       final probe = PowerSyncDatabase(schema: ps.schema, path: p);
       await probe.initialize();
       await probe.close();
@@ -74,7 +77,9 @@ void main() {
       final mockClient = MockSupabaseClient();
       final mockBuilder = MockSupabaseQueryBuilder();
       when(() => mockClient.from(any())).thenReturn(mockBuilder);
-      when(() => mockBuilder.insert(any())).thenThrow(Exception('supabase_insert_called'));
+      when(
+        () => mockBuilder.insert(any()),
+      ).thenThrow(Exception('supabase_insert_called'));
 
       final repo = PowerSyncGroupRepository(
         db!,
@@ -85,11 +90,13 @@ void main() {
 
       expect(
         () => repo.create('Online Group', 'EUR'),
-        throwsA(isA<Exception>().having(
-          (e) => e.toString(),
-          'message',
-          contains('supabase_insert_called'),
-        )),
+        throwsA(
+          isA<Exception>().having(
+            (e) => e.toString(),
+            'message',
+            contains('supabase_insert_called'),
+          ),
+        ),
       );
       verify(() => mockClient.from('groups')).called(1);
       verify(() => mockBuilder.insert(any())).called(1);

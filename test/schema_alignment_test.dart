@@ -19,47 +19,53 @@ void main() {
     'invite_usages',
   ];
 
-  test('powersync_schema and sync_engine INSERT columns match for all synced tables', () {
-    final schemaPath = _resolvePath('lib/core/database/powersync_schema.dart');
-    final enginePath = _resolvePath('lib/core/database/sync_engine.dart');
-    expect(File(schemaPath).existsSync(), isTrue, reason: 'schema file');
-    expect(File(enginePath).existsSync(), isTrue, reason: 'sync_engine file');
+  test(
+    'powersync_schema and sync_engine INSERT columns match for all synced tables',
+    () {
+      final schemaPath = _resolvePath(
+        'lib/core/database/powersync_schema.dart',
+      );
+      final enginePath = _resolvePath('lib/core/database/sync_engine.dart');
+      expect(File(schemaPath).existsSync(), isTrue, reason: 'schema file');
+      expect(File(enginePath).existsSync(), isTrue, reason: 'sync_engine file');
 
-    final schemaContent = File(schemaPath).readAsStringSync();
-    final engineContent = File(enginePath).readAsStringSync();
+      final schemaContent = File(schemaPath).readAsStringSync();
+      final engineContent = File(enginePath).readAsStringSync();
 
-    final schemaColumns = _parseSchemaColumns(schemaContent);
-    final engineColumns = _parseInsertColumns(engineContent);
+      final schemaColumns = _parseSchemaColumns(schemaContent);
+      final engineColumns = _parseInsertColumns(engineContent);
 
-    final mismatches = <String>[];
-    for (final table in syncedTables) {
-      final schemaCols = schemaColumns[table];
-      final insertCols = engineColumns[table];
-      if (schemaCols == null) {
-        mismatches.add('$table: missing in powersync_schema.dart');
-        continue;
+      final mismatches = <String>[];
+      for (final table in syncedTables) {
+        final schemaCols = schemaColumns[table];
+        final insertCols = engineColumns[table];
+        if (schemaCols == null) {
+          mismatches.add('$table: missing in powersync_schema.dart');
+          continue;
+        }
+        if (insertCols == null) {
+          mismatches.add('$table: missing INSERT in sync_engine.dart');
+          continue;
+        }
+        // Sync engine INSERT includes `id` (from Supabase); PowerSync adds id to table, schema omits it.
+        final insertColsWithoutId = insertCols.first == 'id'
+            ? insertCols.sublist(1)
+            : insertCols;
+        if (schemaCols.length != insertColsWithoutId.length ||
+            !_listEquals(schemaCols, insertColsWithoutId)) {
+          mismatches.add(
+            '$table: schema [${schemaCols.join(', ')}] vs INSERT (minus id) [${insertColsWithoutId.join(', ')}]',
+          );
+        }
       }
-      if (insertCols == null) {
-        mismatches.add('$table: missing INSERT in sync_engine.dart');
-        continue;
-      }
-      // Sync engine INSERT includes `id` (from Supabase); PowerSync adds id to table, schema omits it.
-      final insertColsWithoutId = insertCols.first == 'id'
-          ? insertCols.sublist(1)
-          : insertCols;
-      if (schemaCols.length != insertColsWithoutId.length ||
-          !_listEquals(schemaCols, insertColsWithoutId)) {
-        mismatches.add(
-          '$table: schema [${schemaCols.join(', ')}] vs INSERT (minus id) [${insertColsWithoutId.join(', ')}]',
-        );
-      }
-    }
-    expect(
-      mismatches,
-      isEmpty,
-      reason: 'Schema alignment failed. Keep powersync_schema.dart and sync_engine.dart INSERT lists in sync.\n${mismatches.join('\n')}',
-    );
-  });
+      expect(
+        mismatches,
+        isEmpty,
+        reason:
+            'Schema alignment failed. Keep powersync_schema.dart and sync_engine.dart INSERT lists in sync.\n${mismatches.join('\n')}',
+      );
+    },
+  );
 }
 
 String _resolvePath(String relative) {
@@ -108,7 +114,8 @@ Map<String, List<String>> _parseInsertColumns(String content) {
   );
   for (final match in insertRegex.allMatches(content)) {
     final tableName = match.group(1)!;
-    final colList = match.group(2)!
+    final colList = match
+        .group(2)!
         .replaceAll(RegExp(r'\s+'), ' ')
         .split(',')
         .map((s) => s.trim())

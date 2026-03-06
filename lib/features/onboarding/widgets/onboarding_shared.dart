@@ -15,9 +15,7 @@ Widget onboardingPageBody(BuildContext context, Widget child) {
         padding: const EdgeInsets.all(padding),
         child: ConstrainedBox(
           constraints: BoxConstraints(minHeight: minHeight),
-          child: Center(
-            child: child,
-          ),
+          child: Center(child: child),
         ),
       );
     },
@@ -40,8 +38,7 @@ Widget onboardingPageBodyWithFixedTitle(
       const titleContentGap = ThemeConfig.spacingXL;
       final viewportHeight = constraints.maxHeight - 2 * padding;
       final topThirdHeight = viewportHeight / 3;
-      final contentAreaHeight =
-          viewportHeight * 2 / 3 - titleContentGap;
+      final contentAreaHeight = viewportHeight * 2 / 3 - titleContentGap;
       return SingleChildScrollView(
         padding: const EdgeInsets.all(padding),
         child: ConstrainedBox(
@@ -53,19 +50,13 @@ Widget onboardingPageBodyWithFixedTitle(
               SizedBox(
                 height: topThirdHeight,
                 child: Center(
-                  child: Align(
-                    alignment: Alignment.bottomLeft,
-                    child: title,
-                  ),
+                  child: Align(alignment: Alignment.bottomLeft, child: title),
                 ),
               ),
               const SizedBox(height: titleContentGap),
               ConstrainedBox(
                 constraints: BoxConstraints(minHeight: contentAreaHeight),
-                child: Align(
-                  alignment: contentAlignment,
-                  child: content,
-                ),
+                child: Align(alignment: contentAlignment, child: content),
               ),
             ],
           ),
@@ -161,9 +152,7 @@ class OnboardingListCard extends StatelessWidget {
       elevation: ThemeConfig.cardElevation,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(ThemeConfig.cardBorderRadius),
-        side: BorderSide(
-          color: colorScheme.outline.withValues(alpha: 0.2),
-        ),
+        side: BorderSide(color: colorScheme.outline.withValues(alpha: 0.2)),
       ),
       child: onTap != null
           ? InkWell(

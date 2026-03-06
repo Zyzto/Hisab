@@ -74,7 +74,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   String? _toParticipantId;
   SplitType _splitType = SplitType.equal;
   TransactionType _transactionType = TransactionType.expense;
-  late final CustomSegmentedController<TransactionType> _transactionTypeSegmentController;
+  late final CustomSegmentedController<TransactionType>
+  _transactionTypeSegmentController;
   bool _saving = false;
 
   // Exchange rate state
@@ -138,7 +139,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     if (!mounted || expense == null || expense.groupId != widget.groupId) {
       return;
     }
-    final group = await ref.read(groupRepositoryProvider).getById(widget.groupId);
+    final group = await ref
+        .read(groupRepositoryProvider)
+        .getById(widget.groupId);
     final participants = await ref
         .read(participantRepositoryProvider)
         .getByGroupId(widget.groupId);
@@ -148,19 +151,19 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       _currencyCode = expense.currencyCode;
       _exchangeRate = expense.exchangeRate;
       if (expense.exchangeRate != 1.0) {
-        _exchangeRateController.text =
-            expense.exchangeRate.toStringAsFixed(4);
+        _exchangeRateController.text = expense.exchangeRate.toStringAsFixed(4);
       }
       if (expense.baseAmountCents != null) {
-        _baseAmountController.text =
-            (expense.baseAmountCents! / 100).toStringAsFixed(2);
+        _baseAmountController.text = (expense.baseAmountCents! / 100)
+            .toStringAsFixed(2);
       }
       _titleController.text = expense.title;
       _descriptionController.text = expense.description ?? '';
       _amountController.text = (expense.amountCents / 100).toStringAsFixed(2);
       _date = expense.date.toLocal();
       _payerParticipantId = expense.payerParticipantId;
-      _transactionType = (group?.isPersonal == true &&
+      _transactionType =
+          (group?.isPersonal == true &&
               expense.transactionType == TransactionType.transfer)
           ? TransactionType.expense
           : expense.transactionType;
@@ -328,7 +331,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       return;
     }
 
-    final group = await ref.read(groupRepositoryProvider).getById(widget.groupId);
+    final group = await ref
+        .read(groupRepositoryProvider)
+        .getById(widget.groupId);
     if (!mounted || group == null) return;
     final localOnly = ref.read(effectiveLocalOnlyProvider);
     final myRole = await ref.read(myRoleInGroupProvider(widget.groupId).future);
@@ -340,15 +345,17 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       context.showToast('add_expense_restricted'.tr());
       return;
     }
-    final restrictPayerToSelf = !group.allowExpenseAsOtherParticipant &&
-        !isOwnerOrAdmin;
+    final restrictPayerToSelf =
+        !group.allowExpenseAsOtherParticipant && !isOwnerOrAdmin;
     final currentUserId = ref.read(authServiceProvider).currentUser?.id;
     var myParticipantId = participants
         .where((p) => p.userId == currentUserId)
         .firstOrNull
         ?.id;
     if (myParticipantId == null) {
-      final myMember = await ref.read(myMemberInGroupProvider(widget.groupId).future);
+      final myMember = await ref.read(
+        myMemberInGroupProvider(widget.groupId).future,
+      );
       final pid = myMember?.participantId;
       if (pid != null && participants.any((p) => p.id == pid)) {
         myParticipantId = pid;
@@ -357,8 +364,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     final payerId = restrictPayerToSelf
         ? (myParticipantId ?? participants.first.id)
         : (_payerParticipantId ?? participants.first.id);
-    final effectiveTransactionType = group.isPersonal &&
-            _transactionType == TransactionType.transfer
+    final effectiveTransactionType =
+        group.isPersonal && _transactionType == TransactionType.transfer
         ? TransactionType.expense
         : _transactionType;
     final isTransfer = effectiveTransactionType == TransactionType.transfer;
@@ -479,7 +486,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         if (item.url != null && item.url!.isNotEmpty) {
           receiptUrls.add(item.url!);
         } else if (item.bytes != null && shouldUploadPhotos) {
-          final uploadId = existingExpenseId.isNotEmpty ? existingExpenseId : '';
+          final uploadId = existingExpenseId.isNotEmpty
+              ? existingExpenseId
+              : '';
           if (uploadId.isEmpty) continue;
           final url = await uploadReceiptBytesToStorage(
             item.bytes!,
@@ -535,7 +544,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           }
         }
         if (createdUrls.isNotEmpty) {
-          await ref.read(expenseRepositoryProvider).update(
+          await ref
+              .read(expenseRepositoryProvider)
+              .update(
                 expense.copyWith(
                   id: id,
                   receiptImagePath: createdUrls.first,
@@ -619,8 +630,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     return List.filled(participants.length, 0);
   }
 
-  String _formatCentsAsAmount(int cents) =>
-      (cents / 100).toStringAsFixed(2);
+  String _formatCentsAsAmount(int cents) => (cents / 100).toStringAsFixed(2);
 
   /// Sum of amount fields in cents (for amounts split type validation).
   int _amountsSumCents(List<Participant> participants) {
@@ -640,8 +650,12 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     final v = double.tryParse(value.trim());
     if (v != null && v > 0) return;
     final participants = ref
-            .read(activeParticipantsByGroupProvider(widget.groupId))
-            .when(data: (d) => d, loading: () => <Participant>[], error: (_, _) => <Participant>[]);
+        .read(activeParticipantsByGroupProvider(widget.groupId))
+        .when(
+          data: (d) => d,
+          loading: () => <Participant>[],
+          error: (_, _) => <Participant>[],
+        );
     final includedList = participants
         .where((x) => _includedInSplitIds.contains(x.id))
         .toList();
@@ -655,7 +669,10 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       final ov = double.tryParse(_customSplitValues[o.id]?.trim() ?? '');
       othersSumCents += (ov != null && ov >= 0) ? (ov * 100).round() : 0;
     }
-    final remainderCents = (amountCentsInt - othersSumCents).clamp(0, amountCentsInt);
+    final remainderCents = (amountCentsInt - othersSumCents).clamp(
+      0,
+      amountCentsInt,
+    );
     final fillValue = _formatCentsAsAmount(remainderCents);
     final ctrl = _splitEditControllers[p.id];
     if (!mounted) return;
@@ -694,10 +711,12 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         .where((x) => x.id != changedParticipant.id)
         .toList();
     if (others.isEmpty) return;
-    final userSetOthers =
-        others.where((o) => _amountsManuallySetIds.contains(o.id)).toList();
-    final nonUserSetOthers =
-        others.where((o) => !_amountsManuallySetIds.contains(o.id)).toList();
+    final userSetOthers = others
+        .where((o) => _amountsManuallySetIds.contains(o.id))
+        .toList();
+    final nonUserSetOthers = others
+        .where((o) => !_amountsManuallySetIds.contains(o.id))
+        .toList();
     double userSetSum = 0;
     for (final o in userSetOthers) {
       userSetSum +=
@@ -742,8 +761,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       for (final o in nonUserSetOthers) {
         final ov =
             double.tryParse(_customSplitValues[o.id]?.trim() ?? '0') ?? 0;
-        final targetCents =
-            (remainder * (ov / nonUserSetSum) * 100).round();
+        final targetCents = (remainder * (ov / nonUserSetSum) * 100).round();
         targetCentsList.add(targetCents);
         sumCents += targetCents;
       }
@@ -838,31 +856,31 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                   title: Text('add_expense'.tr()),
                 ),
                 body: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.pause_circle_outline,
-                      size: 64,
-                      color: theme.colorScheme.primary,
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.pause_circle_outline,
+                          size: 64,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'add_expense_blocked_frozen'.tr(),
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyLarge,
+                        ),
+                        const SizedBox(height: 24),
+                        FilledButton(
+                          onPressed: () => context.pop(),
+                          child: Text('done'.tr()),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'add_expense_blocked_frozen'.tr(),
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyLarge,
-                    ),
-                    const SizedBox(height: 24),
-                    FilledButton(
-                      onPressed: () => context.pop(),
-                      child: Text('done'.tr()),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
               );
             },
           );
@@ -903,7 +921,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                     appBar: ContentAlignedAppBar(
                       contentAreaWidth: layoutConstraints.maxWidth,
                       title: Text(
-                        (widget.expenseId != null ? 'edit_expense' : 'add_expense')
+                        (widget.expenseId != null
+                                ? 'edit_expense'
+                                : 'add_expense')
                             .tr(),
                       ),
                       leading: IconButton(
@@ -918,20 +938,25 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
             }
             final payerId = _payerParticipantId ?? participants.first.id;
             final localOnly = ref.watch(effectiveLocalOnlyProvider);
-            final myRole = ref.watch(myRoleInGroupProvider(widget.groupId)).value;
-            final restrictPayerToSelf = group.isPersonal ||
+            final myRole = ref
+                .watch(myRoleInGroupProvider(widget.groupId))
+                .value;
+            final restrictPayerToSelf =
+                group.isPersonal ||
                 (!group.allowExpenseAsOtherParticipant &&
                     (localOnly ||
-                        (myRole != GroupRole.owner && myRole != GroupRole.admin)));
-            final currentUserId =
-                ref.read(authServiceProvider).currentUser?.id;
+                        (myRole != GroupRole.owner &&
+                            myRole != GroupRole.admin)));
+            final currentUserId = ref.read(authServiceProvider).currentUser?.id;
             // Resolve "my" participant: by userId on participant, or by group_members.participant_id (more reliable when joined via invite)
             var myParticipantId = participants
                 .where((p) => p.userId == currentUserId)
                 .firstOrNull
                 ?.id;
             if (myParticipantId == null) {
-              final myMember = ref.watch(myMemberInGroupProvider(widget.groupId)).value;
+              final myMember = ref
+                  .watch(myMemberInGroupProvider(widget.groupId))
+                  .value;
               final pid = myMember?.participantId;
               if (pid != null && participants.any((p) => p.id == pid)) {
                 myParticipantId = pid;
@@ -961,10 +986,14 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                 _payerParticipantId == null &&
                 participants.isNotEmpty) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
-                ref.read(myMemberInGroupProvider(widget.groupId).future).then((member) {
+                ref.read(myMemberInGroupProvider(widget.groupId).future).then((
+                  member,
+                ) {
                   if (!mounted) return;
-                  final currentUserId =
-                      ref.read(authServiceProvider).currentUser?.id;
+                  final currentUserId = ref
+                      .read(authServiceProvider)
+                      .currentUser
+                      ?.id;
                   var resolvedPayerId = participants
                       .where((p) => p.userId == currentUserId)
                       .firstOrNull
@@ -998,12 +1027,13 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
             final tagsAsync = ref.watch(tagsByGroupProvider(widget.groupId));
             final customTags = tagsAsync.value ?? [];
             final fullFeatures = ref.watch(expenseFormFullFeaturesProvider);
-            final showSimpleForm =
-                !fullFeatures && widget.expenseId == null;
-            final expandDescription =
-                ref.watch(expenseFormExpandDescriptionProvider);
-            final expandBillBreakdown =
-                ref.watch(expenseFormExpandBillBreakdownProvider);
+            final showSimpleForm = !fullFeatures && widget.expenseId == null;
+            final expandDescription = ref.watch(
+              expenseFormExpandDescriptionProvider,
+            );
+            final expandBillBreakdown = ref.watch(
+              expenseFormExpandBillBreakdownProvider,
+            );
 
             return LayoutBuilder(
               builder: (context, layoutConstraints) {
@@ -1015,16 +1045,19 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       onPressed: () => context.pop(),
                     ),
                     title: Text(
-                      (widget.expenseId != null ? 'edit_expense' : 'add_expense')
+                      (widget.expenseId != null
+                              ? 'edit_expense'
+                              : 'add_expense')
                           .tr(),
                     ),
                     actions: showSimpleForm
                         ? [
                             Tooltip(
-                              message: (group.isPersonal
-                                      ? 'expense_form_full_features_tooltip_personal'
-                                      : 'expense_form_full_features_tooltip')
-                                  .tr(),
+                              message:
+                                  (group.isPersonal
+                                          ? 'expense_form_full_features_tooltip_personal'
+                                          : 'expense_form_full_features_tooltip')
+                                      .tr(),
                               child: IconButton(
                                 icon: const Icon(Icons.info_outline),
                                 onPressed: () =>
@@ -1035,452 +1068,533 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                         : null,
                   ),
                   body: ConstrainedContent(
-                child: Form(
-                key: _formKey,
-                child: FocusTraversalGroup(
-                  child: ListView(
-                  padding: EdgeInsets.only(
-                    left: 16,
-                    right: 16,
-                    top: 12,
-                    bottom: 12 +
-                        _kSubmitBarHeight +
-                        MediaQuery.of(context).padding.bottom,
-                  ),
-                  children: [
-                    if (!showSimpleForm) ...[
-                      Theme(
-                        data: Theme.of(context).copyWith(
-                          splashFactory: NoSplash.splashFactory,
-                          highlightColor: Colors.transparent,
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Builder(
-                            builder: (context) {
-                              if (group.isPersonal &&
-                                  _transactionType ==
-                                      TransactionType.transfer) {
-                                WidgetsBinding.instance.addPostFrameCallback(
-                                    (_) {
-                                  if (mounted) {
-                                    setState(() {
-                                      _transactionType =
-                                          TransactionType.expense;
-                                      _transactionTypeSegmentController
-                                          .value = TransactionType.expense;
-                                    });
-                                  }
-                                });
-                                return const SizedBox(height: 52);
-                              }
-                              final theme = Theme.of(context);
-                              final colorScheme = theme.colorScheme;
-                              final segmentChildren = <TransactionType, Widget>{
-                                TransactionType.expense: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 4,
-                                  ),
-                                  child: Text(
-                                    'expenses'.tr(),
-                                    style: theme.textTheme.titleSmall
-                                        ?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                      color: _transactionType ==
-                                              TransactionType.expense
-                                          ? colorScheme.primary
-                                          : colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
+                    child: Form(
+                      key: _formKey,
+                      child: FocusTraversalGroup(
+                        child: ListView(
+                          padding: EdgeInsets.only(
+                            left: 16,
+                            right: 16,
+                            top: 12,
+                            bottom:
+                                12 +
+                                _kSubmitBarHeight +
+                                MediaQuery.of(context).padding.bottom,
+                          ),
+                          children: [
+                            if (!showSimpleForm) ...[
+                              Theme(
+                                data: Theme.of(context).copyWith(
+                                  splashFactory: NoSplash.splashFactory,
+                                  highlightColor: Colors.transparent,
                                 ),
-                                TransactionType.income: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 4,
-                                  ),
-                                  child: Text(
-                                    'income'.tr(),
-                                    style: theme.textTheme.titleSmall
-                                        ?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                      color: _transactionType ==
-                                              TransactionType.income
-                                          ? colorScheme.primary
-                                          : colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ),
-                              };
-                              if (!group.isPersonal) {
-                                segmentChildren[TransactionType.transfer] =
-                                    Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 4,
-                                  ),
-                                  child: Text(
-                                    'transfer'.tr(),
-                                    style: theme.textTheme.titleSmall
-                                        ?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                      color: _transactionType ==
-                                              TransactionType.transfer
-                                          ? colorScheme.primary
-                                          : colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                );
-                              }
-                              return CustomSlidingSegmentedControl<
-                                  TransactionType>(
-                                controller:
-                                    _transactionTypeSegmentController,
-                                children: segmentChildren,
-                                height: 52,
-                                padding: 16,
-                                innerPadding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: colorScheme.surfaceContainerHighest
-                                      .withValues(alpha: 0.6),
+                                child: ClipRRect(
                                   borderRadius: BorderRadius.circular(12),
-                                ),
-                                thumbDecoration: BoxDecoration(
-                                  color: colorScheme.surface,
-                                  borderRadius: BorderRadius.circular(10),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: colorScheme.shadow
-                                          .withValues(alpha: 0.1),
-                                      blurRadius: 3,
-                                      offset: const Offset(0, 1),
-                                    ),
-                                  ],
-                                ),
-                                isStretch: true,
-                                duration: const Duration(milliseconds: 200),
-                                curve: Curves.easeInOut,
-                                onValueChanged: (type) {
-                                  setState(() {
-                                    _transactionType = type;
-                                    if (type == TransactionType.transfer &&
-                                        _toParticipantId == null) {
-                                      final participants = ref
-                                          .read(
-                                            activeParticipantsByGroupProvider(
-                                              widget.groupId,
+                                  child: Builder(
+                                    builder: (context) {
+                                      if (group.isPersonal &&
+                                          _transactionType ==
+                                              TransactionType.transfer) {
+                                        WidgetsBinding.instance
+                                            .addPostFrameCallback((_) {
+                                              if (mounted) {
+                                                setState(() {
+                                                  _transactionType =
+                                                      TransactionType.expense;
+                                                  _transactionTypeSegmentController
+                                                          .value =
+                                                      TransactionType.expense;
+                                                });
+                                              }
+                                            });
+                                        return const SizedBox(height: 52);
+                                      }
+                                      final theme = Theme.of(context);
+                                      final colorScheme = theme.colorScheme;
+                                      final segmentChildren =
+                                          <TransactionType, Widget>{
+                                            TransactionType.expense: Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 4,
+                                                  ),
+                                              child: Text(
+                                                'expenses'.tr(),
+                                                style: theme
+                                                    .textTheme
+                                                    .titleSmall
+                                                    ?.copyWith(
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color:
+                                                          _transactionType ==
+                                                              TransactionType
+                                                                  .expense
+                                                          ? colorScheme.primary
+                                                          : colorScheme
+                                                                .onSurfaceVariant,
+                                                    ),
+                                              ),
                                             ),
-                                          )
-                                          .when(
-                                            data: (d) => d,
-                                            loading: () => <Participant>[],
-                                            error: (_, _) => <Participant>[],
-                                          );
-                                      final payerId =
-                                          _payerParticipantId ??
-                                          (participants.isNotEmpty
-                                              ? participants.first.id
-                                              : null);
-                                      if (participants.length > 1 &&
-                                          payerId != null) {
-                                        _toParticipantId = participants
-                                            .firstWhere(
-                                              (p) => p.id != payerId,
-                                              orElse: () =>
-                                                  participants.first,
-                                            )
-                                            .id;
+                                            TransactionType.income: Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 4,
+                                                  ),
+                                              child: Text(
+                                                'income'.tr(),
+                                                style: theme
+                                                    .textTheme
+                                                    .titleSmall
+                                                    ?.copyWith(
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color:
+                                                          _transactionType ==
+                                                              TransactionType
+                                                                  .income
+                                                          ? colorScheme.primary
+                                                          : colorScheme
+                                                                .onSurfaceVariant,
+                                                    ),
+                                              ),
+                                            ),
+                                          };
+                                      if (!group.isPersonal) {
+                                        segmentChildren[TransactionType
+                                            .transfer] = Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 4,
+                                          ),
+                                          child: Text(
+                                            'transfer'.tr(),
+                                            style: theme.textTheme.titleSmall
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w600,
+                                                  color:
+                                                      _transactionType ==
+                                                          TransactionType
+                                                              .transfer
+                                                      ? colorScheme.primary
+                                                      : colorScheme
+                                                            .onSurfaceVariant,
+                                                ),
+                                          ),
+                                        );
+                                      }
+                                      return CustomSlidingSegmentedControl<
+                                        TransactionType
+                                      >(
+                                        controller:
+                                            _transactionTypeSegmentController,
+                                        children: segmentChildren,
+                                        height: 52,
+                                        padding: 16,
+                                        innerPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 6,
+                                            ),
+                                        decoration: BoxDecoration(
+                                          color: colorScheme
+                                              .surfaceContainerHighest
+                                              .withValues(alpha: 0.6),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        thumbDecoration: BoxDecoration(
+                                          color: colorScheme.surface,
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: colorScheme.shadow
+                                                  .withValues(alpha: 0.1),
+                                              blurRadius: 3,
+                                              offset: const Offset(0, 1),
+                                            ),
+                                          ],
+                                        ),
+                                        isStretch: true,
+                                        duration: const Duration(
+                                          milliseconds: 200,
+                                        ),
+                                        curve: Curves.easeInOut,
+                                        onValueChanged: (type) {
+                                          setState(() {
+                                            _transactionType = type;
+                                            if (type ==
+                                                    TransactionType.transfer &&
+                                                _toParticipantId == null) {
+                                              final participants = ref
+                                                  .read(
+                                                    activeParticipantsByGroupProvider(
+                                                      widget.groupId,
+                                                    ),
+                                                  )
+                                                  .when(
+                                                    data: (d) => d,
+                                                    loading: () =>
+                                                        <Participant>[],
+                                                    error: (_, _) =>
+                                                        <Participant>[],
+                                                  );
+                                              final payerId =
+                                                  _payerParticipantId ??
+                                                  (participants.isNotEmpty
+                                                      ? participants.first.id
+                                                      : null);
+                                              if (participants.length > 1 &&
+                                                  payerId != null) {
+                                                _toParticipantId = participants
+                                                    .firstWhere(
+                                                      (p) => p.id != payerId,
+                                                      orElse: () =>
+                                                          participants.first,
+                                                    )
+                                                    .id;
+                                              }
+                                            }
+                                          });
+                                        },
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                            ],
+                            if (!isTransfer) ...[
+                              ExpenseTitleSection(
+                                controller: _titleController,
+                                selectedTag: _selectedTag,
+                                customTags: customTags,
+                                onTagPicker: () => _showTagPicker(customTags),
+                                onPickReceipt: _receiptPhotos.isEmpty
+                                    ? _addPhoto
+                                    : null,
+                              ),
+                              if (_receiptPhotos.isNotEmpty)
+                                _buildPhotosSection(context),
+                              const SizedBox(height: 20),
+                              ListenableBuilder(
+                                listenable: _descriptionController,
+                                builder: (context, _) {
+                                  final desc = _descriptionController.text
+                                      .trim();
+                                  return ExpandableSection(
+                                    title: 'expense_description'.tr(),
+                                    trailingSummary: desc.isNotEmpty
+                                        ? (desc.length > 40
+                                              ? '${desc.substring(0, 40)}…'
+                                              : desc)
+                                        : null,
+                                    initiallyExpanded: expandDescription,
+                                    child: _buildDescriptionSection(
+                                      context,
+                                      showLabel: false,
+                                    ),
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 20),
+                            ],
+                            ListenableBuilder(
+                              listenable: _amountController,
+                              builder: (context, _) {
+                                // Defer recalc to avoid setState/markNeedsBuild during build
+                                WidgetsBinding.instance.addPostFrameCallback((
+                                  _,
+                                ) {
+                                  if (mounted)
+                                    _onAmountChangedForExchangeRate();
+                                });
+                                return ExpenseAmountSection(
+                                  controller: _amountController,
+                                  currencyCode: _currencyCode,
+                                  onCurrencyTap: _openExpenseCurrencyPicker,
+                                  groupCurrencyCode: _groupCurrencyCode,
+                                  exchangeRateController:
+                                      _exchangeRateController,
+                                  baseAmountController: _baseAmountController,
+                                  fetchingRate: _fetchingRate,
+                                  onExchangeRateChanged: _onExchangeRateChanged,
+                                  onBaseAmountChanged: _onBaseAmountChanged,
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 20),
+                            if (isTransfer) ...[
+                              _buildTransferFromToRow(
+                                context,
+                                participants,
+                                effectivePayerId,
+                                toId,
+                                payerReadOnly: restrictPayerToSelf,
+                              ),
+                              const SizedBox(height: 20),
+                              _buildWhenSection(context),
+                            ] else
+                              group.isPersonal
+                                  ? _buildWhenSection(context)
+                                  : _buildPaidByAndWhenRow(
+                                      context,
+                                      participants,
+                                      effectivePayerId,
+                                      payerReadOnly: restrictPayerToSelf,
+                                    ),
+                            if (!isTransfer) ...[
+                              const SizedBox(height: 20),
+                              ExpandableSection(
+                                title: 'bill_breakdown'.tr(),
+                                trailingSummary: _lineItems.isNotEmpty
+                                    ? (_lineItems.length == 1
+                                          ? 'bill_breakdown_item'.tr()
+                                          : 'bill_breakdown_items'.tr(
+                                              args: ['${_lineItems.length}'],
+                                            ))
+                                    : null,
+                                initiallyExpanded: expandBillBreakdown,
+                                child: ExpenseBillBreakdownSection(
+                                  lineItems: _lineItems,
+                                  lineItemControllers: _lineItemControllers,
+                                  onAddItem: () {
+                                    setState(() {
+                                      _lineItems.add(
+                                        const ReceiptLineItem(
+                                          description: '',
+                                          amountCents: 0,
+                                        ),
+                                      );
+                                      _lineItemControllers.add((
+                                        desc: TextEditingController(),
+                                        amount: TextEditingController(),
+                                      ));
+                                    });
+                                  },
+                                  onRemoveItem: (i) {
+                                    setState(() {
+                                      _lineItemControllers[i].desc.dispose();
+                                      _lineItemControllers[i].amount.dispose();
+                                      _lineItemControllers.removeAt(i);
+                                      _lineItems.removeAt(i);
+                                    });
+                                  },
+                                  onItemChanged: (i, desc, amountCents) {
+                                    setState(() {
+                                      _lineItems[i] = ReceiptLineItem(
+                                        description: desc,
+                                        amountCents: amountCents,
+                                      );
+                                    });
+                                  },
+                                ),
+                              ),
+                              if (!group.isPersonal) ...[
+                                const SizedBox(height: 24),
+                                ListenableBuilder(
+                                  listenable: _amountController,
+                                  builder: (context, _) {
+                                    final amountCents =
+                                        (double.tryParse(
+                                              _amountController.text.trim(),
+                                            ) ??
+                                            0) *
+                                        100;
+                                    final amountCentsInt = amountCents.toInt();
+                                    if (_splitType == SplitType.parts ||
+                                        _splitType == SplitType.amounts) {
+                                      _ensureCustomSplitValues(
+                                        amountCentsInt,
+                                        participants,
+                                      );
+                                    }
+                                    final shares = amountCentsInt > 0
+                                        ? (_splitType == SplitType.equal
+                                              ? _splitSharesPreview(
+                                                  amountCentsInt,
+                                                  participants,
+                                                )
+                                              : _customSharesPreview(
+                                                  amountCentsInt,
+                                                  participants,
+                                                ))
+                                        : <int>[];
+                                    final participantIds = participants
+                                        .map((e) => e.id)
+                                        .toSet();
+                                    for (final id in List.from(
+                                      _splitEditControllers.keys,
+                                    )) {
+                                      if (!participantIds.contains(id)) {
+                                        _splitEditControllers[id]?.dispose();
+                                        _splitEditControllers.remove(id);
+                                        _splitFocusNodes[id]?.dispose();
+                                        _splitFocusNodes.remove(id);
                                       }
                                     }
-                                  });
-                                },
+                                    return Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        ExpenseSplitSection(
+                                          participants: participants,
+                                          sharesCents: shares,
+                                          amountCents: amountCentsInt,
+                                          currencyCode: currencyCode,
+                                          splitType: _splitType,
+                                          includedInSplitIds:
+                                              _includedInSplitIds,
+                                          customSplitValues: _customSplitValues,
+                                          splitEditControllers:
+                                              _splitEditControllers,
+                                          splitFocusNodes: _splitFocusNodes,
+                                          getOrCreateController: (p) {
+                                            var c = _splitEditControllers[p.id];
+                                            if (c == null &&
+                                                (_splitType ==
+                                                        SplitType.parts ||
+                                                    _splitType ==
+                                                        SplitType.amounts)) {
+                                              c = TextEditingController(
+                                                text:
+                                                    _customSplitValues[p.id] ??
+                                                    '1',
+                                              );
+                                              _splitEditControllers[p.id] = c;
+                                              if (!_splitFocusNodes.containsKey(
+                                                p.id,
+                                              )) {
+                                                final node = FocusNode();
+                                                node.addListener(() {
+                                                  if (!node.hasFocus) {
+                                                    _handleAmountFieldUnfocused(
+                                                      p,
+                                                    );
+                                                  }
+                                                });
+                                                _splitFocusNodes[p.id] = node;
+                                              }
+                                            }
+                                            return c;
+                                          },
+                                          getOrCreateFocusNode: (p) =>
+                                              _splitFocusNodes[p.id],
+                                          onSplitTypeTap: () =>
+                                              _showSplitTypePicker(context),
+                                          onIncludeChanged: (p, included) {
+                                            setState(() {
+                                              if (included) {
+                                                _includedInSplitIds.add(p.id);
+                                              } else {
+                                                _includedInSplitIds.remove(
+                                                  p.id,
+                                                );
+                                                _amountsManuallySetIds.remove(
+                                                  p.id,
+                                                );
+                                                _customSplitValues.remove(p.id);
+                                                _splitEditControllers[p.id]
+                                                    ?.dispose();
+                                                _splitEditControllers.remove(
+                                                  p.id,
+                                                );
+                                                _splitFocusNodes[p.id]
+                                                    ?.dispose();
+                                                _splitFocusNodes.remove(p.id);
+                                              }
+                                            });
+                                          },
+                                          onAmountChanged:
+                                              (p, v, includedList, ctrl) {
+                                                setState(() {
+                                                  _applyAmountsChange(
+                                                    p,
+                                                    v,
+                                                    amountCentsInt,
+                                                    includedList,
+                                                    ctrl,
+                                                  );
+                                                });
+                                              },
+                                          onPartsChanged: (p, v) {
+                                            setState(
+                                              () =>
+                                                  _customSplitValues[p.id] = v,
+                                            );
+                                          },
+                                          amountsSumCents: () =>
+                                              _amountsSumCents(participants),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                ),
+                              ],
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  bottomNavigationBar: SizedBox(
+                    height:
+                        _kSubmitBarHeight +
+                        MediaQuery.of(context).padding.bottom,
+                    child: ConstrainedContent(
+                      child: SafeArea(
+                        top: false,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          child: ListenableBuilder(
+                            listenable: _amountController,
+                            builder: (context, _) {
+                              final amountCentsInt =
+                                  ((double.tryParse(
+                                                _amountController.text.trim(),
+                                              ) ??
+                                              0) *
+                                          100)
+                                      .toInt();
+                              return SizedBox(
+                                height: 52,
+                                width: double.infinity,
+                                child: FilledButton(
+                                  onPressed:
+                                      (_saving ||
+                                          (_splitType == SplitType.amounts &&
+                                              _amountsSumCents(participants) !=
+                                                  amountCentsInt))
+                                      ? null
+                                      : _save,
+                                  child: _saving
+                                      ? const SizedBox(
+                                          height: 24,
+                                          width: 24,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : Text(
+                                          (widget.expenseId != null
+                                                  ? 'submit'
+                                                  : 'add_expense')
+                                              .tr(),
+                                        ),
+                                ),
                               );
                             },
                           ),
                         ),
                       ),
-                      const SizedBox(height: 24),
-                    ],
-                    if (!isTransfer) ...[
-                      ExpenseTitleSection(
-                        controller: _titleController,
-                        selectedTag: _selectedTag,
-                        customTags: customTags,
-                        onTagPicker: () => _showTagPicker(customTags),
-                        onPickReceipt: _receiptPhotos.isEmpty ? _addPhoto : null,
-                      ),
-                      if (_receiptPhotos.isNotEmpty) _buildPhotosSection(context),
-                      const SizedBox(height: 20),
-                      ListenableBuilder(
-                        listenable: _descriptionController,
-                        builder: (context, _) {
-                          final desc = _descriptionController.text.trim();
-                          return ExpandableSection(
-                            title: 'expense_description'.tr(),
-                            trailingSummary: desc.isNotEmpty
-                                ? (desc.length > 40
-                                    ? '${desc.substring(0, 40)}…'
-                                    : desc)
-                                : null,
-                            initiallyExpanded: expandDescription,
-                            child: _buildDescriptionSection(
-                              context,
-                              showLabel: false,
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                    ],
-                    ListenableBuilder(
-                      listenable: _amountController,
-                      builder: (context, _) {
-                        // Defer recalc to avoid setState/markNeedsBuild during build
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (mounted) _onAmountChangedForExchangeRate();
-                        });
-                        return ExpenseAmountSection(
-                          controller: _amountController,
-                          currencyCode: _currencyCode,
-                          onCurrencyTap: _openExpenseCurrencyPicker,
-                          groupCurrencyCode: _groupCurrencyCode,
-                          exchangeRateController: _exchangeRateController,
-                          baseAmountController: _baseAmountController,
-                          fetchingRate: _fetchingRate,
-                          onExchangeRateChanged: _onExchangeRateChanged,
-                          onBaseAmountChanged: _onBaseAmountChanged,
-                        );
-                      },
                     ),
-                    const SizedBox(height: 20),
-                    if (isTransfer) ...[
-                      _buildTransferFromToRow(
-                        context,
-                        participants,
-                        effectivePayerId,
-                        toId,
-                        payerReadOnly: restrictPayerToSelf,
-                      ),
-                      const SizedBox(height: 20),
-                      _buildWhenSection(context),
-                    ] else
-                      group.isPersonal
-                          ? _buildWhenSection(context)
-                          : _buildPaidByAndWhenRow(
-                              context,
-                              participants,
-                              effectivePayerId,
-                              payerReadOnly: restrictPayerToSelf,
-                            ),
-                    if (!isTransfer) ...[
-                      const SizedBox(height: 20),
-                      ExpandableSection(
-                        title: 'bill_breakdown'.tr(),
-                        trailingSummary: _lineItems.isNotEmpty
-                            ? (_lineItems.length == 1
-                                ? 'bill_breakdown_item'.tr()
-                                : 'bill_breakdown_items'.tr(
-                                    args: ['${_lineItems.length}'],
-                                  ))
-                            : null,
-                        initiallyExpanded: expandBillBreakdown,
-                        child: ExpenseBillBreakdownSection(
-                          lineItems: _lineItems,
-                          lineItemControllers: _lineItemControllers,
-                          onAddItem: () {
-                            setState(() {
-                              _lineItems.add(
-                                const ReceiptLineItem(
-                                  description: '',
-                                  amountCents: 0,
-                                ),
-                              );
-                              _lineItemControllers.add((
-                                desc: TextEditingController(),
-                                amount: TextEditingController(),
-                              ));
-                            });
-                          },
-                          onRemoveItem: (i) {
-                            setState(() {
-                              _lineItemControllers[i].desc.dispose();
-                              _lineItemControllers[i].amount.dispose();
-                              _lineItemControllers.removeAt(i);
-                              _lineItems.removeAt(i);
-                            });
-                          },
-                          onItemChanged: (i, desc, amountCents) {
-                            setState(() {
-                              _lineItems[i] = ReceiptLineItem(
-                                description: desc,
-                                amountCents: amountCents,
-                              );
-                            });
-                          },
-                        ),
-                      ),
-                      if (!group.isPersonal) ...[
-                        const SizedBox(height: 24),
-                        ListenableBuilder(
-                          listenable: _amountController,
-                          builder: (context, _) {
-                            final amountCents =
-                                (double.tryParse(_amountController.text.trim()) ??
-                                    0) *
-                                100;
-                            final amountCentsInt = amountCents.toInt();
-                            if (_splitType == SplitType.parts ||
-                                _splitType == SplitType.amounts) {
-                              _ensureCustomSplitValues(
-                                amountCentsInt,
-                                participants,
-                              );
-                            }
-                            final shares = amountCentsInt > 0
-                                ? (_splitType == SplitType.equal
-                                      ? _splitSharesPreview(
-                                          amountCentsInt,
-                                          participants,
-                                        )
-                                      : _customSharesPreview(
-                                          amountCentsInt,
-                                          participants,
-                                        ))
-                                : <int>[];
-                            final participantIds = participants
-                                .map((e) => e.id)
-                                .toSet();
-                            for (final id in List.from(
-                              _splitEditControllers.keys,
-                            )) {
-                              if (!participantIds.contains(id)) {
-                                _splitEditControllers[id]?.dispose();
-                                _splitEditControllers.remove(id);
-                                _splitFocusNodes[id]?.dispose();
-                                _splitFocusNodes.remove(id);
-                              }
-                            }
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                ExpenseSplitSection(
-                                participants: participants,
-                                sharesCents: shares,
-                                amountCents: amountCentsInt,
-                                currencyCode: currencyCode,
-                                splitType: _splitType,
-                                includedInSplitIds: _includedInSplitIds,
-                                customSplitValues: _customSplitValues,
-                                splitEditControllers: _splitEditControllers,
-                                splitFocusNodes: _splitFocusNodes,
-                                getOrCreateController: (p) {
-                                  var c = _splitEditControllers[p.id];
-                                  if (c == null &&
-                                      (_splitType == SplitType.parts ||
-                                          _splitType == SplitType.amounts)) {
-                                    c = TextEditingController(
-                                      text: _customSplitValues[p.id] ?? '1',
-                                    );
-                                    _splitEditControllers[p.id] = c;
-                                    if (!_splitFocusNodes.containsKey(p.id)) {
-                                      final node = FocusNode();
-                                      node.addListener(() {
-                                        if (!node.hasFocus) {
-                                          _handleAmountFieldUnfocused(p);
-                                        }
-                                      });
-                                      _splitFocusNodes[p.id] = node;
-                                    }
-                                  }
-                                  return c;
-                                },
-                                getOrCreateFocusNode: (p) =>
-                                    _splitFocusNodes[p.id],
-                                onSplitTypeTap: () =>
-                                    _showSplitTypePicker(context),
-                                onIncludeChanged: (p, included) {
-                                  setState(() {
-                                    if (included) {
-                                      _includedInSplitIds.add(p.id);
-                                    } else {
-                                      _includedInSplitIds.remove(p.id);
-                                      _amountsManuallySetIds.remove(p.id);
-                                      _customSplitValues.remove(p.id);
-                                      _splitEditControllers[p.id]?.dispose();
-                                      _splitEditControllers.remove(p.id);
-                                      _splitFocusNodes[p.id]?.dispose();
-                                      _splitFocusNodes.remove(p.id);
-                                    }
-                                  });
-                                },
-                                onAmountChanged: (p, v, includedList, ctrl) {
-                                  setState(() {
-                                    _applyAmountsChange(
-                                      p,
-                                      v,
-                                      amountCentsInt,
-                                      includedList,
-                                      ctrl,
-                                    );
-                                  });
-                                },
-                                onPartsChanged: (p, v) {
-                                  setState(() => _customSplitValues[p.id] = v);
-                                },
-                                amountsSumCents: () =>
-                                    _amountsSumCents(participants),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                      ],
-                    ],
-                  ],
-                ),
-                ),
-              ),
-            ),
-            bottomNavigationBar: SizedBox(
-              height: _kSubmitBarHeight + MediaQuery.of(context).padding.bottom,
-              child: ConstrainedContent(
-                child: SafeArea(
-                  top: false,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    child: ListenableBuilder(
-                  listenable: _amountController,
-                  builder: (context, _) {
-                    final amountCentsInt =
-                        ((double.tryParse(_amountController.text.trim()) ?? 0) * 100).toInt();
-                    return SizedBox(
-                      height: 52,
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed:
-                            (_saving ||
-                                (_splitType == SplitType.amounts &&
-                                    _amountsSumCents(participants) != amountCentsInt))
-                                ? null
-                                : _save,
-                        child: _saving
-                            ? const SizedBox(
-                                height: 24,
-                                width: 24,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : Text(
-                                (widget.expenseId != null ? 'submit' : 'add_expense').tr(),
-                              ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-            ),
-            ),
-            );
+                  ),
+                );
               },
             );
           },
@@ -1581,169 +1695,169 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       centerInFullViewport: true,
       child: Builder(
         builder: (ctx) => SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              16,
-              16,
-              16,
-              MediaQuery.of(ctx).padding.bottom + 24,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (!LayoutBreakpoints.isTabletOrWider(context)) ...[
-                  Text(
-                    'category'.tr(),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                MediaQuery.of(ctx).padding.bottom + 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ...presetExpenseTags.map((preset) {
-                    final selected = _selectedTag == preset.id;
-                    return InkWell(
-                      onTap: () {
-                        setState(() => _selectedTag = preset.id);
-                        if (ctx.mounted) Navigator.of(ctx).pop();
-                      },
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? theme.colorScheme.primaryContainer
-                              : theme.colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              preset.icon,
-                              size: 20,
-                              color: selected
-                                  ? theme.colorScheme.onPrimaryContainer
-                                  : theme.colorScheme.onSurfaceVariant,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'category_${preset.id}'.tr(),
-                              style: theme.textTheme.labelLarge?.copyWith(
-                                color: selected
-                                    ? theme.colorScheme.onPrimaryContainer
-                                    : theme.colorScheme.onSurface,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }),
-                  ...customTags.map((tag) {
-                    final selected = _selectedTag == tag.id;
-                    final iconData =
-                        selectableExpenseIcons[tag.iconName] ??
-                        Icons.label_outlined;
-                    return InkWell(
-                      onTap: () {
-                        setState(() => _selectedTag = tag.id);
-                        if (ctx.mounted) Navigator.of(ctx).pop();
-                      },
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? theme.colorScheme.primaryContainer
-                              : theme.colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              iconData,
-                              size: 20,
-                              color: selected
-                                  ? theme.colorScheme.onPrimaryContainer
-                                  : theme.colorScheme.onSurfaceVariant,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              tag.label,
-                              style: theme.textTheme.labelLarge?.copyWith(
-                                color: selected
-                                    ? theme.colorScheme.onPrimaryContainer
-                                    : theme.colorScheme.onSurface,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }),
-                  InkWell(
-                    onTap: () async {
-                      Navigator.of(ctx).pop();
-                      final created = await _showCreateTagDialog();
-                      if (created != null && mounted) {
-                        setState(() => _selectedTag = created.id);
-                      }
-                    },
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: theme.colorScheme.outline.withValues(
-                            alpha: 0.5,
-                          ),
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.add_circle_outline,
-                            size: 20,
-                            color: theme.colorScheme.primary,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'create_new_tag'.tr(),
-                            style: theme.textTheme.labelLarge?.copyWith(
-                              color: theme.colorScheme.primary,
-                            ),
-                          ),
-                        ],
+                  if (!LayoutBreakpoints.isTabletOrWider(context)) ...[
+                    Text(
+                      'category'.tr(),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
+                    const SizedBox(height: 16),
+                  ],
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      ...presetExpenseTags.map((preset) {
+                        final selected = _selectedTag == preset.id;
+                        return InkWell(
+                          onTap: () {
+                            setState(() => _selectedTag = preset.id);
+                            if (ctx.mounted) Navigator.of(ctx).pop();
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: selected
+                                  ? theme.colorScheme.primaryContainer
+                                  : theme.colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  preset.icon,
+                                  size: 20,
+                                  color: selected
+                                      ? theme.colorScheme.onPrimaryContainer
+                                      : theme.colorScheme.onSurfaceVariant,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'category_${preset.id}'.tr(),
+                                  style: theme.textTheme.labelLarge?.copyWith(
+                                    color: selected
+                                        ? theme.colorScheme.onPrimaryContainer
+                                        : theme.colorScheme.onSurface,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
+                      ...customTags.map((tag) {
+                        final selected = _selectedTag == tag.id;
+                        final iconData =
+                            selectableExpenseIcons[tag.iconName] ??
+                            Icons.label_outlined;
+                        return InkWell(
+                          onTap: () {
+                            setState(() => _selectedTag = tag.id);
+                            if (ctx.mounted) Navigator.of(ctx).pop();
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: selected
+                                  ? theme.colorScheme.primaryContainer
+                                  : theme.colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  iconData,
+                                  size: 20,
+                                  color: selected
+                                      ? theme.colorScheme.onPrimaryContainer
+                                      : theme.colorScheme.onSurfaceVariant,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  tag.label,
+                                  style: theme.textTheme.labelLarge?.copyWith(
+                                    color: selected
+                                        ? theme.colorScheme.onPrimaryContainer
+                                        : theme.colorScheme.onSurface,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
+                      InkWell(
+                        onTap: () async {
+                          Navigator.of(ctx).pop();
+                          final created = await _showCreateTagDialog();
+                          if (created != null && mounted) {
+                            setState(() => _selectedTag = created.id);
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: theme.colorScheme.outline.withValues(
+                                alpha: 0.5,
+                              ),
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.add_circle_outline,
+                                size: 20,
+                                color: theme.colorScheme.primary,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'create_new_tag'.tr(),
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
         ),
       ),
-        ),
-    ),
     );
   }
 
@@ -1869,8 +1983,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
               final item = entry.value;
               return _buildPhotoThumbnail(context, item, i);
             }),
-            if (count < _kMaxReceiptPhotos)
-              _buildAddPhotoChip(context),
+            if (count < _kMaxReceiptPhotos) _buildAddPhotoChip(context),
           ],
         ),
         const SizedBox(height: 20),
@@ -1924,7 +2037,11 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     }
   }
 
-  Widget _buildPhotoThumbnail(BuildContext context, _ReceiptPhotoItem item, int index) {
+  Widget _buildPhotoThumbnail(
+    BuildContext context,
+    _ReceiptPhotoItem item,
+    int index,
+  ) {
     final theme = Theme.of(context);
     Widget image;
     if (item.bytes != null) {
@@ -1945,11 +2062,13 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           return const SizedBox(
             width: 80,
             height: 80,
-            child: Center(child: SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )),
+            child: Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
           );
         },
         errorBuilder: (_, Object o, StackTrace? s) => const SizedBox(
@@ -1972,18 +2091,18 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
             onLongPress: !kIsWeb && item.bytes != null
                 ? () => _onScanReceiptFromPhoto(item.bytes!)
                 : null,
-            child: SizedBox(
-              width: 80,
-              height: 80,
-              child: image,
-            ),
+            child: SizedBox(width: 80, height: 80, child: image),
           ),
         ),
         Positioned(
           top: -4,
           right: -4,
           child: IconButton(
-            icon: Icon(Icons.close, size: 18, color: theme.colorScheme.onSurface),
+            icon: Icon(
+              Icons.close,
+              size: 18,
+              color: theme.colorScheme.onSurface,
+            ),
             style: IconButton.styleFrom(
               backgroundColor: theme.colorScheme.surfaceContainerHighest,
               padding: const EdgeInsets.all(4),
@@ -2156,9 +2275,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           ),
         ),
         const SizedBox(width: 12),
-        Expanded(
-          child: _buildDateTimeField(context, label: 'when'.tr()),
-        ),
+        Expanded(child: _buildDateTimeField(context, label: 'when'.tr())),
       ],
     );
   }
@@ -2277,7 +2394,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                     padding: const EdgeInsets.all(16),
                                     child: Text(
                                       'to'.tr(),
-                                      style: Theme.of(ctx).textTheme.titleMedium,
+                                      style: Theme.of(
+                                        ctx,
+                                      ).textTheme.titleMedium,
                                     ),
                                   ),
                                 ...others.map(
@@ -2472,12 +2591,12 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       onTap: () => Navigator.of(ctx).pop(e),
                     ),
                   ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
       ),
-    ),
     );
     if (chosen != null) {
       setState(() {
@@ -2545,47 +2664,44 @@ class _CreateTagSheetContentState extends State<_CreateTagSheetContent> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           TextField(
-              controller: _nameController,
-              decoration: InputDecoration(
-                labelText: 'tag_name'.tr(),
-                border: const OutlineInputBorder(),
-              ),
-              autofocus: true,
-              textCapitalization: TextCapitalization.sentences,
+            controller: _nameController,
+            decoration: InputDecoration(
+              labelText: 'tag_name'.tr(),
+              border: const OutlineInputBorder(),
             ),
-            const SizedBox(height: 16),
-            Text(
-              'choose_icon'.tr(),
-              style: Theme.of(ctx).textTheme.labelLarge,
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: selectableExpenseIcons.entries.map((e) {
-                final selected = _selectedIconName == e.key;
-                return InkWell(
-                  onTap: () => setState(() => _selectedIconName = e.key),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? Theme.of(ctx).colorScheme.primaryContainer
-                          : Theme.of(ctx).colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      e.value,
-                      size: 28,
-                      color: selected
-                          ? Theme.of(ctx).colorScheme.onPrimaryContainer
-                          : Theme.of(ctx).colorScheme.onSurfaceVariant,
-                    ),
+            autofocus: true,
+            textCapitalization: TextCapitalization.sentences,
+          ),
+          const SizedBox(height: 16),
+          Text('choose_icon'.tr(), style: Theme.of(ctx).textTheme.labelLarge),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: selectableExpenseIcons.entries.map((e) {
+              final selected = _selectedIconName == e.key;
+              return InkWell(
+                onTap: () => setState(() => _selectedIconName = e.key),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? Theme.of(ctx).colorScheme.primaryContainer
+                        : Theme.of(ctx).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                );
-              }).toList(),
-            ),
+                  child: Icon(
+                    e.value,
+                    size: 28,
+                    color: selected
+                        ? Theme.of(ctx).colorScheme.onPrimaryContainer
+                        : Theme.of(ctx).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
         ],
       ),
       actions: [
@@ -2618,4 +2734,3 @@ class _CreateTagSheetContentState extends State<_CreateTagSheetContent> {
     );
   }
 }
-

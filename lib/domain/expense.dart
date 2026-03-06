@@ -79,10 +79,10 @@ class Expense {
   /// Effective list of receipt image URLs: [receiptImagePaths] if non-empty, else single [receiptImagePath] if set.
   List<String> get effectiveReceiptImageUrls =>
       (receiptImagePaths != null && receiptImagePaths!.isNotEmpty)
-          ? receiptImagePaths!
-          : (receiptImagePath != null && receiptImagePath!.isNotEmpty)
-              ? [receiptImagePath!]
-              : [];
+      ? receiptImagePaths!
+      : (receiptImagePath != null && receiptImagePath!.isNotEmpty)
+      ? [receiptImagePath!]
+      : [];
 
   /// Returns the effective amount in the group's base currency (in cents).
   /// Uses [baseAmountCents] if available, otherwise falls back to [amountCents].

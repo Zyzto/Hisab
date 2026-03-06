@@ -37,21 +37,26 @@ Future<({String plainText, String githubBody})> buildErrorReportPayload({
   if (details != null && details.isNotEmpty) {
     buffer.writeln();
     buffer.writeln('**Details:**');
-    buffer.writeln(details.length > _maxMessageForShare
-        ? '${details.substring(0, _maxMessageForShare)}...'
-        : details);
+    buffer.writeln(
+      details.length > _maxMessageForShare
+          ? '${details.substring(0, _maxMessageForShare)}...'
+          : details,
+    );
   }
   if (stackTrace != null) {
     final stackStr = stackTrace.toString();
     buffer.writeln();
     buffer.writeln('**Stack trace:**');
-    buffer.writeln(stackStr.length > _maxStackChars
-        ? '${stackStr.substring(0, _maxStackChars)}...'
-        : stackStr);
+    buffer.writeln(
+      stackStr.length > _maxStackChars
+          ? '${stackStr.substring(0, _maxStackChars)}...'
+          : stackStr,
+    );
   }
 
   final githubBody = buffer.toString();
-  final plainText = 'Hisab error: $sanitizedMessage\nVersion: $version'
+  final plainText =
+      'Hisab error: $sanitizedMessage\nVersion: $version'
       '${details != null && details.isNotEmpty ? '\nDetails: $details' : ''}';
   return (plainText: plainText, githubBody: githubBody);
 }
@@ -96,8 +101,8 @@ Future<void> openErrorReportGitHubIssue(
   );
   if (!context.mounted) return;
 
-  final title =
-      'Bug: ${_sanitizeForReport(message, _maxGithubTitle)}'.replaceAll('\n', ' ');
+  final title = 'Bug: ${_sanitizeForReport(message, _maxGithubTitle)}'
+      .replaceAll('\n', ' ');
 
   if (reportIssueUrl.isEmpty) {
     await Clipboard.setData(ClipboardData(text: payload.githubBody));
@@ -135,15 +140,13 @@ void sendErrorTelemetryIfOnline(
       ? 'web'
       : (defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android');
 
-  PackageInfo.fromPlatform().then((info) {
-    TelemetryService.sendEvent(
-      'error_occurred',
-      {
-        'message': sanitizedMessage,
-        'version': '${info.version}+${info.buildNumber}',
-        'platform': platform,
-      },
-      enabled: true,
-    );
-  }).catchError((_) {});
+  PackageInfo.fromPlatform()
+      .then((info) {
+        TelemetryService.sendEvent('error_occurred', {
+          'message': sanitizedMessage,
+          'version': '${info.version}+${info.buildNumber}',
+          'platform': platform,
+        }, enabled: true);
+      })
+      .catchError((_) {});
 }

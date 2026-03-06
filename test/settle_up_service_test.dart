@@ -42,27 +42,30 @@ void main() {
   });
 
   group('computeBalances', () {
-    test('two participants one expense payer A equal split: A positive B negative', () {
-      // A paid 1000, split equal: A 500, B 500. A balance = 1000 - 500 = 500, B = 0 - 500 = -500.
-      final expense = Expense(
-        id: 'e1',
-        groupId: 'g1',
-        payerParticipantId: 'p-a',
-        amountCents: 1000,
-        currencyCode: 'USD',
-        title: 'Lunch',
-        date: now,
-        splitType: SplitType.equal,
-        splitShares: {'p-a': 500, 'p-b': 500},
-        createdAt: now,
-        updatedAt: now,
-      );
-      final balances = computeBalances(twoParticipants, [expense], 'USD');
-      expect(balances.length, 2);
-      final byId = {for (final b in balances) b.participantId: b};
-      expect(byId['p-a']!.balanceCents, 500);
-      expect(byId['p-b']!.balanceCents, -500);
-    });
+    test(
+      'two participants one expense payer A equal split: A positive B negative',
+      () {
+        // A paid 1000, split equal: A 500, B 500. A balance = 1000 - 500 = 500, B = 0 - 500 = -500.
+        final expense = Expense(
+          id: 'e1',
+          groupId: 'g1',
+          payerParticipantId: 'p-a',
+          amountCents: 1000,
+          currencyCode: 'USD',
+          title: 'Lunch',
+          date: now,
+          splitType: SplitType.equal,
+          splitShares: {'p-a': 500, 'p-b': 500},
+          createdAt: now,
+          updatedAt: now,
+        );
+        final balances = computeBalances(twoParticipants, [expense], 'USD');
+        expect(balances.length, 2);
+        final byId = {for (final b in balances) b.participantId: b};
+        expect(byId['p-a']!.balanceCents, 500);
+        expect(byId['p-b']!.balanceCents, -500);
+      },
+    );
 
     test('three participants one expense parts split sum of balances zero', () {
       // Parts 1:1:2 -> 250, 250, 500 for 1000 total. Payer p-a: paid 1000, owed 250 -> 750; p-b 0-250=-250; p-c 0-500=-500.
@@ -120,8 +123,16 @@ void main() {
   group('computeSettleUpGreedy', () {
     test('one debtor one creditor single transaction', () {
       final balances = [
-        const ParticipantBalance(participantId: 'p-a', balanceCents: 500, currencyCode: 'USD'),
-        const ParticipantBalance(participantId: 'p-b', balanceCents: -500, currencyCode: 'USD'),
+        const ParticipantBalance(
+          participantId: 'p-a',
+          balanceCents: 500,
+          currencyCode: 'USD',
+        ),
+        const ParticipantBalance(
+          participantId: 'p-b',
+          balanceCents: -500,
+          currencyCode: 'USD',
+        ),
       ];
       final result = computeSettleUpGreedy(balances, 'USD');
       expect(result.length, 1);
@@ -130,23 +141,46 @@ void main() {
       expect(result.first.amountCents, 500);
     });
 
-    test('two debtors one creditor two transactions creditor receives total', () {
-      final balances = [
-        const ParticipantBalance(participantId: 'p-a', balanceCents: 600, currencyCode: 'USD'),
-        const ParticipantBalance(participantId: 'p-b', balanceCents: -300, currencyCode: 'USD'),
-        const ParticipantBalance(participantId: 'p-c', balanceCents: -300, currencyCode: 'USD'),
-      ];
-      final result = computeSettleUpGreedy(balances, 'USD');
-      expect(result.length, 2);
-      final toA = result.where((t) => t.toParticipantId == 'p-a').toList();
-      expect(toA.length, 2);
-      expect(toA.fold<int>(0, (s, t) => s + t.amountCents), 600);
-    });
+    test(
+      'two debtors one creditor two transactions creditor receives total',
+      () {
+        final balances = [
+          const ParticipantBalance(
+            participantId: 'p-a',
+            balanceCents: 600,
+            currencyCode: 'USD',
+          ),
+          const ParticipantBalance(
+            participantId: 'p-b',
+            balanceCents: -300,
+            currencyCode: 'USD',
+          ),
+          const ParticipantBalance(
+            participantId: 'p-c',
+            balanceCents: -300,
+            currencyCode: 'USD',
+          ),
+        ];
+        final result = computeSettleUpGreedy(balances, 'USD');
+        expect(result.length, 2);
+        final toA = result.where((t) => t.toParticipantId == 'p-a').toList();
+        expect(toA.length, 2);
+        expect(toA.fold<int>(0, (s, t) => s + t.amountCents), 600);
+      },
+    );
 
     test('zero balances empty list', () {
       final balances = [
-        const ParticipantBalance(participantId: 'p-a', balanceCents: 0, currencyCode: 'USD'),
-        const ParticipantBalance(participantId: 'p-b', balanceCents: 0, currencyCode: 'USD'),
+        const ParticipantBalance(
+          participantId: 'p-a',
+          balanceCents: 0,
+          currencyCode: 'USD',
+        ),
+        const ParticipantBalance(
+          participantId: 'p-b',
+          balanceCents: 0,
+          currencyCode: 'USD',
+        ),
       ];
       final result = computeSettleUpGreedy(balances, 'USD');
       expect(result, isEmpty);
@@ -154,9 +188,21 @@ void main() {
 
     test('multiple creditors debtor total distributed correctly', () {
       final balances = [
-        const ParticipantBalance(participantId: 'p-a', balanceCents: 200, currencyCode: 'USD'),
-        const ParticipantBalance(participantId: 'p-b', balanceCents: 300, currencyCode: 'USD'),
-        const ParticipantBalance(participantId: 'p-c', balanceCents: -500, currencyCode: 'USD'),
+        const ParticipantBalance(
+          participantId: 'p-a',
+          balanceCents: 200,
+          currencyCode: 'USD',
+        ),
+        const ParticipantBalance(
+          participantId: 'p-b',
+          balanceCents: 300,
+          currencyCode: 'USD',
+        ),
+        const ParticipantBalance(
+          participantId: 'p-c',
+          balanceCents: -500,
+          currencyCode: 'USD',
+        ),
       ];
       final result = computeSettleUpGreedy(balances, 'USD');
       expect(result.length, 2);
@@ -228,14 +274,28 @@ void main() {
   group('computeSettleUpTreasurer', () {
     test('debtors pay treasurer creditors receive from treasurer', () {
       final balances = [
-        const ParticipantBalance(participantId: 'p-a', balanceCents: 400, currencyCode: 'USD'),
-        const ParticipantBalance(participantId: 'p-b', balanceCents: -300, currencyCode: 'USD'),
-        const ParticipantBalance(participantId: 'p-c', balanceCents: -100, currencyCode: 'USD'),
+        const ParticipantBalance(
+          participantId: 'p-a',
+          balanceCents: 400,
+          currencyCode: 'USD',
+        ),
+        const ParticipantBalance(
+          participantId: 'p-b',
+          balanceCents: -300,
+          currencyCode: 'USD',
+        ),
+        const ParticipantBalance(
+          participantId: 'p-c',
+          balanceCents: -100,
+          currencyCode: 'USD',
+        ),
       ];
       const treasurerId = 'p-a';
       final result = computeSettleUpTreasurer(balances, 'USD', treasurerId);
       expect(result.length, 2);
-      final toTreasurer = result.where((t) => t.toParticipantId == treasurerId).toList();
+      final toTreasurer = result
+          .where((t) => t.toParticipantId == treasurerId)
+          .toList();
       // Treasurer is the only creditor, so no fromTreasurer; debtors pay treasurer
       expect(toTreasurer.length, 2);
       expect(toTreasurer.fold<int>(0, (s, t) => s + t.amountCents), 400);
@@ -243,9 +303,21 @@ void main() {
 
     test('zero balance participants no transaction for them', () {
       final balances = [
-        const ParticipantBalance(participantId: 'p-a', balanceCents: 0, currencyCode: 'USD'),
-        const ParticipantBalance(participantId: 'p-b', balanceCents: -100, currencyCode: 'USD'),
-        const ParticipantBalance(participantId: 'p-c', balanceCents: 100, currencyCode: 'USD'),
+        const ParticipantBalance(
+          participantId: 'p-a',
+          balanceCents: 0,
+          currencyCode: 'USD',
+        ),
+        const ParticipantBalance(
+          participantId: 'p-b',
+          balanceCents: -100,
+          currencyCode: 'USD',
+        ),
+        const ParticipantBalance(
+          participantId: 'p-c',
+          balanceCents: 100,
+          currencyCode: 'USD',
+        ),
       ];
       final result = computeSettleUpTreasurer(balances, 'USD', 'p-c');
       expect(result.length, 1);
@@ -272,7 +344,11 @@ void main() {
           updatedAt: now,
         ),
       ];
-      final result = computeSettleUpConsolidated(twoParticipants, expenses, 'USD');
+      final result = computeSettleUpConsolidated(
+        twoParticipants,
+        expenses,
+        'USD',
+      );
       expect(result.length, 1);
       expect(result.first.amountCents, 500);
       expect(result.first.fromParticipantId, 'p-b');
@@ -287,8 +363,16 @@ void main() {
   group('computeSettlements', () {
     test('greedy returns list', () {
       final balances = [
-        const ParticipantBalance(participantId: 'p-a', balanceCents: 100, currencyCode: 'USD'),
-        const ParticipantBalance(participantId: 'p-b', balanceCents: -100, currencyCode: 'USD'),
+        const ParticipantBalance(
+          participantId: 'p-a',
+          balanceCents: 100,
+          currencyCode: 'USD',
+        ),
+        const ParticipantBalance(
+          participantId: 'p-b',
+          balanceCents: -100,
+          currencyCode: 'USD',
+        ),
       ];
       final result = computeSettlements(
         SettlementMethod.greedy,
@@ -363,8 +447,16 @@ void main() {
 
     test('treasurer returns list with treasurer as from or to', () {
       final balances = [
-        const ParticipantBalance(participantId: 'p-a', balanceCents: 100, currencyCode: 'USD'),
-        const ParticipantBalance(participantId: 'p-b', balanceCents: -100, currencyCode: 'USD'),
+        const ParticipantBalance(
+          participantId: 'p-a',
+          balanceCents: 100,
+          currencyCode: 'USD',
+        ),
+        const ParticipantBalance(
+          participantId: 'p-b',
+          balanceCents: -100,
+          currencyCode: 'USD',
+        ),
       ];
       final result = computeSettlements(
         SettlementMethod.treasurer,
@@ -375,7 +467,11 @@ void main() {
         'p-a',
       );
       expect(result.length, 1);
-      expect(result.first.fromParticipantId == 'p-a' || result.first.toParticipantId == 'p-a', true);
+      expect(
+        result.first.fromParticipantId == 'p-a' ||
+            result.first.toParticipantId == 'p-a',
+        true,
+      );
     });
 
     test('treasurer with no participants returns empty', () {
@@ -423,8 +519,16 @@ void main() {
   group('computeSettleUp legacy alias', () {
     test('matches computeSettleUpGreedy', () {
       final balances = [
-        const ParticipantBalance(participantId: 'p-a', balanceCents: 50, currencyCode: 'EUR'),
-        const ParticipantBalance(participantId: 'p-b', balanceCents: -50, currencyCode: 'EUR'),
+        const ParticipantBalance(
+          participantId: 'p-a',
+          balanceCents: 50,
+          currencyCode: 'EUR',
+        ),
+        const ParticipantBalance(
+          participantId: 'p-b',
+          balanceCents: -50,
+          currencyCode: 'EUR',
+        ),
       ];
       final greedy = computeSettleUpGreedy(balances, 'EUR');
       final legacy = computeSettleUp(balances, 'EUR');

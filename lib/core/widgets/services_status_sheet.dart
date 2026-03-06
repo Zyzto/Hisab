@@ -35,7 +35,8 @@ class _ServicesStatusSheet extends ConsumerStatefulWidget {
   final WidgetRef ref;
 
   @override
-  ConsumerState<_ServicesStatusSheet> createState() => _ServicesStatusSheetState();
+  ConsumerState<_ServicesStatusSheet> createState() =>
+      _ServicesStatusSheetState();
 }
 
 class _ServicesStatusSheetState extends ConsumerState<_ServicesStatusSheet> {
@@ -144,7 +145,10 @@ class _SyncStatusLine extends StatelessWidget {
     }
     final theme = Theme.of(context);
     final (label, icon) = switch (status) {
-      SyncStatus.connected => ('sync_connected'.tr(), Icons.cloud_done_outlined),
+      SyncStatus.connected => (
+        'sync_connected'.tr(),
+        Icons.cloud_done_outlined,
+      ),
       SyncStatus.syncing => ('sync_syncing'.tr(), Icons.sync),
       SyncStatus.offline => ('sync_offline'.tr(), Icons.cloud_off_outlined),
       SyncStatus.syncFailed => ('sync_failed'.tr(), Icons.cloud_off_outlined),
@@ -252,11 +256,7 @@ class _ServiceRow extends StatelessWidget {
                       ],
                     ),
                   ),
-                  Icon(
-                    Icons.open_in_new,
-                    size: 18,
-                    color: cs.primary,
-                  ),
+                  Icon(Icons.open_in_new, size: 18, color: cs.primary),
                 ],
               ),
               // Always show recent section (Kuma-style): list incidents or "None"
@@ -284,7 +284,9 @@ class _ServiceRow extends StatelessWidget {
                         ),
                       )
                     else
-                      ...recentIncidents.take(3).map(
+                      ...recentIncidents
+                          .take(3)
+                          .map(
                             (i) => Padding(
                               padding: const EdgeInsets.only(top: 2),
                               child: Text(
@@ -458,7 +460,9 @@ class _FirebaseServiceRow extends StatelessWidget {
                         ),
                       )
                     else
-                      ...recentIncidents.take(3).map(
+                      ...recentIncidents
+                          .take(3)
+                          .map(
                             (i) => Padding(
                               padding: const EdgeInsets.only(top: 2),
                               child: Text(
@@ -491,10 +495,7 @@ class _FirebaseServiceRow extends StatelessWidget {
 
 /// Service row with no API: name, "Check status", link to status page.
 class _LinkOnlyServiceRow extends StatelessWidget {
-  const _LinkOnlyServiceRow({
-    required this.name,
-    required this.statusPageUrl,
-  });
+  const _LinkOnlyServiceRow({required this.name, required this.statusPageUrl});
 
   final String name;
   final String statusPageUrl;

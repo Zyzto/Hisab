@@ -33,8 +33,16 @@ void main() {
       final arKeys = ar.keys.toSet();
       final missingInAr = enKeys.difference(arKeys);
       final missingInEn = arKeys.difference(enKeys);
-      expect(missingInAr, isEmpty, reason: 'Keys in en but not in ar: $missingInAr');
-      expect(missingInEn, isEmpty, reason: 'Keys in ar but not in en: $missingInEn');
+      expect(
+        missingInAr,
+        isEmpty,
+        reason: 'Keys in en but not in ar: $missingInAr',
+      );
+      expect(
+        missingInEn,
+        isEmpty,
+        reason: 'Keys in ar but not in en: $missingInEn',
+      );
     });
 
     test('critical UI keys exist and are non-empty in en', () {

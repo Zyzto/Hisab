@@ -42,10 +42,7 @@ class _PwaInstallBannerState extends State<PwaInstallBanner>
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.5),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animController,
-      curve: Curves.easeOut,
-    ));
+    ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
 
     if (kIsWeb) {
       _checkShouldShow();
@@ -142,8 +139,9 @@ class _PwaInstallBannerState extends State<PwaInstallBanner>
                       Text(
                         'install_app_description'.tr(),
                         style: TextStyle(
-                          color: colorScheme.onPrimaryContainer
-                              .withValues(alpha: 0.7),
+                          color: colorScheme.onPrimaryContainer.withValues(
+                            alpha: 0.7,
+                          ),
                           fontSize: 12,
                         ),
                       ),
@@ -177,7 +175,9 @@ class _PwaInstallBannerState extends State<PwaInstallBanner>
                   icon: Icon(
                     Icons.close_rounded,
                     size: 18,
-                    color: colorScheme.onPrimaryContainer.withValues(alpha: 0.5),
+                    color: colorScheme.onPrimaryContainer.withValues(
+                      alpha: 0.5,
+                    ),
                   ),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(

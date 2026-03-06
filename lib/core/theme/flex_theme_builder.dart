@@ -39,7 +39,10 @@ Color primaryColorForSchemeId(String schemeId) {
 class FlexThemeBuilder {
   FlexThemeBuilder._();
 
-  static TextTheme _scaleTextTheme(TextTheme baseTextTheme, double scaleFactor) {
+  static TextTheme _scaleTextTheme(
+    TextTheme baseTextTheme,
+    double scaleFactor,
+  ) {
     return TextTheme(
       displayLarge: baseTextTheme.displayLarge?.copyWith(
         fontSize: (baseTextTheme.displayLarge?.fontSize ?? 57) * scaleFactor,
@@ -111,7 +114,9 @@ class FlexThemeBuilder {
       theme.extensions.values.where((e) => e is! AppThemeExtension),
     );
     exts.add(
-      brightness == Brightness.light ? AppThemeExtension.light : AppThemeExtension.dark,
+      brightness == Brightness.light
+          ? AppThemeExtension.light
+          : AppThemeExtension.dark,
     );
     return theme.copyWith(
       colorScheme: colorScheme,
@@ -141,10 +146,7 @@ class FlexThemeBuilder {
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(ThemeConfig.cardBorderRadius),
-          side: BorderSide(
-            color: colorScheme.outlineVariant,
-            width: 1,
-          ),
+          side: BorderSide(color: colorScheme.outlineVariant, width: 1),
         ),
         color: colorScheme.surfaceContainerHighest,
       ),
@@ -241,10 +243,7 @@ class FlexThemeBuilder {
       );
     } else {
       final scheme = FlexScheme.values.byName(themeScheme);
-      baseTheme = FlexThemeData.dark(
-        scheme: scheme,
-        darkIsTrueBlack: amoled,
-      );
+      baseTheme = FlexThemeData.dark(scheme: scheme, darkIsTrueBlack: amoled);
     }
     return _applyAppOverrides(
       baseTheme,

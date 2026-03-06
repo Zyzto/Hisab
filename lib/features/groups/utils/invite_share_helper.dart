@@ -53,9 +53,7 @@ Future<void> shareInviteLink({
         mimeType: 'image/png',
         name: 'hisab_invite_qr.png',
       );
-      await SharePlus.instance.share(
-        ShareParams(files: [xFile], text: text),
-      );
+      await SharePlus.instance.share(ShareParams(files: [xFile], text: text));
       return;
     } catch (e, st) {
       Log.warning('Share invite link failed', error: e, stackTrace: st);
@@ -84,7 +82,11 @@ Future<void> shareInviteLinkWithFallback(
     if (!context.mounted) return;
     context.showSuccess('invite_shared'.tr());
   } catch (e, st) {
-    Log.warning('Share invite link with fallback failed', error: e, stackTrace: st);
+    Log.warning(
+      'Share invite link with fallback failed',
+      error: e,
+      stackTrace: st,
+    );
     await Clipboard.setData(ClipboardData(text: url));
     if (!context.mounted) return;
     context.showSuccess('invite_link_copied'.tr());

@@ -102,10 +102,7 @@ class _LogsViewerDialogState extends State<LogsViewerDialog> {
                     padding: const EdgeInsets.all(12),
                     scrollDirection: Axis.vertical,
                     child: SelectionArea(
-                      child: _LogContent(
-                        content: widget.content,
-                        theme: theme,
-                      ),
+                      child: _LogContent(content: widget.content, theme: theme),
                     ),
                   ),
                 ),
@@ -137,10 +134,7 @@ class _LogsViewerDialogState extends State<LogsViewerDialog> {
                 icon: const Icon(Icons.bug_report_outlined, size: 18),
                 label: Text('report_issue'.tr()),
               ),
-              FilledButton(
-                onPressed: widget.onClose,
-                child: Text('done'.tr()),
-              ),
+              FilledButton(onPressed: widget.onClose, child: Text('done'.tr())),
             ],
           ),
         ),
@@ -150,10 +144,7 @@ class _LogsViewerDialogState extends State<LogsViewerDialog> {
 }
 
 class _LogContent extends StatelessWidget {
-  const _LogContent({
-    required this.content,
-    required this.theme,
-  });
+  const _LogContent({required this.content, required this.theme});
 
   final String content;
   final ThemeData theme;
@@ -164,7 +155,10 @@ class _LogContent extends StatelessWidget {
     final textSpans = <InlineSpan>[];
 
     for (final line in lines) {
-      final levelColor = LogLevelColors.levelColorForLine(line, theme.brightness);
+      final levelColor = LogLevelColors.levelColorForLine(
+        line,
+        theme.brightness,
+      );
       textSpans.add(
         TextSpan(
           text: '$line\n',
@@ -194,5 +188,4 @@ class _LogContent extends StatelessWidget {
       ),
     );
   }
-
 }

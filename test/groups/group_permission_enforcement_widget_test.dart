@@ -33,132 +33,142 @@ void main() {
     EasyLocalization.logger.enableBuildModes = [];
   });
 
-  testWidgets('Group settings is read-only for member when change settings is disabled', (
-    tester,
-  ) async {
-    final group = Group(
-      id: groupId,
-      name: 'Trip',
-      currencyCode: 'USD',
-      createdAt: now,
-      updatedAt: now,
-      allowMemberChangeSettings: false,
-      isPersonal: false,
-    );
+  testWidgets(
+    'Group settings is read-only for member when change settings is disabled',
+    (tester) async {
+      final group = Group(
+        id: groupId,
+        name: 'Trip',
+        currencyCode: 'USD',
+        createdAt: now,
+        updatedAt: now,
+        allowMemberChangeSettings: false,
+        isPersonal: false,
+      );
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          effectiveLocalOnlyProvider.overrideWith((ref) => false),
-          futureGroupProvider(groupId).overrideWithValue(AsyncValue.data(group)),
-          expensesByGroupProvider(groupId).overrideWithValue(
-            const AsyncValue.data(<Expense>[]),
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            effectiveLocalOnlyProvider.overrideWith((ref) => false),
+            futureGroupProvider(
+              groupId,
+            ).overrideWithValue(AsyncValue.data(group)),
+            expensesByGroupProvider(
+              groupId,
+            ).overrideWithValue(const AsyncValue.data(<Expense>[])),
+            activeParticipantsByGroupProvider(
+              groupId,
+            ).overrideWithValue(const AsyncValue.data(<Participant>[])),
+            locallyArchivedGroupIdsProvider.overrideWithValue(
+              const AsyncValue.data(<String>{}),
+            ),
+            myRoleInGroupProvider(
+              groupId,
+            ).overrideWithValue(const AsyncValue.data(GroupRole.member)),
+          ],
+          child: EasyLocalization(
+            path: 'assets/translations',
+            supportedLocales: testSupportedLocales,
+            fallbackLocale: const Locale('en'),
+            startLocale: const Locale('en'),
+            child: const MaterialApp(home: GroupSettingsPage(groupId: groupId)),
           ),
-          activeParticipantsByGroupProvider(groupId).overrideWithValue(
-            const AsyncValue.data(<Participant>[]),
-          ),
-          locallyArchivedGroupIdsProvider.overrideWithValue(
-            const AsyncValue.data(<String>{}),
-          ),
-          myRoleInGroupProvider(groupId).overrideWithValue(
-            const AsyncValue.data(GroupRole.member),
-          ),
-        ],
-        child: EasyLocalization(
-          path: 'assets/translations',
-          supportedLocales: testSupportedLocales,
-          fallbackLocale: const Locale('en'),
-          startLocale: const Locale('en'),
-          child: const MaterialApp(home: GroupSettingsPage(groupId: groupId)),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.byIcon(Icons.edit_outlined), findsNothing);
-    final switches = tester.widgetList<SwitchListTile>(
-      find.byType(SwitchListTile),
-    );
-    expect(switches.isNotEmpty, isTrue);
-    expect(switches.every((s) => s.onChanged == null), isTrue);
-  });
+      expect(find.byIcon(Icons.edit_outlined), findsNothing);
+      final switches = tester.widgetList<SwitchListTile>(
+        find.byType(SwitchListTile),
+      );
+      expect(switches.isNotEmpty, isTrue);
+      expect(switches.every((s) => s.onChanged == null), isTrue);
+    },
+  );
 
-  testWidgets('Expense save is blocked for member when add expense is disabled', (
-    tester,
-  ) async {
-    final group = Group(
-      id: groupId,
-      name: 'Trip',
-      currencyCode: 'USD',
-      createdAt: now,
-      updatedAt: now,
-      allowMemberAddExpense: false,
-      allowExpenseAsOtherParticipant: true,
-      isPersonal: false,
-    );
-    final member = GroupMember(
-      id: 'm1',
-      groupId: groupId,
-      userId: 'u1',
-      role: 'member',
-      participantId: memberParticipant.id,
-      joinedAt: now,
-    );
-    final fakeGroupRepo = _FakeGroupRepository(group);
-    final fakeParticipantRepo = _FakeParticipantRepository([memberParticipant]);
-    final fakeExpenseRepo = _FakeExpenseRepository();
+  testWidgets(
+    'Expense save is blocked for member when add expense is disabled',
+    (tester) async {
+      final group = Group(
+        id: groupId,
+        name: 'Trip',
+        currencyCode: 'USD',
+        createdAt: now,
+        updatedAt: now,
+        allowMemberAddExpense: false,
+        allowExpenseAsOtherParticipant: true,
+        isPersonal: false,
+      );
+      final member = GroupMember(
+        id: 'm1',
+        groupId: groupId,
+        userId: 'u1',
+        role: 'member',
+        participantId: memberParticipant.id,
+        joinedAt: now,
+      );
+      final fakeGroupRepo = _FakeGroupRepository(group);
+      final fakeParticipantRepo = _FakeParticipantRepository([
+        memberParticipant,
+      ]);
+      final fakeExpenseRepo = _FakeExpenseRepository();
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          effectiveLocalOnlyProvider.overrideWith((ref) => false),
-          groupRepositoryProvider.overrideWithValue(fakeGroupRepo),
-          participantRepositoryProvider.overrideWithValue(fakeParticipantRepo),
-          expenseRepositoryProvider.overrideWithValue(fakeExpenseRepo),
-          futureGroupProvider(groupId).overrideWithValue(AsyncValue.data(group)),
-          participantsByGroupProvider(groupId).overrideWithValue(
-            AsyncValue.data([memberParticipant]),
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            effectiveLocalOnlyProvider.overrideWith((ref) => false),
+            groupRepositoryProvider.overrideWithValue(fakeGroupRepo),
+            participantRepositoryProvider.overrideWithValue(
+              fakeParticipantRepo,
+            ),
+            expenseRepositoryProvider.overrideWithValue(fakeExpenseRepo),
+            futureGroupProvider(
+              groupId,
+            ).overrideWithValue(AsyncValue.data(group)),
+            participantsByGroupProvider(
+              groupId,
+            ).overrideWithValue(AsyncValue.data([memberParticipant])),
+            activeParticipantsByGroupProvider(
+              groupId,
+            ).overrideWithValue(AsyncValue.data([memberParticipant])),
+            tagsByGroupProvider(
+              groupId,
+            ).overrideWithValue(const AsyncValue.data(<ExpenseTag>[])),
+            myRoleInGroupProvider(
+              groupId,
+            ).overrideWithValue(const AsyncValue.data(GroupRole.member)),
+            myMemberInGroupProvider(
+              groupId,
+            ).overrideWithValue(AsyncValue.data(member)),
+          ],
+          child: EasyLocalization(
+            path: 'assets/translations',
+            supportedLocales: testSupportedLocales,
+            fallbackLocale: const Locale('en'),
+            startLocale: const Locale('en'),
+            child: const MaterialApp(home: ExpenseFormPage(groupId: groupId)),
           ),
-          activeParticipantsByGroupProvider(groupId).overrideWithValue(
-            AsyncValue.data([memberParticipant]),
-          ),
-          tagsByGroupProvider(groupId).overrideWithValue(
-            const AsyncValue.data(<ExpenseTag>[]),
-          ),
-          myRoleInGroupProvider(groupId).overrideWithValue(
-            const AsyncValue.data(GroupRole.member),
-          ),
-          myMemberInGroupProvider(groupId).overrideWithValue(
-            AsyncValue.data(member),
-          ),
-        ],
-        child: EasyLocalization(
-          path: 'assets/translations',
-          supportedLocales: testSupportedLocales,
-          fallbackLocale: const Locale('en'),
-          startLocale: const Locale('en'),
-          child: const MaterialApp(home: ExpenseFormPage(groupId: groupId)),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    final textFields = find.byType(TextFormField);
-    expect(textFields, findsWidgets);
-    await tester.enterText(textFields.at(0), 'Lunch');
-    await tester.enterText(textFields.at(1), '12');
-    await tester.pumpAndSettle();
+      final textFields = find.byType(TextFormField);
+      expect(textFields, findsWidgets);
+      await tester.enterText(textFields.at(0), 'Lunch');
+      await tester.enterText(textFields.at(1), '12');
+      await tester.pumpAndSettle();
 
-    final submitButton = find.byType(FilledButton).last;
-    expect(submitButton, findsOneWidget);
-    await tester.tap(submitButton);
-    await tester.pumpAndSettle();
+      final submitButton = find.byType(FilledButton).last;
+      expect(submitButton, findsOneWidget);
+      await tester.tap(submitButton);
+      await tester.pumpAndSettle();
 
-    expect(fakeParticipantRepo.getByGroupCalls, greaterThanOrEqualTo(1));
-    expect(fakeGroupRepo.getByIdCalls, greaterThanOrEqualTo(1));
-    expect(fakeExpenseRepo.createCalls, 0);
-    await tester.pump(const Duration(seconds: 5));
-  });
+      expect(fakeParticipantRepo.getByGroupCalls, greaterThanOrEqualTo(1));
+      expect(fakeGroupRepo.getByIdCalls, greaterThanOrEqualTo(1));
+      expect(fakeExpenseRepo.createCalls, 0);
+      await tester.pump(const Duration(seconds: 5));
+    },
+  );
 }
 
 class _FakeGroupRepository implements IGroupRepository {
@@ -294,8 +304,7 @@ class _FakeExpenseRepository implements IExpenseRepository {
   Future<List<Expense>> getByGroupId(String groupId) async => const <Expense>[];
 
   @override
-  Stream<List<Expense>> watchByGroupId(String groupId) =>
-      const Stream.empty();
+  Stream<List<Expense>> watchByGroupId(String groupId) => const Stream.empty();
 
   @override
   Future<Expense?> getById(String id) async => null;

@@ -31,10 +31,7 @@ Widget buildSheetShell(
             if (showTitleInBody)
               Padding(
                 padding: const EdgeInsets.all(_kSheetPadding),
-                child: Text(
-                  title,
-                  style: Theme.of(ctx).textTheme.titleMedium,
-                ),
+                child: Text(title, style: Theme.of(ctx).textTheme.titleMedium),
               ),
             body,
             if (actions.isNotEmpty) ...[
@@ -196,8 +193,12 @@ class _ConfirmSheetButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final backgroundColor = isDestructive ? colorScheme.error : colorScheme.primary;
-    final foregroundColor = isDestructive ? colorScheme.onError : colorScheme.onPrimary;
+    final backgroundColor = isDestructive
+        ? colorScheme.error
+        : colorScheme.primary;
+    final foregroundColor = isDestructive
+        ? colorScheme.onError
+        : colorScheme.onPrimary;
 
     return Material(
       color: backgroundColor,

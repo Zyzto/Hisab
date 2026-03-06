@@ -89,7 +89,9 @@ void main() {
     expect(find.byType(ExpenseSplitSection), findsOneWidget);
   });
 
-  testWidgets('ExpenseSplitSection shows participant names for equal split', (tester) async {
+  testWidgets('ExpenseSplitSection shows participant names for equal split', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       EasyLocalization(
         path: 'assets/translations',

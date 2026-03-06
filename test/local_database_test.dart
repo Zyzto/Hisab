@@ -55,11 +55,11 @@ void main() {
   });
 
   IGroupRepository repo() => PowerSyncGroupRepository(
-        db!,
-        client: null,
-        isOnline: false,
-        isLocalOnly: true,
-      );
+    db!,
+    client: null,
+    isOnline: false,
+    isLocalOnly: true,
+  );
 
   group('PowerSyncGroupRepository (local only)', () {
     test('create then getById and getAll', () async {
@@ -141,11 +141,7 @@ void main() {
         isLocalOnly: true,
       );
 
-      final participantId = await participantRepo.create(
-        groupId,
-        'Alice',
-        1,
-      );
+      final participantId = await participantRepo.create(groupId, 'Alice', 1);
       expect(participantId, isNotEmpty);
 
       final list = await participantRepo.getByGroupId(groupId);
@@ -187,7 +183,11 @@ void main() {
         isOnline: false,
         isLocalOnly: true,
       );
-      final participantId = await participantRepo.create(groupId, 'ToDelete', 0);
+      final participantId = await participantRepo.create(
+        groupId,
+        'ToDelete',
+        0,
+      );
       expect(await participantRepo.getById(participantId), isNotNull);
 
       await participantRepo.delete(participantId);

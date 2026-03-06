@@ -27,11 +27,15 @@ Future<void> main() async {
         msg.contains('Service connection disposed') ||
         msg.contains('VmServiceDisappeared')) {
       print('');
-      print('Integration test run incomplete: device/emulator connection was lost.');
+      print(
+        'Integration test run incomplete: device/emulator connection was lost.',
+      );
       print('This is usually an emulator or ADB issue, not a test failure.');
       print('Error: $e');
       print('');
-      print('See test/README.md "Android emulator troubleshooting" for workarounds.');
+      print(
+        'See test/README.md "Android emulator troubleshooting" for workarounds.',
+      );
     } else {
       print('driver.requestData failed: $e');
     }

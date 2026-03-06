@@ -15,7 +15,8 @@ import '../navigation/route_paths.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
 import 'permission_service.dart';
 import 'notification_service_web_stub.dart'
-    if (dart.library.html) 'notification_service_web_impl.dart' as web_notifications;
+    if (dart.library.html) 'notification_service_web_impl.dart'
+    as web_notifications;
 
 part 'notification_service.g.dart';
 
@@ -48,7 +49,9 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 /// Shows a local notification from a data-only FCM message. Runs in background isolate.
 @pragma('vm:entry-point')
-Future<void> _showDataOnlyNotificationInBackground(RemoteMessage message) async {
+Future<void> _showDataOnlyNotificationInBackground(
+  RemoteMessage message,
+) async {
   try {
     final plugin = FlutterLocalNotificationsPlugin();
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -64,8 +67,10 @@ Future<void> _showDataOnlyNotificationInBackground(RemoteMessage message) async 
         macOS: darwinInit,
       ),
     );
-    final androidPlugin = plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+    final androidPlugin = plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     await androidPlugin?.createNotificationChannel(_androidChannel);
 
     final title = message.data['title'] as String? ?? 'Group activity';
@@ -95,7 +100,10 @@ Future<void> _showDataOnlyNotificationInBackground(RemoteMessage message) async 
       payload: groupId.isNotEmpty ? groupId : null,
     );
   } catch (e) {
-    Log.warning('NotificationService: data-only background notification failed', error: e);
+    Log.warning(
+      'NotificationService: data-only background notification failed',
+      error: e,
+    );
   }
 }
 
@@ -170,7 +178,9 @@ class NotificationService extends _$NotificationService {
     if (_initialized) return true;
     if (!supabaseConfigAvailable || !firebaseInitialized || _initializing) {
       if (!firebaseInitialized) {
-        Log.warning('NotificationService: Firebase not initialized, cannot enable notifications');
+        Log.warning(
+          'NotificationService: Firebase not initialized, cannot enable notifications',
+        );
       }
       return false;
     }
@@ -179,7 +189,9 @@ class NotificationService extends _$NotificationService {
     try {
       final client = supabaseClientIfConfigured;
       if (client == null || client.auth.currentUser == null) {
-        Log.warning('NotificationService: initialize called without authenticated user');
+        Log.warning(
+          'NotificationService: initialize called without authenticated user',
+        );
         return false;
       }
 
@@ -221,8 +233,9 @@ class NotificationService extends _$NotificationService {
 
       // Handle foreground messages
       _foregroundSub?.cancel();
-      _foregroundSub =
-          FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+      _foregroundSub = FirebaseMessaging.onMessage.listen(
+        _handleForegroundMessage,
+      );
 
       // Handle notification taps when app is in background / terminated
       _openedAppSub?.cancel();
@@ -259,10 +272,7 @@ class NotificationService extends _$NotificationService {
     final client = supabaseClientIfConfigured;
     if (client == null) return;
     try {
-      await client
-          .from('device_tokens')
-          .delete()
-          .eq('token', _currentToken!);
+      await client.from('device_tokens').delete().eq('token', _currentToken!);
       Log.info('NotificationService: token unregistered');
       _currentToken = null;
     } catch (e) {
@@ -290,11 +300,10 @@ class NotificationService extends _$NotificationService {
     );
 
     // Create the Android notification channel
-    final androidPlugin =
-        _localNotifications
-            .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin
-            >();
+    final androidPlugin = _localNotifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     await androidPlugin?.createNotificationChannel(_androidChannel);
   }
 
@@ -306,7 +315,9 @@ class NotificationService extends _$NotificationService {
       final String? token;
       if (kIsWeb) {
         if (fcmVapidKey.isEmpty) {
-          Log.warning('NotificationService: FCM_VAPID_KEY not set, skipping web token');
+          Log.warning(
+            'NotificationService: FCM_VAPID_KEY not set, skipping web token',
+          );
           return;
         }
         token = await messaging.getToken(vapidKey: fcmVapidKey);
@@ -330,22 +341,21 @@ class NotificationService extends _$NotificationService {
       final client = supabaseClientIfConfigured;
       final userId = client?.auth.currentUser?.id;
       if (client == null || userId == null) {
-        Log.warning('NotificationService: skip token upsert, no client or no authenticated user');
+        Log.warning(
+          'NotificationService: skip token upsert, no client or no authenticated user',
+        );
         return;
       }
 
       final locale = ref.read(languageProvider);
 
-      await client.from('device_tokens').upsert(
-        {
-          'user_id': userId,
-          'token': token,
-          'platform': platform,
-          'locale': locale,
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
-        onConflict: 'user_id,token',
-      );
+      await client.from('device_tokens').upsert({
+        'user_id': userId,
+        'token': token,
+        'platform': platform,
+        'locale': locale,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }, onConflict: 'user_id,token');
 
       Log.info('NotificationService: token registered ($platform)');
     } catch (e, st) {
@@ -420,7 +430,9 @@ class NotificationService extends _$NotificationService {
     final groupId = response.payload;
     if (groupId == null || groupId.isEmpty) return;
 
-    Log.info('NotificationService: tapped local notification for group $groupId');
+    Log.info(
+      'NotificationService: tapped local notification for group $groupId',
+    );
     _navigateToGroup(groupId);
   }
 

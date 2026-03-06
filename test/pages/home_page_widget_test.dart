@@ -27,9 +27,7 @@ void main() {
           supportedLocales: const [Locale('en')],
           fallbackLocale: const Locale('en'),
           startLocale: const Locale('en'),
-          child: const MaterialApp(
-            home: Scaffold(body: HomePage()),
-          ),
+          child: const MaterialApp(home: Scaffold(body: HomePage())),
         ),
       ),
     );
@@ -38,7 +36,9 @@ void main() {
     expect(find.byIcon(Icons.add), findsWidgets);
   });
 
-  testWidgets('HomePage empty state shows no_groups and add_first_group', (tester) async {
+  testWidgets('HomePage empty state shows no_groups and add_first_group', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -51,9 +51,7 @@ void main() {
           supportedLocales: const [Locale('en')],
           fallbackLocale: const Locale('en'),
           startLocale: const Locale('en'),
-          child: const MaterialApp(
-            home: Scaffold(body: HomePage()),
-          ),
+          child: const MaterialApp(home: Scaffold(body: HomePage())),
         ),
       ),
     );
@@ -62,7 +60,9 @@ void main() {
     expect(find.byIcon(Icons.group_outlined), findsOneWidget);
   });
 
-  testWidgets('HomePage with one group shows group in list (list default)', (tester) async {
+  testWidgets('HomePage with one group shows group in list (list default)', (
+    tester,
+  ) async {
     final now = DateTime(2025, 1, 1);
     final group = Group(
       id: 'g1',
@@ -85,9 +85,7 @@ void main() {
           supportedLocales: const [Locale('en')],
           fallbackLocale: const Locale('en'),
           startLocale: const Locale('en'),
-          child: const MaterialApp(
-            home: Scaffold(body: HomePage()),
-          ),
+          child: const MaterialApp(home: Scaffold(body: HomePage())),
         ),
       ),
     );

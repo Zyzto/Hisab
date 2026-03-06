@@ -63,8 +63,9 @@ class DebugMenuFab extends ConsumerWidget {
     return FloatingActionButton.small(
       heroTag: 'debugMenuFab',
       tooltip: 'Debug menu',
-      backgroundColor:
-          Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.9),
+      backgroundColor: Theme.of(
+        context,
+      ).colorScheme.errorContainer.withValues(alpha: 0.9),
       foregroundColor: Theme.of(context).colorScheme.onErrorContainer,
       onPressed: () {
         final navContext = navigatorContext;
@@ -186,15 +187,18 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
           children: [
             Row(
               children: [
-                Icon(Icons.bug_report_outlined,
-                    color: colorScheme.error, size: 20),
+                Icon(
+                  Icons.bug_report_outlined,
+                  color: colorScheme.error,
+                  size: 20,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'Debug Menu',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: colorScheme.error,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    color: colorScheme.error,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -217,9 +221,9 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
                     children: [
                       _InfoRow(label: 'Package', value: info.packageName),
                       _InfoRow(
-                          label: 'Version',
-                          value:
-                              '${info.version} (${info.buildNumber})'),
+                        label: 'Version',
+                        value: '${info.version} (${info.buildNumber})',
+                      ),
                     ],
                   ),
                 );
@@ -263,8 +267,8 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
             Text(
               'Sync status (override)',
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 6),
             Wrap(
@@ -273,27 +277,27 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
               children: [
                 _SyncStatusChip(
                   label: 'Connected',
-                  onTap: () => ref
-                      .read(debugSyncStatusOverrideProvider.notifier)
-                      .state = SyncStatus.connected,
+                  onTap: () =>
+                      ref.read(debugSyncStatusOverrideProvider.notifier).state =
+                          SyncStatus.connected,
                 ),
                 _SyncStatusChip(
                   label: 'Syncing',
-                  onTap: () => ref
-                      .read(debugSyncStatusOverrideProvider.notifier)
-                      .state = SyncStatus.syncing,
+                  onTap: () =>
+                      ref.read(debugSyncStatusOverrideProvider.notifier).state =
+                          SyncStatus.syncing,
                 ),
                 _SyncStatusChip(
                   label: 'Offline',
-                  onTap: () => ref
-                      .read(debugSyncStatusOverrideProvider.notifier)
-                      .state = SyncStatus.offline,
+                  onTap: () =>
+                      ref.read(debugSyncStatusOverrideProvider.notifier).state =
+                          SyncStatus.offline,
                 ),
                 _SyncStatusChip(
                   label: 'Local only',
-                  onTap: () => ref
-                      .read(debugSyncStatusOverrideProvider.notifier)
-                      .state = SyncStatus.localOnly,
+                  onTap: () =>
+                      ref.read(debugSyncStatusOverrideProvider.notifier).state =
+                          SyncStatus.localOnly,
                 ),
                 _SyncStatusChip(
                   label: 'Clear',
@@ -308,8 +312,10 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
             if (_statusMessage != null) ...[
               const SizedBox(height: 12),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: colorScheme.secondaryContainer,
                   borderRadius: BorderRadius.circular(6),
@@ -317,8 +323,8 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
                 child: Text(
                   _statusMessage!,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSecondaryContainer,
-                      ),
+                    color: colorScheme.onSecondaryContainer,
+                  ),
                 ),
               ),
             ],
@@ -345,14 +351,18 @@ class _InfoRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 72,
-            child: Text(label,
-                style: textTheme.bodySmall
-                    ?.copyWith(color: colorScheme.onSurfaceVariant)),
+            child: Text(
+              label,
+              style: textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
           ),
           Expanded(
-            child: Text(value,
-                style: textTheme.bodySmall
-                    ?.copyWith(fontWeight: FontWeight.w600)),
+            child: Text(
+              value,
+              style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
@@ -387,10 +397,7 @@ class _DebugAction extends StatelessWidget {
 }
 
 class _SyncStatusChip extends StatelessWidget {
-  const _SyncStatusChip({
-    required this.label,
-    required this.onTap,
-  });
+  const _SyncStatusChip({required this.label, required this.onTap});
 
   final String label;
   final VoidCallback onTap;

@@ -8,7 +8,9 @@ void main() {
     EasyLocalization.logger.enableBuildModes = [];
   });
 
-  testWidgets('AppCurrencyPickerList shows search and currency list', (tester) async {
+  testWidgets('AppCurrencyPickerList shows search and currency list', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       EasyLocalization(
         path: 'assets/translations',

@@ -15,11 +15,7 @@ void main() {
         supportedLocales: const [Locale('en')],
         fallbackLocale: const Locale('en'),
         startLocale: const Locale('en'),
-        child: const MaterialApp(
-          home: Scaffold(
-            body: PwaInstallBanner(),
-          ),
-        ),
+        child: const MaterialApp(home: Scaffold(body: PwaInstallBanner())),
       ),
     );
     await tester.pumpAndSettle();

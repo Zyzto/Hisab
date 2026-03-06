@@ -22,9 +22,7 @@ void main() {
           supportedLocales: testSupportedLocales,
           fallbackLocale: const Locale('en'),
           startLocale: const Locale('en'),
-          child: const MaterialApp(
-            home: Scaffold(body: SyncStatusChip()),
-          ),
+          child: const MaterialApp(home: Scaffold(body: SyncStatusChip())),
         ),
       ),
     );
@@ -33,7 +31,9 @@ void main() {
     expect(find.byIcon(Icons.cloud_done_outlined), findsNothing);
   });
 
-  testWidgets('SyncStatusChip when connected is visible with icon', (tester) async {
+  testWidgets('SyncStatusChip when connected is visible with icon', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -44,9 +44,7 @@ void main() {
           supportedLocales: testSupportedLocales,
           fallbackLocale: const Locale('en'),
           startLocale: const Locale('en'),
-          child: const MaterialApp(
-            home: Scaffold(body: SyncStatusChip()),
-          ),
+          child: const MaterialApp(home: Scaffold(body: SyncStatusChip())),
         ),
       ),
     );
@@ -66,9 +64,7 @@ void main() {
           supportedLocales: testSupportedLocales,
           fallbackLocale: const Locale('en'),
           startLocale: const Locale('en'),
-          child: const MaterialApp(
-            home: Scaffold(body: SyncStatusChip()),
-          ),
+          child: const MaterialApp(home: Scaffold(body: SyncStatusChip())),
         ),
       ),
     );
@@ -76,7 +72,9 @@ void main() {
     expect(find.byType(SyncStatusChip), findsOneWidget);
   });
 
-  testWidgets('SyncStatusChip when offline is visible with Arabic locale', (tester) async {
+  testWidgets('SyncStatusChip when offline is visible with Arabic locale', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -87,9 +85,7 @@ void main() {
           supportedLocales: testSupportedLocales,
           fallbackLocale: const Locale('en'),
           startLocale: const Locale('ar'),
-          child: const MaterialApp(
-            home: Scaffold(body: SyncStatusChip()),
-          ),
+          child: const MaterialApp(home: Scaffold(body: SyncStatusChip())),
         ),
       ),
     );
@@ -106,7 +102,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            syncStatusForDisplayProvider.overrideWithValue(SyncStatus.connected),
+            syncStatusForDisplayProvider.overrideWithValue(
+              SyncStatus.connected,
+            ),
           ],
           child: EasyLocalization(
             path: 'assets/translations',
@@ -138,7 +136,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(tapCount, 1);
 
-      final emptySpaceTap = Offset(leadingRect.right - 8, leadingRect.center.dy);
+      final emptySpaceTap = Offset(
+        leadingRect.right - 8,
+        leadingRect.center.dy,
+      );
       await tester.tapAt(emptySpaceTap);
       await tester.pumpAndSettle();
       expect(tapCount, 1);

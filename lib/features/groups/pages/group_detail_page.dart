@@ -292,176 +292,187 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
             ],
           ),
           body: ConstrainedContent(
-        child: Column(
-          children: [
-            if (widget.group.isArchived) _buildArchivedBanner(context),
-            if (widget.group.isPersonal) ...[
-              _PersonalBudgetHeader(group: widget.group, onRefresh: _onRefresh),
-              Expanded(
-                child: _ExpensesTab(
-                  groupId: widget.group.id,
-                  group: widget.group,
-                  onRefresh: _onRefresh,
-                ),
-              ),
-            ] else ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                child: Theme(
-                  data: Theme.of(context).copyWith(
-                    splashFactory: NoSplash.splashFactory,
-                    highlightColor: Colors.transparent,
+            child: Column(
+              children: [
+                if (widget.group.isArchived) _buildArchivedBanner(context),
+                if (widget.group.isPersonal) ...[
+                  _PersonalBudgetHeader(
+                    group: widget.group,
+                    onRefresh: _onRefresh,
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Builder(
-                      builder: (context) {
-                        final theme = Theme.of(context);
-                        final colorScheme = theme.colorScheme;
-                        return CustomSlidingSegmentedControl<int>(
-                          controller: _segmentController,
-                          children: {
-                            0: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: Text(
-                                'expenses'.tr(),
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  color: _selectedTabIndex == 0
-                                      ? colorScheme.primary
-                                      : colorScheme.onSurfaceVariant,
+                  Expanded(
+                    child: _ExpensesTab(
+                      groupId: widget.group.id,
+                      group: widget.group,
+                      onRefresh: _onRefresh,
+                    ),
+                  ),
+                ] else ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    child: Theme(
+                      data: Theme.of(context).copyWith(
+                        splashFactory: NoSplash.splashFactory,
+                        highlightColor: Colors.transparent,
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Builder(
+                          builder: (context) {
+                            final theme = Theme.of(context);
+                            final colorScheme = theme.colorScheme;
+                            return CustomSlidingSegmentedControl<int>(
+                              controller: _segmentController,
+                              children: {
+                                0: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 4,
+                                  ),
+                                  child: Text(
+                                    'expenses'.tr(),
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: _selectedTabIndex == 0
+                                          ? colorScheme.primary
+                                          : colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
-                            1: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: Text(
-                                'balance'.tr(),
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  color: _selectedTabIndex == 1
-                                      ? colorScheme.primary
-                                      : colorScheme.onSurfaceVariant,
+                                1: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 4,
+                                  ),
+                                  child: Text(
+                                    'balance'.tr(),
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: _selectedTabIndex == 1
+                                          ? colorScheme.primary
+                                          : colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
-                            2: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: Text(
-                                'people'.tr(),
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  color: _selectedTabIndex == 2
-                                      ? colorScheme.primary
-                                      : colorScheme.onSurfaceVariant,
+                                2: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 4,
+                                  ),
+                                  child: Text(
+                                    'people'.tr(),
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: _selectedTabIndex == 2
+                                          ? colorScheme.primary
+                                          : colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
                                 ),
+                              },
+                              height: 52,
+                              padding: 16,
+                              innerPadding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 6,
                               ),
-                            ),
-                          },
-                          height: 52,
-                          padding: 16,
-                          innerPadding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: colorScheme.surfaceContainerHighest
-                                .withValues(alpha: 0.6),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          thumbDecoration: BoxDecoration(
-                            color: colorScheme.surface,
-                            borderRadius: BorderRadius.circular(10),
-                            boxShadow: [
-                              BoxShadow(
-                                color: colorScheme.shadow.withValues(
-                                  alpha: 0.1,
-                                ),
-                                blurRadius: 3,
-                                offset: const Offset(0, 1),
+                              decoration: BoxDecoration(
+                                color: colorScheme.surfaceContainerHighest
+                                    .withValues(alpha: 0.6),
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                            ],
-                          ),
-                          isStretch: true,
-                          duration: const Duration(milliseconds: 200),
-                          curve: Curves.easeInOut,
-                          onValueChanged: (v) {
-                            setState(() {
-                              _selectedTabIndex = v;
-                              _programmaticTargetPage = v;
-                            });
-                            _tabIndexNotifier.value = v;
-                            _pageController
-                                .animateToPage(
-                                  v,
-                                  duration: const Duration(milliseconds: 300),
-                                  curve: Curves.easeInOut,
-                                )
-                                .whenComplete(() {
-                                  if (mounted) {
-                                    setState(
-                                      () => _programmaticTargetPage = null,
-                                    );
-                                  }
+                              thumbDecoration: BoxDecoration(
+                                color: colorScheme.surface,
+                                borderRadius: BorderRadius.circular(10),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: colorScheme.shadow.withValues(
+                                      alpha: 0.1,
+                                    ),
+                                    blurRadius: 3,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
+                              ),
+                              isStretch: true,
+                              duration: const Duration(milliseconds: 200),
+                              curve: Curves.easeInOut,
+                              onValueChanged: (v) {
+                                setState(() {
+                                  _selectedTabIndex = v;
+                                  _programmaticTargetPage = v;
                                 });
+                                _tabIndexNotifier.value = v;
+                                _pageController
+                                    .animateToPage(
+                                      v,
+                                      duration: const Duration(
+                                        milliseconds: 300,
+                                      ),
+                                      curve: Curves.easeInOut,
+                                    )
+                                    .whenComplete(() {
+                                      if (mounted) {
+                                        setState(
+                                          () => _programmaticTargetPage = null,
+                                        );
+                                      }
+                                    });
+                              },
+                            );
                           },
-                        );
-                      },
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              Expanded(
-                child: PageView(
-                  controller: _pageController,
-                  onPageChanged: (i) {
-                    if (_programmaticTargetPage != null &&
-                        i != _programmaticTargetPage) {
-                      return;
-                    }
-                    if (_programmaticTargetPage != null) {
-                      setState(() => _programmaticTargetPage = null);
-                    }
-                    setState(() => _selectedTabIndex = i);
-                    _tabIndexNotifier.value = i;
-                    _segmentController.value = i;
-                  },
-                  children: [
-                    _ExpensesTab(
-                      groupId: widget.group.id,
-                      group: widget.group,
-                      onRefresh: _onRefresh,
+                  Expanded(
+                    child: PageView(
+                      controller: _pageController,
+                      onPageChanged: (i) {
+                        if (_programmaticTargetPage != null &&
+                            i != _programmaticTargetPage) {
+                          return;
+                        }
+                        if (_programmaticTargetPage != null) {
+                          setState(() => _programmaticTargetPage = null);
+                        }
+                        setState(() => _selectedTabIndex = i);
+                        _tabIndexNotifier.value = i;
+                        _segmentController.value = i;
+                      },
+                      children: [
+                        _ExpensesTab(
+                          groupId: widget.group.id,
+                          group: widget.group,
+                          onRefresh: _onRefresh,
+                        ),
+                        _BalanceTab(
+                          groupId: widget.group.id,
+                          onRefresh: _onRefresh,
+                        ),
+                        _PeopleTab(
+                          groupId: widget.group.id,
+                          group: widget.group,
+                          onRefresh: _onRefresh,
+                        ),
+                      ],
                     ),
-                    _BalanceTab(
-                      groupId: widget.group.id,
-                      onRefresh: _onRefresh,
-                    ),
-                    _PeopleTab(
-                      groupId: widget.group.id,
-                      group: widget.group,
-                      onRefresh: _onRefresh,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-      floatingActionButton: ValueListenableBuilder<int>(
-        valueListenable: _tabIndexNotifier,
-        builder: (context, index, _) =>
-            _buildFAB(
-              context,
-              widget.group.isPersonal ? 0 : index,
-              myRole,
-              localOnly,
-            ) ??
-            const SizedBox.shrink(),
-      ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          floatingActionButton: ValueListenableBuilder<int>(
+            valueListenable: _tabIndexNotifier,
+            builder: (context, index, _) =>
+                _buildFAB(
+                  context,
+                  widget.group.isPersonal ? 0 : index,
+                  myRole,
+                  localOnly,
+                ) ??
+                const SizedBox.shrink(),
+          ),
         );
       },
     );
@@ -1516,6 +1527,7 @@ class _ExpenseSummaryCard extends StatelessWidget {
   final String label;
   final String value;
   final ThemeData theme;
+
   /// When set, shown instead of [value] (e.g. [AmountWithSecondaryDisplay]).
   final Widget? valueWidget;
 
@@ -1627,10 +1639,10 @@ Future<void> _showAddParticipant(
           .read(participantRepositoryProvider)
           .create(groupId, name, currentCount)
           .catchError((Object e, StackTrace st) {
-        Log.warning('Add participant failed', error: e, stackTrace: st);
-        if (context.mounted) context.showError('generic_error'.tr());
-        throw e;
-      });
+            Log.warning('Add participant failed', error: e, stackTrace: st);
+            if (context.mounted) context.showError('generic_error'.tr());
+            throw e;
+          });
     });
   }
 }
