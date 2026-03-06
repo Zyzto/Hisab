@@ -10,10 +10,8 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   group('Online sync flow', () {
-    testWidgets(
-        'create group → verify in Supabase → add expense → verify → '
-        'trigger sync → delete group',
-        (tester) async {
+    testWidgets('create group → verify in Supabase → add expense → verify → '
+        'trigger sync → delete group', (tester) async {
       final ready = await runOnlineTestApp(
         skipOnboarding: true,
         signInEmail: testUserAEmail,
@@ -21,8 +19,11 @@ void main() {
       );
       ensureBootstrapReady(ready);
       await pumpAndSettleWithTimeout(tester);
-      await waitForWidget(tester, find.text('Groups'),
-          timeout: const Duration(seconds: 20));
+      await waitForWidget(
+        tester,
+        find.text('Groups'),
+        timeout: const Duration(seconds: 20),
+      );
 
       final client = Supabase.instance.client;
       final userId = client.auth.currentUser!.id;
@@ -30,31 +31,31 @@ void main() {
       // ── Stage: create group via UI ──
       await stage('create group', () async {
         await tapAndSettle(tester, find.byIcon(Icons.add));
-        await waitForWidget(tester, find.text('Create Group'));
-        await tapAndSettle(tester, find.text('Create Group'));
+        final createGroupButton = actionByLabel(tester, 'Create Group');
+        await waitForWidget(tester, createGroupButton);
+        await tapAndSettle(tester, createGroupButton);
         await pumpAndSettleWithTimeout(tester);
 
         // Name
-        await waitForWidget(
-            tester, find.byKey(const Key('wizard_name_field')));
+        await waitForWidget(tester, find.byKey(const Key('wizard_name_field')));
         await enterTextAndPump(
           tester,
           find.byKey(const Key('wizard_name_field')),
           'Sync Test Group',
         );
-        await tapAndSettle(tester, find.text('Next'));
+        await tapAndSettle(tester, actionByLabel(tester, 'Next'));
         await tester.pump(const Duration(milliseconds: 400));
 
         // Participants
-        await waitForWidget(tester, find.text('Add'));
+        await waitForWidget(tester, actionByLabel(tester, 'Add'));
         await addWizardParticipant(tester, 'Alice');
         await addWizardParticipant(tester, 'Bob');
 
-        await tapAndSettle(tester, find.text('Next'));
+        await tapAndSettle(tester, actionByLabel(tester, 'Next'));
         await tester.pump(const Duration(milliseconds: 400));
 
         // Icon & Color – skip, use defaults
-        await tapAndSettle(tester, find.text('Next'));
+        await tapAndSettle(tester, actionByLabel(tester, 'Next'));
         await tester.pump(const Duration(milliseconds: 400));
         await pumpAndSettleWithTimeout(tester);
 
@@ -72,18 +73,23 @@ void main() {
 
       // ── Stage: wait for sync then verify group in Supabase ──
       await stage('verify group in supabase', () async {
-        // Give DataSyncService time to push
-        await tester.pump(const Duration(seconds: 5));
-        await pumpAndSettleWithTimeout(tester);
+        final groupsResult = await waitForAsyncResult<List<dynamic>>(
+          tester,
+          load: () async => await client
+              .from('groups')
+              .select()
+              .eq('owner_id', userId)
+              .eq('name', 'Sync Test Group'),
+          isReady: (rows) => rows.isNotEmpty,
+          timeout: const Duration(seconds: 20),
+          reason: 'Group should exist in Supabase after sync',
+        );
 
-        final groupsResult = await client
-            .from('groups')
-            .select()
-            .eq('owner_id', userId)
-            .eq('name', 'Sync Test Group');
-
-        expect(groupsResult, isNotEmpty,
-            reason: 'Group should exist in Supabase after sync');
+        expect(
+          groupsResult,
+          isNotEmpty,
+          reason: 'Group should exist in Supabase after sync',
+        );
       });
 
       // ── Stage: add an expense ──
@@ -102,38 +108,44 @@ void main() {
         await pumpAndSettleWithTimeout(tester);
 
         // Title (first TextField on the expense form)
-        await waitForWidget(tester, find.byType(TextField),
-            timeout: const Duration(seconds: 10));
+        await waitForWidget(
+          tester,
+          find.byType(TextField),
+          timeout: const Duration(seconds: 10),
+        );
         await enterTextAndPump(
-            tester, find.byType(TextField).first, 'Test Dinner');
+          tester,
+          find.byType(TextField).first,
+          'Test Dinner',
+        );
 
         // Amount (second TextField)
         if (find.byType(TextField).evaluate().length > 1) {
-          await enterTextAndPump(
-              tester, find.byType(TextField).at(1), '42.50');
+          await enterTextAndPump(tester, find.byType(TextField).at(1), '42.50');
         }
 
         // Submit
         await tapSubmitExpenseButton(tester);
         await ensureFormClosed(tester);
-
-        await tester.pump(const Duration(seconds: 2));
       });
 
       // ── Stage: verify expense in Supabase ──
       await stage('verify expense in supabase', () async {
-        // Give time for sync
-        await tester.pump(const Duration(seconds: 5));
-        await pumpAndSettleWithTimeout(tester);
-
         if (groupId != null) {
-          final expenses = await client
-              .from('expenses')
-              .select()
-              .eq('group_id', groupId!);
+          final expenses = await waitForAsyncResult<List<dynamic>>(
+            tester,
+            load: () async =>
+                await client.from('expenses').select().eq('group_id', groupId!),
+            isReady: (rows) => rows.isNotEmpty,
+            timeout: const Duration(seconds: 20),
+            reason: 'Expense should exist in Supabase after sync',
+          );
 
-          expect(expenses, isNotEmpty,
-              reason: 'Expense should exist in Supabase after sync');
+          expect(
+            expenses,
+            isNotEmpty,
+            reason: 'Expense should exist in Supabase after sync',
+          );
         }
       });
 
@@ -145,10 +157,11 @@ void main() {
           await pumpAndSettleWithTimeout(tester);
         }
 
-        await waitForWidget(tester, find.text('Sync Test Group'));
+        final groupTileText = find.text('Sync Test Group');
+        await waitForWidget(tester, groupTileText);
 
         // Tap into group detail
-        await tapAndSettle(tester, find.text('Sync Test Group'));
+        await tapAndSettle(tester, groupTileText);
         await pumpAndSettleWithTimeout(tester);
 
         // Navigate to group settings
@@ -159,18 +172,17 @@ void main() {
         }
 
         // Scroll to find Delete Group
-        await scrollUntilVisible(tester, find.text('Delete Group'));
-        await tapAndSettle(tester, find.text('Delete Group'));
+        final deleteGroupButton = actionByLabel(tester, 'Delete Group');
+        await scrollUntilVisible(tester, deleteGroupButton);
+        await tapAndSettle(tester, deleteGroupButton);
         await pumpAndSettleWithTimeout(tester);
 
         // Confirm deletion (dialog button also says "Delete Group")
-        final confirmDelete = find.text('Delete Group');
+        final confirmDelete = actionByLabel(tester, 'Delete Group');
         if (confirmDelete.evaluate().isNotEmpty) {
-          await tapAndSettle(tester, confirmDelete.last);
+          await tapAndSettle(tester, confirmDelete.first);
           await pumpAndSettleWithTimeout(tester);
         }
-
-        await tester.pump(const Duration(seconds: 2));
       });
 
       // ── Stage: verify deletion synced or clean up directly ──
@@ -179,14 +191,19 @@ void main() {
 
         // Poll Supabase for up to 15s to allow sync to propagate
         var deleted = false;
-        for (var i = 0; i < 5; i++) {
-          await tester.pump(const Duration(seconds: 3));
-          final remaining =
-              await client.from('groups').select().eq('id', groupId!);
-          if (remaining.isEmpty) {
-            deleted = true;
-            break;
-          }
+        try {
+          await waitForAsyncResult<List<dynamic>>(
+            tester,
+            load: () async =>
+                await client.from('groups').select().eq('id', groupId!),
+            isReady: (rows) => rows.isEmpty,
+            timeout: const Duration(seconds: 15),
+            interval: const Duration(seconds: 1),
+            reason: 'Group deletion did not sync within expected time',
+          );
+          deleted = true;
+        } catch (_) {
+          deleted = false;
         }
 
         // If sync didn't propagate, clean up directly via API

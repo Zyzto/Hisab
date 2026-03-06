@@ -11,206 +11,253 @@ void main() {
 
   group('Online invite flow', () {
     testWidgets(
-        'User A creates group + invite → User B accepts → verify membership',
-        (tester) async {
-      final ready = await runOnlineTestApp(
-        skipOnboarding: true,
-        signInEmail: testUserAEmail,
-        signInPassword: testPassword,
-      );
-      ensureBootstrapReady(ready);
-      await pumpAndSettleWithTimeout(tester);
-      await waitForWidget(tester, find.text('Groups'),
-          timeout: const Duration(seconds: 20));
-
-      final client = Supabase.instance.client;
-      String? groupId;
-      String? inviteId;
-      String? inviteToken;
-
-      // ── Stage: User A creates a group ──
-      await stage('User A creates group', () async {
-        await tapAndSettle(tester, find.byIcon(Icons.add));
-        await waitForWidget(tester, find.text('Create Group'));
-        await tapAndSettle(tester, find.text('Create Group'));
-        await pumpAndSettleWithTimeout(tester);
-
-        // Name
-        await waitForWidget(
-            tester, find.byKey(const Key('wizard_name_field')));
-        await enterTextAndPump(
-          tester,
-          find.byKey(const Key('wizard_name_field')),
-          'Invite Test Group',
+      'User A creates group + invite → User B accepts → verify membership',
+      (tester) async {
+        final ready = await runOnlineTestApp(
+          skipOnboarding: true,
+          signInEmail: testUserAEmail,
+          signInPassword: testPassword,
         );
-        await tapAndSettle(tester, find.text('Next'));
-        await tester.pump(const Duration(milliseconds: 400));
-
-        // Participants
-        await waitForWidget(tester, find.text('Add'));
-        await enterTextAndPump(tester, find.byType(TextField).last, 'User A');
-        await tapAndSettle(tester, find.text('Add'));
-
-        await tapAndSettle(tester, find.text('Next'));
-        await tester.pump(const Duration(milliseconds: 400));
-
-        // Icon & Color – defaults
-        await tapAndSettle(tester, find.text('Next'));
-        await tester.pump(const Duration(milliseconds: 400));
+        ensureBootstrapReady(ready);
         await pumpAndSettleWithTimeout(tester);
-
-        // Summary → Create
-        final createButton = find.byKey(const Key('wizard_create_button'));
-        await tapAndPump(tester, createButton);
-
         await waitForWidget(
           tester,
-          find.text('Expenses'),
+          find.text('Groups'),
           timeout: const Duration(seconds: 20),
         );
-        expect(find.text('Invite Test Group'), findsWidgets);
-      });
 
-      // ── Stage: wait for sync, get group ID ──
-      await stage('wait for group sync', () async {
-        await tester.pump(const Duration(seconds: 5));
-        await pumpAndSettleWithTimeout(tester);
+        final client = Supabase.instance.client;
+        String? groupId;
+        String? inviteId;
+        String? inviteToken;
 
-        final userAId = client.auth.currentUser!.id;
-        final groups = await client
-            .from('groups')
-            .select()
-            .eq('owner_id', userAId)
-            .eq('name', 'Invite Test Group');
-        expect(groups, isNotEmpty, reason: 'Group should be synced');
-        groupId = groups.first['id'] as String;
-      });
+        // ── Stage: User A creates a group ──
+        await stage('User A creates group', () async {
+          await tapAndSettle(tester, find.byIcon(Icons.add));
+          final createGroupButton = actionByLabel(tester, 'Create Group');
+          await waitForWidget(tester, createGroupButton);
+          await tapAndSettle(tester, createGroupButton);
+          await pumpAndSettleWithTimeout(tester);
 
-      // ── Stage: User A creates an invite via RPC ──
-      await stage('User A creates invite', () async {
-        final result = await client.rpc('create_invite', params: {
-          'p_group_id': groupId,
+          // Name
+          await waitForWidget(
+            tester,
+            find.byKey(const Key('wizard_name_field')),
+          );
+          await enterTextAndPump(
+            tester,
+            find.byKey(const Key('wizard_name_field')),
+            'Invite Test Group',
+          );
+          await tapAndSettle(tester, actionByLabel(tester, 'Next'));
+          await tester.pump(const Duration(milliseconds: 400));
+
+          // Participants
+          await waitForWidget(tester, actionByLabel(tester, 'Add'));
+          await enterTextAndPump(tester, find.byType(TextField).last, 'User A');
+          await tapAndSettle(tester, actionByLabel(tester, 'Add'));
+
+          await tapAndSettle(tester, actionByLabel(tester, 'Next'));
+          await tester.pump(const Duration(milliseconds: 400));
+
+          // Icon & Color – defaults
+          await tapAndSettle(tester, actionByLabel(tester, 'Next'));
+          await tester.pump(const Duration(milliseconds: 400));
+          await pumpAndSettleWithTimeout(tester);
+
+          // Summary → Create
+          final createButton = find.byKey(const Key('wizard_create_button'));
+          await tapAndPump(tester, createButton);
+
+          await waitForWidget(
+            tester,
+            find.text('Expenses'),
+            timeout: const Duration(seconds: 20),
+          );
+          expect(find.text('Invite Test Group'), findsWidgets);
         });
 
-        expect(result, isNotNull);
-        final rows = result as List;
-        expect(rows, isNotEmpty, reason: 'create_invite should return a row');
-        inviteId = rows.first['id'] as String;
-        inviteToken = rows.first['token'] as String;
-        expect(inviteId, isNotNull);
-        expect(inviteToken, isNotNull);
-        expect(inviteToken!.isNotEmpty, isTrue);
-      });
-
-      // ── Stage: User A signs out ──
-      await stage('User A signs out', () async {
-        await signOutCurrentUser();
-        await tester.pump(const Duration(seconds: 2));
-
-        expect(client.auth.currentSession, isNull);
-      });
-
-      // ── Stage: User B signs in and accepts invite via RPC ──
-      await stage('User B accepts invite', () async {
-        final ok = await signInAs(testUserBEmail, testPassword);
-        expect(ok, isTrue, reason: 'User B sign-in should succeed');
-        await tester.pump(const Duration(seconds: 2));
-
-        final userBId = client.auth.currentUser!.id;
-        expect(userBId, isNotNull);
-
-        final acceptResult = await client.rpc('accept_invite', params: {
-          'p_token': inviteToken,
-          'p_new_participant_name': 'User B',
+        // ── Stage: wait for sync, get group ID ──
+        await stage('wait for group sync', () async {
+          final userAId = client.auth.currentUser!.id;
+          final groups = await waitForAsyncResult<List<dynamic>>(
+            tester,
+            load: () async => await client
+                .from('groups')
+                .select()
+                .eq('owner_id', userAId)
+                .eq('name', 'Invite Test Group'),
+            isReady: (rows) => rows.isNotEmpty,
+            timeout: const Duration(seconds: 20),
+            reason: 'Group should be synced',
+          );
+          expect(groups, isNotEmpty, reason: 'Group should be synced');
+          groupId = groups.first['id'] as String;
         });
 
-        expect(
-          acceptResult,
-          equals(groupId),
-          reason: 'accept_invite should return the created group id',
-        );
-      });
+        // ── Stage: User A creates an invite via RPC ──
+        await stage('User A creates invite', () async {
+          final result = await client.rpc(
+            'create_invite',
+            params: {'p_group_id': groupId},
+          );
 
-      // ── Stage: verify User B is a member ──
-      await stage('verify User B membership', () async {
-        final userBId = client.auth.currentUser!.id;
+          expect(result, isNotNull);
+          final rows = result as List;
+          expect(rows, isNotEmpty, reason: 'create_invite should return a row');
+          inviteId = rows.first['id'] as String;
+          inviteToken = rows.first['token'] as String;
+          expect(inviteId, isNotNull);
+          expect(inviteToken, isNotNull);
+          expect(inviteToken!.isNotEmpty, isTrue);
+        });
 
-        final members = await client
-            .from('group_members')
-            .select()
-            .eq('group_id', groupId!)
-            .eq('user_id', userBId);
+        // ── Stage: User A signs out ──
+        await stage('User A signs out', () async {
+          await signOutCurrentUser();
+          await waitForCondition(
+            tester,
+            condition: () => client.auth.currentSession == null,
+            timeout: const Duration(seconds: 10),
+            reason: 'User A session did not clear after sign out',
+          );
+        });
 
-        expect(members, isNotEmpty,
-            reason: 'User B should be a member of the group');
-        expect(members.first['role'], equals('member'));
-      });
+        // ── Stage: User B signs in and accepts invite via RPC ──
+        await stage('User B accepts invite', () async {
+          final ok = await signInAs(testUserBEmail, testPassword);
+          expect(ok, isTrue, reason: 'User B sign-in should succeed');
+          await waitForCondition(
+            tester,
+            condition: () => client.auth.currentSession != null,
+            timeout: const Duration(seconds: 10),
+            reason: 'User B session did not become available',
+          );
 
-      // ── Stage: verify invite was consumed ──
-      await stage('verify invite consumed', () async {
-        // User B is now a member so can query group_invites
-        final invites = await client
-            .from('group_invites')
-            .select()
-            .eq('group_id', groupId!);
+          final userBId = client.auth.currentUser!.id;
+          expect(userBId, isNotNull);
 
-        // Invite may have been deleted (max_uses=null, single use by default
-        // in the old function, but the latest keeps it). Either way is fine.
-        // Just verify no error occurred.
-        expect(invites, isNotNull);
-      });
+          final acceptResult = await client.rpc(
+            'accept_invite',
+            params: {
+              'p_token': inviteToken,
+              'p_new_participant_name': 'User B',
+            },
+          );
 
-      // ── Stage: verify invite usage recorded ──
-      await stage('verify invite usage recorded', () async {
-        final userBId = client.auth.currentUser!.id;
-        final usages = await client
-            .from('invite_usages')
-            .select()
-            .eq('invite_id', inviteId!)
-            .eq('user_id', userBId);
+          expect(
+            acceptResult,
+            equals(groupId),
+            reason: 'accept_invite should return the created group id',
+          );
+        });
 
-        expect(
-          usages,
-          isNotEmpty,
-          reason: 'invite_usages should contain User B acceptance row',
-        );
-      });
+        // ── Stage: verify User B is a member ──
+        await stage('verify User B membership', () async {
+          final userBId = client.auth.currentUser!.id;
 
-      // ── Stage: User B signs out, User A verifies member list ──
-      await stage('User A verifies member list', () async {
-        await signOutCurrentUser();
-        await tester.pump(const Duration(seconds: 1));
+          final members = await client
+              .from('group_members')
+              .select()
+              .eq('group_id', groupId!)
+              .eq('user_id', userBId);
 
-        final ok = await signInAs(testUserAEmail, testPassword);
-        expect(ok, isTrue);
-        await tester.pump(const Duration(seconds: 2));
+          expect(
+            members,
+            isNotEmpty,
+            reason: 'User B should be a member of the group',
+          );
+          expect(members.first['role'], equals('member'));
+        });
 
-        final members = await client
-            .from('group_members')
-            .select()
-            .eq('group_id', groupId!);
+        // ── Stage: verify invite was consumed ──
+        await stage('verify invite consumed', () async {
+          // User B is now a member so can query group_invites
+          final invites = await client
+              .from('group_invites')
+              .select()
+              .eq('group_id', groupId!);
 
-        expect(members.length, greaterThanOrEqualTo(2),
-            reason: 'Group should have at least 2 members (A and B)');
+          // Invite may have been deleted (max_uses=null, single use by default
+          // in the old function, but the latest keeps it). Either way is fine.
+          // Just verify no error occurred.
+          expect(invites, isNotNull);
+        });
 
-        final userBMember = members.where(
-          (m) => m['user_id'] == client.auth.currentUser!.id ? false : true,
-        );
-        expect(userBMember, isNotEmpty,
-            reason: 'User B should appear in the member list');
-      });
+        // ── Stage: verify invite usage recorded ──
+        await stage('verify invite usage recorded', () async {
+          final userBId = client.auth.currentUser!.id;
+          final usages = await client
+              .from('invite_usages')
+              .select()
+              .eq('invite_id', inviteId!)
+              .eq('user_id', userBId);
 
-      // ── Cleanup: delete group ──
-      await stage('cleanup - delete group', () async {
-        if (groupId != null) {
-          await client.from('expenses').delete().eq('group_id', groupId!);
-          await client.from('group_invites').delete().eq('group_id', groupId!);
-          await client.from('group_members').delete().eq('group_id', groupId!);
-          await client.from('participants').delete().eq('group_id', groupId!);
-          await client.from('groups').delete().eq('id', groupId!);
-        }
-        await signOutCurrentUser();
-      });
-    });
+          expect(
+            usages,
+            isNotEmpty,
+            reason: 'invite_usages should contain User B acceptance row',
+          );
+        });
+
+        // ── Stage: User B signs out, User A verifies member list ──
+        await stage('User A verifies member list', () async {
+          await signOutCurrentUser();
+          await waitForCondition(
+            tester,
+            condition: () => client.auth.currentSession == null,
+            timeout: const Duration(seconds: 10),
+            reason: 'User B session did not clear before User A sign-in',
+          );
+
+          final ok = await signInAs(testUserAEmail, testPassword);
+          expect(ok, isTrue);
+          await waitForCondition(
+            tester,
+            condition: () => client.auth.currentSession != null,
+            timeout: const Duration(seconds: 10),
+            reason: 'User A session did not become available',
+          );
+
+          final members = await client
+              .from('group_members')
+              .select()
+              .eq('group_id', groupId!);
+
+          expect(
+            members.length,
+            greaterThanOrEqualTo(2),
+            reason: 'Group should have at least 2 members (A and B)',
+          );
+
+          final userBMember = members.where(
+            (m) => m['user_id'] == client.auth.currentUser!.id ? false : true,
+          );
+          expect(
+            userBMember,
+            isNotEmpty,
+            reason: 'User B should appear in the member list',
+          );
+        });
+
+        // ── Cleanup: delete group ──
+        await stage('cleanup - delete group', () async {
+          if (groupId != null) {
+            await client.from('expenses').delete().eq('group_id', groupId!);
+            await client
+                .from('group_invites')
+                .delete()
+                .eq('group_id', groupId!);
+            await client
+                .from('group_members')
+                .delete()
+                .eq('group_id', groupId!);
+            await client.from('participants').delete().eq('group_id', groupId!);
+            await client.from('groups').delete().eq('id', groupId!);
+          }
+          await signOutCurrentUser();
+        });
+      },
+    );
   });
 }
