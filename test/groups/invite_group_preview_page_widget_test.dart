@@ -103,6 +103,22 @@ void main() {
       findsWidgets,
     );
 
+    // Regression: preview balance tab must resolve data and never show
+    // "Group not found" due to missing provider overrides.
+    await tester.tap(
+      find.byWidgetPredicate(
+        (w) => w is Text && (w.data == 'Balance' || w.data == 'balance'),
+      ).first,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Group not found'), findsNothing);
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is Text && (w.data ?? '').toLowerCase().contains('settle'),
+      ),
+      findsWidgets,
+    );
+
     expect(find.byIcon(Icons.settings), findsNothing);
     expect(find.byIcon(Icons.person_add), findsNothing);
     expect(find.byIcon(Icons.add), findsNothing);
