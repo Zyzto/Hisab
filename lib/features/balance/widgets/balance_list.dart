@@ -15,8 +15,14 @@ import 'record_settlement_sheet.dart';
 class BalanceList extends ConsumerWidget {
   final String groupId;
   final Future<void> Function()? onRefresh;
+  final bool readOnlyMode;
 
-  const BalanceList({super.key, required this.groupId, this.onRefresh});
+  const BalanceList({
+    super.key,
+    required this.groupId,
+    this.onRefresh,
+    this.readOnlyMode = false,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -37,6 +43,7 @@ class BalanceList extends ConsumerWidget {
         final myMember = myMemberAsync.hasValue ? myMemberAsync.value : null;
         final myRole = myRoleAsync.hasValue ? myRoleAsync.value : null;
         bool canRecordSettlement(SettlementTransaction s) {
+          if (readOnlyMode) return false;
           if (group.isSettlementFrozen) return false;
           if (group.allowMemberSettleForOthers) return true;
           if (myRole == GroupRole.owner) return true;
@@ -48,7 +55,7 @@ class BalanceList extends ConsumerWidget {
         final theme = Theme.of(context);
 
         // Flatten for ListView.builder: compute item count and build by index
-        final hasFrozen = group.isSettlementFrozen;
+            final hasFrozen = group.isSettlementFrozen && !readOnlyMode;
         var itemCount = (hasFrozen ? 1 : 0) + 4 + balances.length;
         itemCount += settlements.isEmpty ? 1 : settlements.length;
 
@@ -199,7 +206,7 @@ class BalanceList extends ConsumerWidget {
                     ],
                   ],
                 ),
-                trailing: !hasFrozen
+                trailing: !hasFrozen && !readOnlyMode
                     ? Semantics(
                         label: canRecord
                             ? 'record_settlement'.tr()
@@ -229,7 +236,7 @@ class BalanceList extends ConsumerWidget {
                         ),
                       )
                     : null,
-                onTap: hasFrozen
+                onTap: hasFrozen || readOnlyMode
                     ? null
                     : canRecord
                     ? () => showRecordSettlementSheet(

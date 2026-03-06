@@ -20,6 +20,7 @@ import '../../../domain/domain.dart';
 import '../providers/group_invite_provider.dart';
 import '../providers/groups_provider.dart';
 import '../../settings/providers/settings_framework_providers.dart';
+import '../../settings/settings_definitions.dart';
 
 class InviteAcceptPage extends ConsumerStatefulWidget {
   final String token;
@@ -99,47 +100,6 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
     final isAuthenticated = ref.watch(isAuthenticatedProvider);
     final inviteAsync = ref.watch(inviteByTokenProvider(widget.token));
 
-    // Web: when local-only or not signed in, show "Accept invite in browser" landing with Sign in CTA
-    if (kIsWeb && (localOnly || !isAuthenticated)) {
-      return LayoutBuilder(
-        builder: (context, layoutConstraints) {
-          return Scaffold(
-            appBar: ContentAlignedAppBar(
-              contentAreaWidth: layoutConstraints.maxWidth,
-              title: Text('invite'.tr()),
-            ),
-            body: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'invite_web_heading'.tr(),
-                      style: Theme.of(context).textTheme.headlineSmall,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'invite_web_message'.tr(),
-                      style: Theme.of(context).textTheme.bodyLarge,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 32),
-                    FilledButton.icon(
-                      onPressed: () => _openSignInForWebInvite(context),
-                      icon: const Icon(Icons.login),
-                      label: Text('invite_web_sign_in'.tr()),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      );
-    }
-
     // Native app in local-only: show generic online-required message
     if (localOnly) {
       return LayoutBuilder(
@@ -158,6 +118,92 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
               ),
+            ),
+          );
+        },
+      );
+    }
+
+    // Keep the existing web landing for unauthenticated users only in standard mode.
+    if (kIsWeb && !isAuthenticated) {
+      return LayoutBuilder(
+        builder: (context, layoutConstraints) {
+          return Scaffold(
+            appBar: ContentAlignedAppBar(
+              contentAreaWidth: layoutConstraints.maxWidth,
+              title: Text('invite'.tr()),
+            ),
+            body: inviteAsync.when(
+              data: (data) {
+                if (data == null) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.link_off,
+                          size: 64,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'invite_expired'.tr(),
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                if (data.invite.accessMode == InviteAccessMode.standard) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'invite_web_heading'.tr(),
+                            style: Theme.of(context).textTheme.headlineSmall,
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'invite_web_message'.tr(),
+                            style: Theme.of(context).textTheme.bodyLarge,
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 32),
+                          FilledButton.icon(
+                            onPressed: () => _openSignInForWebInvite(context),
+                            icon: const Icon(Icons.login),
+                            label: Text('invite_web_sign_in'.tr()),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+                return ConstrainedContent(
+                  child: _buildInviteContent(context, data.invite, data.group),
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, st) {
+                sendErrorTelemetryIfOnline(
+                  ref,
+                  message: e.toString(),
+                  details: e.toString(),
+                );
+                return Center(
+                  child: ErrorContentWidget(
+                    message: e.toString(),
+                    details: e.toString(),
+                    stackTrace: st,
+                    onRetry: () =>
+                        ref.invalidate(inviteByTokenProvider(widget.token)),
+                  ),
+                );
+              },
             ),
           );
         },
@@ -229,6 +275,13 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
     Group group,
   ) {
     final theme = Theme.of(context);
+    final isAuthenticated = ref.watch(isAuthenticatedProvider);
+    final isReadonlyJoin = invite.accessMode == InviteAccessMode.readonlyJoin;
+    final isReadonlyOnly = invite.accessMode == InviteAccessMode.readonlyOnly;
+    final showReadonlyBanner = isReadonlyJoin || isReadonlyOnly;
+    final canAcceptInvite =
+        !isReadonlyOnly && (isAuthenticated || invite.accessMode != InviteAccessMode.standard);
+    final showJoinOnboardingCta = isReadonlyJoin && !isAuthenticated;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -272,6 +325,21 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
               ),
             ),
           ),
+          if (showReadonlyBanner) ...[
+            const SizedBox(height: 12),
+            Card(
+              color: theme.colorScheme.surfaceContainerHighest,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(
+                  isReadonlyOnly
+                      ? 'invite_preview_readonly_only_message'.tr()
+                      : 'invite_preview_readonly_join_message'.tr(),
+                  style: theme.textTheme.bodyMedium,
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 32),
           if (_alreadyMemberGroupId != null)
             FilledButton(
@@ -280,19 +348,56 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
               child: Text('open_group'.tr()),
             )
           else
-            FilledButton(
-              onPressed: _accepting ? null : () => _accept(context, group),
-              child: _accepting
-                  ? const SizedBox(
-                      height: 24,
-                      width: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text('accept_invite'.tr()),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (showReadonlyBanner) ...[
+                  OutlinedButton(
+                    onPressed: () =>
+                        context.push(RoutePaths.invitePreview(widget.token)),
+                    child: Text('invite_preview_open_group'.tr()),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                if (showJoinOnboardingCta)
+                  FilledButton(
+                    onPressed: () => _goToOnboardingForInvite(context),
+                    child: Text('invite_preview_join_cta'.tr()),
+                  )
+                else if (canAcceptInvite)
+                  FilledButton(
+                    onPressed: _accepting ? null : () => _accept(context, group),
+                    child: _accepting
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text('accept_invite'.tr()),
+                  )
+                else
+                  OutlinedButton(
+                    onPressed: null,
+                    child: Text('accept_invite'.tr()),
+                  ),
+              ],
             ),
         ],
       ),
     );
+  }
+
+  void _persistPendingInviteToken() {
+    final settings = ref.read(hisabSettingsProvidersProvider);
+    if (settings == null) return;
+    ref.read(settings.provider(pendingInviteTokenSettingDef).notifier).set(
+      widget.token,
+    );
+  }
+
+  void _goToOnboardingForInvite(BuildContext context) {
+    _persistPendingInviteToken();
+    context.go(RoutePaths.onboarding);
   }
 
   Future<void> _openSignInForWebInvite(BuildContext context) async {
@@ -303,6 +408,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
         // Page will rebuild; invite content or accept button will show
         break;
       case SignInResult.pendingRedirect:
+        _persistPendingInviteToken();
         break;
       case SignInResult.cancelled:
         if (context.mounted) context.showToast('sign_in_required'.tr());
@@ -318,6 +424,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
           await ref.read(dataSyncServiceProvider.notifier).syncNow();
           break;
         case SignInResult.pendingRedirect:
+          _persistPendingInviteToken();
           return;
         case SignInResult.cancelled:
           if (context.mounted) context.showToast('sign_in_required'.tr());

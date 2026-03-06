@@ -32,8 +32,15 @@ import '../utils/group_icon_utils.dart';
 
 class GroupDetailPage extends ConsumerStatefulWidget {
   final String groupId;
+  final bool readOnlyPreview;
+  final String? previewToken;
 
-  const GroupDetailPage({super.key, required this.groupId});
+  const GroupDetailPage({
+    super.key,
+    required this.groupId,
+    this.readOnlyPreview = false,
+    this.previewToken,
+  });
 
   @override
   ConsumerState<GroupDetailPage> createState() => _GroupDetailPageState();
@@ -73,7 +80,11 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
           });
           return const SizedBox.shrink();
         }
-        return _GroupDetailContent(group: group);
+        return _GroupDetailContent(
+          group: group,
+          readOnlyPreview: widget.readOnlyPreview,
+          previewToken: widget.previewToken,
+        );
       },
       loading: (context) =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
@@ -83,8 +94,14 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
 
 class _GroupDetailContent extends ConsumerStatefulWidget {
   final Group group;
+  final bool readOnlyPreview;
+  final String? previewToken;
 
-  const _GroupDetailContent({required this.group});
+  const _GroupDetailContent({
+    required this.group,
+    required this.readOnlyPreview,
+    required this.previewToken,
+  });
 
   @override
   ConsumerState<_GroupDetailContent> createState() =>
@@ -118,6 +135,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
   }
 
   Future<void> _onRefresh() async {
+    if (widget.readOnlyPreview) return;
     final localOnly = ref.read(effectiveLocalOnlyProvider);
     if (!localOnly) {
       Log.info('Group detail refresh: syncing group ${widget.group.id}');
@@ -215,6 +233,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
     GroupRole? myRole,
     bool localOnly,
   ) {
+    if (widget.readOnlyPreview) return null;
     final theme = Theme.of(context);
     final isOwnerOrAdmin =
         localOnly || myRole == GroupRole.owner || myRole == GroupRole.admin;
@@ -276,6 +295,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
             title: _buildAppBarTitle(context),
             actions: [
               if (!localOnly &&
+                  !widget.readOnlyPreview &&
                   (myRole == GroupRole.owner || myRole == GroupRole.admin) &&
                   !widget.group.isPersonal)
                 IconButton(
@@ -284,11 +304,12 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
                   onPressed: () =>
                       showCreateInviteSheet(context, ref, widget.group.id),
                 ),
-              IconButton(
-                icon: const Icon(Icons.settings),
-                onPressed: () =>
-                    context.push(RoutePaths.groupSettings(widget.group.id)),
-              ),
+              if (!widget.readOnlyPreview)
+                IconButton(
+                  icon: const Icon(Icons.settings),
+                  onPressed: () =>
+                      context.push(RoutePaths.groupSettings(widget.group.id)),
+                ),
             ],
           ),
           body: ConstrainedContent(
@@ -305,6 +326,8 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
                       groupId: widget.group.id,
                       group: widget.group,
                       onRefresh: _onRefresh,
+                      readOnlyPreview: widget.readOnlyPreview,
+                      previewToken: widget.previewToken,
                     ),
                   ),
                 ] else ...[
@@ -445,15 +468,19 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
                           groupId: widget.group.id,
                           group: widget.group,
                           onRefresh: _onRefresh,
+                          readOnlyPreview: widget.readOnlyPreview,
+                          previewToken: widget.previewToken,
                         ),
                         _BalanceTab(
                           groupId: widget.group.id,
                           onRefresh: _onRefresh,
+                          readOnlyPreview: widget.readOnlyPreview,
                         ),
                         _PeopleTab(
                           groupId: widget.group.id,
                           group: widget.group,
                           onRefresh: _onRefresh,
+                          readOnlyPreview: widget.readOnlyPreview,
                         ),
                       ],
                     ),
@@ -589,11 +616,15 @@ class _ExpensesTab extends ConsumerWidget {
   final String groupId;
   final Group group;
   final Future<void> Function() onRefresh;
+  final bool readOnlyPreview;
+  final String? previewToken;
 
   const _ExpensesTab({
     required this.groupId,
     required this.group,
     required this.onRefresh,
+    required this.readOnlyPreview,
+    required this.previewToken,
   });
 
   static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
@@ -748,20 +779,30 @@ class _ExpensesTab extends ConsumerWidget {
                       );
                     case _ExpenseListExpenseItem():
                       final expense = item.expense;
-                      return InkWell(
+                      return ExpenseListTile(
                         key: ValueKey(expense.id),
-                        onTap: () => context.push(
-                          RoutePaths.groupExpenseDetail(groupId, expense.id),
-                        ),
-                        child: ExpenseListTile(
-                          expense: expense,
-                          payerName:
-                              nameOf[expense.payerParticipantId] ??
-                              expense.payerParticipantId,
-                          icon: iconForExpenseTag(expense.tag, customTags),
-                          showPaidBy: !group.isPersonal,
-                          groupCurrencyCode: group.currencyCode,
-                        ),
+                        expense: expense,
+                        payerName:
+                            nameOf[expense.payerParticipantId] ??
+                            expense.payerParticipantId,
+                        icon: iconForExpenseTag(expense.tag, customTags),
+                        showPaidBy: !group.isPersonal,
+                        groupCurrencyCode: group.currencyCode,
+                        showDisclosure: true,
+                        onTap: () {
+                          if (readOnlyPreview && previewToken != null) {
+                            context.push(
+                              RoutePaths.invitePreviewExpenseDetail(
+                                previewToken!,
+                                expense.id,
+                              ),
+                            );
+                            return;
+                          }
+                          context.push(
+                            RoutePaths.groupExpenseDetail(groupId, expense.id),
+                          );
+                        },
                       );
                   }
                 },
@@ -781,12 +822,21 @@ class _ExpensesTab extends ConsumerWidget {
 class _BalanceTab extends ConsumerWidget {
   final String groupId;
   final Future<void> Function() onRefresh;
+  final bool readOnlyPreview;
 
-  const _BalanceTab({required this.groupId, required this.onRefresh});
+  const _BalanceTab({
+    required this.groupId,
+    required this.onRefresh,
+    required this.readOnlyPreview,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return BalanceList(groupId: groupId, onRefresh: onRefresh);
+    return BalanceList(
+      groupId: groupId,
+      onRefresh: onRefresh,
+      readOnlyMode: readOnlyPreview,
+    );
   }
 }
 
@@ -794,11 +844,13 @@ class _PeopleTab extends ConsumerWidget {
   final String groupId;
   final Group group;
   final Future<void> Function() onRefresh;
+  final bool readOnlyPreview;
 
   const _PeopleTab({
     required this.groupId,
     required this.group,
     required this.onRefresh,
+    required this.readOnlyPreview,
   });
 
   String _roleLabel(String role) {
@@ -829,9 +881,10 @@ class _PeopleTab extends ConsumerWidget {
             final theme = Theme.of(context);
             final myRole = myRoleAsync.value;
             final isOwnerOrAdmin =
-                localOnly ||
-                myRole == GroupRole.owner ||
-                myRole == GroupRole.admin;
+                !readOnlyPreview &&
+                (localOnly ||
+                    myRole == GroupRole.owner ||
+                    myRole == GroupRole.admin);
 
             // Build lookup: participantId -> GroupMember
             final memberByParticipantId = <String, GroupMember>{};

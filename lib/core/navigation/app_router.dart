@@ -13,6 +13,7 @@ import '../../features/groups/pages/group_create_page.dart';
 import '../../features/groups/pages/group_detail_page.dart';
 import '../../features/groups/pages/group_settings_page.dart';
 import '../../features/groups/pages/invite_accept_page.dart';
+import '../../features/groups/pages/invite_group_preview_page.dart';
 import '../../features/groups/pages/invite_management_page.dart';
 import '../../features/groups/pages/invite_redirect_proxy_page.dart';
 import '../../features/groups/pages/invite_scan_page.dart';
@@ -199,6 +200,24 @@ GoRouter router(Ref ref) {
               state.uri.queryParameters['token'] ??
               '';
           return InviteAcceptPage(token: token);
+        },
+      ),
+      GoRoute(
+        path: '/invite/:token/preview/expenses/:eid',
+        builder: (context, state) {
+          final token = state.pathParameters['token'] ?? '';
+          final expenseId = state.pathParameters['eid'] ?? '';
+          return InvitePreviewExpenseDetailPage(
+            token: token,
+            expenseId: expenseId,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/invite/:token/preview',
+        builder: (context, state) {
+          final token = state.pathParameters['token'] ?? '';
+          return InviteGroupPreviewPage(token: token);
         },
       ),
       GoRoute(
