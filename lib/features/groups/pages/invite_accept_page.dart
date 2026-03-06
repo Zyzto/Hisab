@@ -183,6 +183,14 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                     ),
                   );
                 }
+                final router = GoRouter.maybeOf(context);
+                if (router != null) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted) return;
+                    context.go(RoutePaths.invitePreview(widget.token));
+                  });
+                  return const Center(child: CircularProgressIndicator());
+                }
                 return ConstrainedContent(
                   child: _buildInviteContent(context, data.invite, data.group),
                 );

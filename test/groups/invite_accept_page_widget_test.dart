@@ -1,7 +1,9 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:hisab/core/auth/auth_service.dart';
 import 'package:hisab/core/auth/auth_user_profile.dart';
@@ -128,6 +130,50 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<void> pumpWithRouter(
+    WidgetTester tester,
+    _FakeGroupInviteRepository repo, {
+    bool authenticated = false,
+  }) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          effectiveLocalOnlyProvider.overrideWith((ref) => false),
+          isAuthenticatedProvider.overrideWith((ref) => authenticated),
+          authServiceProvider.overrideWith((ref) => _FakeAuthService()),
+          groupInviteRepositoryProvider.overrideWithValue(repo),
+        ],
+        child: EasyLocalization(
+          path: 'assets/translations',
+          supportedLocales: testSupportedLocales,
+          fallbackLocale: const Locale('en'),
+          startLocale: const Locale('en'),
+          child: MaterialApp.router(
+            routerConfig: GoRouter(
+              initialLocation: '/invite/token-1',
+              routes: [
+                GoRoute(
+                  path: '/invite/:token',
+                  builder: (context, state) =>
+                      InviteAcceptPage(token: state.pathParameters['token']!),
+                ),
+                GoRoute(
+                  path: '/invite/:token/preview',
+                  builder: (context, state) => Scaffold(
+                    body: Center(
+                      child: Text('PREVIEW_PAGE_${state.pathParameters['token']}'),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('handles already-member accept failure without crashing', (
     tester,
   ) async {
@@ -226,4 +272,28 @@ void main() {
     // Preview button remains, accept action is disabled.
     expect(find.byType(OutlinedButton), findsAtLeastNWidgets(1));
   });
+
+  testWidgets('unauthenticated readonly_join routes directly to preview', (
+    tester,
+  ) async {
+    final repo = _FakeGroupInviteRepository(
+      invite: makeInvite().copyWith(accessMode: InviteAccessMode.readonlyJoin),
+      group: makeGroup(),
+    );
+    await pumpWithRouter(tester, repo, authenticated: false);
+
+    expect(find.text('PREVIEW_PAGE_token-1'), findsOneWidget);
+  }, skip: !kIsWeb);
+
+  testWidgets('unauthenticated readonly_only routes directly to preview', (
+    tester,
+  ) async {
+    final repo = _FakeGroupInviteRepository(
+      invite: makeInvite().copyWith(accessMode: InviteAccessMode.readonlyOnly),
+      group: makeGroup(),
+    );
+    await pumpWithRouter(tester, repo, authenticated: false);
+
+    expect(find.text('PREVIEW_PAGE_token-1'), findsOneWidget);
+  }, skip: !kIsWeb);
 }
