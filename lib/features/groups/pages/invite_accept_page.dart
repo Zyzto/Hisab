@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/auth/sign_in_sheet.dart';
 import '../../../core/database/database_providers.dart';
@@ -36,6 +37,62 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
   /// Set when accept fails because user is already a member; enables "Open Group" action.
   String? _alreadyMemberGroupId;
 
+  _InviteAcceptErrorKind _classifyInviteAcceptError(Object error) {
+    if (error is AuthException) return _InviteAcceptErrorKind.unauthenticated;
+    final dynamic d = error;
+    int? statusCode;
+    String? code;
+    String? message;
+    String? details;
+    String? hint;
+    try {
+      if (d.status is int) statusCode = d.status as int;
+      if (d.statusCode is int) statusCode = d.statusCode as int;
+      if (d.code is String) code = d.code as String;
+      if (d.message is String) message = d.message as String;
+      if (d.details is String) details = d.details as String;
+      if (d.hint is String) hint = d.hint as String;
+    } catch (_) {}
+
+    if (statusCode == 401 || statusCode == 403) {
+      return _InviteAcceptErrorKind.unauthenticated;
+    }
+    final combined = <String>[
+      error.toString(),
+      ...[message, details, hint].whereType<String>(),
+    ].join(' | ').toLowerCase();
+    final normalizedCode = code?.toUpperCase();
+
+    if (normalizedCode == 'UNAUTHENTICATED' ||
+        combined.contains('unauthenticated') ||
+        combined.contains('not authenticated')) {
+      return _InviteAcceptErrorKind.unauthenticated;
+    }
+    if (normalizedCode == 'ALREADY_MEMBER' ||
+        combined.contains('already a member of this group')) {
+      return _InviteAcceptErrorKind.alreadyMember;
+    }
+    if (normalizedCode == 'INVITE_INVALID_OR_EXPIRED' ||
+        normalizedCode == 'INVITE_INACTIVE' ||
+        normalizedCode == 'INVITE_MAX_USES' ||
+        combined.contains('invalid or expired invite') ||
+        combined.contains('invite is not active') ||
+        combined.contains('invite has reached max uses')) {
+      return _InviteAcceptErrorKind.invalidOrExpired;
+    }
+    return _InviteAcceptErrorKind.unknown;
+  }
+
+  String _errorMessageForDisplay(Object error) {
+    final dynamic d = error;
+    try {
+      if (d.message is String && (d.message as String).trim().isNotEmpty) {
+        return d.message as String;
+      }
+    } catch (_) {}
+    return error.toString();
+  }
+
   @override
   Widget build(BuildContext context) {
     final localOnly = ref.watch(effectiveLocalOnlyProvider);
@@ -52,32 +109,32 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
               title: Text('invite'.tr()),
             ),
             body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'invite_web_heading'.tr(),
-                  style: Theme.of(context).textTheme.headlineSmall,
-                  textAlign: TextAlign.center,
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'invite_web_heading'.tr(),
+                      style: Theme.of(context).textTheme.headlineSmall,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'invite_web_message'.tr(),
+                      style: Theme.of(context).textTheme.bodyLarge,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 32),
+                    FilledButton.icon(
+                      onPressed: () => _openSignInForWebInvite(context),
+                      icon: const Icon(Icons.login),
+                      label: Text('invite_web_sign_in'.tr()),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  'invite_web_message'.tr(),
-                  style: Theme.of(context).textTheme.bodyLarge,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 32),
-                FilledButton.icon(
-                  onPressed: () => _openSignInForWebInvite(context),
-                  icon: const Icon(Icons.login),
-                  label: Text('invite_web_sign_in'.tr()),
-                ),
-              ],
+              ),
             ),
-          ),
-        ),
           );
         },
       );
@@ -93,15 +150,15 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
               title: Text('invite'.tr()),
             ),
             body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(
-              'invite_requires_online'.tr(),
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyLarge,
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  'invite_requires_online'.tr(),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+              ),
             ),
-          ),
-        ),
           );
         },
       );
@@ -119,48 +176,48 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
             ),
           ),
           body: ConstrainedContent(
-        child: inviteAsync.when(
-          data: (data) {
-            if (data == null) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.link_off,
-                      size: 64,
-                      color: Theme.of(context).colorScheme.error,
+            child: inviteAsync.when(
+              data: (data) {
+                if (data == null) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.link_off,
+                          size: 64,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'invite_expired'.tr(),
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'invite_expired'.tr(),
-                      style: Theme.of(context).textTheme.bodyLarge,
-                    ),
-                  ],
-                ),
-              );
-            }
-            return _buildInviteContent(context, data.invite, data.group);
-          },
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, st) {
-            sendErrorTelemetryIfOnline(
-              ref,
-              message: e.toString(),
-              details: e.toString(),
-            );
-            return Center(
-              child: ErrorContentWidget(
-                message: e.toString(),
-                details: e.toString(),
-                stackTrace: st,
-                onRetry: () =>
-                    ref.invalidate(inviteByTokenProvider(widget.token)),
-              ),
-            );
-          },
-        ),
-      ),
+                  );
+                }
+                return _buildInviteContent(context, data.invite, data.group);
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, st) {
+                sendErrorTelemetryIfOnline(
+                  ref,
+                  message: e.toString(),
+                  details: e.toString(),
+                );
+                return Center(
+                  child: ErrorContentWidget(
+                    message: e.toString(),
+                    details: e.toString(),
+                    stackTrace: st,
+                    onRetry: () =>
+                        ref.invalidate(inviteByTokenProvider(widget.token)),
+                  ),
+                );
+              },
+            ),
+          ),
         );
       },
     );
@@ -315,30 +372,21 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
       }
     } catch (e, st) {
       Log.warning('Invite accept or sync failed', error: e, stackTrace: st);
-      final errorText = e.toString();
-      final isInvalidOrExpired =
-          errorText.contains('Invalid or expired invite') ||
-          errorText.contains('Invite is not active') ||
-          errorText.contains('Invite has reached max uses');
+      final errorKind = _classifyInviteAcceptError(e);
+      final errorText = _errorMessageForDisplay(e);
       if (mounted) {
-        final isAlreadyMember = errorText.contains(
-          'Already a member of this group',
-        );
-        final isUnauthenticated =
-            errorText.contains('Unauthenticated') ||
-            errorText.contains('Not authenticated');
-        if (isInvalidOrExpired) {
+        if (errorKind == _InviteAcceptErrorKind.invalidOrExpired) {
           // The invite may have been consumed/revoked after initial preview.
           ref.invalidate(inviteByTokenProvider(widget.token));
         }
         setState(() {
-          if (isAlreadyMember) {
+          if (errorKind == _InviteAcceptErrorKind.alreadyMember) {
             _error = 'invite_already_member'.tr();
             _alreadyMemberGroupId = group.id;
-          } else if (isInvalidOrExpired) {
+          } else if (errorKind == _InviteAcceptErrorKind.invalidOrExpired) {
             _error = 'invite_expired'.tr();
           } else {
-            _error = isUnauthenticated
+            _error = errorKind == _InviteAcceptErrorKind.unauthenticated
                 ? 'sign_in_required'.tr()
                 : errorText;
           }
@@ -350,4 +398,11 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
       }
     }
   }
+}
+
+enum _InviteAcceptErrorKind {
+  alreadyMember,
+  invalidOrExpired,
+  unauthenticated,
+  unknown,
 }

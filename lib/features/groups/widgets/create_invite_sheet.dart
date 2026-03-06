@@ -104,7 +104,9 @@ class _CreateInviteSheetState extends ConsumerState<_CreateInviteSheet> {
     final expiry = _expiryOptions[_expiryIndex];
     final maxUses = _maxUsesOptions[_maxUsesIndex];
     final result = await runGuardedAsync<({String id, String token})>(
-      ref.read(groupInviteRepositoryProvider).createInvite(
+      ref
+          .read(groupInviteRepositoryProvider)
+          .createInvite(
             widget.groupId,
             role: _role,
             label: _labelController.text.trim().isEmpty
@@ -119,14 +121,13 @@ class _CreateInviteSheetState extends ConsumerState<_CreateInviteSheet> {
       ref: ref,
     );
     if (result == null) {
+      if (!mounted) return;
       setState(() => _creating = false);
       return;
     }
-    TelemetryService.sendEvent(
-      'invite_created',
-      {'groupId': widget.groupId},
-      enabled: ref.read(telemetryEnabledProvider),
-    );
+    TelemetryService.sendEvent('invite_created', {
+      'groupId': widget.groupId,
+    }, enabled: ref.read(telemetryEnabledProvider));
     if (!mounted) return;
     setState(() => _creating = false);
     Navigator.of(context).pop(result.token);
@@ -148,96 +149,96 @@ class _CreateInviteSheetState extends ConsumerState<_CreateInviteSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-          if (!LayoutBreakpoints.isTabletOrWider(context)) ...[
-            Text(
-              'create_invite'.tr(),
-              style: theme.textTheme.titleLarge,
+            if (!LayoutBreakpoints.isTabletOrWider(context)) ...[
+              Text('create_invite'.tr(), style: theme.textTheme.titleLarge),
+              const SizedBox(height: ThemeConfig.spacingM),
+            ],
+
+            // Label
+            TextField(
+              controller: _labelController,
+              decoration: InputDecoration(
+                labelText: 'invite_label'.tr(),
+                hintText: 'invite_label_hint'.tr(),
+                prefixIcon: const Icon(Icons.label_outline),
+                border: const OutlineInputBorder(),
+              ),
+              textCapitalization: TextCapitalization.sentences,
             ),
             const SizedBox(height: ThemeConfig.spacingM),
-          ],
 
-          // Label
-          TextField(
-            controller: _labelController,
-            decoration: InputDecoration(
-              labelText: 'invite_label'.tr(),
-              hintText: 'invite_label_hint'.tr(),
-              prefixIcon: const Icon(Icons.label_outline),
-              border: const OutlineInputBorder(),
+            // Role
+            Text('invite_role'.tr(), style: theme.textTheme.titleSmall),
+            const SizedBox(height: ThemeConfig.spacingS),
+            SegmentedButton<String>(
+              segments: [
+                ButtonSegment(
+                  value: 'member',
+                  label: Text('group_member'.tr()),
+                  icon: const Icon(Icons.person_outline, size: 18),
+                ),
+                ButtonSegment(
+                  value: 'admin',
+                  label: Text('group_admin'.tr()),
+                  icon: const Icon(
+                    Icons.admin_panel_settings_outlined,
+                    size: 18,
+                  ),
+                ),
+              ],
+              selected: {_role},
+              onSelectionChanged: (v) => setState(() => _role = v.first),
             ),
-            textCapitalization: TextCapitalization.sentences,
-          ),
-          const SizedBox(height: ThemeConfig.spacingM),
+            const SizedBox(height: ThemeConfig.spacingM),
 
-          // Role
-          Text('invite_role'.tr(), style: theme.textTheme.titleSmall),
-          const SizedBox(height: ThemeConfig.spacingS),
-          SegmentedButton<String>(
-            segments: [
-              ButtonSegment(
-                value: 'member',
-                label: Text('group_member'.tr()),
-                icon: const Icon(Icons.person_outline, size: 18),
-              ),
-              ButtonSegment(
-                value: 'admin',
-                label: Text('group_admin'.tr()),
-                icon: const Icon(Icons.admin_panel_settings_outlined, size: 18),
-              ),
-            ],
-            selected: {_role},
-            onSelectionChanged: (v) => setState(() => _role = v.first),
-          ),
-          const SizedBox(height: ThemeConfig.spacingM),
+            // Expiry
+            Text('invite_expiry'.tr(), style: theme.textTheme.titleSmall),
+            const SizedBox(height: ThemeConfig.spacingS),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: List.generate(_expiryOptions.length, (i) {
+                final opt = _expiryOptions[i];
+                return ChoiceChip(
+                  label: Text(opt.labelKey.tr()),
+                  selected: _expiryIndex == i,
+                  onSelected: (_) => setState(() => _expiryIndex = i),
+                );
+              }),
+            ),
+            const SizedBox(height: ThemeConfig.spacingM),
 
-          // Expiry
-          Text('invite_expiry'.tr(), style: theme.textTheme.titleSmall),
-          const SizedBox(height: ThemeConfig.spacingS),
-          Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            children: List.generate(_expiryOptions.length, (i) {
-              final opt = _expiryOptions[i];
-              return ChoiceChip(
-                label: Text(opt.labelKey.tr()),
-                selected: _expiryIndex == i,
-                onSelected: (_) => setState(() => _expiryIndex = i),
-              );
-            }),
-          ),
-          const SizedBox(height: ThemeConfig.spacingM),
+            // Max uses
+            Text('invite_max_uses'.tr(), style: theme.textTheme.titleSmall),
+            const SizedBox(height: ThemeConfig.spacingS),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: List.generate(_maxUsesOptions.length, (i) {
+                final opt = _maxUsesOptions[i];
+                return ChoiceChip(
+                  label: Text(opt.value?.toString() ?? 'invite_unlimited'.tr()),
+                  selected: _maxUsesIndex == i,
+                  onSelected: (_) => setState(() => _maxUsesIndex = i),
+                );
+              }),
+            ),
+            const SizedBox(height: ThemeConfig.spacingL),
 
-          // Max uses
-          Text('invite_max_uses'.tr(), style: theme.textTheme.titleSmall),
-          const SizedBox(height: ThemeConfig.spacingS),
-          Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            children: List.generate(_maxUsesOptions.length, (i) {
-              final opt = _maxUsesOptions[i];
-              return ChoiceChip(
-                label: Text(opt.value?.toString() ?? 'invite_unlimited'.tr()),
-                selected: _maxUsesIndex == i,
-                onSelected: (_) => setState(() => _maxUsesIndex = i),
-              );
-            }),
-          ),
-          const SizedBox(height: ThemeConfig.spacingL),
-
-          // Create button
-          FilledButton.icon(
-            onPressed: _creating ? null : _create,
-            icon: _creating
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.add_link),
-            label: Text('create_invite'.tr()),
-          ),
-          const SizedBox(height: ThemeConfig.spacingS),
-        ],
+            // Create button
+            FilledButton.icon(
+              onPressed: _creating ? null : _create,
+              icon: _creating
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.add_link),
+              label: Text('create_invite'.tr()),
+            ),
+            const SizedBox(height: ThemeConfig.spacingS),
+          ],
         ),
       ),
     );
