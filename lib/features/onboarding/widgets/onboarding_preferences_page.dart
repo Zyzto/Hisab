@@ -43,17 +43,17 @@ class OnboardingPreferencesPage extends ConsumerWidget {
         children: [
           Text(
             'onboarding_preferences'.tr(),
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: ThemeConfig.spacingS),
           Text(
             'onboarding_preferences_desc'.tr(),
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  height: 1.4,
-                ),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              height: 1.4,
+            ),
           ),
         ],
       ),
@@ -72,24 +72,19 @@ List<Widget> _buildPreferencesTiles(
   SettingsProviders settings,
 ) {
   final colorScheme = Theme.of(context).colorScheme;
-  final displayCurrency = ref.watch(
-    settings.provider(displayCurrencySettingDef),
-  ).trim();
+  final displayCurrency = ref
+      .watch(settings.provider(displayCurrencySettingDef))
+      .trim();
   final displayCurrencyLabel = displayCurrency.isEmpty
       ? 'display_currency_none'.tr()
       : (CurrencyHelpers.fromCode(displayCurrency) != null
-          ? CurrencyHelpers.shortLabel(
-              CurrencyHelpers.fromCode(displayCurrency)!)
-          : displayCurrency);
-  final use24h = ref.watch(
-    settings.provider(use24HourFormatSettingDef),
-  );
-  final fontSize = ref.watch(
-    settings.provider(fontSizeScaleSettingDef),
-  );
-  final themeScheme = ref.watch(
-    settings.provider(themeSchemeSettingDef),
-  );
+            ? CurrencyHelpers.shortLabel(
+                CurrencyHelpers.fromCode(displayCurrency)!,
+              )
+            : displayCurrency);
+  final use24h = ref.watch(settings.provider(use24HourFormatSettingDef));
+  final fontSize = ref.watch(settings.provider(fontSizeScaleSettingDef));
+  final themeScheme = ref.watch(settings.provider(themeSchemeSettingDef));
 
   return [
     OnboardingListCard(
@@ -102,17 +97,17 @@ List<Widget> _buildPreferencesTiles(
           Text(
             'display_currency_hint'.tr(),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  height: 1.3,
-                ),
+              color: colorScheme.onSurfaceVariant,
+              height: 1.3,
+            ),
           ),
           const SizedBox(height: ThemeConfig.spacingXS),
           Text(
             displayCurrencyLabel,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.primary,
-                  fontWeight: FontWeight.w500,
-                ),
+              color: colorScheme.primary,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
@@ -122,9 +117,7 @@ List<Widget> _buildPreferencesTiles(
               tooltip: 'display_currency_none'.tr(),
               onPressed: () {
                 ref
-                    .read(
-                      settings.provider(displayCurrencySettingDef).notifier,
-                    )
+                    .read(settings.provider(displayCurrencySettingDef).notifier)
                     .set('');
                 Log.info(
                   'Setting changed: ${displayCurrencySettingDef.key}=(none)',
@@ -139,9 +132,7 @@ List<Widget> _buildPreferencesTiles(
           favorite: CurrencyHelpers.getEffectiveFavorites(''),
           onSelect: (currency) {
             ref
-                .read(
-                  settings.provider(displayCurrencySettingDef).notifier,
-                )
+                .read(settings.provider(displayCurrencySettingDef).notifier)
                 .set(currency.code);
             Log.info(
               'Setting changed: ${displayCurrencySettingDef.key}=${currency.code}',
@@ -156,21 +147,17 @@ List<Widget> _buildPreferencesTiles(
       subtitle: Text(
         'use_24_hour_format_description'.tr(),
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              height: 1.3,
-            ),
+          color: colorScheme.onSurfaceVariant,
+          height: 1.3,
+        ),
       ),
       trailing: Switch(
         value: use24h,
         onChanged: (v) {
           ref
-              .read(
-                settings.provider(use24HourFormatSettingDef).notifier,
-              )
+              .read(settings.provider(use24HourFormatSettingDef).notifier)
               .set(v);
-          Log.info(
-            'Setting changed: ${use24HourFormatSettingDef.key}=$v',
-          );
+          Log.info('Setting changed: ${use24HourFormatSettingDef.key}=$v');
         },
       ),
     ),
@@ -186,17 +173,17 @@ List<Widget> _buildPreferencesTiles(
           Text(
             'font_size_description'.tr(),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  height: 1.3,
-                ),
+              color: colorScheme.onSurfaceVariant,
+              height: 1.3,
+            ),
           ),
           const SizedBox(height: ThemeConfig.spacingXS),
           Text(
             fontSize.tr(),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.primary,
-                  fontWeight: FontWeight.w500,
-                ),
+              color: colorScheme.primary,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
@@ -212,7 +199,8 @@ List<Widget> _buildPreferencesTiles(
               child: SingleChildScrollView(
                 child: Padding(
                   padding: EdgeInsets.only(
-                    bottom: MediaQuery.of(ctx).padding.bottom +
+                    bottom:
+                        MediaQuery.of(ctx).padding.bottom +
                         ThemeConfig.spacingM,
                   ),
                   child: Column(
@@ -233,13 +221,9 @@ List<Widget> _buildPreferencesTiles(
         ).then((chosen) {
           if (chosen != null && context.mounted) {
             ref
-                .read(
-                  settings.provider(fontSizeScaleSettingDef).notifier,
-                )
+                .read(settings.provider(fontSizeScaleSettingDef).notifier)
                 .set(chosen);
-            Log.info(
-              'Setting changed: ${fontSizeScaleSettingDef.key}=$chosen',
-            );
+            Log.info('Setting changed: ${fontSizeScaleSettingDef.key}=$chosen');
           }
         });
       },
@@ -271,17 +255,17 @@ List<Widget> _buildPreferencesTiles(
           Text(
             'color_scheme_description'.tr(),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  height: 1.3,
-                ),
+              color: colorScheme.onSurfaceVariant,
+              height: 1.3,
+            ),
           ),
           const SizedBox(height: ThemeConfig.spacingXS),
           Text(
             'theme_scheme_$themeScheme'.tr(),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.primary,
-                  fontWeight: FontWeight.w500,
-                ),
+              color: colorScheme.primary,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
@@ -297,43 +281,34 @@ List<Widget> _buildPreferencesTiles(
               child: SingleChildScrollView(
                 child: Padding(
                   padding: EdgeInsets.only(
-                    bottom: MediaQuery.of(ctx).padding.bottom +
+                    bottom:
+                        MediaQuery.of(ctx).padding.bottom +
                         ThemeConfig.spacingM,
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    children: _onboardingThemeSchemeIds
-                        .map(
-                          (schemeId) {
-                            final chipColor =
-                                primaryColorForSchemeId(schemeId);
-                            return ListTile(
-                              leading: Container(
-                                width: 24,
-                                height: 24,
-                                decoration: BoxDecoration(
-                                  color: chipColor != Colors.transparent
-                                      ? chipColor
-                                      : Theme.of(ctx)
-                                          .colorScheme
-                                          .surfaceContainerHighest,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Theme.of(ctx)
-                                        .colorScheme
-                                        .outline,
-                                  ),
-                                ),
-                              ),
-                              title: Text(
-                                'theme_scheme_$schemeId'.tr(),
-                              ),
-                              onTap: () =>
-                                  Navigator.of(ctx).pop(schemeId),
-                            );
-                          },
-                        )
-                        .toList(),
+                    children: _onboardingThemeSchemeIds.map((schemeId) {
+                      final chipColor = primaryColorForSchemeId(schemeId);
+                      return ListTile(
+                        leading: Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: chipColor != Colors.transparent
+                                ? chipColor
+                                : Theme.of(
+                                    ctx,
+                                  ).colorScheme.surfaceContainerHighest,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Theme.of(ctx).colorScheme.outline,
+                            ),
+                          ),
+                        ),
+                        title: Text('theme_scheme_$schemeId'.tr()),
+                        onTap: () => Navigator.of(ctx).pop(schemeId),
+                      );
+                    }).toList(),
                   ),
                 ),
               ),
@@ -342,13 +317,9 @@ List<Widget> _buildPreferencesTiles(
         ).then((chosen) {
           if (chosen != null && context.mounted) {
             ref
-                .read(
-                  settings.provider(themeSchemeSettingDef).notifier,
-                )
+                .read(settings.provider(themeSchemeSettingDef).notifier)
                 .set(chosen);
-            Log.info(
-              'Setting changed: ${themeSchemeSettingDef.key}=$chosen',
-            );
+            Log.info('Setting changed: ${themeSchemeSettingDef.key}=$chosen');
           }
         });
       },

@@ -8,30 +8,35 @@ void main() {
     EasyLocalization.logger.enableBuildModes = [];
   });
 
-  testWidgets('ErrorContentWidget shows message and retry button when onRetry provided', (tester) async {
-    await tester.pumpWidget(
-      EasyLocalization(
-        path: 'assets/translations',
-        supportedLocales: const [Locale('en')],
-        fallbackLocale: const Locale('en'),
-        startLocale: const Locale('en'),
-        child: MaterialApp(
-          home: Scaffold(
-            body: ErrorContentWidget(
-              message: 'Something went wrong',
-              onRetry: () {},
+  testWidgets(
+    'ErrorContentWidget shows message and retry button when onRetry provided',
+    (tester) async {
+      await tester.pumpWidget(
+        EasyLocalization(
+          path: 'assets/translations',
+          supportedLocales: const [Locale('en')],
+          fallbackLocale: const Locale('en'),
+          startLocale: const Locale('en'),
+          child: MaterialApp(
+            home: Scaffold(
+              body: ErrorContentWidget(
+                message: 'Something went wrong',
+                onRetry: () {},
+              ),
             ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.textContaining('Something went wrong'), findsOneWidget);
-    expect(find.byIcon(Icons.refresh), findsOneWidget);
-  });
+      expect(find.textContaining('Something went wrong'), findsOneWidget);
+      expect(find.byIcon(Icons.refresh), findsOneWidget);
+    },
+  );
 
-  testWidgets('ErrorContentWidget without onRetry has no retry button', (tester) async {
+  testWidgets('ErrorContentWidget without onRetry has no retry button', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       EasyLocalization(
         path: 'assets/translations',
@@ -39,9 +44,7 @@ void main() {
         fallbackLocale: const Locale('en'),
         startLocale: const Locale('en'),
         child: const MaterialApp(
-          home: Scaffold(
-            body: ErrorContentWidget(message: 'Error'),
-          ),
+          home: Scaffold(body: ErrorContentWidget(message: 'Error')),
         ),
       ),
     );

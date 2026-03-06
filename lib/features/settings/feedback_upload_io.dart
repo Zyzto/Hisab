@@ -13,7 +13,9 @@ Future<String?> uploadFeedbackScreenshot(Uint8List pngBytes) async {
   if (client == null || pngBytes.isEmpty) return null;
   final bucketKey = 'feedback/${const Uuid().v4()}.png';
   try {
-    await client.storage.from(_bucket).uploadBinary(
+    await client.storage
+        .from(_bucket)
+        .uploadBinary(
           bucketKey,
           pngBytes,
           fileOptions: const FileOptions(upsert: false),

@@ -77,8 +77,8 @@ class _SyncStatusChipState extends ConsumerState<SyncStatusChip> {
                 // Fit circle in the leading slot (e.g. some AppBars give only 32px height).
                 final compactSize = isCompact
                     ? _compactSize
-                        .clamp(0.0, constraints.maxWidth)
-                        .clamp(0.0, constraints.maxHeight)
+                          .clamp(0.0, constraints.maxWidth)
+                          .clamp(0.0, constraints.maxHeight)
                     : _compactSize;
 
                 final chip = AnimatedContainer(
@@ -190,7 +190,6 @@ class _SyncStatusChipState extends ConsumerState<SyncStatusChip> {
       ),
     };
   }
-
 }
 
 class _ChipData {

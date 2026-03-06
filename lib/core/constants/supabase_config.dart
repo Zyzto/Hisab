@@ -39,7 +39,10 @@ SupabaseClient? get supabaseClientIfConfigured {
 /// When set via `--dart-define=INVITE_BASE_URL=https://invite.example.com`,
 /// generated invite links use this instead of [supabaseUrl].
 /// Use this with Supabase Custom Domain so links show your brand (no extra hosting).
-const inviteBaseUrl = String.fromEnvironment('INVITE_BASE_URL', defaultValue: '');
+const inviteBaseUrl = String.fromEnvironment(
+  'INVITE_BASE_URL',
+  defaultValue: '',
+);
 
 /// Base URL used to build invite redirect links. Prefers [inviteBaseUrl] when set.
 String get inviteLinkBaseUrl =>

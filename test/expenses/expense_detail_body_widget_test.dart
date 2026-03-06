@@ -44,12 +44,18 @@ void main() {
     ];
   });
 
-  testWidgets('ExpenseDetailBody shows header and section labels', (tester) async {
+  testWidgets('ExpenseDetailBody shows header and section labels', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          futureExpenseProvider(expenseId).overrideWithValue(AsyncValue.data(testExpense)),
-          participantsByGroupProvider(groupId).overrideWithValue(AsyncValue.data(testParticipants)),
+          futureExpenseProvider(
+            expenseId,
+          ).overrideWithValue(AsyncValue.data(testExpense)),
+          participantsByGroupProvider(
+            groupId,
+          ).overrideWithValue(AsyncValue.data(testParticipants)),
           use24HourFormatProvider.overrideWithValue(false),
         ],
         child: EasyLocalization(

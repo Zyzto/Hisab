@@ -123,14 +123,12 @@ class BalanceList extends ConsumerWidget {
               final color = isPositive
                   ? theme.colorScheme.primary
                   : theme.colorScheme.error;
-              final amountStyle = theme.textTheme.bodyLarge?.copyWith(
+              final amountStyle =
+                  theme.textTheme.bodyLarge?.copyWith(
                     color: color,
                     fontWeight: FontWeight.w600,
                   ) ??
-                  TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.w600,
-                  );
+                  TextStyle(color: color, fontWeight: FontWeight.w600);
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
@@ -219,14 +217,14 @@ class BalanceList extends ConsumerWidget {
                               : 'record_settlement_restricted'.tr(),
                           onPressed: canRecord
                               ? () => showRecordSettlementSheet(
-                                    context,
-                                    ref,
-                                    groupId: groupId,
-                                    currencyCode: group.currencyCode,
-                                    settlement: s,
-                                    fromName: from,
-                                    toName: to,
-                                  )
+                                  context,
+                                  ref,
+                                  groupId: groupId,
+                                  currencyCode: group.currencyCode,
+                                  settlement: s,
+                                  fromName: from,
+                                  toName: to,
+                                )
                               : null,
                         ),
                       )
@@ -234,16 +232,16 @@ class BalanceList extends ConsumerWidget {
                 onTap: hasFrozen
                     ? null
                     : canRecord
-                        ? () => showRecordSettlementSheet(
-                              context,
-                              ref,
-                              groupId: groupId,
-                              currencyCode: group.currencyCode,
-                              settlement: s,
-                              fromName: from,
-                              toName: to,
-                            )
-                        : null,
+                    ? () => showRecordSettlementSheet(
+                        context,
+                        ref,
+                        groupId: groupId,
+                        currencyCode: group.currencyCode,
+                        settlement: s,
+                        fromName: from,
+                        toName: to,
+                      )
+                    : null,
               ),
             );
           },

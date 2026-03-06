@@ -82,16 +82,13 @@ class MigrationService {
         final memberId = '${g['id']}_$userId'.hashCode
             .toRadixString(16)
             .padLeft(32, '0');
-        await _client.from('group_members').upsert(
-          {
-            'id': memberId,
-            'group_id': g['id'],
-            'user_id': userId,
-            'role': 'owner',
-            'joined_at': g['created_at'],
-          },
-          onConflict: 'group_id,user_id',
-        );
+        await _client.from('group_members').upsert({
+          'id': memberId,
+          'group_id': g['id'],
+          'user_id': userId,
+          'role': 'owner',
+          'joined_at': g['created_at'],
+        }, onConflict: 'group_id,user_id');
 
         completed++;
         onProgress?.call(completed, total);

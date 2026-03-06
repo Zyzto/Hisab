@@ -27,7 +27,8 @@ Widget buildBoolSettingTile(
     title: title,
     subtitle: subtitle,
     value: ref.watch(settings.provider(settingDef)),
-    onChanged: onChanged ??
+    onChanged:
+        onChanged ??
         (v) {
           ref.read(settings.provider(settingDef).notifier).set(v);
           Log.info('Setting changed: ${settingDef.key}=$v');

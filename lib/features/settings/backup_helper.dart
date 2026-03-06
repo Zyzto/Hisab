@@ -30,12 +30,17 @@ Future<Map<String, dynamic>> exportDataToJson({
   final allExpenses = await expenseRepo.getAll();
   final allTags = await tagRepo.getAll();
 
-  final participants = allParticipants.where((p) => groupIds.contains(p.groupId)).toList();
-  final expenses = allExpenses.where((e) => groupIds.contains(e.groupId)).toList();
-  final expenseTags = allTags.where((t) => groupIds.contains(t.groupId)).toList();
+  final participants = allParticipants
+      .where((p) => groupIds.contains(p.groupId))
+      .toList();
+  final expenses = allExpenses
+      .where((e) => groupIds.contains(e.groupId))
+      .toList();
+  final expenseTags = allTags
+      .where((t) => groupIds.contains(t.groupId))
+      .toList();
 
-  final localArchivedGroupIds =
-      await groupRepo.getLocallyArchivedGroupIds();
+  final localArchivedGroupIds = await groupRepo.getLocallyArchivedGroupIds();
 
   return {
     'version': 1,
@@ -112,6 +117,7 @@ class BackupParseResult {
   const BackupParseResult({this.data, this.errorMessageKey});
 
   final BackupData? data;
+
   /// Translation key (e.g. backup_parse_unsupported_version) for UI to show.
   final String? errorMessageKey;
 }
@@ -122,11 +128,15 @@ BackupParseResult parseBackupJson(String jsonString) {
   try {
     final map = jsonDecode(jsonString) as Map<String, dynamic>?;
     if (map == null) {
-      return const BackupParseResult(errorMessageKey: 'backup_parse_invalid_format');
+      return const BackupParseResult(
+        errorMessageKey: 'backup_parse_invalid_format',
+      );
     }
     final version = map['version'] as int?;
     if (version == null || version != 1) {
-      return const BackupParseResult(errorMessageKey: 'backup_parse_unsupported_version');
+      return const BackupParseResult(
+        errorMessageKey: 'backup_parse_unsupported_version',
+      );
     }
     final groups =
         (map['groups'] as List<dynamic>?)
@@ -163,7 +173,9 @@ BackupParseResult parseBackupJson(String jsonString) {
       ),
     );
   } on FormatException catch (_) {
-    return const BackupParseResult(errorMessageKey: 'backup_parse_invalid_format');
+    return const BackupParseResult(
+      errorMessageKey: 'backup_parse_invalid_format',
+    );
   } catch (e) {
     Log.warning('Backup parse failed', error: e);
     return const BackupParseResult(errorMessageKey: 'backup_parse_failed');
@@ -208,7 +220,9 @@ Group _mapToGroup(Map<String, dynamic> m) {
     allowMemberSettleForOthers: allowMemberSettleForOthers,
     icon: m['icon'] as String?,
     color: (m['color'] as num?)?.toInt(),
-    archivedAt: archivedAt != null ? DateTime.tryParse(archivedAt as String) : null,
+    archivedAt: archivedAt != null
+        ? DateTime.tryParse(archivedAt as String)
+        : null,
     isPersonal: isPersonal,
     budgetAmountCents: budgetAmountCents,
   );

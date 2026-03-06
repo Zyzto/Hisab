@@ -6,10 +6,7 @@ import 'package:flutter/material.dart';
 /// navigate. Registering in a post-frame callback ensures this runs before
 /// route-specific interceptors (e.g. MainScaffold double-back-to-exit).
 class BackButtonKeyboardDismiss extends StatefulWidget {
-  const BackButtonKeyboardDismiss({
-    super.key,
-    required this.child,
-  });
+  const BackButtonKeyboardDismiss({super.key, required this.child});
 
   final Widget child;
 

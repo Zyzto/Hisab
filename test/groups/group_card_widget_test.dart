@@ -13,9 +13,7 @@ Widget wrapGroupCard(Widget child) {
       supportedLocales: const [Locale('en')],
       fallbackLocale: const Locale('en'),
       startLocale: const Locale('en'),
-      child: MaterialApp(
-        home: Scaffold(body: child),
-      ),
+      child: MaterialApp(home: Scaffold(body: child)),
     ),
   );
 }
@@ -48,19 +46,16 @@ void main() {
 
   testWidgets('GroupCard shows createdDateLabel when provided', (tester) async {
     await tester.pumpWidget(
-      wrapGroupCard(
-        GroupCard(
-          group: testGroup,
-          createdDateLabel: 'Jan 15',
-        ),
-      ),
+      wrapGroupCard(GroupCard(group: testGroup, createdDateLabel: 'Jan 15')),
     );
     await tester.pumpAndSettle();
     expect(find.text('Jan 15'), findsOneWidget);
     expect(find.text('Test Trip'), findsOneWidget);
   });
 
-  testWidgets('GroupCard shows pin icon when onPinToggle provided', (tester) async {
+  testWidgets('GroupCard shows pin icon when onPinToggle provided', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       wrapGroupCard(GroupCard(group: testGroup, onPinToggle: () {})),
     );
@@ -79,7 +74,9 @@ void main() {
     expect(tapped, true);
   });
 
-  testWidgets('GroupCard onLongPress is called when long-pressed', (tester) async {
+  testWidgets('GroupCard onLongPress is called when long-pressed', (
+    tester,
+  ) async {
     var longPressed = false;
     await tester.pumpWidget(
       wrapGroupCard(
@@ -151,7 +148,9 @@ void main() {
     expect(find.byType(GroupCard), findsOneWidget);
   });
 
-  testWidgets('GroupCard isPinned with onPinToggle shows filled pin icon', (tester) async {
+  testWidgets('GroupCard isPinned with onPinToggle shows filled pin icon', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       wrapGroupCard(
         GroupCard(group: testGroup, isPinned: true, onPinToggle: () {}),
@@ -162,11 +161,7 @@ void main() {
   });
 
   testWidgets('GroupCard shows name and currency', (tester) async {
-    await tester.pumpWidget(
-      wrapGroupCard(
-        GroupCard(group: testGroup),
-      ),
-    );
+    await tester.pumpWidget(wrapGroupCard(GroupCard(group: testGroup)));
     await tester.pumpAndSettle();
     expect(find.text('Test Trip'), findsOneWidget);
     expect(find.text('USD'), findsOneWidget);
@@ -176,12 +171,7 @@ void main() {
 
   testWidgets('GroupCard with createdDateLabel shows date', (tester) async {
     await tester.pumpWidget(
-      wrapGroupCard(
-        GroupCard(
-          group: testGroup,
-          createdDateLabel: '15\nJan',
-        ),
-      ),
+      wrapGroupCard(GroupCard(group: testGroup, createdDateLabel: '15\nJan')),
     );
     await tester.pumpAndSettle();
     expect(find.text('15\nJan'), findsOneWidget);
@@ -190,12 +180,7 @@ void main() {
 
   testWidgets('GroupCard with onPinToggle shows pin', (tester) async {
     await tester.pumpWidget(
-      wrapGroupCard(
-        GroupCard(
-          group: testGroup,
-          onPinToggle: () {},
-        ),
-      ),
+      wrapGroupCard(GroupCard(group: testGroup, onPinToggle: () {})),
     );
     await tester.pumpAndSettle();
     expect(find.byIcon(Icons.push_pin_outlined), findsOneWidget);
@@ -204,11 +189,7 @@ void main() {
   testWidgets('GroupCard fits in constrained layout', (tester) async {
     await tester.pumpWidget(
       wrapGroupCard(
-        SizedBox(
-          width: 400,
-          height: 100,
-          child: GroupCard(group: testGroup),
-        ),
+        SizedBox(width: 400, height: 100, child: GroupCard(group: testGroup)),
       ),
     );
     await tester.pumpAndSettle();

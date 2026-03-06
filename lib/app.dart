@@ -38,12 +38,13 @@ class App extends ConsumerStatefulWidget {
   ConsumerState<App> createState() => _AppState();
 }
 
-class _AppState extends ConsumerState<App>
-    with WidgetsBindingObserver {
+class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
   late final HisabUpgrader _upgrader;
+
   /// In release, defer UpgradeAlert until after first frame to avoid any
   /// upgrader work blocking the first paint (splash can disappear).
   bool _showUpgradeAlert = kDebugMode;
+
   /// Hide debug FAB while the debug menu sheet is open so it doesn't obstruct it.
   bool _debugFabVisible = true;
   bool _updateTriggerRegistered = false;
@@ -59,13 +60,19 @@ class _AppState extends ConsumerState<App>
     _scheduleStartupKeyboardDismiss();
     _upgrader = HisabUpgrader(
       durationUntilAlertAgain: const Duration(days: 3),
-      debugLogging: false, // use app-level aggregated log instead of package prints
+      debugLogging:
+          false, // use app-level aggregated log instead of package prints
       messages: HisabUpgraderMessages(context: context),
-      willDisplayUpgrade: ({required bool display, String? installedVersion, UpgraderVersionInfo? versionInfo}) {
-        Log.debug(
-          'Upgrader (auto): store=${versionInfo?.appStoreVersion}, installed=$installedVersion, showDialog=$display',
-        );
-      },
+      willDisplayUpgrade:
+          ({
+            required bool display,
+            String? installedVersion,
+            UpgraderVersionInfo? versionInfo,
+          }) {
+            Log.debug(
+              'Upgrader (auto): store=${versionInfo?.appStoreVersion}, installed=$installedVersion, showDialog=$display',
+            );
+          },
     );
     _registerAuthListener();
     if (!kDebugMode) {
@@ -142,16 +149,19 @@ class _AppState extends ConsumerState<App>
 
   void _saveCurrentRoute() {
     if (!mounted) return;
-    final path = ref.read(routerProvider).routerDelegate.currentConfiguration.uri.path;
+    final path = ref
+        .read(routerProvider)
+        .routerDelegate
+        .currentConfiguration
+        .uri
+        .path;
     if (path.isEmpty || path == '/') return;
     final settings = ref.read(hisabSettingsProvidersProvider);
     if (settings != null) {
       final current = ref.read(settings.provider(lastRoutePathSettingDef));
       if (current == path) return;
       ref.read(settings.provider(lastRoutePathSettingDef).notifier).set(path);
-      Log.info(
-        'Setting changed: ${lastRoutePathSettingDef.key}=$path',
-      );
+      Log.info('Setting changed: ${lastRoutePathSettingDef.key}=$path');
     }
   }
 
@@ -162,38 +172,37 @@ class _AppState extends ConsumerState<App>
       final current = ref.read(settings.provider(lastRoutePathSettingDef));
       if (current.isEmpty) return;
       ref.read(settings.provider(lastRoutePathSettingDef).notifier).set('');
-      Log.info(
-        'Setting changed: ${lastRoutePathSettingDef.key}=(cleared)',
-      );
+      Log.info('Setting changed: ${lastRoutePathSettingDef.key}=(cleared)');
     }
   }
 
   void _registerAuthListener() {
     _authSubscription?.close();
-    _authSubscription = ref.listenManual<bool>(
-      isAuthenticatedProvider,
-      (prev, isAuth) {
-        if (!mounted) return;
-        if (isAuth && prev != true) {
-          if (ref.read(notificationsEnabledProvider)) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted) return;
-              unawaited(
-                ref.read(notificationServiceProvider.notifier).initialize(context),
-              );
-            });
-          }
-        } else if (!isAuth && prev == true) {
+    _authSubscription = ref.listenManual<bool>(isAuthenticatedProvider, (
+      prev,
+      isAuth,
+    ) {
+      if (!mounted) return;
+      if (isAuth && prev != true) {
+        if (ref.read(notificationsEnabledProvider)) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;
             unawaited(
-              ref.read(notificationServiceProvider.notifier).unregisterToken(),
+              ref
+                  .read(notificationServiceProvider.notifier)
+                  .initialize(context),
             );
           });
         }
-      },
-      fireImmediately: true,
-    );
+      } else if (!isAuth && prev == true) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          unawaited(
+            ref.read(notificationServiceProvider.notifier).unregisterToken(),
+          );
+        });
+      }
+    }, fireImmediately: true);
   }
 
   void _registerUpdateCheckTrigger() {
@@ -310,8 +319,7 @@ class _AppState extends ConsumerState<App>
             navigatorKey: router.routerDelegate.navigatorKey,
             upgrader: _upgrader,
             onUpdate: () {
-              if (!kIsWeb &&
-                  defaultTargetPlatform == TargetPlatform.android) {
+              if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
                 handleAndroidUpdateThenStore(_upgrader);
                 return false;
               }
@@ -320,12 +328,7 @@ class _AppState extends ConsumerState<App>
             child: contentWithSyncIndicator,
           )
         : contentWithSyncIndicator;
-    return Stack(
-      children: [
-        rootChild,
-        debugFab,
-      ],
-    );
+    return Stack(children: [rootChild, debugFab]);
   }
 
   @override
@@ -364,57 +367,60 @@ class _AppState extends ConsumerState<App>
             alignment: Alignment.bottomCenter,
             itemWidth: LayoutBreakpoints.isTabletOrWider(context)
                 ? LayoutBreakpoints.sheetDialogMaxWidth
-                : (MediaQuery.sizeOf(context).width - 32)
-                    .clamp(0.0, LayoutBreakpoints.sheetDialogMaxWidth),
+                : (MediaQuery.sizeOf(context).width - 32).clamp(
+                    0.0,
+                    LayoutBreakpoints.sheetDialogMaxWidth,
+                  ),
           ),
           child: MaterialApp.router(
-        title: 'app_name'.tr(),
-        debugShowCheckedModeBanner: false,
-        scrollBehavior: AppScrollBehavior(),
-        localizationsDelegates: context.localizationDelegates,
-        supportedLocales: context.supportedLocales,
-        locale: context.locale,
-        builder: (context, child) {
-          final isRtl = context.locale.languageCode == 'ar';
-          final isDebug =
-              ref.watch(isDebugBuildProvider).asData?.value == true;
-          final innerContent = BackButtonKeyboardDismiss(
-            child: GestureDetector(
-              onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-              behavior: HitTestBehavior.deferToChild,
-              child: Directionality(
-                textDirection:
-                    isRtl ? ui.TextDirection.rtl : ui.TextDirection.ltr,
-                child: child ?? const SizedBox.shrink(),
-              ),
-            ),
-          );
-          final contentWithSyncIndicator = Stack(
-            children: [
-              Positioned.fill(child: innerContent),
-              const Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: _SyncProgressLine(),
-              ),
-            ],
-          );
-          // In release, first frame paints without UpgradeAlert to avoid
-          // any upgrader init blocking splash removal.
-          return _buildRootContent(
-            context: context,
-            contentWithSyncIndicator: contentWithSyncIndicator,
-            isDebug: isDebug,
-            isRtl: isRtl,
-            router: router,
-          );
-        },
-        theme: themes.light,
-        darkTheme: themes.dark,
-        themeMode: themeMode,
-        routerConfig: router,
-        ),
+            title: 'app_name'.tr(),
+            debugShowCheckedModeBanner: false,
+            scrollBehavior: AppScrollBehavior(),
+            localizationsDelegates: context.localizationDelegates,
+            supportedLocales: context.supportedLocales,
+            locale: context.locale,
+            builder: (context, child) {
+              final isRtl = context.locale.languageCode == 'ar';
+              final isDebug =
+                  ref.watch(isDebugBuildProvider).asData?.value == true;
+              final innerContent = BackButtonKeyboardDismiss(
+                child: GestureDetector(
+                  onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+                  behavior: HitTestBehavior.deferToChild,
+                  child: Directionality(
+                    textDirection: isRtl
+                        ? ui.TextDirection.rtl
+                        : ui.TextDirection.ltr,
+                    child: child ?? const SizedBox.shrink(),
+                  ),
+                ),
+              );
+              final contentWithSyncIndicator = Stack(
+                children: [
+                  Positioned.fill(child: innerContent),
+                  const Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: _SyncProgressLine(),
+                  ),
+                ],
+              );
+              // In release, first frame paints without UpgradeAlert to avoid
+              // any upgrader init blocking splash removal.
+              return _buildRootContent(
+                context: context,
+                contentWithSyncIndicator: contentWithSyncIndicator,
+                isDebug: isDebug,
+                isRtl: isRtl,
+                router: router,
+              );
+            },
+            theme: themes.light,
+            darkTheme: themes.dark,
+            themeMode: themeMode,
+            routerConfig: router,
+          ),
         ),
       ),
     );
@@ -436,9 +442,9 @@ class _SyncProgressLine extends ConsumerWidget {
       child: SizedBox(
         height: 3,
         child: LinearProgressIndicator(
-          backgroundColor: Theme.of(context)
-              .colorScheme
-              .surfaceContainerHighest,
+          backgroundColor: Theme.of(
+            context,
+          ).colorScheme.surfaceContainerHighest,
         ),
       ),
     );

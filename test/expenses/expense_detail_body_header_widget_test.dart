@@ -72,7 +72,9 @@ void main() {
     expect(find.textContaining('2025'), findsOneWidget);
   });
 
-  testWidgets('ExpenseDetailBodyHeader income shows trending icon', (tester) async {
+  testWidgets('ExpenseDetailBodyHeader income shows trending icon', (
+    tester,
+  ) async {
     final income = Expense(
       id: 'e2',
       groupId: 'g1',
@@ -94,9 +96,7 @@ void main() {
         fallbackLocale: const Locale('en'),
         startLocale: const Locale('en'),
         child: MaterialApp(
-          home: Scaffold(
-            body: ExpenseDetailBodyHeader(expense: income),
-          ),
+          home: Scaffold(body: ExpenseDetailBodyHeader(expense: income)),
         ),
       ),
     );

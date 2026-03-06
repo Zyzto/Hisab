@@ -31,7 +31,9 @@ void main() {
     expect(find.text('hello'), findsOneWidget);
   });
 
-  testWidgets('AsyncValueBuilder loading shows CircularProgressIndicator', (tester) async {
+  testWidgets('AsyncValueBuilder loading shows CircularProgressIndicator', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       EasyLocalization(
         path: 'assets/translations',
@@ -74,7 +76,9 @@ void main() {
     expect(find.byIcon(Icons.error_outline), findsOneWidget);
   });
 
-  testWidgets('AsyncValueBuilder empty with empty builder renders empty', (tester) async {
+  testWidgets('AsyncValueBuilder empty with empty builder renders empty', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       EasyLocalization(
         path: 'assets/translations',
@@ -96,7 +100,9 @@ void main() {
     expect(find.text('empty'), findsOneWidget);
   });
 
-  testWidgets('AsyncValueBuilder data with empty string uses data builder', (tester) async {
+  testWidgets('AsyncValueBuilder data with empty string uses data builder', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       EasyLocalization(
         path: 'assets/translations',
@@ -117,7 +123,9 @@ void main() {
     expect(find.text('blank'), findsOneWidget);
   });
 
-  testWidgets('AsyncValueBuilder error shows error UI with Arabic locale', (tester) async {
+  testWidgets('AsyncValueBuilder error shows error UI with Arabic locale', (
+    tester,
+  ) async {
     await pumpApp(
       tester,
       child: AsyncValueBuilder<String>(

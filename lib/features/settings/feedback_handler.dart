@@ -30,14 +30,17 @@ Future<void> handleFeedback(
   } else if (feedback.screenshot.isNotEmpty) {
     buffer.writeln();
     buffer.writeln();
-    buffer.writeln('(Screenshot was captured; please attach it manually if needed.)');
+    buffer.writeln(
+      '(Screenshot was captured; please attach it manually if needed.)',
+    );
   }
 
   final body = buffer.toString();
   const title = 'Feedback';
 
-  final screenshotBytes =
-      feedback.screenshot.isNotEmpty ? feedback.screenshot : null;
+  final screenshotBytes = feedback.screenshot.isNotEmpty
+      ? feedback.screenshot
+      : null;
   try {
     if (reportIssueUrl.isNotEmpty) {
       final uri = Uri.parse(reportIssueUrl).replace(

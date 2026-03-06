@@ -14,7 +14,10 @@ const int _kMinPasswordLength = 6;
 
 /// Bottom sheet to change password for email/password users. Verifies current
 /// password via sign-in then calls Supabase updateUser.
-Future<void> showChangePasswordSheet(BuildContext context, WidgetRef ref) async {
+Future<void> showChangePasswordSheet(
+  BuildContext context,
+  WidgetRef ref,
+) async {
   await showResponsiveSheet<void>(
     context: context,
     title: 'change_password_title'.tr(),
@@ -60,13 +63,17 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
     node.addListener(() {
       if (node.hasFocus) return;
       final primary = FocusManager.instance.primaryFocus;
-      if (primary == _focusCurrent || primary == _focusNew || primary == _focusConfirm) return;
+      if (primary == _focusCurrent ||
+          primary == _focusNew ||
+          primary == _focusConfirm)
+        return;
       final widgetType = primary?.context?.widget.runtimeType.toString() ?? '';
       if (widgetType.contains('EditableText')) return;
       Future.delayed(const Duration(milliseconds: 100), () {
         if (!mounted || node.hasFocus) return;
         final now = FocusManager.instance.primaryFocus;
-        if (now == _focusCurrent || now == _focusNew || now == _focusConfirm) return;
+        if (now == _focusCurrent || now == _focusNew || now == _focusConfirm)
+          return;
         node.requestFocus();
       });
     });
@@ -235,7 +242,8 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
                 border: const OutlineInputBorder(),
                 suffixIcon: _VisibilityToggle(
                   obscure: _obscureCurrent,
-                  onTap: () => setState(() => _obscureCurrent = !_obscureCurrent),
+                  onTap: () =>
+                      setState(() => _obscureCurrent = !_obscureCurrent),
                 ),
               ),
               obscureText: _obscureCurrent,
@@ -280,10 +288,7 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
             ),
             const SizedBox(height: 24),
             // Use non-focusable control so the focus manager does not steal focus from the password fields (FilledButton is focusable and was receiving focus during applyFocusChangesIfNeeded).
-            _SubmitButton(
-              saving: _saving,
-              onPressed: _saving ? null : _submit,
-            ),
+            _SubmitButton(saving: _saving, onPressed: _saving ? null : _submit),
           ],
         ),
       ),
@@ -339,10 +344,7 @@ class _SubmitButton extends StatelessWidget {
 /// Visibility toggle that does not participate in focus, so it never steals
 /// focus from the password TextField when tapped or when the keyboard opens.
 class _VisibilityToggle extends StatelessWidget {
-  const _VisibilityToggle({
-    required this.obscure,
-    required this.onTap,
-  });
+  const _VisibilityToggle({required this.obscure, required this.onTap});
   final bool obscure;
   final VoidCallback onTap;
 

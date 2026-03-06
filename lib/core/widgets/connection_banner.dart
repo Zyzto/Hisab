@@ -35,14 +35,14 @@ class _ConnectionBannerState extends ConsumerState<ConnectionBanner>
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, -1),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: Curves.easeOut,
-      reverseCurve: Curves.easeIn,
-    ));
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, -1), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _slideController,
+            curve: Curves.easeOut,
+            reverseCurve: Curves.easeIn,
+          ),
+        );
   }
 
   @override
@@ -108,7 +108,9 @@ class _ConnectionBannerState extends ConsumerState<ConnectionBanner>
     final fgColor = isOffline
         ? colorScheme.onErrorContainer
         : colorScheme.onPrimaryContainer;
-    final icon = isOffline ? Icons.cloud_off_outlined : Icons.cloud_done_outlined;
+    final icon = isOffline
+        ? Icons.cloud_off_outlined
+        : Icons.cloud_done_outlined;
     final text = isOffline
         ? 'sync_offline_banner'.tr()
         : 'sync_back_online'.tr();
@@ -150,8 +152,4 @@ class _ConnectionBannerState extends ConsumerState<ConnectionBanner>
   }
 }
 
-enum _BannerMode {
-  hidden,
-  offline,
-  backOnline,
-}
+enum _BannerMode { hidden, offline, backOnline }

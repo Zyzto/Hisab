@@ -35,9 +35,7 @@ class GroupColorPicker extends StatelessWidget {
               color: color,
               shape: BoxShape.circle,
               border: Border.all(
-                color: isSelected
-                    ? colorScheme.onSurface
-                    : Colors.transparent,
+                color: isSelected ? colorScheme.onSurface : Colors.transparent,
                 width: 3,
               ),
               boxShadow: isSelected

@@ -18,7 +18,8 @@ class InviteRedirectProxyPage extends StatefulWidget {
   final Uri uri;
 
   @override
-  State<InviteRedirectProxyPage> createState() => _InviteRedirectProxyPageState();
+  State<InviteRedirectProxyPage> createState() =>
+      _InviteRedirectProxyPageState();
 }
 
 class _InviteRedirectProxyPageState extends State<InviteRedirectProxyPage> {

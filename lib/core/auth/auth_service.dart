@@ -14,7 +14,8 @@ class AuthService {
   SupabaseClient? get _client => supabaseClientIfConfigured;
 
   SupabaseClient get _clientOrThrow =>
-      supabaseClientIfConfigured ?? (throw StateError('Supabase not configured'));
+      supabaseClientIfConfigured ??
+      (throw StateError('Supabase not configured'));
 
   /// Redirect URL for OAuth: on web use [authRedirectUrl] (SITE_URL); on native use deep link so the app reopens.
   String? get _oauthRedirectUrl {
@@ -94,7 +95,9 @@ class AuthService {
   Future<void> updatePassword(String newPassword) async {
     Log.debug('Updating password');
     try {
-      await _clientOrThrow.auth.updateUser(UserAttributes(password: newPassword));
+      await _clientOrThrow.auth.updateUser(
+        UserAttributes(password: newPassword),
+      );
       Log.info('Password updated');
     } catch (e, st) {
       Log.error('Password update failed', error: e, stackTrace: st);

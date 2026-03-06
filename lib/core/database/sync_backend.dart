@@ -54,7 +54,9 @@ class SupabaseSyncBackend implements SyncBackend {
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getParticipants(List<String> groupIds) async {
+  Future<List<Map<String, dynamic>>> getParticipants(
+    List<String> groupIds,
+  ) async {
     if (groupIds.isEmpty) return [];
     final rows = await _client
         .from('participants')
@@ -94,7 +96,9 @@ class SupabaseSyncBackend implements SyncBackend {
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getInviteUsages(List<String> inviteIds) async {
+  Future<List<Map<String, dynamic>>> getInviteUsages(
+    List<String> inviteIds,
+  ) async {
     if (inviteIds.isEmpty) return [];
     try {
       final rows = await _client
@@ -113,7 +117,11 @@ class SupabaseSyncBackend implements SyncBackend {
   }
 
   @override
-  Future<void> update(String table, Map<String, dynamic> data, String id) async {
+  Future<void> update(
+    String table,
+    Map<String, dynamic> data,
+    String id,
+  ) async {
     await _client.from(table).update(data).eq('id', id);
   }
 

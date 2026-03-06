@@ -71,25 +71,31 @@ class AmountWithSecondaryDisplay extends ConsumerWidget {
     final rateKey = displayCurrency.isEmpty
         ? null
         : '$groupCurrencyCode|$displayCurrency';
-    final rateAsync =
-        rateKey == null ? null : ref.watch(displayCurrencyRateProvider(rateKey));
+    final rateAsync = rateKey == null
+        ? null
+        : ref.watch(displayCurrencyRateProvider(rateKey));
 
-    final primaryStyle = this.primaryStyle ??
+    final primaryStyle =
+        this.primaryStyle ??
         theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600);
-    final secondaryStyle = this.secondaryStyle ??
+    final secondaryStyle =
+        this.secondaryStyle ??
         theme.textTheme.bodySmall?.copyWith(
           color: theme.colorScheme.onSurfaceVariant,
         );
 
-    final primaryFormatted =
-        CurrencyFormatter.formatCents(amountCents, groupCurrencyCode);
+    final primaryFormatted = CurrencyFormatter.formatCents(
+      amountCents,
+      groupCurrencyCode,
+    );
     final primaryWidget = Text(
       isNegative ? '- $primaryFormatted' : primaryFormatted,
       style: primaryStyle,
     );
 
     final rate = rateAsync?.asData?.value;
-    final hasSecondary = showSecondary &&
+    final hasSecondary =
+        showSecondary &&
         displayCurrency.isNotEmpty &&
         groupCurrencyCode != displayCurrency &&
         rate != null &&
@@ -104,13 +110,17 @@ class AmountWithSecondaryDisplay extends ConsumerWidget {
       displayCurrency,
       rate,
     );
-    final displayFormatted =
-        CurrencyFormatter.formatCents(displayCents, displayCurrency);
-    final secondaryText =
-        isNegative ? '(- $displayFormatted)' : '($displayFormatted)';
+    final displayFormatted = CurrencyFormatter.formatCents(
+      displayCents,
+      displayCurrency,
+    );
+    final secondaryText = isNegative
+        ? '(- $displayFormatted)'
+        : '($displayFormatted)';
     final secondaryWidget = Text(
       secondaryText,
-      style: secondaryStyle?.copyWith(height: 1.0) ??
+      style:
+          secondaryStyle?.copyWith(height: 1.0) ??
           theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
             height: 1.0,
@@ -122,21 +132,13 @@ class AmountWithSecondaryDisplay extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.baseline,
         textBaseline: TextBaseline.alphabetic,
-        children: [
-          primaryWidget,
-          const SizedBox(width: 8),
-          secondaryWidget,
-        ],
+        children: [primaryWidget, const SizedBox(width: 8), secondaryWidget],
       );
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
-      children: [
-        primaryWidget,
-        const SizedBox(height: 2),
-        secondaryWidget,
-      ],
+      children: [primaryWidget, const SizedBox(height: 2), secondaryWidget],
     );
   }
 }
@@ -164,10 +166,12 @@ class SecondaryAmountLine extends ConsumerWidget {
     final rateKey = displayCurrency.isEmpty
         ? null
         : '$groupCurrencyCode|$displayCurrency';
-    final rateAsync =
-        rateKey == null ? null : ref.watch(displayCurrencyRateProvider(rateKey));
+    final rateAsync = rateKey == null
+        ? null
+        : ref.watch(displayCurrencyRateProvider(rateKey));
     final rate = rateAsync?.asData?.value;
-    final showSecondary = displayCurrency.isNotEmpty &&
+    final showSecondary =
+        displayCurrency.isNotEmpty &&
         groupCurrencyCode != displayCurrency &&
         rate != null &&
         rate > 0;
@@ -178,11 +182,15 @@ class SecondaryAmountLine extends ConsumerWidget {
       displayCurrency,
       rate,
     );
-    final displayFormatted =
-        CurrencyFormatter.formatCents(displayCents, displayCurrency);
-    final secondaryText =
-        isNegative ? '(- $displayFormatted)' : '($displayFormatted)';
-    final style = secondaryStyle ??
+    final displayFormatted = CurrencyFormatter.formatCents(
+      displayCents,
+      displayCurrency,
+    );
+    final secondaryText = isNegative
+        ? '(- $displayFormatted)'
+        : '($displayFormatted)';
+    final style =
+        secondaryStyle ??
         theme.textTheme.bodySmall?.copyWith(
           color: theme.colorScheme.onSurfaceVariant,
         );

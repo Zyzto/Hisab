@@ -43,10 +43,7 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(ThemeConfig.cardBorderRadius),
-          side: BorderSide(
-            color: colorScheme.outlineVariant,
-            width: 1,
-          ),
+          side: BorderSide(color: colorScheme.outlineVariant, width: 1),
         ),
         color: colorScheme.surfaceContainerHighest,
       ),
@@ -157,23 +154,24 @@ class AppTheme {
     bool alwaysShowScrollbars = false,
   }) {
     final baseSeedColor = seedColor ?? ThemeConfig.defaultSeedColor;
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: baseSeedColor,
-      brightness: Brightness.light,
-    ).copyWith(
-      surface: ThemeConfig.lightSurface,
-      surfaceContainerHighest: ThemeConfig.lightSurfaceContainerHighest,
-      onSurface: ThemeConfig.lightOnSurface,
-      onSurfaceVariant: ThemeConfig.lightOnSurfaceVariant,
-      outline: ThemeConfig.lightOutline,
-      outlineVariant: ThemeConfig.lightOutlineVariant,
-      primary: baseSeedColor,
-      onPrimary: Colors.white,
-      secondary: baseSeedColor.withValues(alpha: 0.8),
-      onSecondary: Colors.white,
-      error: ThemeConfig.lightError,
-      onError: Colors.white,
-    );
+    final colorScheme =
+        ColorScheme.fromSeed(
+          seedColor: baseSeedColor,
+          brightness: Brightness.light,
+        ).copyWith(
+          surface: ThemeConfig.lightSurface,
+          surfaceContainerHighest: ThemeConfig.lightSurfaceContainerHighest,
+          onSurface: ThemeConfig.lightOnSurface,
+          onSurfaceVariant: ThemeConfig.lightOnSurfaceVariant,
+          outline: ThemeConfig.lightOutline,
+          outlineVariant: ThemeConfig.lightOutlineVariant,
+          primary: baseSeedColor,
+          onPrimary: Colors.white,
+          secondary: baseSeedColor.withValues(alpha: 0.8),
+          onSecondary: Colors.white,
+          error: ThemeConfig.lightError,
+          onError: Colors.white,
+        );
     final textScaleFactor = ThemeConfig.getTextScaleFactor(fontSizeScale);
     final textTheme = _scaleTextTheme(
       GoogleFonts.cairoTextTheme(ThemeData.light().textTheme),
@@ -198,23 +196,24 @@ class AppTheme {
     bool alwaysShowScrollbars = false,
   }) {
     final baseSeedColor = seedColor ?? ThemeConfig.defaultSeedColor;
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: baseSeedColor,
-      brightness: Brightness.dark,
-    ).copyWith(
-      surface: ThemeConfig.darkSurface,
-      surfaceContainerHighest: ThemeConfig.darkSurfaceContainerHighest,
-      onSurface: ThemeConfig.darkOnSurface,
-      onSurfaceVariant: ThemeConfig.darkOnSurfaceVariant,
-      outline: ThemeConfig.darkOutline,
-      outlineVariant: ThemeConfig.darkOutlineVariant,
-      primary: baseSeedColor,
-      onPrimary: Colors.white,
-      secondary: baseSeedColor.withValues(alpha: 0.8),
-      onSecondary: Colors.white,
-      error: ThemeConfig.darkError,
-      onError: Colors.white,
-    );
+    final colorScheme =
+        ColorScheme.fromSeed(
+          seedColor: baseSeedColor,
+          brightness: Brightness.dark,
+        ).copyWith(
+          surface: ThemeConfig.darkSurface,
+          surfaceContainerHighest: ThemeConfig.darkSurfaceContainerHighest,
+          onSurface: ThemeConfig.darkOnSurface,
+          onSurfaceVariant: ThemeConfig.darkOnSurfaceVariant,
+          outline: ThemeConfig.darkOutline,
+          outlineVariant: ThemeConfig.darkOutlineVariant,
+          primary: baseSeedColor,
+          onPrimary: Colors.white,
+          secondary: baseSeedColor.withValues(alpha: 0.8),
+          onSecondary: Colors.white,
+          error: ThemeConfig.darkError,
+          onError: Colors.white,
+        );
     final textScaleFactor = ThemeConfig.getTextScaleFactor(fontSizeScale);
     final textTheme = _scaleTextTheme(
       GoogleFonts.cairoTextTheme(ThemeData.dark().textTheme),
@@ -239,23 +238,24 @@ class AppTheme {
     bool alwaysShowScrollbars = false,
   }) {
     final baseSeedColor = seedColor ?? ThemeConfig.defaultSeedColor;
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: baseSeedColor,
-      brightness: Brightness.dark,
-    ).copyWith(
-      surface: ThemeConfig.amoledSurface,
-      surfaceContainerHighest: ThemeConfig.amoledSurfaceContainerHighest,
-      onSurface: ThemeConfig.amoledOnSurface,
-      onSurfaceVariant: ThemeConfig.amoledOnSurfaceVariant,
-      outline: ThemeConfig.amoledOutline,
-      outlineVariant: ThemeConfig.amoledOutlineVariant,
-      primary: baseSeedColor,
-      onPrimary: Colors.white,
-      secondary: baseSeedColor.withValues(alpha: 0.8),
-      onSecondary: Colors.white,
-      error: ThemeConfig.amoledError,
-      onError: Colors.white,
-    );
+    final colorScheme =
+        ColorScheme.fromSeed(
+          seedColor: baseSeedColor,
+          brightness: Brightness.dark,
+        ).copyWith(
+          surface: ThemeConfig.amoledSurface,
+          surfaceContainerHighest: ThemeConfig.amoledSurfaceContainerHighest,
+          onSurface: ThemeConfig.amoledOnSurface,
+          onSurfaceVariant: ThemeConfig.amoledOnSurfaceVariant,
+          outline: ThemeConfig.amoledOutline,
+          outlineVariant: ThemeConfig.amoledOutlineVariant,
+          primary: baseSeedColor,
+          onPrimary: Colors.white,
+          secondary: baseSeedColor.withValues(alpha: 0.8),
+          onSecondary: Colors.white,
+          error: ThemeConfig.amoledError,
+          onError: Colors.white,
+        );
     final textScaleFactor = ThemeConfig.getTextScaleFactor(fontSizeScale);
     final textTheme = _scaleTextTheme(
       GoogleFonts.cairoTextTheme(ThemeData.dark().textTheme),

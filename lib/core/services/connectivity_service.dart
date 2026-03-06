@@ -11,8 +11,9 @@ part 'connectivity_service.g.dart';
 
 /// Debug-only: when non-null, UI shows this instead of real sync status.
 /// Set from debug menu to test chip/banner for each status.
-final debugSyncStatusOverrideProvider =
-    StateProvider<SyncStatus?>((ref) => null);
+final debugSyncStatusOverrideProvider = StateProvider<SyncStatus?>(
+  (ref) => null,
+);
 
 /// Sync status exposed to the UI for the connection status icon.
 enum SyncStatus {

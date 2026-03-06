@@ -18,8 +18,9 @@ class OnboardingWelcomePage extends StatelessWidget {
           const SizedBox(height: ThemeConfig.spacingS),
           Text(
             'onboarding_welcome'.tr(),
-            style: Theme.of(context).textTheme.headlineMedium
-                ?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: ThemeConfig.spacingS),
           Text(
@@ -31,9 +32,9 @@ class OnboardingWelcomePage extends StatelessWidget {
           const SizedBox(height: ThemeConfig.spacingM),
           Text(
             'onboarding_how_it_works'.tr(),
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: ThemeConfig.spacingM),
           _OnboardingFeatureCard(
@@ -134,9 +135,7 @@ class _OnboardingFeatureCard extends StatelessWidget {
                     title,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: isOptional
-                          ? colorScheme.onSurfaceVariant
-                          : null,
+                      color: isOptional ? colorScheme.onSurfaceVariant : null,
                     ),
                   ),
                   const SizedBox(height: ThemeConfig.spacingXS),

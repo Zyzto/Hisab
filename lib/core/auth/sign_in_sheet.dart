@@ -276,7 +276,8 @@ class _SignInSheetState extends State<_SignInSheet> {
     } catch (e) {
       Log.warning('Resend confirmation failed', error: e);
       if (mounted) {
-        final isRateLimit = e is AuthException &&
+        final isRateLimit =
+            e is AuthException &&
             (e.code == 'over_email_send_rate_limit' ||
                 e.message.toLowerCase().contains('rate limit'));
         setState(() {
@@ -341,349 +342,353 @@ class _SignInSheetState extends State<_SignInSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-            if (!LayoutBreakpoints.isTabletOrWider(context)) ...[
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: colorScheme.outline.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(2),
+              if (!LayoutBreakpoints.isTabletOrWider(context)) ...[
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: colorScheme.outline.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
+                const SizedBox(height: 20),
+              ],
+
+              // Title (omit on tablet+ when top bar shows it)
+              if (!LayoutBreakpoints.isTabletOrWider(context)) ...[
+                Text(
+                  _isSignUp ? 'auth_sign_up'.tr() : 'sign_in'.tr(),
+                  style: textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _isSignUp
+                      ? 'auth_sign_up_subtitle'.tr()
+                      : 'auth_sign_in_subtitle'.tr(),
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+              ],
+
+              // Sign-up only: name and avatar
+              if (_isSignUp) ...[
+                TextField(
+                  controller: _nameController,
+                  decoration: InputDecoration(
+                    labelText: 'auth_name'.tr(),
+                    hintText: 'auth_name_hint'.tr(),
+                    prefixIcon: const Icon(Icons.badge_outlined),
+                    border: const OutlineInputBorder(),
+                  ),
+                  textInputAction: TextInputAction.next,
+                  enabled: !_loading,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'auth_avatar'.tr(),
+                  style: textTheme.labelLarge?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: predefinedAvatars.map((e) {
+                    final selected = _selectedAvatarId == e.key;
+                    return GestureDetector(
+                      onTap: _loading
+                          ? null
+                          : () => setState(() => _selectedAvatarId = e.key),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? colorScheme.primaryContainer
+                              : colorScheme.surfaceContainerHighest,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: selected
+                                ? colorScheme.primary
+                                : colorScheme.outline.withValues(alpha: 0.3),
+                            width: selected ? 2.5 : 1,
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          e.value,
+                          style: const TextStyle(fontSize: 22),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 20),
+              ],
+
+              // Magic link sent confirmation
+              if (_magicLinkSent) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.mark_email_read, color: colorScheme.primary),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'auth_magic_link_sent'.tr(),
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Email confirmation banner (after sign-up or when sign-in blocked)
+              if (_emailNotConfirmed) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: _confirmationResent
+                        ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+                        : colorScheme.tertiaryContainer.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            _confirmationResent
+                                ? Icons.mark_email_read
+                                : Icons.mark_email_unread,
+                            color: _confirmationResent
+                                ? colorScheme.primary
+                                : colorScheme.tertiary,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _confirmationResent
+                                  ? 'auth_confirmation_resent'.tr()
+                                  : 'auth_email_not_confirmed'.tr(),
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: _confirmationResent
+                                    ? colorScheme.onPrimaryContainer
+                                    : colorScheme.onTertiaryContainer,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (!_confirmationResent) ...[
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: _loading ? null : _resendConfirmation,
+                            icon: const Icon(Icons.send, size: 18),
+                            label: Text('auth_resend_confirmation'.tr()),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Error message
+              if (_error != null && !_emailNotConfirmed) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: colorScheme.errorContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 20,
+                        color: colorScheme.error,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _error!,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onErrorContainer,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // OAuth buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _loading
+                          ? null
+                          : () => _signInWithOAuth(OAuthProvider.google),
+                      icon: const Icon(Icons.g_mobiledata, size: 22),
+                      label: Text('auth_provider_google'.tr()),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _loading
+                          ? null
+                          : () => _signInWithOAuth(OAuthProvider.github),
+                      icon: const Icon(Icons.code, size: 20),
+                      label: Text('auth_provider_github'.tr()),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 20),
-            ],
 
-            // Title (omit on tablet+ when top bar shows it)
-            if (!LayoutBreakpoints.isTabletOrWider(context)) ...[
-              Text(
-                _isSignUp ? 'auth_sign_up'.tr() : 'sign_in'.tr(),
-                style: textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
+              // Divider
+              Row(
+                children: [
+                  Expanded(
+                    child: Divider(
+                      color: colorScheme.outline.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      'auth_or'.tr(),
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Divider(
+                      color: colorScheme.outline.withValues(alpha: 0.3),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                _isSignUp
-                    ? 'auth_sign_up_subtitle'.tr()
-                    : 'auth_sign_in_subtitle'.tr(),
-                style: textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-            ],
+              const SizedBox(height: 20),
 
-            // Sign-up only: name and avatar
-            if (_isSignUp) ...[
+              // Email field
               TextField(
-                controller: _nameController,
+                controller: _emailController,
                 decoration: InputDecoration(
-                  labelText: 'auth_name'.tr(),
-                  hintText: 'auth_name_hint'.tr(),
-                  prefixIcon: const Icon(Icons.badge_outlined),
+                  labelText: 'auth_email'.tr(),
+                  prefixIcon: const Icon(Icons.email_outlined),
                   border: const OutlineInputBorder(),
                 ),
+                keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
                 enabled: !_loading,
               ),
               const SizedBox(height: 12),
-              Text(
-                'auth_avatar'.tr(),
-                style: textTheme.labelLarge?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
+
+              // Password field
+              TextField(
+                controller: _passwordController,
+                decoration: InputDecoration(
+                  labelText: 'auth_password'.tr(),
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  border: const OutlineInputBorder(),
                 ),
+                obscureText: true,
+                textInputAction: TextInputAction.done,
+                enabled: !_loading,
+                onSubmitted: (_) => _signInWithEmail(),
+              ),
+              const SizedBox(height: 16),
+
+              // Sign in / Sign up button
+              FilledButton(
+                onPressed: _loading ? null : _signInWithEmail,
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: _loading
+                    ? SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: colorScheme.onPrimary,
+                        ),
+                      )
+                    : Text(
+                        _isSignUp ? 'auth_sign_up'.tr() : 'sign_in'.tr(),
+                        style: const TextStyle(fontSize: 16),
+                      ),
               ),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: predefinedAvatars.map((e) {
-                  final selected = _selectedAvatarId == e.key;
-                  return GestureDetector(
-                    onTap: _loading
-                        ? null
-                        : () => setState(() => _selectedAvatarId = e.key),
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? colorScheme.primaryContainer
-                            : colorScheme.surfaceContainerHighest,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: selected
-                              ? colorScheme.primary
-                              : colorScheme.outline.withValues(alpha: 0.3),
-                          width: selected ? 2.5 : 1,
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        e.value,
-                        style: const TextStyle(fontSize: 22),
-                      ),
-                    ),
-                  );
-                }).toList(),
+
+              // Magic link button
+              TextButton(
+                onPressed: _loading ? null : _sendMagicLink,
+                child: Text('auth_magic_link'.tr()),
               ),
-              const SizedBox(height: 20),
-            ],
 
-            // Magic link sent confirmation
-            if (_magicLinkSent) ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.mark_email_read, color: colorScheme.primary),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'auth_magic_link_sent'.tr(),
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onPrimaryContainer,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-
-            // Email confirmation banner (after sign-up or when sign-in blocked)
-            if (_emailNotConfirmed) ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: _confirmationResent
-                      ? colorScheme.primaryContainer.withValues(alpha: 0.3)
-                      : colorScheme.tertiaryContainer.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          _confirmationResent
-                              ? Icons.mark_email_read
-                              : Icons.mark_email_unread,
-                          color: _confirmationResent
-                              ? colorScheme.primary
-                              : colorScheme.tertiary,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            _confirmationResent
-                                ? 'auth_confirmation_resent'.tr()
-                                : 'auth_email_not_confirmed'.tr(),
-                            style: textTheme.bodyMedium?.copyWith(
-                              color: _confirmationResent
-                                  ? colorScheme.onPrimaryContainer
-                                  : colorScheme.onTertiaryContainer,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (!_confirmationResent) ...[
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: _loading ? null : _resendConfirmation,
-                          icon: const Icon(Icons.send, size: 18),
-                          label: Text('auth_resend_confirmation'.tr()),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-
-            // Error message
-            if (_error != null && !_emailNotConfirmed) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: colorScheme.errorContainer,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 20,
-                      color: colorScheme.error,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _error!,
-                        style: textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onErrorContainer,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-
-            // OAuth buttons
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _loading
-                        ? null
-                        : () => _signInWithOAuth(OAuthProvider.google),
-                    icon: const Icon(Icons.g_mobiledata, size: 22),
-                    label: Text('auth_provider_google'.tr()),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _loading
-                        ? null
-                        : () => _signInWithOAuth(OAuthProvider.github),
-                    icon: const Icon(Icons.code, size: 20),
-                    label: Text('auth_provider_github'.tr()),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // Divider
-            Row(
-              children: [
-                Expanded(
-                  child: Divider(
-                    color: colorScheme.outline.withValues(alpha: 0.3),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Text(
-                    'auth_or'.tr(),
+              // Toggle sign-in / sign-up
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _isSignUp
+                        ? 'auth_have_account'.tr()
+                        : 'auth_no_account'.tr(),
                     style: textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
                   ),
-                ),
-                Expanded(
-                  child: Divider(
-                    color: colorScheme.outline.withValues(alpha: 0.3),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // Email field
-            TextField(
-              controller: _emailController,
-              decoration: InputDecoration(
-                labelText: 'auth_email'.tr(),
-                prefixIcon: const Icon(Icons.email_outlined),
-                border: const OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.emailAddress,
-              textInputAction: TextInputAction.next,
-              enabled: !_loading,
-            ),
-            const SizedBox(height: 12),
-
-            // Password field
-            TextField(
-              controller: _passwordController,
-              decoration: InputDecoration(
-                labelText: 'auth_password'.tr(),
-                prefixIcon: const Icon(Icons.lock_outline),
-                border: const OutlineInputBorder(),
-              ),
-              obscureText: true,
-              textInputAction: TextInputAction.done,
-              enabled: !_loading,
-              onSubmitted: (_) => _signInWithEmail(),
-            ),
-            const SizedBox(height: 16),
-
-            // Sign in / Sign up button
-            FilledButton(
-              onPressed: _loading ? null : _signInWithEmail,
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              child: _loading
-                  ? SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: colorScheme.onPrimary,
-                      ),
-                    )
-                  : Text(
-                      _isSignUp ? 'auth_sign_up'.tr() : 'sign_in'.tr(),
-                      style: const TextStyle(fontSize: 16),
+                  TextButton(
+                    onPressed: _loading
+                        ? null
+                        : () => setState(() {
+                            _isSignUp = !_isSignUp;
+                            _error = null;
+                            if (_isSignUp) {
+                              _selectedAvatarId = defaultAvatarId;
+                            }
+                          }),
+                    child: Text(
+                      _isSignUp ? 'sign_in'.tr() : 'auth_sign_up'.tr(),
                     ),
-            ),
-            const SizedBox(height: 8),
-
-            // Magic link button
-            TextButton(
-              onPressed: _loading ? null : _sendMagicLink,
-              child: Text('auth_magic_link'.tr()),
-            ),
-
-            // Toggle sign-in / sign-up
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  _isSignUp ? 'auth_have_account'.tr() : 'auth_no_account'.tr(),
-                  style: textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
                   ),
-                ),
-                TextButton(
-                  onPressed: _loading
-                      ? null
-                      : () => setState(() {
-                          _isSignUp = !_isSignUp;
-                          _error = null;
-                          if (_isSignUp) {
-                            _selectedAvatarId = defaultAvatarId;
-                          }
-                        }),
-                  child: Text(_isSignUp ? 'sign_in'.tr() : 'auth_sign_up'.tr()),
-                ),
-              ],
-            ),
+                ],
+              ),
             ],
           ),
         ),

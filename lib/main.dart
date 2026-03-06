@@ -100,257 +100,283 @@ void main() {
       }
 
       Future<void> runRestOfMain() async {
-    await LoggingService.init(
-      const LoggingConfig(
-        appName: 'Hisab',
-        logFileName: 'hisab.log',
-        crashLogFileName: 'hisab_crashes.log',
-      ),
-    );
-    Log.info('main: LoggingService initialized');
-
-  // Timeout to avoid release hang if asset loading never completes (e.g. release bundle)
-  bool easyLocalizationReady = false;
-  const easyLocalizationTimeout = Duration(seconds: 15);
-  try {
-    await EasyLocalization.ensureInitialized().timeout(
-      easyLocalizationTimeout,
-      onTimeout: () {
-        throw TimeoutException(
-          'EasyLocalization.ensureInitialized()',
-          easyLocalizationTimeout,
+        await LoggingService.init(
+          const LoggingConfig(
+            appName: 'Hisab',
+            logFileName: 'hisab.log',
+            crashLogFileName: 'hisab_crashes.log',
+          ),
         );
-      },
-    );
-    easyLocalizationReady = true;
-  } on TimeoutException catch (e) {
-    Log.warning(
-      'main: EasyLocalization.ensureInitialized() timed out after ${e.duration?.inSeconds ?? 15}s, using fallback locale',
-    );
-  }
-  // Reduce console noise from easy_localization [DEBUG] / [INFO] messages
-  EasyLocalization.logger.enableBuildModes = [];
-  if (easyLocalizationReady) {
-    Log.info('main: EasyLocalization initialized');
-  } else {
-    Log.info('main: EasyLocalization skipped (timeout), using fallback locale');
-  }
+        Log.info('main: LoggingService initialized');
 
-  // Use Android Photo Picker for gallery (no READ_MEDIA_IMAGES required).
-  initImagePicker();
-
-  final settingsProviders = await initializeHisabSettings();
-  if (settingsProviders != null) {
-    Log.info('main: Settings framework initialized');
-  } else {
-    Log.warning('main: Settings framework init returned null, using defaults');
-  }
-
-  // --------------------------------------------------------------------------
-  // Local SQLite database (always initialized — works offline)
-  // --------------------------------------------------------------------------
-  Log.info('main: Opening PowerSync database...');
-  final dbPath = kIsWeb
-      ? 'hisab.db'
-      : join((await getApplicationDocumentsDirectory()).path, 'hisab.db');
-  final db = await _initializePowerSyncDatabase(ps.schema, dbPath);
-  Log.info('main: PowerSync database initialized (local SQLite)');
-
-  // --------------------------------------------------------------------------
-  // Supabase (ONLY if configured via --dart-define)
-  // --------------------------------------------------------------------------
-  if (supabaseConfigAvailable) {
-    Log.info('main: Initializing Supabase...');
-    await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
-    Log.info('main: Supabase client initialized');
-
-    if (settingsProviders != null) {
-      final session = supabaseClientIfConfigured?.auth.currentSession;
-
-      // Handle pending OAuth redirects (web only — page reloaded after redirect)
-      final onboardingPending = settingsProviders.controller.get(
-        onboardingOnlinePendingSettingDef,
-      );
-      final settingsPending = settingsProviders.controller.get(
-        settingsOnlinePendingSettingDef,
-      );
-
-      if (onboardingPending && session != null) {
-        // OAuth completed after onboarding redirect
-        settingsProviders.controller.set(
-          onboardingOnlinePendingSettingDef,
-          false,
-        );
-        settingsProviders.controller.set(localOnlySettingDef, false);
-        settingsProviders.controller.set(onboardingCompletedSettingDef, true);
-        Log.info(
-          'Setting changed: onboarding OAuth flags and local_only, onboarding_completed=true',
-        );
-      } else if (onboardingPending && session == null) {
-        // OAuth was started but failed/cancelled
-        settingsProviders.controller.set(
-          onboardingOnlinePendingSettingDef,
-          false,
-        );
-        Log.info(
-          'Setting changed: ${onboardingOnlinePendingSettingDef.key}=false',
-        );
-      }
-
-      if (settingsPending && session != null) {
-        // OAuth completed after settings redirect
-        settingsProviders.controller.set(
-          settingsOnlinePendingSettingDef,
-          false,
-        );
-        settingsProviders.controller.set(localOnlySettingDef, false);
-        Log.info(
-          'Setting changed: ${settingsOnlinePendingSettingDef.key}=false, '
-          '${localOnlySettingDef.key}=false',
-        );
-      } else if (settingsPending && session == null) {
-        // OAuth was started but failed/cancelled
-        settingsProviders.controller.set(
-          settingsOnlinePendingSettingDef,
-          false,
-        );
-        Log.info(
-          'Setting changed: ${settingsOnlinePendingSettingDef.key}=false',
-        );
-      }
-
-      // If previously online but no session on startup, do NOT force
-      // local-only. On web, the session may recover asynchronously after
-      // a token refresh. Forcing local-only permanently overwrites the
-      // user's preference and requires them to manually switch back.
-      // Instead, keep the online preference — the DataSyncService already
-      // handles "online but not authenticated" by pausing sync, and the
-      // account UI shows a re-authenticate prompt.
-      final localOnly = settingsProviders.controller.get(localOnlySettingDef);
-      if (!localOnly && session == null) {
-        Log.info(
-          'Online mode active but no session yet — '
-          'user can re-authenticate from settings',
-        );
-      }
-    }
-  } else {
-    Log.info('main: Supabase not configured — running in local-only mode');
-  }
-
-  // --------------------------------------------------------------------------
-  // Firebase (for push notifications — only if Supabase is configured)
-  // --------------------------------------------------------------------------
-  if (supabaseConfigAvailable) {
-    try {
-      Log.info('main: Initializing Firebase...');
-      if (kIsWeb) {
-        final options = firebaseOptionsForWeb;
-        if (options != null) {
-          await Firebase.initializeApp(options: options);
-          firebaseInitialized = true;
-          FirebaseMessaging.onBackgroundMessage(
-            firebaseMessagingBackgroundHandler,
+        // Timeout to avoid release hang if asset loading never completes (e.g. release bundle)
+        bool easyLocalizationReady = false;
+        const easyLocalizationTimeout = Duration(seconds: 15);
+        try {
+          await EasyLocalization.ensureInitialized().timeout(
+            easyLocalizationTimeout,
+            onTimeout: () {
+              throw TimeoutException(
+                'EasyLocalization.ensureInitialized()',
+                easyLocalizationTimeout,
+              );
+            },
           );
-          Log.info('main: Firebase initialized');
-        } else {
-          Log.info(
-            'main: Firebase web options missing (push notifications disabled on web)',
+          easyLocalizationReady = true;
+        } on TimeoutException catch (e) {
+          Log.warning(
+            'main: EasyLocalization.ensureInitialized() timed out after ${e.duration?.inSeconds ?? 15}s, using fallback locale',
           );
         }
-      } else {
-        await Firebase.initializeApp();
-        firebaseInitialized = true;
-        FirebaseMessaging.onBackgroundMessage(
-          firebaseMessagingBackgroundHandler,
+        // Reduce console noise from easy_localization [DEBUG] / [INFO] messages
+        EasyLocalization.logger.enableBuildModes = [];
+        if (easyLocalizationReady) {
+          Log.info('main: EasyLocalization initialized');
+        } else {
+          Log.info(
+            'main: EasyLocalization skipped (timeout), using fallback locale',
+          );
+        }
+
+        // Use Android Photo Picker for gallery (no READ_MEDIA_IMAGES required).
+        initImagePicker();
+
+        final settingsProviders = await initializeHisabSettings();
+        if (settingsProviders != null) {
+          Log.info('main: Settings framework initialized');
+        } else {
+          Log.warning(
+            'main: Settings framework init returned null, using defaults',
+          );
+        }
+
+        // --------------------------------------------------------------------------
+        // Local SQLite database (always initialized — works offline)
+        // --------------------------------------------------------------------------
+        Log.info('main: Opening PowerSync database...');
+        final dbPath = kIsWeb
+            ? 'hisab.db'
+            : join((await getApplicationDocumentsDirectory()).path, 'hisab.db');
+        final db = await _initializePowerSyncDatabase(ps.schema, dbPath);
+        Log.info('main: PowerSync database initialized (local SQLite)');
+
+        // --------------------------------------------------------------------------
+        // Supabase (ONLY if configured via --dart-define)
+        // --------------------------------------------------------------------------
+        if (supabaseConfigAvailable) {
+          Log.info('main: Initializing Supabase...');
+          await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
+          Log.info('main: Supabase client initialized');
+
+          if (settingsProviders != null) {
+            final session = supabaseClientIfConfigured?.auth.currentSession;
+
+            // Handle pending OAuth redirects (web only — page reloaded after redirect)
+            final onboardingPending = settingsProviders.controller.get(
+              onboardingOnlinePendingSettingDef,
+            );
+            final settingsPending = settingsProviders.controller.get(
+              settingsOnlinePendingSettingDef,
+            );
+
+            if (onboardingPending && session != null) {
+              // OAuth completed after onboarding redirect
+              settingsProviders.controller.set(
+                onboardingOnlinePendingSettingDef,
+                false,
+              );
+              settingsProviders.controller.set(localOnlySettingDef, false);
+              settingsProviders.controller.set(
+                onboardingCompletedSettingDef,
+                true,
+              );
+              Log.info(
+                'Setting changed: onboarding OAuth flags and local_only, onboarding_completed=true',
+              );
+            } else if (onboardingPending && session == null) {
+              // OAuth was started but failed/cancelled
+              settingsProviders.controller.set(
+                onboardingOnlinePendingSettingDef,
+                false,
+              );
+              Log.info(
+                'Setting changed: ${onboardingOnlinePendingSettingDef.key}=false',
+              );
+            }
+
+            if (settingsPending && session != null) {
+              // OAuth completed after settings redirect
+              settingsProviders.controller.set(
+                settingsOnlinePendingSettingDef,
+                false,
+              );
+              settingsProviders.controller.set(localOnlySettingDef, false);
+              Log.info(
+                'Setting changed: ${settingsOnlinePendingSettingDef.key}=false, '
+                '${localOnlySettingDef.key}=false',
+              );
+            } else if (settingsPending && session == null) {
+              // OAuth was started but failed/cancelled
+              settingsProviders.controller.set(
+                settingsOnlinePendingSettingDef,
+                false,
+              );
+              Log.info(
+                'Setting changed: ${settingsOnlinePendingSettingDef.key}=false',
+              );
+            }
+
+            // If previously online but no session on startup, do NOT force
+            // local-only. On web, the session may recover asynchronously after
+            // a token refresh. Forcing local-only permanently overwrites the
+            // user's preference and requires them to manually switch back.
+            // Instead, keep the online preference — the DataSyncService already
+            // handles "online but not authenticated" by pausing sync, and the
+            // account UI shows a re-authenticate prompt.
+            final localOnly = settingsProviders.controller.get(
+              localOnlySettingDef,
+            );
+            if (!localOnly && session == null) {
+              Log.info(
+                'Online mode active but no session yet — '
+                'user can re-authenticate from settings',
+              );
+            }
+          }
+        } else {
+          Log.info(
+            'main: Supabase not configured — running in local-only mode',
+          );
+        }
+
+        // --------------------------------------------------------------------------
+        // Firebase (for push notifications — only if Supabase is configured)
+        // --------------------------------------------------------------------------
+        if (supabaseConfigAvailable) {
+          try {
+            Log.info('main: Initializing Firebase...');
+            if (kIsWeb) {
+              final options = firebaseOptionsForWeb;
+              if (options != null) {
+                await Firebase.initializeApp(options: options);
+                firebaseInitialized = true;
+                FirebaseMessaging.onBackgroundMessage(
+                  firebaseMessagingBackgroundHandler,
+                );
+                Log.info('main: Firebase initialized');
+              } else {
+                Log.info(
+                  'main: Firebase web options missing (push notifications disabled on web)',
+                );
+              }
+            } else {
+              await Firebase.initializeApp();
+              firebaseInitialized = true;
+              FirebaseMessaging.onBackgroundMessage(
+                firebaseMessagingBackgroundHandler,
+              );
+              Log.info('main: Firebase initialized');
+            }
+          } catch (e, st) {
+            Log.warning(
+              'main: Firebase init failed (push notifications disabled)',
+              error: e,
+              stackTrace: st,
+            );
+          }
+        }
+
+        // --------------------------------------------------------------------------
+        // Run app — EasyLocalization stays mounted (no key change) to avoid
+        // setState-after-dispose from its async asset loading. We sync locale
+        // by calling setLocale when languageProvider changes (_LocaleSync).
+        // First initial language (onboarding, default): system locale if supported, else English.
+        // --------------------------------------------------------------------------
+        if (settingsProviders != null &&
+            easyLocalizationReady &&
+            !settingsProviders.controller.get(onboardingCompletedSettingDef) &&
+            settingsProviders.controller.get(languageSettingDef) == 'en') {
+          final resolved = ui.PlatformDispatcher.instance
+              .computePlatformResolvedLocale(const [
+                Locale('en'),
+                Locale('ar'),
+              ]);
+          if (resolved != null) {
+            settingsProviders.controller.set(
+              languageSettingDef,
+              resolved.languageCode,
+            );
+            Log.info(
+              'Setting changed: ${languageSettingDef.key}=${resolved.languageCode} (platform)',
+            );
+          }
+        }
+        final startLocale = easyLocalizationReady && settingsProviders != null
+            ? Locale(settingsProviders.controller.get(languageSettingDef))
+            : const Locale('en');
+
+        Log.info('main: Starting app (runApp)');
+        runApp(
+          EasyLocalization(
+            supportedLocales: const [Locale('en'), Locale('ar')],
+            path: 'assets/translations',
+            fallbackLocale: const Locale('en'),
+            startLocale: startLocale,
+            saveLocale: false,
+            child: ProviderScope(
+              overrides: [
+                powerSyncDatabaseProvider.overrideWithValue(db),
+                if (settingsProviders != null) ...[
+                  settingsControllerProvider.overrideWithValue(
+                    settingsProviders.controller,
+                  ),
+                  settingsSearchIndexProvider.overrideWithValue(
+                    settingsProviders.searchIndex,
+                  ),
+                  settingsProvidersProvider.overrideWithValue(
+                    settingsProviders,
+                  ),
+                  hisabSettingsProvidersProvider.overrideWithValue(
+                    settingsProviders,
+                  ),
+                ],
+              ],
+              child: const _LocaleSync(child: App()),
+            ),
+          ),
         );
-        Log.info('main: Firebase initialized');
-      }
-    } catch (e, st) {
-      Log.warning('main: Firebase init failed (push notifications disabled)',
-          error: e, stackTrace: st);
-    }
-  }
-
-  // --------------------------------------------------------------------------
-  // Run app — EasyLocalization stays mounted (no key change) to avoid
-  // setState-after-dispose from its async asset loading. We sync locale
-  // by calling setLocale when languageProvider changes (_LocaleSync).
-  // First initial language (onboarding, default): system locale if supported, else English.
-  // --------------------------------------------------------------------------
-  if (settingsProviders != null &&
-      easyLocalizationReady &&
-      !settingsProviders.controller.get(onboardingCompletedSettingDef) &&
-      settingsProviders.controller.get(languageSettingDef) == 'en') {
-    final resolved = ui.PlatformDispatcher.instance
-        .computePlatformResolvedLocale(const [
-      Locale('en'),
-      Locale('ar'),
-    ]);
-    if (resolved != null) {
-      settingsProviders.controller.set(languageSettingDef, resolved.languageCode);
-      Log.info(
-        'Setting changed: ${languageSettingDef.key}=${resolved.languageCode} (platform)',
-      );
-    }
-  }
-  final startLocale = easyLocalizationReady && settingsProviders != null
-      ? Locale(settingsProviders.controller.get(languageSettingDef))
-      : const Locale('en');
-
-  Log.info('main: Starting app (runApp)');
-  runApp(
-    EasyLocalization(
-      supportedLocales: const [Locale('en'), Locale('ar')],
-      path: 'assets/translations',
-      fallbackLocale: const Locale('en'),
-      startLocale: startLocale,
-      saveLocale: false,
-      child: ProviderScope(
-        overrides: [
-          powerSyncDatabaseProvider.overrideWithValue(db),
-          if (settingsProviders != null) ...[
-            settingsControllerProvider.overrideWithValue(
-              settingsProviders.controller,
-            ),
-            settingsSearchIndexProvider.overrideWithValue(
-              settingsProviders.searchIndex,
-            ),
-            settingsProvidersProvider.overrideWithValue(settingsProviders),
-            hisabSettingsProvidersProvider.overrideWithValue(settingsProviders),
-          ],
-        ],
-        child: const _LocaleSync(child: App()),
-      ),
-    ),
-  );
-  if (kIsWeb) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      SemanticsBinding.instance.ensureSemantics();
-    });
-  }
+        if (kIsWeb) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            SemanticsBinding.instance.ensureSemantics();
+          });
+        }
       }
 
-  if (kIsWeb) {
-    await runZoned(() async {
-      WidgetsFlutterBinding.ensureInitialized();
-      PWAInstall().setup(installCallback: () {
-        debugPrint('PWA installed!');
-      });
-      initWebLogCapture();
-      setupErrorHandlers();
-      await runRestOfMain();
-    }, zoneSpecification: ZoneSpecification(
-      print: (Zone self, ZoneDelegate parent, Zone zone, String line) {
-        capturePrintLine(line);
-        parent.print(zone, line);
-      },
-    ));
-  } else {
-    WidgetsFlutterBinding.ensureInitialized();
-    setupErrorHandlers();
-    await runRestOfMain();
-  }
+      if (kIsWeb) {
+        await runZoned(
+          () async {
+            WidgetsFlutterBinding.ensureInitialized();
+            PWAInstall().setup(
+              installCallback: () {
+                debugPrint('PWA installed!');
+              },
+            );
+            initWebLogCapture();
+            setupErrorHandlers();
+            await runRestOfMain();
+          },
+          zoneSpecification: ZoneSpecification(
+            print: (Zone self, ZoneDelegate parent, Zone zone, String line) {
+              capturePrintLine(line);
+              parent.print(zone, line);
+            },
+          ),
+        );
+      } else {
+        WidgetsFlutterBinding.ensureInitialized();
+        setupErrorHandlers();
+        await runRestOfMain();
+      }
     },
     (error, stack) {
       if (kIsWeb &&
@@ -423,7 +449,11 @@ class _LocaleSync extends ConsumerWidget {
     try {
       languageCode = ref.watch(languageProvider);
     } catch (e, st) {
-      Log.warning('_LocaleSync: languageProvider read failed', error: e, stackTrace: st);
+      Log.warning(
+        '_LocaleSync: languageProvider read failed',
+        error: e,
+        stackTrace: st,
+      );
       languageCode = 'en';
     }
     if (context.locale.languageCode != languageCode) {
@@ -433,7 +463,11 @@ class _LocaleSync extends ConsumerWidget {
         try {
           context.setLocale(locale);
         } catch (e, st) {
-          Log.warning('_LocaleSync: setLocale failed', error: e, stackTrace: st);
+          Log.warning(
+            '_LocaleSync: setLocale failed',
+            error: e,
+            stackTrace: st,
+          );
         }
       });
     }

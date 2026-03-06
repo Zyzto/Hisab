@@ -29,12 +29,10 @@ class GroupInvite {
   });
 
   /// Whether the invite has passed its expiry date.
-  bool get isExpired =>
-      expiresAt != null && DateTime.now().isAfter(expiresAt!);
+  bool get isExpired => expiresAt != null && DateTime.now().isAfter(expiresAt!);
 
   /// Whether the invite has reached its max usage limit.
-  bool get isMaxedOut =>
-      maxUses != null && useCount >= maxUses!;
+  bool get isMaxedOut => maxUses != null && useCount >= maxUses!;
 
   /// Whether the invite can currently be used to join.
   bool get isUsable => isActive && !isExpired && !isMaxedOut;

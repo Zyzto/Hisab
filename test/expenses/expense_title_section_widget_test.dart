@@ -18,7 +18,9 @@ void main() {
     controller.dispose();
   });
 
-  testWidgets('ExpenseTitleSection shows title label and tag icon', (tester) async {
+  testWidgets('ExpenseTitleSection shows title label and tag icon', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       EasyLocalization(
         path: 'assets/translations',

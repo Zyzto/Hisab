@@ -21,9 +21,7 @@ void main() {
           supportedLocales: const [Locale('en')],
           fallbackLocale: const Locale('en'),
           startLocale: const Locale('en'),
-          child: const MaterialApp(
-            home: Scaffold(body: ConnectionBanner()),
-          ),
+          child: const MaterialApp(home: Scaffold(body: ConnectionBanner())),
         ),
       ),
     );
@@ -32,7 +30,9 @@ void main() {
     expect(find.byIcon(Icons.cloud_off_outlined), findsNothing);
   });
 
-  testWidgets('ConnectionBanner when offline from start builds without error', (tester) async {
+  testWidgets('ConnectionBanner when offline from start builds without error', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -43,9 +43,7 @@ void main() {
           supportedLocales: const [Locale('en')],
           fallbackLocale: const Locale('en'),
           startLocale: const Locale('en'),
-          child: const MaterialApp(
-            home: Scaffold(body: ConnectionBanner()),
-          ),
+          child: const MaterialApp(home: Scaffold(body: ConnectionBanner())),
         ),
       ),
     );

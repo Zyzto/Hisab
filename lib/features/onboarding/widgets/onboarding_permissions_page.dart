@@ -43,8 +43,9 @@ class OnboardingPermissionsPage extends ConsumerWidget {
         children: [
           Text(
             'onboarding_permissions_title'.tr(),
-            style: Theme.of(context).textTheme.headlineMedium
-                ?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: ThemeConfig.spacingS),
           Text(
@@ -80,8 +81,7 @@ class OnboardingPermissionsPage extends ConsumerWidget {
                 context,
                 icon: Icons.notifications_outlined,
                 title: 'onboarding_permission_notifications'.tr(),
-                subtitle:
-                    'onboarding_permission_notifications_desc'.tr(),
+                subtitle: 'onboarding_permission_notifications_desc'.tr(),
                 granted: notificationGrantedValue,
                 onAllow: onRequestNotification,
               ),
@@ -126,8 +126,11 @@ Widget _buildPermissionRow(
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.check_circle,
-                      size: 18, color: colorScheme.primary),
+                  Icon(
+                    Icons.check_circle,
+                    size: 18,
+                    color: colorScheme.primary,
+                  ),
                   const SizedBox(width: 6),
                   Text('onboarding_permission_allowed'.tr()),
                 ],
@@ -212,9 +215,7 @@ class _TelemetryToggle extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final enabled = ref.watch(
-      settings.provider(telemetryEnabledSettingDef),
-    );
+    final enabled = ref.watch(settings.provider(telemetryEnabledSettingDef));
     return OnboardingListCard(
       leading: const OnboardingListCardIcon(
         icon: Icons.analytics_outlined,
@@ -233,9 +234,7 @@ class _TelemetryToggle extends ConsumerWidget {
           ref
               .read(settings.provider(telemetryEnabledSettingDef).notifier)
               .set(v);
-          Log.info(
-            'Setting changed: ${telemetryEnabledSettingDef.key}=$v',
-          );
+          Log.info('Setting changed: ${telemetryEnabledSettingDef.key}=$v');
         },
       ),
     );

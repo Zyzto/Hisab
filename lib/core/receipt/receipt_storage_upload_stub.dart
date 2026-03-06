@@ -29,7 +29,9 @@ Future<String?> uploadReceiptBytesToStorage(
   final ext = fileExt ?? 'jpg';
   final bucketKey = '$groupId/$expenseId/${const Uuid().v4()}.$ext';
   try {
-    await client.storage.from(_bucket).uploadBinary(
+    await client.storage
+        .from(_bucket)
+        .uploadBinary(
           bucketKey,
           bytes,
           fileOptions: const FileOptions(upsert: false),

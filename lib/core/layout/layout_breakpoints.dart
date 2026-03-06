@@ -67,8 +67,10 @@ class LayoutBreakpoints {
     final effectiveRailWidth = (viewportWidth - contentAreaWidth) > 5
         ? (viewportWidth - contentAreaWidth)
         : 0.0;
-    var leftOffset = (viewportWidth / 2 - maxW / 2 - effectiveRailWidth)
-        .clamp(0.0, double.infinity);
+    var leftOffset = (viewportWidth / 2 - maxW / 2 - effectiveRailWidth).clamp(
+      0.0,
+      double.infinity,
+    );
     if (leftOffset > contentAreaWidth) leftOffset = 0.0;
     final bandWidth = (contentAreaWidth - leftOffset).clamp(0.0, maxW);
     return (leftOffset, bandWidth);

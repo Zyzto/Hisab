@@ -33,8 +33,9 @@ class OnboardingConnectPage extends ConsumerWidget {
         children: [
           Text(
             'onboarding_connect'.tr(),
-            style: Theme.of(context).textTheme.headlineMedium
-                ?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: ThemeConfig.spacingS),
           Text(
@@ -77,9 +78,7 @@ class OnboardingConnectPage extends ConsumerWidget {
               onSelectionChanged: (selection) {
                 if (selection.isNotEmpty) {
                   ref
-                      .read(
-                        settings.provider(localOnlySettingDef).notifier,
-                      )
+                      .read(settings.provider(localOnlySettingDef).notifier)
                       .set(selection.first);
                   Log.info(
                     'Setting changed: ${localOnlySettingDef.key}=${selection.first}',
@@ -92,12 +91,8 @@ class OnboardingConnectPage extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(ThemeConfig.spacingM),
                 decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer.withValues(
-                    alpha: 0.3,
-                  ),
-                  borderRadius: BorderRadius.circular(
-                    ThemeConfig.radiusM,
-                  ),
+                  color: colorScheme.primaryContainer.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(ThemeConfig.radiusM),
                 ),
                 child: Row(
                   children: [
@@ -110,11 +105,10 @@ class OnboardingConnectPage extends ConsumerWidget {
                     Expanded(
                       child: Text(
                         'onboarding_online_requires_sign_in'.tr(),
-                        style: Theme.of(context).textTheme.bodyMedium
-                            ?.copyWith(
-                              color: colorScheme.onPrimaryContainer,
-                              fontWeight: FontWeight.w500,
-                            ),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onPrimaryContainer,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ],
@@ -124,12 +118,8 @@ class OnboardingConnectPage extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(ThemeConfig.spacingM),
                 decoration: BoxDecoration(
-                  color: colorScheme.errorContainer.withValues(
-                    alpha: 0.4,
-                  ),
-                  borderRadius: BorderRadius.circular(
-                    ThemeConfig.radiusM,
-                  ),
+                  color: colorScheme.errorContainer.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(ThemeConfig.radiusM),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -158,9 +148,7 @@ class OnboardingConnectPage extends ConsumerWidget {
               padding: const EdgeInsets.all(ThemeConfig.spacingM),
               decoration: BoxDecoration(
                 color: colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(
-                  ThemeConfig.radiusL,
-                ),
+                borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
                 border: Border.all(
                   color: colorScheme.outline.withValues(alpha: 0.2),
                 ),
@@ -171,9 +159,7 @@ class OnboardingConnectPage extends ConsumerWidget {
                     padding: const EdgeInsets.all(ThemeConfig.spacingS),
                     decoration: BoxDecoration(
                       color: colorScheme.surfaceContainerHigh,
-                      borderRadius: BorderRadius.circular(
-                        ThemeConfig.radiusM,
-                      ),
+                      borderRadius: BorderRadius.circular(ThemeConfig.radiusM),
                     ),
                     child: Icon(
                       Icons.cloud_off_outlined,
@@ -188,18 +174,14 @@ class OnboardingConnectPage extends ConsumerWidget {
                       children: [
                         Text(
                           'onboarding_online'.tr(),
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
+                          style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: ThemeConfig.spacingXS),
                         Text(
                           'onboarding_online_unavailable'.tr(),
                           style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
+                              ?.copyWith(color: colorScheme.onSurfaceVariant),
                         ),
                       ],
                     ),
@@ -225,10 +207,9 @@ class OnboardingConnectPage extends ConsumerWidget {
                   ),
                 ],
               ),
-              style:
-                  Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
           ),

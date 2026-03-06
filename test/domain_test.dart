@@ -4,22 +4,25 @@ import 'package:hisab/domain/domain.dart';
 
 void main() {
   group('Expense', () {
-    test('effectiveBaseAmountCents returns amountCents when baseAmountCents is null', () {
-      final expense = Expense(
-        id: 'e1',
-        groupId: 'g1',
-        payerParticipantId: 'p1',
-        amountCents: 3000,
-        currencyCode: 'USD',
-        title: 'Test',
-        date: DateTime(2025, 1, 1),
-        splitType: SplitType.equal,
-        splitShares: {},
-        createdAt: DateTime(2025, 1, 1),
-        updatedAt: DateTime(2025, 1, 1),
-      );
-      expect(expense.effectiveBaseAmountCents, 3000);
-    });
+    test(
+      'effectiveBaseAmountCents returns amountCents when baseAmountCents is null',
+      () {
+        final expense = Expense(
+          id: 'e1',
+          groupId: 'g1',
+          payerParticipantId: 'p1',
+          amountCents: 3000,
+          currencyCode: 'USD',
+          title: 'Test',
+          date: DateTime(2025, 1, 1),
+          splitType: SplitType.equal,
+          splitShares: {},
+          createdAt: DateTime(2025, 1, 1),
+          updatedAt: DateTime(2025, 1, 1),
+        );
+        expect(expense.effectiveBaseAmountCents, 3000);
+      },
+    );
 
     test('effectiveBaseAmountCents returns baseAmountCents when set', () {
       final expense = Expense(

@@ -78,41 +78,31 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
       vsync: this,
       duration: const Duration(milliseconds: 2000),
     )..repeat();
-    _languagePulseStopTimer = Timer(
-      const Duration(milliseconds: 6000),
-      () {
-        if (mounted) {
-          _languagePulseController.stop();
-          setState(() => _languagePulseStopped = true);
-        }
-      },
-    );
+    _languagePulseStopTimer = Timer(const Duration(milliseconds: 6000), () {
+      if (mounted) {
+        _languagePulseController.stop();
+        setState(() => _languagePulseStopped = true);
+      }
+    });
     _languageTapController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 150),
     );
-    _hintTimer = Timer.periodic(
-      const Duration(seconds: 4),
-      (_) {
-        if (mounted) {
-          setState(() {
-            _hintLocaleIndex =
-                (_hintLocaleIndex + 1) % _hintLanguageInLocales.length;
-          });
-        }
-      },
-    );
-    _themeDemoTimer = Timer.periodic(
-      const Duration(milliseconds: 2500),
-      (_) {
-        if (mounted && _themeDemoRunning) {
-          setState(() {
-            _themeDemoIndex =
-                (_themeDemoIndex + 1) % _themeDemoOrder.length;
-          });
-        }
-      },
-    );
+    _hintTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (mounted) {
+        setState(() {
+          _hintLocaleIndex =
+              (_hintLocaleIndex + 1) % _hintLanguageInLocales.length;
+        });
+      }
+    });
+    _themeDemoTimer = Timer.periodic(const Duration(milliseconds: 2500), (_) {
+      if (mounted && _themeDemoRunning) {
+        setState(() {
+          _themeDemoIndex = (_themeDemoIndex + 1) % _themeDemoOrder.length;
+        });
+      }
+    });
   }
 
   @override
@@ -190,15 +180,19 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                               notificationGranted: _notificationGranted,
                               permissionStatusFuture: _permissionStatusFuture,
                               onRequestCamera: () async {
-                                final result = await PermissionService
-                                    .requestCameraPermission(context);
+                                final result =
+                                    await PermissionService.requestCameraPermission(
+                                      context,
+                                    );
                                 if (mounted) {
                                   setState(() => _cameraGranted = result);
                                 }
                               },
                               onRequestNotification: () async {
-                                final result = await PermissionService
-                                    .requestNotificationPermission(context);
+                                final result =
+                                    await PermissionService.requestNotificationPermission(
+                                      context,
+                                    );
                                 if (mounted) {
                                   setState(() => _notificationGranted = result);
                                 }
@@ -269,7 +263,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
           final isActive = index == _currentPage;
           return AnimatedContainer(
             duration: ThemeConfig.animationShort,
-            margin: const EdgeInsets.symmetric(horizontal: ThemeConfig.spacingXS),
+            margin: const EdgeInsets.symmetric(
+              horizontal: ThemeConfig.spacingXS,
+            ),
             width: isActive ? 24 : 8,
             height: 8,
             decoration: BoxDecoration(
@@ -328,60 +324,70 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                 onTap: _isCompleting
                     ? null
                     : () async {
-                  if (!_languagePulseStopped) {
-                    _languagePulseStopped = true;
-                    _languagePulseController.stop();
-                  }
-                  _languageTapController.forward(from: 0);
-                  final chosen = await showResponsiveSheet<Locale>(
-                    context: context,
-                    title: 'language'.tr(),
-                    maxHeight: MediaQuery.of(context).size.height * 0.75,
-                    isScrollControlled: true,
-                    centerInFullViewport: true,
-                    child: Builder(
-                      builder: (ctx) => SafeArea(
-                        child: SingleChildScrollView(
-                          child: Padding(
-                            padding: EdgeInsets.only(
-                              bottom: MediaQuery.of(ctx).padding.bottom +
-                                  ThemeConfig.spacingM,
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (!LayoutBreakpoints.isTabletOrWider(context))
-                                  Padding(
-                                    padding: const EdgeInsets.all(
-                                        ThemeConfig.spacingM),
-                                    child: Text(
-                                      'language'.tr(),
-                                      style: Theme.of(ctx).textTheme.titleMedium,
-                                    ),
+                        if (!_languagePulseStopped) {
+                          _languagePulseStopped = true;
+                          _languagePulseController.stop();
+                        }
+                        _languageTapController.forward(from: 0);
+                        final chosen = await showResponsiveSheet<Locale>(
+                          context: context,
+                          title: 'language'.tr(),
+                          maxHeight: MediaQuery.of(context).size.height * 0.75,
+                          isScrollControlled: true,
+                          centerInFullViewport: true,
+                          child: Builder(
+                            builder: (ctx) => SafeArea(
+                              child: SingleChildScrollView(
+                                child: Padding(
+                                  padding: EdgeInsets.only(
+                                    bottom:
+                                        MediaQuery.of(ctx).padding.bottom +
+                                        ThemeConfig.spacingM,
                                   ),
-                                ..._supportedLocales.map(
-                                  (locale) => ListTile(
-                                    title: Text(_localeDisplayName(locale)),
-                                    onTap: () =>
-                                        Navigator.of(ctx).pop(locale),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (!LayoutBreakpoints.isTabletOrWider(
+                                        context,
+                                      ))
+                                        Padding(
+                                          padding: const EdgeInsets.all(
+                                            ThemeConfig.spacingM,
+                                          ),
+                                          child: Text(
+                                            'language'.tr(),
+                                            style: Theme.of(
+                                              ctx,
+                                            ).textTheme.titleMedium,
+                                          ),
+                                        ),
+                                      ..._supportedLocales.map(
+                                        (locale) => ListTile(
+                                          title: Text(
+                                            _localeDisplayName(locale),
+                                          ),
+                                          onTap: () =>
+                                              Navigator.of(ctx).pop(locale),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ],
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                    ),
-                  );
-                  if (chosen != null && context.mounted) {
-                    await ref
-                        .read(settings.provider(languageSettingDef).notifier)
-                        .set(chosen.languageCode);
-                    Log.info(
-                      'Setting changed: ${languageSettingDef.key}=${chosen.languageCode}',
-                    );
-                  }
-                },
+                        );
+                        if (chosen != null && context.mounted) {
+                          await ref
+                              .read(
+                                settings.provider(languageSettingDef).notifier,
+                              )
+                              .set(chosen.languageCode);
+                          Log.info(
+                            'Setting changed: ${languageSettingDef.key}=${chosen.languageCode}',
+                          );
+                        }
+                      },
                 customBorder: const CircleBorder(),
                 child: Padding(
                   padding: const EdgeInsets.all(ThemeConfig.spacingS),
@@ -427,14 +433,13 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
   ) {
     final currentTheme = ref.watch(settings.provider(themeModeSettingDef));
     final colorScheme = Theme.of(context).colorScheme;
-    final displayTheme =
-        _themeDemoRunning ? _themeDemoOrder[_themeDemoIndex] : currentTheme;
+    final displayTheme = _themeDemoRunning
+        ? _themeDemoOrder[_themeDemoIndex]
+        : currentTheme;
     final tooltip = '${'theme'.tr()}: ${currentTheme.tr()}';
     final iconColor = displayTheme == 'light'
         ? _themeLightIcon
-        : (displayTheme == 'system'
-            ? colorScheme.onSurface
-            : _themeDarkIcon);
+        : (displayTheme == 'system' ? colorScheme.onSurface : _themeDarkIcon);
     return Semantics(
       button: true,
       label: tooltip,
@@ -449,21 +454,21 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
               onTap: _isCompleting
                   ? null
                   : () {
-                if (_themeDemoRunning) {
-                  _themeDemoTimer?.cancel();
-                  _themeDemoTimer = null;
-                  setState(() => _themeDemoRunning = false);
-                }
-                const order = ['light', 'dark', 'system', 'amoled'];
-                final idx = order.indexOf(currentTheme);
-                final next = order[(idx + 1) % order.length];
-                ref
-                    .read(settings.provider(themeModeSettingDef).notifier)
-                    .set(next);
-                Log.info(
-                  'Setting changed: ${themeModeSettingDef.key}=$next',
-                );
-              },
+                      if (_themeDemoRunning) {
+                        _themeDemoTimer?.cancel();
+                        _themeDemoTimer = null;
+                        setState(() => _themeDemoRunning = false);
+                      }
+                      const order = ['light', 'dark', 'system', 'amoled'];
+                      final idx = order.indexOf(currentTheme);
+                      final next = order[(idx + 1) % order.length];
+                      ref
+                          .read(settings.provider(themeModeSettingDef).notifier)
+                          .set(next);
+                      Log.info(
+                        'Setting changed: ${themeModeSettingDef.key}=$next',
+                      );
+                    },
               customBorder: const CircleBorder(),
               child: AnimatedContainer(
                 duration: ThemeConfig.animationLong,
@@ -474,10 +479,10 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                   color: displayTheme == 'system'
                       ? colorScheme.surfaceContainerHighest
                       : (displayTheme == 'light'
-                          ? _themeLightBg
-                          : displayTheme == 'amoled'
-                              ? _themeAmoledBg
-                              : _themeDarkBg),
+                            ? _themeLightBg
+                            : displayTheme == 'amoled'
+                            ? _themeAmoledBg
+                            : _themeDarkBg),
                 ),
                 child: AnimatedSwitcher(
                   duration: ThemeConfig.animationLong,
@@ -485,19 +490,19 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                   switchOutCurve: Curves.easeIn,
                   transitionBuilder:
                       (Widget child, Animation<double> animation) {
-                    return FadeTransition(
-                      opacity: animation,
-                      child: ScaleTransition(
-                        scale: Tween<double>(begin: 0.6, end: 1.0).animate(
-                          CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOutBack,
+                        return FadeTransition(
+                          opacity: animation,
+                          child: ScaleTransition(
+                            scale: Tween<double>(begin: 0.6, end: 1.0).animate(
+                              CurvedAnimation(
+                                parent: animation,
+                                curve: Curves.easeOutBack,
+                              ),
+                            ),
+                            child: child,
                           ),
-                        ),
-                        child: child,
-                      ),
-                    );
-                  },
+                        );
+                      },
                   child: Icon(
                     _themeIcon(displayTheme),
                     key: ValueKey<String>(displayTheme),
@@ -549,11 +554,11 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                               onPressed: _isCompleting
                                   ? null
                                   : () {
-                                _pageController.previousPage(
-                                  duration: ThemeConfig.animationMedium,
-                                  curve: Curves.easeInOut,
-                                );
-                              },
+                                      _pageController.previousPage(
+                                        duration: ThemeConfig.animationMedium,
+                                        curve: Curves.easeInOut,
+                                      );
+                                    },
                               icon: const Icon(Icons.arrow_back),
                               label: Text('onboarding_back'.tr()),
                             ),
@@ -580,11 +585,11 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                               onPressed: _isCompleting
                                   ? null
                                   : () {
-                                _pageController.nextPage(
-                                  duration: ThemeConfig.animationMedium,
-                                  curve: Curves.easeInOut,
-                                );
-                              },
+                                      _pageController.nextPage(
+                                        duration: ThemeConfig.animationMedium,
+                                        curve: Curves.easeInOut,
+                                      );
+                                    },
                               icon: const Icon(Icons.arrow_forward),
                               label: Text('onboarding_next'.tr()),
                             ),
@@ -595,8 +600,10 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                             child: FilledButton.icon(
                               onPressed: _isCompleting
                                   ? null
-                                  : () async =>
-                                      await _completeOnboarding(ref, settings),
+                                  : () async => await _completeOnboarding(
+                                      ref,
+                                      settings,
+                                    ),
                               icon: const Icon(Icons.check),
                               label: Text('onboarding_complete'.tr()),
                             ),
@@ -612,9 +619,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                 _hintLanguageInLocales[_hintLocaleIndex],
                 key: ValueKey<int>(_hintLocaleIndex),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      fontStyle: FontStyle.italic,
-                    ),
+                  color: colorScheme.onSurfaceVariant,
+                  fontStyle: FontStyle.italic,
+                ),
                 textAlign: TextAlign.center,
               ),
             ),
@@ -647,7 +654,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
             case SignInResult.pendingRedirect:
               ref
                   .read(
-                    settings.provider(onboardingOnlinePendingSettingDef)
+                    settings
+                        .provider(onboardingOnlinePendingSettingDef)
                         .notifier,
                   )
                   .set(true);
@@ -667,9 +675,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
       ref
           .read(settings.provider(onboardingCompletedSettingDef).notifier)
           .set(true);
-      Log.info(
-        'Setting changed: ${onboardingCompletedSettingDef.key}=true',
-      );
+      Log.info('Setting changed: ${onboardingCompletedSettingDef.key}=true');
       if (!mounted) return;
       final pendingToken = ref.read(
         settings.provider(pendingInviteTokenSettingDef),

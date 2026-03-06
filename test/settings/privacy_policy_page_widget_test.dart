@@ -8,16 +8,16 @@ void main() {
     EasyLocalization.logger.enableBuildModes = [];
   });
 
-  testWidgets('PrivacyPolicyPage shows appBar and intro section', (tester) async {
+  testWidgets('PrivacyPolicyPage shows appBar and intro section', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       EasyLocalization(
         path: 'assets/translations',
         supportedLocales: const [Locale('en')],
         fallbackLocale: const Locale('en'),
         startLocale: const Locale('en'),
-        child: const MaterialApp(
-          home: PrivacyPolicyPage(),
-        ),
+        child: const MaterialApp(home: PrivacyPolicyPage()),
       ),
     );
     await tester.pumpAndSettle();

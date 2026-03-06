@@ -32,122 +32,131 @@ class ArchivedGroupsPage extends ConsumerWidget {
             ),
           ),
           body: ConstrainedContent(
-        child: archivedAsync.when(
-          data: (archived) => locallyArchivedAsync.when(
-            data: (locallyArchived) {
-              final hasAny = archived.isNotEmpty || locallyArchived.isNotEmpty;
-              if (!hasAny) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.archive_outlined,
-                          size: 64,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+            child: archivedAsync.when(
+              data: (archived) => locallyArchivedAsync.when(
+                data: (locallyArchived) {
+                  final hasAny =
+                      archived.isNotEmpty || locallyArchived.isNotEmpty;
+                  if (!hasAny) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.archive_outlined,
+                              size: 64,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'no_archived_items'.tr(),
+                              style: Theme.of(context).textTheme.titleMedium,
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+                  return ListView(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    children: [
+                      if (archived.isNotEmpty) ...[
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                          child: Text(
+                            'archived_groups'.tr(),
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                        ),
+                        ...archived.map(
+                          (group) => GroupCard(
+                            key: ValueKey('global-${group.id}'),
+                            group: group,
+                            onTap: () =>
+                                context.push(RoutePaths.groupDetail(group.id)),
+                          ),
                         ),
                         const SizedBox(height: 16),
-                        Text(
-                          'no_archived_items'.tr(),
-                          style: Theme.of(context).textTheme.titleMedium,
-                          textAlign: TextAlign.center,
+                      ],
+                      if (locallyArchived.isNotEmpty) ...[
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                          child: Text(
+                            'hidden_by_me'.tr(),
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                        ),
+                        ...locallyArchived.map(
+                          (group) => _LocallyArchivedTile(
+                            key: ValueKey('local-${group.id}'),
+                            group: group,
+                            onUnhide: () => ref
+                                .read(groupRepositoryProvider)
+                                .clearLocalArchived(group.id),
+                            onTap: () =>
+                                context.push(RoutePaths.groupDetail(group.id)),
+                          ),
                         ),
                       ],
+                    ],
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, st) {
+                  sendErrorTelemetryIfOnline(
+                    ref,
+                    message: e.toString(),
+                    details: e.toString(),
+                  );
+                  return Center(
+                    child: ErrorContentWidget(
+                      message: e.toString(),
+                      details: e.toString(),
+                      stackTrace: st,
+                      onRetry: () {
+                        ref.invalidate(archivedGroupsProvider);
+                        ref.invalidate(locallyArchivedGroupsProvider);
+                      },
                     ),
-                  ),
-                );
-              }
-              return ListView(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                children: [
-                  if (archived.isNotEmpty) ...[
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                      child: Text(
-                        'archived_groups'.tr(),
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                    ...archived.map(
-                      (group) => GroupCard(
-                        key: ValueKey('global-${group.id}'),
-                        group: group,
-                        onTap: () =>
-                            context.push(RoutePaths.groupDetail(group.id)),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  if (locallyArchived.isNotEmpty) ...[
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                      child: Text(
-                        'hidden_by_me'.tr(),
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                    ...locallyArchived.map(
-                      (group) => _LocallyArchivedTile(
-                        key: ValueKey('local-${group.id}'),
-                        group: group,
-                        onUnhide: () => ref
-                            .read(groupRepositoryProvider)
-                            .clearLocalArchived(group.id),
-                        onTap: () =>
-                            context.push(RoutePaths.groupDetail(group.id)),
-                      ),
-                    ),
-                  ],
-                ],
-              );
-            },
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, st) {
-              sendErrorTelemetryIfOnline(
-                ref,
-                message: e.toString(),
-                details: e.toString(),
-              );
-              return Center(
-                child: ErrorContentWidget(
-                  message: e.toString(),
-                  details: e.toString(),
-                  stackTrace: st,
-                  onRetry: () {
-                    ref.invalidate(archivedGroupsProvider);
-                    ref.invalidate(locallyArchivedGroupsProvider);
-                  },
-                ),
-              );
-            },
-          ),
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, st) {
-            sendErrorTelemetryIfOnline(
-              ref,
-              message: e.toString(),
-              details: e.toString(),
-            );
-            return Center(
-              child: ErrorContentWidget(
-                message: e.toString(),
-                details: e.toString(),
-                stackTrace: st,
-                onRetry: () {
-                  ref.invalidate(archivedGroupsProvider);
-                  ref.invalidate(locallyArchivedGroupsProvider);
+                  );
                 },
               ),
-            );
-          },
-        ),
-      ),
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, st) {
+                sendErrorTelemetryIfOnline(
+                  ref,
+                  message: e.toString(),
+                  details: e.toString(),
+                );
+                return Center(
+                  child: ErrorContentWidget(
+                    message: e.toString(),
+                    details: e.toString(),
+                    stackTrace: st,
+                    onRetry: () {
+                      ref.invalidate(archivedGroupsProvider);
+                      ref.invalidate(locallyArchivedGroupsProvider);
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
         );
       },
     );

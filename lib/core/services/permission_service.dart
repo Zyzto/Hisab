@@ -56,8 +56,8 @@ class PermissionService {
     BuildContext context,
   ) async {
     if (kIsWeb) {
-      final granted =
-          await browser_notification.requestBrowserNotificationPermission();
+      final granted = await browser_notification
+          .requestBrowserNotificationPermission();
       if (!granted) return false;
       if (!firebaseInitialized) return true;
       try {
@@ -83,7 +83,8 @@ class PermissionService {
 
   /// Whether notification permission is currently granted (no request).
   static Future<bool> isNotificationPermissionGranted() async {
-    if (kIsWeb) return browser_notification.isBrowserNotificationPermissionGranted();
+    if (kIsWeb)
+      return browser_notification.isBrowserNotificationPermissionGranted();
     final status = await Permission.notification.status;
     return status.isGranted || status.isLimited;
   }

@@ -28,14 +28,15 @@ class ContentAlignedAppBar extends StatelessWidget
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final appBarTheme = theme.appBarTheme;
-    final (leftOffset, bandWidth) =
-        LayoutBreakpoints.contentBandMetrics(context, contentAreaWidth);
+    final (leftOffset, bandWidth) = LayoutBreakpoints.contentBandMetrics(
+      context,
+      contentAreaWidth,
+    );
 
-    final titleStyle = (appBarTheme.titleTextStyle ?? theme.textTheme.titleLarge)
-            ?.copyWith(
-                  color: appBarTheme.foregroundColor ??
-                      theme.colorScheme.onSurface,
-                ) ??
+    final titleStyle =
+        (appBarTheme.titleTextStyle ?? theme.textTheme.titleLarge)?.copyWith(
+          color: appBarTheme.foregroundColor ?? theme.colorScheme.onSurface,
+        ) ??
         (theme.textTheme.titleLarge ?? theme.textTheme.bodyLarge!);
 
     return Material(
@@ -64,10 +65,7 @@ class ContentAlignedAppBar extends StatelessWidget
                 child: Center(
                   child: DefaultTextStyle(
                     style: titleStyle,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: title,
-                    ),
+                    child: FittedBox(fit: BoxFit.scaleDown, child: title),
                   ),
                 ),
               ),

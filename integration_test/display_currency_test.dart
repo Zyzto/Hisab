@@ -12,10 +12,10 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   group('Display currency and group currency display', () {
-    testWidgets(
-        'set display currency → create group → add expense → '
-        'group detail shows group currency → expense detail shows group currency',
-        (tester) async {
+    testWidgets('set display currency → create group → add expense → '
+        'group detail shows group currency → expense detail shows group currency', (
+      tester,
+    ) async {
       await ensureIntegrationTestReady(tester);
 
       // ── Stage: set display currency in Settings ──
@@ -41,7 +41,11 @@ void main() {
 
         // Tap the USD row by its full name (list shows code + "United States Dollar")
         final usdRowFinder = find.text('United States Dollar');
-        expect(usdRowFinder, findsWidgets, reason: 'USD row should appear in picker');
+        expect(
+          usdRowFinder,
+          findsWidgets,
+          reason: 'USD row should appear in picker',
+        );
         await tester.ensureVisible(usdRowFinder.first);
         await tapAndSettle(tester, usdRowFinder.first);
         await pumpAndSettleWithTimeout(tester);
@@ -84,14 +88,16 @@ void main() {
         await tapAndSettle(tester, find.text('Create Group'));
         await pumpAndSettleWithTimeout(tester);
 
-        await waitForWidget(
-            tester, find.byKey(const Key('wizard_name_field')));
+        await waitForWidget(tester, find.byKey(const Key('wizard_name_field')));
         await enterTextAndPump(
           tester,
           find.byKey(const Key('wizard_name_field')),
           'Display Currency Group',
         );
-        await waitForWidget(tester, find.byKey(const Key('wizard_next_button')));
+        await waitForWidget(
+          tester,
+          find.byKey(const Key('wizard_next_button')),
+        );
         await tapAndSettle(tester, find.byKey(const Key('wizard_next_button')));
         await tester.pump(const Duration(milliseconds: 400));
 
@@ -103,10 +109,16 @@ void main() {
         await tester.testTextInput.receiveAction(TextInputAction.done);
         await tester.pumpAndSettle();
 
-        await waitForWidget(tester, find.byKey(const Key('wizard_next_button')));
+        await waitForWidget(
+          tester,
+          find.byKey(const Key('wizard_next_button')),
+        );
         await tapAndSettle(tester, find.byKey(const Key('wizard_next_button')));
         await tester.pump(const Duration(milliseconds: 400));
-        await waitForWidget(tester, find.byKey(const Key('wizard_next_button')));
+        await waitForWidget(
+          tester,
+          find.byKey(const Key('wizard_next_button')),
+        );
         await tapAndSettle(tester, find.byKey(const Key('wizard_next_button')));
         await tester.pump(const Duration(milliseconds: 400));
         await pumpAndSettleWithTimeout(tester);
@@ -128,8 +140,7 @@ void main() {
         await pumpAndSettleWithTimeout(tester);
         await ensureExpenseFormReady(tester);
 
-        await enterTextAndPump(
-            tester, find.byType(TextField).first, 'Coffee');
+        await enterTextAndPump(tester, find.byType(TextField).first, 'Coffee');
         await enterTextAndPump(tester, find.byType(TextField).at(1), '85');
 
         await tapSubmitExpenseButton(tester);
@@ -160,12 +171,20 @@ void main() {
       // ── Stage: clear display currency (verifies clear button works) ──
       await stage('clear display currency', () async {
         // We may still be on group detail; tap back until Settings is visible in shell nav
-        for (var i = 0; i < 3 && find.text('Settings').evaluate().isEmpty; i++) {
+        for (
+          var i = 0;
+          i < 3 && find.text('Settings').evaluate().isEmpty;
+          i++
+        ) {
           if (find.byIcon(Icons.arrow_back).evaluate().isEmpty) break;
           await tapAndSettle(tester, find.byIcon(Icons.arrow_back).first);
           await pumpAndSettleWithTimeout(tester);
         }
-        await waitForWidget(tester, find.text('Settings'), timeout: const Duration(seconds: 5));
+        await waitForWidget(
+          tester,
+          find.text('Settings'),
+          timeout: const Duration(seconds: 5),
+        );
         await tapAndSettle(tester, find.text('Settings'));
         await pumpAndSettleWithTimeout(tester);
 

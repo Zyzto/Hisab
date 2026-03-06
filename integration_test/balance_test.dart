@@ -8,10 +8,8 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   group('Balance lifecycle', () {
-    testWidgets(
-        'group + multiple expenses → balance → settlements → '
-        'record payment → people → verify',
-        (tester) async {
+    testWidgets('group + multiple expenses → balance → settlements → '
+        'record payment → people → verify', (tester) async {
       await ensureIntegrationTestReady(tester);
 
       // ── Stage: create group ──
@@ -21,14 +19,16 @@ void main() {
         await tapAndSettle(tester, find.text('Create Group'));
         await pumpAndSettleWithTimeout(tester);
 
-        await waitForWidget(
-            tester, find.byKey(const Key('wizard_name_field')));
+        await waitForWidget(tester, find.byKey(const Key('wizard_name_field')));
         await enterTextAndPump(
           tester,
           find.byKey(const Key('wizard_name_field')),
           'Balance Test',
         );
-        await waitForWidget(tester, find.byKey(const Key('wizard_next_button')));
+        await waitForWidget(
+          tester,
+          find.byKey(const Key('wizard_next_button')),
+        );
         await tapAndSettle(tester, find.byKey(const Key('wizard_next_button')));
         await tester.pump(const Duration(milliseconds: 400));
 
@@ -36,10 +36,16 @@ void main() {
         await addWizardParticipant(tester, 'Alice');
         await addWizardParticipant(tester, 'Bob');
 
-        await waitForWidget(tester, find.byKey(const Key('wizard_next_button')));
+        await waitForWidget(
+          tester,
+          find.byKey(const Key('wizard_next_button')),
+        );
         await tapAndSettle(tester, find.byKey(const Key('wizard_next_button')));
         await tester.pump(const Duration(milliseconds: 400));
-        await waitForWidget(tester, find.byKey(const Key('wizard_next_button')));
+        await waitForWidget(
+          tester,
+          find.byKey(const Key('wizard_next_button')),
+        );
         await tapAndSettle(tester, find.byKey(const Key('wizard_next_button')));
         await tester.pump(const Duration(milliseconds: 400));
         await pumpAndSettleWithTimeout(tester);
@@ -60,7 +66,10 @@ void main() {
         await pumpAndSettleWithTimeout(tester);
         await ensureExpenseFormReady(tester);
         await enterTextAndPump(
-            tester, find.byType(TextField).first, 'Group Dinner');
+          tester,
+          find.byType(TextField).first,
+          'Group Dinner',
+        );
         await enterTextAndPump(tester, find.byType(TextField).at(1), '150');
         await tapSubmitExpenseButton(tester);
         await ensureFormClosed(tester);
@@ -74,7 +83,10 @@ void main() {
         await pumpAndSettleWithTimeout(tester);
         await ensureExpenseFormReady(tester);
         await enterTextAndPump(
-            tester, find.byType(TextField).first, 'Movie Tickets');
+          tester,
+          find.byType(TextField).first,
+          'Movie Tickets',
+        );
         await enterTextAndPump(tester, find.byType(TextField).at(1), '75');
 
         await tapSubmitExpenseButton(tester);
@@ -88,8 +100,7 @@ void main() {
         await tapAndSettle(tester, find.byIcon(Icons.add).first);
         await pumpAndSettleWithTimeout(tester);
         await ensureExpenseFormReady(tester);
-        await enterTextAndPump(
-            tester, find.byType(TextField).first, 'Snacks');
+        await enterTextAndPump(tester, find.byType(TextField).first, 'Snacks');
         await enterTextAndPump(tester, find.byType(TextField).at(1), '30');
 
         await tapSubmitExpenseButton(tester);
@@ -120,7 +131,11 @@ void main() {
       await stage('verify settlement arrows', () async {
         await tester.pump(const Duration(milliseconds: 1500));
         // Wait for "Settle Up" section title (balance list builds in stages).
-        await waitForWidget(tester, find.text('Settle Up'), timeout: const Duration(seconds: 15));
+        await waitForWidget(
+          tester,
+          find.text('Settle Up'),
+          timeout: const Duration(seconds: 15),
+        );
         // Scroll down to reveal settlement rows below the title.
         final scrollable = find.byType(Scrollable).first;
         for (var i = 0; i < 12; i++) {
@@ -133,11 +148,15 @@ void main() {
           }
         }
         final hasArrows = find.textContaining('\u2192').evaluate().isNotEmpty;
-        final hasPaymentIcons = find.byIcon(Icons.payments_outlined).evaluate().isNotEmpty;
+        final hasPaymentIcons = find
+            .byIcon(Icons.payments_outlined)
+            .evaluate()
+            .isNotEmpty;
         expect(
           hasArrows || hasPaymentIcons,
           isTrue,
-          reason: 'Should show settlement arrows or payment buttons for unsettled debts',
+          reason:
+              'Should show settlement arrows or payment buttons for unsettled debts',
         );
       });
 
@@ -186,8 +205,10 @@ void main() {
         // After recording all settlements, check for "All settled" or
         // verify no more payment icons remain
         final allSettled = find.text('All settled').evaluate().isNotEmpty;
-        final noPayments =
-            find.byIcon(Icons.payments_outlined).evaluate().isEmpty;
+        final noPayments = find
+            .byIcon(Icons.payments_outlined)
+            .evaluate()
+            .isEmpty;
         final hasBalance = find.text('Balance').evaluate().isNotEmpty;
         expect(
           allSettled || noPayments || hasBalance,

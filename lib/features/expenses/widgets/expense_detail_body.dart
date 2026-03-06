@@ -39,20 +39,19 @@ class ExpenseDetailBody extends ConsumerWidget {
             final nameOf = {for (final p in participants) p.id: p.name};
             final group = groupAsync.asData?.value;
             final groupCurrencyCode = group?.currencyCode;
-            final useGroupCurrency = groupCurrencyCode != null &&
+            final useGroupCurrency =
+                groupCurrencyCode != null &&
                 groupCurrencyCode.isNotEmpty &&
                 expense.currencyCode != groupCurrencyCode;
             final payerCents = useGroupCurrency
                 ? expense.effectiveBaseAmountCents
                 : expense.amountCents;
-            final displayCurrencyCode =
-                useGroupCurrency ? groupCurrencyCode : expense.currencyCode;
+            final displayCurrencyCode = useGroupCurrency
+                ? groupCurrencyCode
+                : expense.currencyCode;
 
             return ListView(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 16,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               children: [
                 ExpenseDetailBodyHeader(
                   expense: expense,
@@ -64,12 +63,9 @@ class ExpenseDetailBody extends ConsumerWidget {
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Text(
                       'receipt'.tr(),
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleSmall
-                          ?.copyWith(
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
                     ),
                   ),
                   SingleChildScrollView(
@@ -83,10 +79,8 @@ class ExpenseDetailBody extends ConsumerWidget {
                               child: SizedBox(
                                 width: 200,
                                 child: GestureDetector(
-                                  onTap: () => showReceiptImageFullScreen(
-                                    context,
-                                    url,
-                                  ),
+                                  onTap: () =>
+                                      showReceiptImageFullScreen(context, url),
                                   child: buildReceiptImageView(
                                     context,
                                     url,
@@ -116,10 +110,9 @@ class ExpenseDetailBody extends ConsumerWidget {
                 ),
                 const SizedBox(height: 24),
                 _SectionLabel(
-                  label:
-                      expense.transactionType == TransactionType.transfer
-                          ? 'to'.tr()
-                          : 'participants'.tr(),
+                  label: expense.transactionType == TransactionType.transfer
+                      ? 'to'.tr()
+                      : 'participants'.tr(),
                 ),
                 const SizedBox(height: 10),
                 ..._participantShares(
@@ -169,13 +162,16 @@ class ExpenseDetailBody extends ConsumerWidget {
     Map<String, String> nameOf,
     String? groupCurrencyCode,
   ) {
-    final useGroupCurrency = groupCurrencyCode != null &&
+    final useGroupCurrency =
+        groupCurrencyCode != null &&
         groupCurrencyCode.isNotEmpty &&
         expense.currencyCode != groupCurrencyCode;
     final conversionFactor = useGroupCurrency && expense.amountCents > 0
         ? expense.effectiveBaseAmountCents / expense.amountCents
         : 1.0;
-    final displayCode = useGroupCurrency ? groupCurrencyCode : expense.currencyCode;
+    final displayCode = useGroupCurrency
+        ? groupCurrencyCode
+        : expense.currencyCode;
 
     int toDisplayCents(int cents) {
       if (!useGroupCurrency) return cents;
@@ -237,7 +233,9 @@ class ExpenseDetailBodyHeader extends StatelessWidget {
         ? DateFormat('EEEE, MMMM d, yyyy').add_Hm()
         : DateFormat('EEEE, MMMM d, yyyy').add_jm();
     // Display in device timezone: stored date is UTC, convert for display.
-    final localDate = expense.date.isUtc ? expense.date.toLocal() : expense.date;
+    final localDate = expense.date.isUtc
+        ? expense.date.toLocal()
+        : expense.date;
 
     return Column(
       children: [
@@ -295,6 +293,7 @@ class _PersonCard extends StatelessWidget {
   final String name;
   final int amountCents;
   final String currencyCode;
+
   /// When set, shown instead of the default formatted amount (e.g. [AmountWithSecondaryDisplay]).
   final Widget? amountWidget;
 
