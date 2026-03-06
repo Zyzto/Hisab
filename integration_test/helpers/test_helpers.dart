@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -26,7 +27,11 @@ Future<void> pumpAndSettleWithTimeout(
   WidgetTester tester, {
   Duration timeout = const Duration(seconds: 30),
 }) async {
-  await tester.pumpAndSettle(const Duration(milliseconds: 100), EnginePhase.sendSemanticsUpdate, timeout);
+  await tester.pumpAndSettle(
+    const Duration(milliseconds: 100),
+    EnginePhase.sendSemanticsUpdate,
+    timeout,
+  );
 }
 
 /// Tap a widget and wait for animations to settle.
@@ -36,7 +41,25 @@ Future<void> tapAndSettle(
   Duration timeout = const Duration(seconds: 10),
 }) async {
   await tester.tap(finder);
-  await tester.pumpAndSettle(const Duration(milliseconds: 100), EnginePhase.sendSemanticsUpdate, timeout);
+  await tester.pumpAndSettle(
+    const Duration(milliseconds: 100),
+    EnginePhase.sendSemanticsUpdate,
+    timeout,
+  );
+}
+
+/// Finds a tappable control by visible label with a resilient fallback order.
+Finder actionByLabel(WidgetTester tester, String label) {
+  final candidates = <Finder>[
+    find.widgetWithText(FilledButton, label),
+    find.widgetWithText(OutlinedButton, label),
+    find.widgetWithText(TextButton, label),
+    find.text(label),
+  ];
+  for (final candidate in candidates) {
+    if (candidate.evaluate().isNotEmpty) return candidate.first;
+  }
+  return find.text(label);
 }
 
 /// Tap a widget and pump manually (no pumpAndSettle). Use this for buttons
@@ -99,8 +122,9 @@ Future<void> enterTextAndPump(
       final editable = tester.widget<EditableText>(editableFinder.first);
       if (editable.controller.text != text) {
         editable.controller.text = text;
-        editable.controller.selection =
-            TextSelection.collapsed(offset: text.length);
+        editable.controller.selection = TextSelection.collapsed(
+          offset: text.length,
+        );
         await tester.pump(pumpDuration);
       }
     }
@@ -121,6 +145,40 @@ Future<void> waitForWidget(
   expect(finder, findsWidgets, reason: 'Timed out waiting for $finder');
 }
 
+/// Polls a synchronous [condition] while pumping frames until it becomes true.
+Future<void> waitForCondition(
+  WidgetTester tester, {
+  required bool Function() condition,
+  Duration timeout = const Duration(seconds: 15),
+  Duration interval = const Duration(milliseconds: 200),
+  String reason = 'Timed out waiting for condition',
+}) async {
+  final end = DateTime.now().add(timeout);
+  while (DateTime.now().isBefore(end)) {
+    if (condition()) return;
+    await tester.pump(interval);
+  }
+  throw TestFailure(reason);
+}
+
+/// Polls an async [load] function until [isReady] returns true for the result.
+Future<T> waitForAsyncResult<T>(
+  WidgetTester tester, {
+  required Future<T> Function() load,
+  required bool Function(T value) isReady,
+  Duration timeout = const Duration(seconds: 20),
+  Duration interval = const Duration(milliseconds: 500),
+  String reason = 'Timed out waiting for async result',
+}) async {
+  final end = DateTime.now().add(timeout);
+  while (DateTime.now().isBefore(end)) {
+    final value = await load();
+    if (isReady(value)) return value;
+    await tester.pump(interval);
+  }
+  throw TestFailure(reason);
+}
+
 /// Scroll until [finder] is visible, using [tester.ensureVisible] when the
 /// widget is already in the tree, or manual drag-scrolling otherwise.
 Future<void> scrollUntilVisible(
@@ -137,7 +195,11 @@ Future<void> scrollUntilVisible(
   }
   final scrollCandidates = scrollable ?? find.byType(Scrollable);
   if (scrollCandidates.evaluate().isEmpty) {
-    expect(finder, findsWidgets, reason: 'Could not scroll to $finder (no Scrollable found)');
+    expect(
+      finder,
+      findsWidgets,
+      reason: 'Could not scroll to $finder (no Scrollable found)',
+    );
     return;
   }
   final scrollFinder = scrollCandidates.first;
@@ -162,21 +224,29 @@ Future<void> tapSubmitExpenseButton(WidgetTester tester) async {
   }
   if (submitButton.evaluate().isNotEmpty) {
     await tester.ensureVisible(submitButton);
-    await tapAndSettle(tester, submitButton,
-        timeout: const Duration(seconds: 15));
+    await tapAndSettle(
+      tester,
+      submitButton,
+      timeout: const Duration(seconds: 15),
+    );
   }
   await tester.pump(const Duration(seconds: 1));
 }
 
 /// Wait until the expense form has at least title and amount fields (2 TextFields).
 /// Call after opening the expense form (tap add FAB) to avoid "No element" when using .at(1).
-Future<void> ensureExpenseFormReady(WidgetTester tester, {Duration timeout = const Duration(seconds: 8)}) async {
+Future<void> ensureExpenseFormReady(
+  WidgetTester tester, {
+  Duration timeout = const Duration(seconds: 8),
+}) async {
   final deadline = DateTime.now().add(timeout);
   while (DateTime.now().isBefore(deadline)) {
     await tester.pump(const Duration(milliseconds: 200));
     if (find.byType(TextField).evaluate().length >= 2) return;
   }
-  throw TestFailure('Expense form did not show title and amount fields within ${timeout.inSeconds}s');
+  throw TestFailure(
+    'Expense form did not show title and amount fields within ${timeout.inSeconds}s',
+  );
 }
 
 /// After calling [tapSubmitExpenseButton], call this to ensure we're not
