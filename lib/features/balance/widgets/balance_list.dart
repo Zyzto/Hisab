@@ -54,8 +54,9 @@ class BalanceList extends ConsumerWidget {
         final nameOf = {for (final p in participants) p.id: p.name};
         final theme = Theme.of(context);
 
-        // Flatten for ListView.builder: compute item count and build by index
-            final hasFrozen = group.isSettlementFrozen && !readOnlyMode;
+        // Flatten for ListView.builder: compute item count and build by index.
+        // Keep frozen-state context visible in read-only preview too.
+        final hasFrozen = group.isSettlementFrozen;
         var itemCount = (hasFrozen ? 1 : 0) + 4 + balances.length;
         itemCount += settlements.isEmpty ? 1 : settlements.length;
 
@@ -100,9 +101,11 @@ class BalanceList extends ConsumerWidget {
                               ),
                             ),
                             TextButton(
-                              onPressed: () => context.push(
-                                RoutePaths.groupSettings(groupId),
-                              ),
+                              onPressed: readOnlyMode
+                                  ? null
+                                  : () => context.push(
+                                      RoutePaths.groupSettings(groupId),
+                                    ),
                               child: Text('unfreeze_settlement'.tr()),
                             ),
                           ],
