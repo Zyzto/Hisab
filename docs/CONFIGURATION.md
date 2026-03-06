@@ -163,7 +163,7 @@ This should download the WASM and worker assets into `web/`. Rebuild and redeplo
 
 | Feature | Local-Only | Online (Connected) | Online (Temporarily Offline) |
 |---------|------------|-------------------|------------------------------|
-| Create groups, participants, expenses | Yes | Yes | Expenses only (queued) |
+| Create/edit local data (groups, participants, expenses, tags) | Yes | Yes | Queued and pushed on reconnect |
 | Record settlement | Yes | Yes | Queued for later push |
 | Local data persistence | Yes | Yes | Yes |
 | Authentication (email, OAuth) | No | Yes | N/A |
@@ -225,7 +225,7 @@ Your `firebase.json` already points `hosting.public` to `build/web`, so the buil
 ### 3. Keeping secrets out of your shell history
 
 - **Option A – CI (recommended)**  
-  Use GitHub Actions (or similar) and store `SUPABASE_URL` and `SUPABASE_ANON_KEY` as **repository secrets**. In the workflow, run the same `flutter build web --dart-define=...` using `${{ secrets.SUPABASE_URL }}` (and the anon key), then run `firebase deploy --only hosting` using a Firebase token (e.g. `FIREBASE_TOKEN` from `firebase login:ci`). The build and deploy happen in CI; you never type secrets locally.
+  Use GitHub Actions (or similar) and store `SUPABASE_URL` and `SUPABASE_ANON_KEY` as **repository secrets**. In the workflow, run the same `flutter build web --dart-define=...` using `${{ secrets.SUPABASE_URL }}` (and the anon key), then deploy via `FirebaseExtended/action-hosting-deploy` using `FIREBASE_SERVICE_ACCOUNT`. The build and deploy happen in CI; you never type secrets locally.
 
 - **Option B – Local script**  
   Put the build command in a script that reads from env vars (e.g. `SUPABASE_URL`, `SUPABASE_ANON_KEY`) and passes them to `--dart-define`. Source the vars from a file that is gitignored (e.g. `.env.production`) so you don't commit them. Never commit that file or the script's contents with real keys.
