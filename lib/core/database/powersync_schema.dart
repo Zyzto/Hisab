@@ -83,6 +83,7 @@ const schema = Schema([
     Column.integer('max_uses'),
     Column.integer('use_count'),
     Column.integer('is_active'),
+    Column.text('access_mode'),
   ]),
   Table('invite_usages', [
     Column.text('invite_id'),

@@ -9,6 +9,7 @@ abstract class IGroupInviteRepository {
     String? label,
     int? maxUses,
     Duration? expiresIn,
+    InviteAccessMode accessMode = InviteAccessMode.standard,
   });
   Future<String> accept(String token, {String? newParticipantName});
   Future<List<GroupInvite>> listByGroup(String groupId);
