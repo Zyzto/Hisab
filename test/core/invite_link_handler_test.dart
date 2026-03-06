@@ -7,10 +7,13 @@ void main() {
       expect(extractInviteTokenFromUri(null), isNull);
     });
 
-    test('returns token for deep link io.supabase.hisab://invite?token=abc', () {
-      final uri = Uri.parse('io.supabase.hisab://invite?token=abc');
-      expect(extractInviteTokenFromUri(uri), 'abc');
-    });
+    test(
+      'returns token for deep link io.supabase.hisab://invite?token=abc',
+      () {
+        final uri = Uri.parse('io.supabase.hisab://invite?token=abc');
+        expect(extractInviteTokenFromUri(uri), 'abc');
+      },
+    );
 
     test('returns token for web-style path containing invite', () {
       final uri = Uri.parse('https://hisab.example.com/invite?token=xyz');
@@ -21,6 +24,22 @@ void main() {
       final uri = Uri.parse('https://hisab.example.com/invite/abc?token=xyz');
       expect(extractInviteTokenFromUri(uri), 'xyz');
     });
+
+    test(
+      'returns path token for /invite/<token> when query token is missing',
+      () {
+        final uri = Uri.parse('https://hisab.example.com/invite/path-token');
+        expect(extractInviteTokenFromUri(uri), 'path-token');
+      },
+    );
+
+    test(
+      'returns token for deep link host path io.supabase.hisab://invite/abc',
+      () {
+        final uri = Uri.parse('io.supabase.hisab://invite/abc');
+        expect(extractInviteTokenFromUri(uri), 'abc');
+      },
+    );
 
     test('returns null when token is missing', () {
       final uri = Uri.parse('io.supabase.hisab://invite');

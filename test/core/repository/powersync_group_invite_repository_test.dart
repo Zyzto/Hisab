@@ -57,10 +57,7 @@ void main() {
     test('getByToken throws UnsupportedError when client is null', () async {
       if (!powerSyncAvailable || db == null) return;
       final repo = PowerSyncGroupInviteRepository(db!, supabaseClient: null);
-      expect(
-        () => repo.getByToken('abc'),
-        throwsA(isA<UnsupportedError>()),
-      );
+      expect(() => repo.getByToken('abc'), throwsA(isA<UnsupportedError>()));
     });
 
     test('getByToken returns null for empty rpc payload', () async {
@@ -80,13 +77,14 @@ void main() {
       final auth = MockGoTrueClient();
       when(() => client.auth).thenReturn(auth);
       when(() => auth.currentUser).thenReturn(null);
-      when(() => client.rpc('create_invite', params: any(named: 'params')))
-          .thenReturn(
-            Future.value([
-                  {'id': 'invite-id', 'token': 'invite-token'},
-                ])
-                as dynamic,
-          );
+      when(
+        () => client.rpc('create_invite', params: any(named: 'params')),
+      ).thenReturn(
+        Future.value([
+              {'id': 'invite-id', 'token': 'invite-token'},
+            ])
+            as dynamic,
+      );
 
       final result = await repo.createInvite(
         'group-1',
@@ -110,16 +108,46 @@ void main() {
       expect(captured['p_expires_in'], '3600 seconds');
     });
 
+    test(
+      'createInvite sends null interval for never-expiring invite',
+      () async {
+        if (!powerSyncAvailable || db == null) return;
+        final repo = PowerSyncGroupInviteRepository(
+          db!,
+          supabaseClient: client,
+        );
+        final auth = MockGoTrueClient();
+        when(() => client.auth).thenReturn(auth);
+        when(() => auth.currentUser).thenReturn(null);
+        when(
+          () => client.rpc('create_invite', params: any(named: 'params')),
+        ).thenReturn(
+          Future.value([
+                {'id': 'invite-id-2', 'token': 'invite-token-2'},
+              ])
+              as dynamic,
+        );
+
+        await repo.createInvite('group-2', expiresIn: null);
+        final verification = verify(
+          () =>
+              client.rpc('create_invite', params: captureAny(named: 'params')),
+        );
+        verification.called(1);
+        final captured = verification.captured.single as Map<String, dynamic>;
+        expect(captured['p_group_id'], 'group-2');
+        expect(captured['p_expires_in'], isNull);
+      },
+    );
+
     test('accept sends expected params and returns group id', () async {
       if (!powerSyncAvailable || db == null) return;
       final repo = PowerSyncGroupInviteRepository(db!, supabaseClient: client);
-      when(() => client.rpc('accept_invite', params: any(named: 'params')))
-          .thenReturn(Future.value('group-xyz') as dynamic);
+      when(
+        () => client.rpc('accept_invite', params: any(named: 'params')),
+      ).thenReturn(Future.value('group-xyz') as dynamic);
 
-      final result = await repo.accept(
-        'tok-123',
-        newParticipantName: 'User B',
-      );
+      final result = await repo.accept('tok-123', newParticipantName: 'User B');
 
       expect(result, 'group-xyz');
       final verification = verify(

@@ -59,9 +59,7 @@ void main() {
         supportedLocales: testSupportedLocales,
         fallbackLocale: const Locale('en'),
         startLocale: locale,
-        child: MaterialApp.router(
-          routerConfig: router,
-        ),
+        child: MaterialApp.router(routerConfig: router),
       ),
     );
   }
@@ -74,12 +72,15 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('CreateInviteSheet is visible and shows create invite title and role', (tester) async {
-    await openCreateInviteSheet(tester);
+  testWidgets(
+    'CreateInviteSheet is visible and shows create invite title and role',
+    (tester) async {
+      await openCreateInviteSheet(tester);
 
-    expect(find.byIcon(Icons.add_link), findsOneWidget);
-    expect(find.byIcon(Icons.label_outline), findsOneWidget);
-  });
+      expect(find.byIcon(Icons.add_link), findsOneWidget);
+      expect(find.byIcon(Icons.label_outline), findsOneWidget);
+    },
+  );
 
   testWidgets('CreateInviteSheet shows create button', (tester) async {
     await openCreateInviteSheet(tester);
@@ -114,7 +115,10 @@ void main() {
 
       expect(fakeInviteRepo.createCalls, 1);
       expect(find.byIcon(Icons.label_outline), findsNothing);
-      final hasOnlineNotice = find.textContaining('online').evaluate().isNotEmpty;
+      final hasOnlineNotice = find
+          .textContaining('online')
+          .evaluate()
+          .isNotEmpty;
       expect(hasOnlineNotice, isTrue);
       expect(find.byIcon(Icons.add_link), findsNothing);
     },
@@ -175,8 +179,7 @@ class FakeGroupInviteRepository implements IGroupInviteRepository {
   Future<List<GroupInvite>> listByGroup(String groupId) async => [];
 
   @override
-  Stream<List<GroupInvite>> watchByGroup(String groupId) =>
-      Stream.value([]);
+  Stream<List<GroupInvite>> watchByGroup(String groupId) => Stream.value([]);
 
   @override
   Future<void> revoke(String inviteId) async {}
@@ -188,6 +191,5 @@ class FakeGroupInviteRepository implements IGroupInviteRepository {
   Future<List<InviteUsage>> listUsages(String inviteId) async => [];
 
   @override
-  Stream<List<InviteUsage>> watchUsages(String inviteId) =>
-      Stream.value([]);
+  Stream<List<InviteUsage>> watchUsages(String inviteId) => Stream.value([]);
 }

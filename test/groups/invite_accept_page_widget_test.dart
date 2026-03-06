@@ -119,9 +119,7 @@ void main() {
           supportedLocales: testSupportedLocales,
           fallbackLocale: const Locale('en'),
           startLocale: const Locale('en'),
-          child: const MaterialApp(
-            home: InviteAcceptPage(token: 'token-1'),
-          ),
+          child: const MaterialApp(home: InviteAcceptPage(token: 'token-1')),
         ),
       ),
     );
@@ -164,23 +162,24 @@ void main() {
     expect(find.text('بيت لحم'), findsOneWidget);
   });
 
-  testWidgets('maps invalid or expired backend message to invite_expired text', (
-    tester,
-  ) async {
-    final repo = _FakeGroupInviteRepository(
-      acceptErrorMessage: 'Invalid or expired invite',
-      invite: makeInvite(),
-      group: makeGroup(),
-    );
-    await pump(tester, repo);
+  testWidgets(
+    'maps invalid or expired backend message to invite_expired text',
+    (tester) async {
+      final repo = _FakeGroupInviteRepository(
+        acceptErrorMessage: 'Invalid or expired invite',
+        invite: makeInvite(),
+        group: makeGroup(),
+      );
+      await pump(tester, repo);
 
-    expect(find.text('بيت لحم'), findsOneWidget);
-    await tester.tap(find.byType(FilledButton).first);
-    await tester.pumpAndSettle();
+      expect(find.text('بيت لحم'), findsOneWidget);
+      await tester.tap(find.byType(FilledButton).first);
+      await tester.pumpAndSettle();
 
-    expect(repo.acceptCalls, 1);
-    expect(find.textContaining('expired'), findsOneWidget);
-  });
+      expect(repo.acceptCalls, 1);
+      expect(find.textContaining('expired'), findsOneWidget);
+    },
+  );
 
   testWidgets('accept button is usable again after failure', (tester) async {
     final repo = _FakeGroupInviteRepository(

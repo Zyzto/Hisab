@@ -16,19 +16,25 @@ const String _inviteHost = 'invite';
 /// Extracts invite token from a URI (deep link or web /invite?token=...).
 String? extractInviteTokenFromUri(Uri? uri) {
   if (uri == null) return null;
-  final token = uri.queryParameters['token'];
-  if (token == null) return null;
-  final normalizedToken = token.trim();
-  if (normalizedToken.isEmpty) return null;
+  final queryToken = uri.queryParameters['token']?.trim();
+  final pathSegments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
+
+  String? nonEmpty(String? value) {
+    if (value == null) return null;
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
   // Deep link: io.supabase.hisab://invite?token=...
   if (uri.scheme == _inviteScheme) {
     if (uri.host != _inviteHost) return null;
-    return normalizedToken;
+    return nonEmpty(queryToken) ??
+        (pathSegments.isNotEmpty ? nonEmpty(pathSegments.first) : null);
   }
-  // Web: https://domain/invite?token=... or /invite/:token
-  final pathSegments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
+  // Web: https://domain/invite?token=... or /invite/:token.
   if (pathSegments.isNotEmpty && pathSegments.first == 'invite') {
-    return normalizedToken;
+    return nonEmpty(queryToken) ??
+        (pathSegments.length >= 2 ? nonEmpty(pathSegments[1]) : null);
   }
   return null;
 }
