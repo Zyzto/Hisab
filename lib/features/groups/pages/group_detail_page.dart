@@ -34,12 +34,14 @@ class GroupDetailPage extends ConsumerStatefulWidget {
   final String groupId;
   final bool readOnlyPreview;
   final String? previewToken;
+  final InviteAccessMode? previewAccessMode;
 
   const GroupDetailPage({
     super.key,
     required this.groupId,
     this.readOnlyPreview = false,
     this.previewToken,
+    this.previewAccessMode,
   });
 
   @override
@@ -84,6 +86,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
           group: group,
           readOnlyPreview: widget.readOnlyPreview,
           previewToken: widget.previewToken,
+          previewAccessMode: widget.previewAccessMode,
         );
       },
       loading: (context) =>
@@ -96,11 +99,13 @@ class _GroupDetailContent extends ConsumerStatefulWidget {
   final Group group;
   final bool readOnlyPreview;
   final String? previewToken;
+  final InviteAccessMode? previewAccessMode;
 
   const _GroupDetailContent({
     required this.group,
     required this.readOnlyPreview,
     required this.previewToken,
+    required this.previewAccessMode,
   });
 
   @override
@@ -267,6 +272,43 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
       );
     }
     return null;
+  }
+
+  Widget? _buildPreviewJoinBar(BuildContext context) {
+    if (!widget.readOnlyPreview) return null;
+    if (widget.previewAccessMode != InviteAccessMode.readonlyJoin) return null;
+    final token = widget.previewToken;
+    if (token == null || token.isEmpty) return null;
+    final theme = Theme.of(context);
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+        child: Card(
+          elevation: 2,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'invite_preview_readonly_join_message'.tr(),
+                    style: theme.textTheme.bodySmall,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                FilledButton(
+                  onPressed: () => context.push(RoutePaths.inviteAccept(token)),
+                  child: Text('invite_preview_join_cta'.tr()),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -500,6 +542,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
                 ) ??
                 const SizedBox.shrink(),
           ),
+          bottomNavigationBar: _buildPreviewJoinBar(context),
         );
       },
     );

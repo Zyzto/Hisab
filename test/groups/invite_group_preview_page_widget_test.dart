@@ -122,6 +122,7 @@ void main() {
     expect(find.byIcon(Icons.settings), findsNothing);
     expect(find.byIcon(Icons.person_add), findsNothing);
     expect(find.byIcon(Icons.add), findsNothing);
+    expect(find.text('Join this group'), findsNothing);
   });
 
   testWidgets('opens read-only expense detail and shows receipt section', (
@@ -227,6 +228,15 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(
+      find.byWidgetPredicate(
+        (w) =>
+            w is Text &&
+            ((w.data ?? '').toLowerCase().contains('join') ||
+                (w.data ?? '').toLowerCase().contains('invite_preview_join_cta')),
+      ),
+      findsWidgets,
+    );
     await tester.tap(find.text('Dinner').first);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));

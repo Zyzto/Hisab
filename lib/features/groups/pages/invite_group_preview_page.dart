@@ -39,6 +39,7 @@ class InviteGroupPreviewPage extends ConsumerWidget {
             groupId: preview.group.id,
             readOnlyPreview: true,
             previewToken: token,
+            previewAccessMode: preview.invite.accessMode,
           ),
         );
       },
