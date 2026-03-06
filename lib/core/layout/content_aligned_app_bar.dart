@@ -39,21 +39,18 @@ class ContentAlignedAppBar extends StatelessWidget
         ) ??
         (theme.textTheme.titleLarge ?? theme.textTheme.bodyLarge!);
 
-    // Reserve horizontal space so long titles do not overlap leading/actions.
-    // This keeps the title aligned to the content band while constraining where
-    // text can render on narrower widths.
+    // Reserve horizontal space symmetrically so the title stays centered in
+    // the content band (not shifted by leading/actions width differences).
     final leadingReservedWidth = leading != null ? kToolbarHeight : 0.0;
     final actionsReservedWidth =
         (actions?.length ?? 0) * kToolbarHeight.toDouble();
     const titleButtonGap = 8.0;
-    final titleBandLeft = leftOffset;
-    final titleBandRight = leftOffset + bandWidth;
-    final safeLeftEdge = leadingReservedWidth + titleButtonGap;
-    final safeRightEdge = contentAreaWidth - actionsReservedWidth - titleButtonGap;
-    final titleInsetLeft =
-        (safeLeftEdge - titleBandLeft).clamp(0.0, bandWidth).toDouble();
-    final titleInsetRight =
-        (titleBandRight - safeRightEdge).clamp(0.0, bandWidth).toDouble();
+    final symmetricInset =
+        (leadingReservedWidth > actionsReservedWidth
+                ? leadingReservedWidth
+                : actionsReservedWidth) +
+        titleButtonGap;
+    final titleInset = symmetricInset.clamp(0.0, bandWidth / 2).toDouble();
 
     return Material(
       color: appBarTheme.backgroundColor ?? theme.colorScheme.surface,
@@ -81,8 +78,8 @@ class ContentAlignedAppBar extends StatelessWidget
                 child: Center(
                   child: Padding(
                     padding: EdgeInsetsDirectional.only(
-                      start: titleInsetLeft,
-                      end: titleInsetRight,
+                      start: titleInset,
+                      end: titleInset,
                     ),
                     child: DefaultTextStyle(
                       style: titleStyle,

@@ -114,4 +114,71 @@ void main() {
     expect(find.text('Alice'), findsOneWidget);
     expect(find.text('Bob'), findsOneWidget);
   });
+
+  testWidgets('parts split +/- buttons update parts value', (tester) async {
+    final customSplitValues = <String, String>{'p1': '1', 'p2': '1'};
+    final controllers = <String, TextEditingController>{
+      'p1': TextEditingController(text: '1'),
+      'p2': TextEditingController(text: '1'),
+    };
+    final focusNodes = <String, FocusNode>{
+      'p1': FocusNode(),
+      'p2': FocusNode(),
+    };
+    final updates = <String>[];
+
+    await tester.pumpWidget(
+      EasyLocalization(
+        path: 'assets/translations',
+        supportedLocales: const [Locale('en')],
+        fallbackLocale: const Locale('en'),
+        startLocale: const Locale('en'),
+        child: MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: ExpenseSplitSection(
+                participants: participants,
+                sharesCents: const [2500, 2500],
+                amountCents: 5000,
+                currencyCode: 'USD',
+                splitType: SplitType.parts,
+                includedInSplitIds: const {'p1', 'p2'},
+                customSplitValues: customSplitValues,
+                splitEditControllers: controllers,
+                splitFocusNodes: focusNodes,
+                getOrCreateController: (p) => controllers[p.id],
+                getOrCreateFocusNode: (p) => focusNodes[p.id],
+                onSplitTypeTap: () {},
+                onIncludeChanged: (_, _) {},
+                onAmountChanged: (_, _, _, _) {},
+                onPartsChanged: (p, v) {
+                  customSplitValues[p.id] = v;
+                  updates.add('${p.id}:$v');
+                },
+                amountsSumCents: () => 5000,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.add).first);
+    await tester.pumpAndSettle();
+    expect(updates.last, 'p1:2');
+    expect(customSplitValues['p1'], '2');
+
+    await tester.tap(find.byIcon(Icons.remove).first);
+    await tester.pumpAndSettle();
+    expect(updates.last, 'p1:1');
+    expect(customSplitValues['p1'], '1');
+
+    for (final c in controllers.values) {
+      c.dispose();
+    }
+    for (final f in focusNodes.values) {
+      f.dispose();
+    }
+  });
 }

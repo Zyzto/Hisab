@@ -167,7 +167,7 @@ class ExpenseSplitSection extends StatelessWidget {
                     final inputWidth = isParts
                         ? kPartsInputWidth
                         : kSplitInputWidth;
-                    const double kPartsTrailingWidth = 140;
+                    const double kPartsTrailingWidth = 152;
                     final content = Material(
                       color: Colors.transparent,
                       child: ConstrainedBox(
@@ -404,30 +404,46 @@ class ExpenseSplitSection extends StatelessWidget {
                     );
                   }
 
-                  return CheckboxListTile(
-                    value: included,
-                    onChanged: (value) {
-                      onIncludeChanged(p, value ?? false);
-                    },
-                    title: Text(
-                      p.name,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: included
-                            ? theme.colorScheme.onSurface
-                            : theme.colorScheme.onSurfaceVariant,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    secondary: trailing,
-                    controlAffinity: ListTileControlAffinity.leading,
-                    contentPadding: const EdgeInsets.symmetric(
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 4,
                     ),
-                    dense: true,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(0),
+                    child: Row(
+                      children: [
+                        Checkbox(
+                          value: included,
+                          onChanged: (value) {
+                            onIncludeChanged(p, value ?? false);
+                          },
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(_kSplitRadius),
+                            onTap: () => onIncludeChanged(p, !included),
+                            child: SizedBox(
+                              height: kMinTapHeight,
+                              child: Align(
+                                alignment: AlignmentDirectional.centerStart,
+                                child: Text(
+                                  p.name,
+                                  style: theme.textTheme.bodyLarge?.copyWith(
+                                    color: included
+                                        ? theme.colorScheme.onSurface
+                                        : theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        trailing,
+                      ],
                     ),
                   );
                 },
