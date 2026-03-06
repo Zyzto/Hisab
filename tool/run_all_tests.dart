@@ -216,8 +216,9 @@ Future<int> _runIntegrationAndroid(
   String? deviceId = await _getAndroidDeviceId(projectRoot);
   if (deviceId == null && !noAvd) {
     final launched = await _launchFirstEmulator(projectRoot);
-    if (launched)
+    if (launched) {
       deviceId = await _waitForAndroidDevice(projectRoot, timeoutSeconds: 120);
+    }
   }
   if (deviceId == null) {
     print('No Android device available. Skip Android integration.');

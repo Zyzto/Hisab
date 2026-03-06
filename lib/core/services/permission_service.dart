@@ -83,8 +83,9 @@ class PermissionService {
 
   /// Whether notification permission is currently granted (no request).
   static Future<bool> isNotificationPermissionGranted() async {
-    if (kIsWeb)
+    if (kIsWeb) {
       return browser_notification.isBrowserNotificationPermissionGranted();
+    }
     final status = await Permission.notification.status;
     return status.isGranted || status.isLimited;
   }

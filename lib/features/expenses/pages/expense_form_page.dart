@@ -1308,8 +1308,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                 WidgetsBinding.instance.addPostFrameCallback((
                                   _,
                                 ) {
-                                  if (mounted)
+                                  if (mounted) {
                                     _onAmountChangedForExchangeRate();
+                                  }
                                 });
                                 return ExpenseAmountSection(
                                   controller: _amountController,

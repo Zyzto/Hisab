@@ -760,8 +760,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
           });
         } catch (e, st) {
           Log.warning('Currency change failed', error: e, stackTrace: st);
-          if (sheetContext.mounted)
+          if (sheetContext.mounted) {
             sheetContext.showError('generic_error'.tr());
+          }
         }
       },
     );

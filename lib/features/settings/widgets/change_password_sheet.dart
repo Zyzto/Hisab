@@ -65,15 +65,19 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
       final primary = FocusManager.instance.primaryFocus;
       if (primary == _focusCurrent ||
           primary == _focusNew ||
-          primary == _focusConfirm)
+          primary == _focusConfirm) {
         return;
+      }
       final widgetType = primary?.context?.widget.runtimeType.toString() ?? '';
       if (widgetType.contains('EditableText')) return;
       Future.delayed(const Duration(milliseconds: 100), () {
         if (!mounted || node.hasFocus) return;
         final now = FocusManager.instance.primaryFocus;
-        if (now == _focusCurrent || now == _focusNew || now == _focusConfirm)
+        if (now == _focusCurrent ||
+            now == _focusNew ||
+            now == _focusConfirm) {
           return;
+        }
         node.requestFocus();
       });
     });
