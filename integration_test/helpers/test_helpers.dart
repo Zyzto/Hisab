@@ -282,10 +282,13 @@ Future<void> stage(String name, Future<void> Function() body) async {
 
 /// Bootstrap guard: call at the start of each test group.
 /// Throws [TestFailure] with a descriptive message if bootstrap returned false.
-void ensureBootstrapReady(bool ready) {
+void ensureBootstrapReady(bool ready, {String? reason}) {
   if (!ready) {
+    final suffix = (reason != null && reason.trim().isNotEmpty)
+        ? ' Reason: $reason'
+        : '';
     throw TestFailure(
-      'Integration test bootstrap failed (e.g. PowerSync unavailable)',
+      'Integration test bootstrap failed.$suffix',
     );
   }
 }
