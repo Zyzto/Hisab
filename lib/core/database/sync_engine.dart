@@ -47,18 +47,13 @@ class SyncEngine {
           break;
       }
 
-      await db.execute('DELETE FROM pending_writes WHERE id = ?', [
-        row['id'],
-      ]);
+      await db.execute('DELETE FROM pending_writes WHERE id = ?', [row['id']]);
     }
   }
 
   /// Full fetch from Supabase into local DB. Replaces local cache for
   /// groups the current user is a member of.
-  Future<void> fetchAll(
-    PowerSyncDatabase db,
-    SupabaseClient client,
-  ) async {
+  Future<void> fetchAll(PowerSyncDatabase db, SupabaseClient client) async {
     await fetchAllWithBackend(db, SupabaseSyncBackend(client));
   }
 
@@ -67,12 +62,22 @@ class SyncEngine {
     PowerSyncDatabase db,
     SyncBackend backend,
   ) async {
+    final pendingWrites = await db.getAll(
+      'SELECT id FROM pending_writes LIMIT 1',
+    );
+    if (pendingWrites.isNotEmpty) {
+      throw StateError(
+        'fetchAllWithBackend called while pending_writes exist; push pending writes before fetch',
+      );
+    }
+
     final userId = backend.currentUserId;
     if (userId == null) return;
 
     final memberRows = await backend.getGroupIdsForUser(userId);
-    final groupIds =
-        memberRows.map<String>((r) => r['group_id'] as String).toList();
+    final groupIds = memberRows
+        .map<String>((r) => r['group_id'] as String)
+        .toList();
 
     if (groupIds.isEmpty) {
       await db.execute('DELETE FROM groups');
@@ -197,8 +202,8 @@ class SyncEngine {
             e['line_items_json'] is String
                 ? e['line_items_json']
                 : (e['line_items_json'] != null
-                    ? jsonEncode(e['line_items_json'])
-                    : null),
+                      ? jsonEncode(e['line_items_json'])
+                      : null),
             e['receipt_image_path'],
             e['receipt_image_paths'],
             e['created_at'],

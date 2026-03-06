@@ -115,7 +115,9 @@ Map<String, int> _parseSplitShares(dynamic v) {
   try {
     final decoded = jsonDecode(v.toString());
     if (decoded is Map) {
-      return decoded.map((k, val) => MapEntry(k.toString(), (val as num).toInt()));
+      return decoded.map(
+        (k, val) => MapEntry(k.toString(), (val as num).toInt()),
+      );
     }
   } catch (_) {}
   return {};
@@ -184,7 +186,8 @@ Group _groupFromRow(Map<String, dynamic> row) => Group(
   ownerId: row['owner_id'] as String?,
   allowMemberAddExpense: _parseBool(row['allow_member_add_expense']),
   allowMemberChangeSettings: _parseBool(row['allow_member_change_settings']),
-  allowExpenseAsOtherParticipant: row['allow_expense_as_other_participant'] == null
+  allowExpenseAsOtherParticipant:
+      row['allow_expense_as_other_participant'] == null
       ? true
       : _parseBool(row['allow_expense_as_other_participant']),
   allowMemberSettleForOthers: row['allow_member_settle_for_others'] == null
@@ -297,6 +300,9 @@ Future<void> _enqueue(
   Log.debug('Queued pending write: $operation on $tableName/$rowId');
 }
 
+bool _shouldQueueOffline({required bool isLocalOnly, required bool isOnline}) =>
+    !isLocalOnly && !isOnline;
+
 // =============================================================================
 // PowerSync Group Repository
 // =============================================================================
@@ -316,8 +322,7 @@ class PowerSyncGroupRepository implements IGroupRepository {
        _isOnline = isOnline,
        _isLocalOnly = isLocalOnly;
 
-  static const _activeGroupsWhere =
-      "(archived_at IS NULL OR archived_at = '')";
+  static const _activeGroupsWhere = "(archived_at IS NULL OR archived_at = '')";
   static const _archivedGroupsWhere =
       "archived_at IS NOT NULL AND archived_at != ''";
 
@@ -334,13 +339,15 @@ class PowerSyncGroupRepository implements IGroupRepository {
     if (kIsWeb) {
       return _pollStream(() async {
         final rows = await _db.getAll(
-            'SELECT * FROM groups WHERE $_activeGroupsWhere ORDER BY updated_at DESC');
+          'SELECT * FROM groups WHERE $_activeGroupsWhere ORDER BY updated_at DESC',
+        );
         return rows.map(_groupFromRow).toList();
       });
     }
     return _db
         .watch(
-            'SELECT * FROM groups WHERE $_activeGroupsWhere ORDER BY updated_at DESC')
+          'SELECT * FROM groups WHERE $_activeGroupsWhere ORDER BY updated_at DESC',
+        )
         .map((rows) => rows.map(_groupFromRow).toList());
   }
 
@@ -349,13 +356,15 @@ class PowerSyncGroupRepository implements IGroupRepository {
     if (kIsWeb) {
       return _pollStream(() async {
         final rows = await _db.getAll(
-            'SELECT * FROM groups WHERE $_archivedGroupsWhere ORDER BY updated_at DESC');
+          'SELECT * FROM groups WHERE $_archivedGroupsWhere ORDER BY updated_at DESC',
+        );
         return rows.map(_groupFromRow).toList();
       });
     }
     return _db
         .watch(
-            'SELECT * FROM groups WHERE $_archivedGroupsWhere ORDER BY updated_at DESC')
+          'SELECT * FROM groups WHERE $_archivedGroupsWhere ORDER BY updated_at DESC',
+        )
         .map((rows) => rows.map(_groupFromRow).toList());
   }
 
@@ -367,7 +376,15 @@ class PowerSyncGroupRepository implements IGroupRepository {
   }
 
   @override
-  Future<String> create(String name, String currencyCode, {String? icon, int? color, List<String> initialParticipants = const [], bool isPersonal = false, int? budgetAmountCents}) async {
+  Future<String> create(
+    String name,
+    String currencyCode, {
+    String? icon,
+    int? color,
+    List<String> initialParticipants = const [],
+    bool isPersonal = false,
+    int? budgetAmountCents,
+  }) async {
     final id = _uuid.v4();
     final now = _nowIso();
     String? ownerId;
@@ -398,7 +415,8 @@ class PowerSyncGroupRepository implements IGroupRepository {
     };
 
     // Pre-generate participant IDs for additional participants so Supabase and local use the same IDs
-    final additionalParticipantIds = <({String id, String name, int sortOrder})>[];
+    final additionalParticipantIds =
+        <({String id, String name, int sortOrder})>[];
     for (int i = 0; i < initialParticipants.length; i++) {
       final pName = initialParticipants[i].trim();
       if (pName.isEmpty) continue;
@@ -411,6 +429,7 @@ class PowerSyncGroupRepository implements IGroupRepository {
 
     // Auto-create a participant for the owner
     final participantId = _uuid.v4();
+    final ownerMemberId = ownerId != null ? _uuid.v4() : null;
     final participantName = ownerDisplayName ?? 'Owner';
 
     if (!_isLocalOnly && _isOnline && _client != null) {
@@ -418,11 +437,9 @@ class PowerSyncGroupRepository implements IGroupRepository {
       await _client.from('groups').insert(groupData);
       // Create owner membership first (without participant_id) so that
       // get_user_role() returns 'owner' for subsequent RLS checks.
-      String? memberId;
-      if (ownerId != null) {
-        memberId = _uuid.v4();
+      if (ownerId != null && ownerMemberId != null) {
         await _client.from('group_members').insert({
-          'id': memberId,
+          'id': ownerMemberId,
           'group_id': id,
           'user_id': ownerId,
           'role': 'owner',
@@ -441,11 +458,11 @@ class PowerSyncGroupRepository implements IGroupRepository {
         'updated_at': now,
       });
       // Link participant to the membership record
-      if (memberId != null) {
+      if (ownerMemberId != null) {
         await _client
             .from('group_members')
             .update({'participant_id': participantId})
-            .eq('id', memberId);
+            .eq('id', ownerMemberId);
       }
       // Create additional participants from the wizard (use same IDs as local loop below)
       for (int i = 0; i < additionalParticipantIds.length; i++) {
@@ -459,24 +476,94 @@ class PowerSyncGroupRepository implements IGroupRepository {
           'updated_at': now,
         });
       }
+    } else if (_shouldQueueOffline(
+      isLocalOnly: _isLocalOnly,
+      isOnline: _isOnline,
+    )) {
+      await _enqueue(
+        _db,
+        tableName: 'groups',
+        operation: 'insert',
+        rowId: id,
+        data: groupData,
+      );
+      await _enqueue(
+        _db,
+        tableName: 'participants',
+        operation: 'insert',
+        rowId: participantId,
+        data: {
+          'id': participantId,
+          'group_id': id,
+          'name': participantName,
+          'sort_order': 0,
+          'user_id': ownerId,
+          'avatar_id': ownerAvatarId,
+          'created_at': now,
+          'updated_at': now,
+        },
+      );
+      if (ownerId != null && ownerMemberId != null) {
+        await _enqueue(
+          _db,
+          tableName: 'group_members',
+          operation: 'insert',
+          rowId: ownerMemberId,
+          data: {
+            'id': ownerMemberId,
+            'group_id': id,
+            'user_id': ownerId,
+            'role': 'owner',
+            'participant_id': participantId,
+            'joined_at': now,
+          },
+        );
+      }
+      for (final entry in additionalParticipantIds) {
+        await _enqueue(
+          _db,
+          tableName: 'participants',
+          operation: 'insert',
+          rowId: entry.id,
+          data: {
+            'id': entry.id,
+            'group_id': id,
+            'name': entry.name,
+            'sort_order': entry.sortOrder,
+            'created_at': now,
+            'updated_at': now,
+          },
+        );
+      }
     }
 
     // Always write to local DB (use signed color for consistency with Supabase and reader)
     final colorStored = _colorToSigned(color);
     await _db.execute(
       'INSERT INTO groups (id, name, currency_code, owner_id, icon, color, archived_at, is_personal, budget_amount_cents, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, name, currencyCode, ownerId, icon, colorStored, null, isPersonal ? 1 : 0, budgetAmountCents, now, now],
+      [
+        id,
+        name,
+        currencyCode,
+        ownerId,
+        icon,
+        colorStored,
+        null,
+        isPersonal ? 1 : 0,
+        budgetAmountCents,
+        now,
+        now,
+      ],
     );
     // Local participant for owner
     await _db.execute(
       'INSERT INTO participants (id, group_id, name, sort_order, user_id, avatar_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [participantId, id, participantName, 0, ownerId, ownerAvatarId, now, now],
     );
-    if (ownerId != null) {
-      final memberId = _uuid.v4();
+    if (ownerId != null && ownerMemberId != null) {
       await _db.execute(
         'INSERT INTO group_members (id, group_id, user_id, role, participant_id, joined_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [memberId, id, ownerId, 'owner', participantId, now],
+        [ownerMemberId, id, ownerId, 'owner', participantId, now],
       );
     }
     // Create additional participants from the wizard in local DB (same IDs as Supabase)
@@ -506,7 +593,8 @@ class PowerSyncGroupRepository implements IGroupRepository {
       'settlement_snapshot_json': group.settlementSnapshotJson,
       'allow_member_add_expense': group.allowMemberAddExpense,
       'allow_member_change_settings': group.allowMemberChangeSettings,
-      'allow_expense_as_other_participant': group.allowExpenseAsOtherParticipant,
+      'allow_expense_as_other_participant':
+          group.allowExpenseAsOtherParticipant,
       'allow_member_settle_for_others': group.allowMemberSettleForOthers,
       'icon': group.icon,
       'color': _colorToSigned(group.color),
@@ -527,6 +615,17 @@ class PowerSyncGroupRepository implements IGroupRepository {
         ..remove('budget_amount_cents')
         ..remove('allow_member_settle_for_others');
       await _client.from('groups').update(supabaseData).eq('id', group.id);
+    } else if (_shouldQueueOffline(
+      isLocalOnly: _isLocalOnly,
+      isOnline: _isOnline,
+    )) {
+      await _enqueue(
+        _db,
+        tableName: 'groups',
+        operation: 'update',
+        rowId: group.id,
+        data: data,
+      );
     }
 
     await _db.execute(
@@ -567,6 +666,17 @@ class PowerSyncGroupRepository implements IGroupRepository {
           .from('groups')
           .update({'archived_at': now, 'updated_at': now})
           .eq('id', groupId);
+    } else if (_shouldQueueOffline(
+      isLocalOnly: _isLocalOnly,
+      isOnline: _isOnline,
+    )) {
+      await _enqueue(
+        _db,
+        tableName: 'groups',
+        operation: 'update',
+        rowId: groupId,
+        data: {'archived_at': now, 'updated_at': now},
+      );
     }
     await _db.execute(
       'UPDATE groups SET archived_at = ?, updated_at = ? WHERE id = ?',
@@ -582,6 +692,17 @@ class PowerSyncGroupRepository implements IGroupRepository {
           .from('groups')
           .update({'archived_at': null, 'updated_at': now})
           .eq('id', groupId);
+    } else if (_shouldQueueOffline(
+      isLocalOnly: _isLocalOnly,
+      isOnline: _isOnline,
+    )) {
+      await _enqueue(
+        _db,
+        tableName: 'groups',
+        operation: 'update',
+        rowId: groupId,
+        data: {'archived_at': null, 'updated_at': now},
+      );
     }
     await _db.execute(
       'UPDATE groups SET archived_at = NULL, updated_at = ? WHERE id = ?',
@@ -593,10 +714,9 @@ class PowerSyncGroupRepository implements IGroupRepository {
   @override
   Future<void> setLocalArchived(String groupId) async {
     final now = _nowIso();
-    await _db.execute(
-      'DELETE FROM local_archived_groups WHERE group_id = ?',
-      [groupId],
-    );
+    await _db.execute('DELETE FROM local_archived_groups WHERE group_id = ?', [
+      groupId,
+    ]);
     await _db.execute(
       'INSERT INTO local_archived_groups (id, group_id, archived_at) VALUES (?, ?, ?)',
       [groupId, groupId, now],
@@ -605,10 +725,9 @@ class PowerSyncGroupRepository implements IGroupRepository {
 
   @override
   Future<void> clearLocalArchived(String groupId) async {
-    await _db.execute(
-      'DELETE FROM local_archived_groups WHERE group_id = ?',
-      [groupId],
-    );
+    await _db.execute('DELETE FROM local_archived_groups WHERE group_id = ?', [
+      groupId,
+    ]);
   }
 
   @override
@@ -632,10 +751,14 @@ class PowerSyncGroupRepository implements IGroupRepository {
             .toSet();
       });
     }
-    return _db.watch(q).map((rows) => rows
-        .map((r) => r['group_id'] as String?)
-        .whereType<String>()
-        .toSet());
+    return _db
+        .watch(q)
+        .map(
+          (rows) => rows
+              .map((r) => r['group_id'] as String?)
+              .whereType<String>()
+              .toSet(),
+        );
   }
 
   static const _locallyArchivedGroupsQuery = '''
@@ -662,6 +785,11 @@ class PowerSyncGroupRepository implements IGroupRepository {
   Future<void> delete(String id) async {
     if (!_isLocalOnly && _isOnline && _client != null) {
       await _client.from('groups').delete().eq('id', id);
+    } else if (_shouldQueueOffline(
+      isLocalOnly: _isLocalOnly,
+      isOnline: _isOnline,
+    )) {
+      await _enqueue(_db, tableName: 'groups', operation: 'delete', rowId: id);
     }
     await _db.execute('DELETE FROM groups WHERE id = ?', [id]);
   }
@@ -683,6 +811,21 @@ class PowerSyncGroupRepository implements IGroupRepository {
             'updated_at': now,
           })
           .eq('id', groupId);
+    } else if (_shouldQueueOffline(
+      isLocalOnly: _isLocalOnly,
+      isOnline: _isOnline,
+    )) {
+      await _enqueue(
+        _db,
+        tableName: 'groups',
+        operation: 'update',
+        rowId: groupId,
+        data: {
+          'settlement_freeze_at': now,
+          'settlement_snapshot_json': snapshotJson,
+          'updated_at': now,
+        },
+      );
     }
 
     await _db.execute(
@@ -704,6 +847,21 @@ class PowerSyncGroupRepository implements IGroupRepository {
             'updated_at': now,
           })
           .eq('id', groupId);
+    } else if (_shouldQueueOffline(
+      isLocalOnly: _isLocalOnly,
+      isOnline: _isOnline,
+    )) {
+      await _enqueue(
+        _db,
+        tableName: 'groups',
+        operation: 'update',
+        rowId: groupId,
+        data: {
+          'settlement_freeze_at': null,
+          'settlement_snapshot_json': null,
+          'updated_at': now,
+        },
+      );
     }
 
     await _db.execute(
@@ -772,7 +930,13 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
   }
 
   @override
-  Future<String> create(String groupId, String name, int order, {String? userId, String? avatarId}) async {
+  Future<String> create(
+    String groupId,
+    String name,
+    int order, {
+    String? userId,
+    String? avatarId,
+  }) async {
     final id = _uuid.v4();
     final now = _nowIso();
     final data = <String, dynamic>{
@@ -788,6 +952,17 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
 
     if (!_isLocalOnly && _isOnline && _client != null) {
       await _client.from('participants').insert(data);
+    } else if (_shouldQueueOffline(
+      isLocalOnly: _isLocalOnly,
+      isOnline: _isOnline,
+    )) {
+      await _enqueue(
+        _db,
+        tableName: 'participants',
+        operation: 'insert',
+        rowId: id,
+        data: data,
+      );
     }
 
     await _db.execute(
@@ -813,11 +988,35 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
             'updated_at': now,
           })
           .eq('id', participant.id);
+    } else if (_shouldQueueOffline(
+      isLocalOnly: _isLocalOnly,
+      isOnline: _isOnline,
+    )) {
+      await _enqueue(
+        _db,
+        tableName: 'participants',
+        operation: 'update',
+        rowId: participant.id,
+        data: {
+          'name': participant.name,
+          'sort_order': participant.order,
+          'avatar_id': participant.avatarId,
+          'left_at': leftAtIso,
+          'updated_at': now,
+        },
+      );
     }
 
     await _db.execute(
       'UPDATE participants SET name = ?, sort_order = ?, avatar_id = ?, left_at = ?, updated_at = ? WHERE id = ?',
-      [participant.name, participant.order, participant.avatarId, leftAtIso, now, participant.id],
+      [
+        participant.name,
+        participant.order,
+        participant.avatarId,
+        leftAtIso,
+        now,
+        participant.id,
+      ],
     );
   }
 
@@ -830,6 +1029,17 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
         params: {'p_group_id': groupId, 'p_participant_id': participantId},
       );
       Log.info('Participant archived via RPC');
+    } else if (_shouldQueueOffline(
+      isLocalOnly: _isLocalOnly,
+      isOnline: _isOnline,
+    )) {
+      await _enqueue(
+        _db,
+        tableName: 'participants',
+        operation: 'update',
+        rowId: participantId,
+        data: {'left_at': now, 'updated_at': now},
+      );
     }
     await _db.execute(
       'UPDATE participants SET left_at = ?, updated_at = ? WHERE id = ?',
@@ -838,19 +1048,36 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
   }
 
   @override
-  Future<void> updateProfileByUserId(String userId, String newName, {String? avatarId}) async {
+  Future<void> updateProfileByUserId(
+    String userId,
+    String newName, {
+    String? avatarId,
+  }) async {
     final now = _nowIso();
-    final updates = <String, dynamic>{
-      'name': newName,
-      'updated_at': now,
-    };
+    final updates = <String, dynamic>{'name': newName, 'updated_at': now};
     if (avatarId != null) updates['avatar_id'] = avatarId;
 
     if (!_isLocalOnly && _isOnline && _client != null) {
-      await _client
-          .from('participants')
-          .update(updates)
-          .eq('user_id', userId);
+      await _client.from('participants').update(updates).eq('user_id', userId);
+    } else if (_shouldQueueOffline(
+      isLocalOnly: _isLocalOnly,
+      isOnline: _isOnline,
+    )) {
+      final rows = await _db.getAll(
+        'SELECT id FROM participants WHERE user_id = ?',
+        [userId],
+      );
+      for (final row in rows) {
+        final participantId = row['id'] as String?;
+        if (participantId == null) continue;
+        await _enqueue(
+          _db,
+          tableName: 'participants',
+          operation: 'update',
+          rowId: participantId,
+          data: updates,
+        );
+      }
     }
 
     if (avatarId != null) {
@@ -868,10 +1095,22 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
 
   @override
   Future<void> delete(String id) async {
-    Log.info('ParticipantRepository.delete: participantId=$id localOnly=$_isLocalOnly online=$_isOnline');
+    Log.info(
+      'ParticipantRepository.delete: participantId=$id localOnly=$_isLocalOnly online=$_isOnline',
+    );
     if (!_isLocalOnly && _isOnline && _client != null) {
       await _client.from('participants').delete().eq('id', id);
       Log.info('ParticipantRepository.delete: deleted on server');
+    } else if (_shouldQueueOffline(
+      isLocalOnly: _isLocalOnly,
+      isOnline: _isOnline,
+    )) {
+      await _enqueue(
+        _db,
+        tableName: 'participants',
+        operation: 'delete',
+        rowId: id,
+      );
     }
     await _db.execute('DELETE FROM participants WHERE id = ?', [id]);
     Log.info('ParticipantRepository.delete: deleted from local DB');
@@ -899,9 +1138,7 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
 
   @override
   Future<List<Expense>> getAll() async {
-    final rows = await _db.getAll(
-      'SELECT * FROM expenses ORDER BY date DESC',
-    );
+    final rows = await _db.getAll('SELECT * FROM expenses ORDER BY date DESC');
     return rows.map(_expenseFromRow).toList();
   }
 
@@ -943,13 +1180,15 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
         ? jsonEncode(expense.lineItems!.map((e) => e.toJson()).toList())
         : null;
 
-    final receiptPaths = expense.receiptImagePaths ??
+    final receiptPaths =
+        expense.receiptImagePaths ??
         (expense.receiptImagePath != null ? [expense.receiptImagePath!] : null);
     final receiptPath = receiptPaths != null && receiptPaths.isNotEmpty
         ? receiptPaths.first
         : expense.receiptImagePath;
-    final receiptPathsJson =
-        receiptPaths != null ? jsonEncode(receiptPaths) : null;
+    final receiptPathsJson = receiptPaths != null
+        ? jsonEncode(receiptPaths)
+        : null;
     final data = <String, dynamic>{
       'id': id,
       'group_id': expense.groupId,
@@ -1028,13 +1267,15 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
     final lineItemsJson = expense.lineItems != null
         ? jsonEncode(expense.lineItems!.map((e) => e.toJson()).toList())
         : null;
-    final receiptPaths = expense.receiptImagePaths ??
+    final receiptPaths =
+        expense.receiptImagePaths ??
         (expense.receiptImagePath != null ? [expense.receiptImagePath!] : null);
     final receiptPath = receiptPaths != null && receiptPaths.isNotEmpty
         ? receiptPaths.first
         : expense.receiptImagePath;
-    final receiptPathsJson =
-        receiptPaths != null ? jsonEncode(receiptPaths) : null;
+    final receiptPathsJson = receiptPaths != null
+        ? jsonEncode(receiptPaths)
+        : null;
 
     if (!_isLocalOnly && _isOnline && _client != null) {
       await _client
@@ -1059,6 +1300,35 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
             'updated_at': now,
           })
           .eq('id', expense.id);
+    } else if (_shouldQueueOffline(
+      isLocalOnly: _isLocalOnly,
+      isOnline: _isOnline,
+    )) {
+      await _enqueue(
+        _db,
+        tableName: 'expenses',
+        operation: 'update',
+        rowId: expense.id,
+        data: {
+          'title': expense.title,
+          'amount_cents': expense.amountCents,
+          'currency_code': expense.currencyCode,
+          'exchange_rate': expense.exchangeRate,
+          'base_amount_cents': expense.baseAmountCents,
+          'payer_participant_id': expense.payerParticipantId,
+          'description': expense.description,
+          'date': expense.date.toUtc().toIso8601String(),
+          'split_type': expense.splitType.name,
+          'split_shares_json': splitSharesJson,
+          'type': expense.transactionType.name,
+          'to_participant_id': expense.toParticipantId,
+          'tag': expense.tag,
+          'line_items_json': lineItemsJson,
+          'receipt_image_path': receiptPath,
+          'receipt_image_paths': receiptPathsJson,
+          'updated_at': now,
+        },
+      );
     }
 
     await _db.execute(
@@ -1097,6 +1367,16 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
   Future<void> delete(String id) async {
     if (!_isLocalOnly && _isOnline && _client != null) {
       await _client.from('expenses').delete().eq('id', id);
+    } else if (_shouldQueueOffline(
+      isLocalOnly: _isLocalOnly,
+      isOnline: _isOnline,
+    )) {
+      await _enqueue(
+        _db,
+        tableName: 'expenses',
+        operation: 'delete',
+        rowId: id,
+      );
     }
     await _db.execute('DELETE FROM expenses WHERE id = ?', [id]);
   }
@@ -1175,6 +1455,17 @@ class PowerSyncTagRepository implements ITagRepository {
 
     if (!_isLocalOnly && _isOnline && _client != null) {
       await _client.from('expense_tags').insert(data);
+    } else if (_shouldQueueOffline(
+      isLocalOnly: _isLocalOnly,
+      isOnline: _isOnline,
+    )) {
+      await _enqueue(
+        _db,
+        tableName: 'expense_tags',
+        operation: 'insert',
+        rowId: id,
+        data: data,
+      );
     }
 
     await _db.execute(
@@ -1197,6 +1488,21 @@ class PowerSyncTagRepository implements ITagRepository {
             'updated_at': now,
           })
           .eq('id', tag.id);
+    } else if (_shouldQueueOffline(
+      isLocalOnly: _isLocalOnly,
+      isOnline: _isOnline,
+    )) {
+      await _enqueue(
+        _db,
+        tableName: 'expense_tags',
+        operation: 'update',
+        rowId: tag.id,
+        data: {
+          'label': tag.label,
+          'icon_name': tag.iconName,
+          'updated_at': now,
+        },
+      );
     }
 
     await _db.execute(
@@ -1209,6 +1515,16 @@ class PowerSyncTagRepository implements ITagRepository {
   Future<void> delete(String id) async {
     if (!_isLocalOnly && _isOnline && _client != null) {
       await _client.from('expense_tags').delete().eq('id', id);
+    } else if (_shouldQueueOffline(
+      isLocalOnly: _isLocalOnly,
+      isOnline: _isOnline,
+    )) {
+      await _enqueue(
+        _db,
+        tableName: 'expense_tags',
+        operation: 'delete',
+        rowId: id,
+      );
     }
     await _db.execute('DELETE FROM expense_tags WHERE id = ?', [id]);
   }
@@ -1452,8 +1768,16 @@ class PowerSyncGroupInviteRepository implements IGroupInviteRepository {
          created_by, label, max_uses, use_count, is_active)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1)''',
       [
-        id, groupId, token, inviteeEmail, effectiveRole, now, expiresAtIso,
-        createdBy, label, maxUses,
+        id,
+        groupId,
+        token,
+        inviteeEmail,
+        effectiveRole,
+        now,
+        expiresAtIso,
+        createdBy,
+        label,
+        maxUses,
       ],
     );
 
@@ -1507,26 +1831,25 @@ class PowerSyncGroupInviteRepository implements IGroupInviteRepository {
       await client.rpc('revoke_invite', params: {'p_invite_id': inviteId});
     }
     // Always update local DB so watchers fire immediately
-    await _db.execute(
-      'UPDATE group_invites SET is_active = 0 WHERE id = ?',
-      [inviteId],
-    );
+    await _db.execute('UPDATE group_invites SET is_active = 0 WHERE id = ?', [
+      inviteId,
+    ]);
   }
 
   @override
   Future<void> toggleActive(String inviteId, bool active) async {
     final client = supabaseClient;
     if (client != null) {
-      await client.rpc('toggle_invite_active', params: {
-        'p_invite_id': inviteId,
-        'p_active': active,
-      });
+      await client.rpc(
+        'toggle_invite_active',
+        params: {'p_invite_id': inviteId, 'p_active': active},
+      );
     }
     // Always update local DB so watchers fire immediately
-    await _db.execute(
-      'UPDATE group_invites SET is_active = ? WHERE id = ?',
-      [active ? 1 : 0, inviteId],
-    );
+    await _db.execute('UPDATE group_invites SET is_active = ? WHERE id = ?', [
+      active ? 1 : 0,
+      inviteId,
+    ]);
   }
 
   @override
