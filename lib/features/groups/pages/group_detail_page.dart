@@ -30,6 +30,9 @@ import '../../../core/auth/predefined_avatars.dart';
 import '../../../domain/domain.dart';
 import '../utils/group_icon_utils.dart';
 
+const double _kTabFabBottomClearance = 96.0;
+const double _kTabListBottomSpacing = 16.0;
+
 class GroupDetailPage extends ConsumerStatefulWidget {
   final String groupId;
   final bool readOnlyPreview;
@@ -758,7 +761,12 @@ class _ExpensesTab extends ConsumerWidget {
               onRefresh: onRefresh,
               child: ListView.builder(
                 key: const PageStorageKey<String>('group_detail_expenses'),
-                padding: const EdgeInsets.only(bottom: 24),
+                padding: EdgeInsets.only(
+                  bottom:
+                      _kTabFabBottomClearance +
+                      _kTabListBottomSpacing +
+                      MediaQuery.of(context).padding.bottom,
+                ),
                 itemCount: flattenedItems.length,
                 itemBuilder: (context, index) {
                   final item = flattenedItems[index];
@@ -959,9 +967,14 @@ class _PeopleTab extends ConsumerWidget {
               onRefresh: onRefresh,
               child: ListView(
                 key: const PageStorageKey<String>('group_detail_members'),
-                padding: const EdgeInsets.symmetric(
-                  vertical: 8,
-                  horizontal: 16,
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  8,
+                  16,
+                  8 +
+                      _kTabFabBottomClearance +
+                      _kTabListBottomSpacing +
+                      MediaQuery.of(context).padding.bottom,
                 ),
                 children: [
                   ...activeParticipants.map((p) {

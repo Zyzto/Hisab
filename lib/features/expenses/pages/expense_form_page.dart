@@ -45,6 +45,7 @@ import '../../../domain/domain.dart';
 
 /// Height of the floating submit bar (button + padding) for ListView bottom padding.
 const double _kSubmitBarHeight = 76.0;
+const double _kSubmitBarExtraBottomPadding = 20.0;
 
 /// Max number of photos per expense.
 const int _kMaxReceiptPhotos = 5;
@@ -1079,6 +1080,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                             bottom:
                                 12 +
                                 _kSubmitBarHeight +
+                                _kSubmitBarExtraBottomPadding +
                                 MediaQuery.of(context).padding.bottom,
                           ),
                           children: [
