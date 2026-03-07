@@ -84,9 +84,11 @@ IGroupMemberRepository groupMemberRepository(Ref ref) {
 
 @riverpod
 IGroupInviteRepository groupInviteRepository(Ref ref) {
-  final localOnly = ref.watch(effectiveLocalOnlyProvider);
   return PowerSyncGroupInviteRepository(
     ref.watch(powerSyncDatabaseProvider),
-    supabaseClient: _clientIfOnline(localOnly),
+    // Invite token lookup is needed to route readonly invite previews even
+    // when account mode is currently local-only. Mutating invite actions still
+    // enforce authentication/online at repository method level.
+    supabaseClient: supabaseClientIfConfigured,
   );
 }
