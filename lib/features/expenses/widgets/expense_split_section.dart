@@ -142,12 +142,8 @@ class ExpenseSplitSection extends StatelessWidget {
           borderRadius: BorderRadius.circular(_kSplitRadius),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(_kSplitRadius),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 320),
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: participants.length,
-                itemBuilder: (context, i) {
+            child: Column(
+              children: List.generate(participants.length, (i) {
                   final p = participants[i];
                   final cents = i < sharesCents.length ? sharesCents[i] : 0;
                   final included = includedInSplitIds.contains(p.id);
@@ -446,8 +442,7 @@ class ExpenseSplitSection extends StatelessWidget {
                       ],
                     ),
                   );
-                },
-              ),
+                }),
             ),
           ),
         ),
