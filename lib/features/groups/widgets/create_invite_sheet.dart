@@ -15,6 +15,7 @@ import '../../../core/theme/theme_config.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../domain/domain.dart';
 import '../../settings/providers/settings_framework_providers.dart';
+import '../providers/group_invite_provider.dart';
 import '../utils/invite_share_helper.dart';
 
 /// Expiry option for invite creation.
@@ -131,6 +132,7 @@ class _CreateInviteSheetState extends ConsumerState<_CreateInviteSheet> {
     TelemetryService.sendEvent('invite_created', {
       'groupId': widget.groupId,
     }, enabled: ref.read(telemetryEnabledProvider));
+    ref.invalidate(invitesByGroupProvider(widget.groupId));
     if (!mounted) return;
     setState(() => _creating = false);
     Navigator.of(context).pop(result.token);

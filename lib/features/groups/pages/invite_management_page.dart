@@ -355,6 +355,8 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
     try {
       final repo = ref.read(groupInviteRepositoryProvider);
       await repo.toggleActive(widget.invite.id, !widget.invite.isActive);
+      ref.invalidate(invitesByGroupProvider(widget.groupId));
+      ref.invalidate(inviteUsagesProvider(widget.invite.id));
     } catch (e, st) {
       Log.warning('Toggle invite failed', error: e, stackTrace: st);
       if (mounted) {
@@ -376,6 +378,8 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
     setState(() => _actionLoading = true);
     try {
       await ref.read(groupInviteRepositoryProvider).revoke(widget.invite.id);
+      ref.invalidate(invitesByGroupProvider(widget.groupId));
+      ref.invalidate(inviteUsagesProvider(widget.invite.id));
     } catch (e, st) {
       Log.warning('Revoke invite failed', error: e, stackTrace: st);
       if (mounted) {

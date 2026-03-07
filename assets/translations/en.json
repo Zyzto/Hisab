@@ -372,6 +372,7 @@
   "group_admin": "Admin",
   "group_member": "Member",
   "merge_with_user": "Merge With User",
+  "merge_with_user_confirm": "Merge \"{name}\" with the selected user? This cannot be undone.",
   "merge_with_user_success": "Participant merged with user",
   "kick_member": "Remove Member",
   "kick_member_confirm": "Remove this member from the group?",

@@ -372,6 +372,7 @@
   "group_admin": "مسؤول",
   "group_member": "عضو",
   "merge_with_user": "دمج مع مستخدم",
+  "merge_with_user_confirm": "دمج \"{name}\" مع المستخدم المحدد؟ لا يمكن التراجع عن هذا الإجراء.",
   "merge_with_user_success": "تم دمج الشخص مع المستخدم",
   "kick_member": "إخراج العضو",
   "kick_member_confirm": "تبغى تطلع هذا العضو من المجموعة؟",

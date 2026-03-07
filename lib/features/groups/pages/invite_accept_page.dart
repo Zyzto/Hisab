@@ -17,6 +17,7 @@ import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/telemetry/telemetry_service.dart';
+import '../../../core/services/connectivity_service.dart';
 import '../../../domain/domain.dart';
 import '../providers/group_invite_provider.dart';
 import '../providers/groups_provider.dart';
@@ -35,6 +36,7 @@ class InviteAcceptPage extends ConsumerStatefulWidget {
 class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
   bool _accepting = false;
   String? _error;
+  bool _didAttemptWebPreviewRedirect = false;
 
   /// Set when accept fails because user is already a member; enables "Open Group" action.
   String? _alreadyMemberGroupId;
@@ -98,6 +100,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
   @override
   Widget build(BuildContext context) {
     final localOnly = ref.watch(effectiveLocalOnlyProvider);
+    final hasNetwork = ref.watch(connectivityProvider);
     final isAuthenticated = ref.watch(isAuthenticatedProvider);
     final inviteAsync = ref.watch(inviteByTokenProvider(widget.token));
 
@@ -110,7 +113,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
               contentAreaWidth: layoutConstraints.maxWidth,
               title: Text('invite'.tr()),
             ),
-            body: !supabaseConfigAvailable
+            body: (!supabaseConfigAvailable || !hasNetwork)
                 ? Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24),
@@ -154,7 +157,8 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                           ),
                         );
                       }
-                      if (kIsWeb) {
+                      if (kIsWeb && !_didAttemptWebPreviewRedirect) {
+                        _didAttemptWebPreviewRedirect = true;
                         WidgetsBinding.instance.addPostFrameCallback((_) {
                           if (!mounted) return;
                           context.go(RoutePaths.invitePreview(widget.token));
@@ -248,7 +252,8 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                   );
                 }
                 final router = GoRouter.maybeOf(context);
-                if (router != null) {
+                if (router != null && !_didAttemptWebPreviewRedirect) {
+                  _didAttemptWebPreviewRedirect = true;
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     if (!mounted) return;
                     context.go(RoutePaths.invitePreview(widget.token));

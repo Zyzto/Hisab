@@ -1865,10 +1865,14 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
         await ref
             .read(groupMemberRepositoryProvider)
             .transferOwnership(widget.groupId, chosen);
+        if (!ref.read(effectiveLocalOnlyProvider)) {
+          await ref.read(dataSyncServiceProvider.notifier).syncNow();
+        }
         TelemetryService.sendEvent('ownership_transferred', {
           'groupId': widget.groupId,
         }, enabled: ref.read(telemetryEnabledProvider));
         ref.invalidate(futureGroupProvider(widget.groupId));
+        ref.invalidate(membersByGroupProvider(widget.groupId));
         ref.invalidate(myRoleInGroupProvider(widget.groupId));
         if (context.mounted) {
           context.showSuccess('ownership_transferred'.tr());
@@ -1926,6 +1930,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
       await _withSaving(() async {
         await ref.read(groupRepositoryProvider).unarchive(widget.groupId);
         Log.info('Group setting: unarchived groupId=${widget.groupId}');
+        ref.invalidate(futureGroupProvider(widget.groupId));
         if (context.mounted) {
           context.showSuccess(
             (isPersonal ? 'list_unarchived' : 'group_unarchived').tr(),
@@ -2054,7 +2059,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
           'groupId': widget.groupId,
         }, enabled: ref.read(telemetryEnabledProvider));
         // Trigger immediate sync so the groups list reflects the change
-        ref.read(dataSyncServiceProvider.notifier).syncNow();
+        await ref.read(dataSyncServiceProvider.notifier).syncNow();
         if (context.mounted) context.go(RoutePaths.home);
       });
     } catch (e, st) {

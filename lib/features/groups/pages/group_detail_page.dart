@@ -1158,79 +1158,203 @@ class _PeopleTab extends ConsumerWidget {
   ) {
     // Active member with member-management actions
     if (isActive && isOwnerOrAdmin && linkedMember!.role != 'owner') {
-      return PopupMenuButton<String>(
-        onSelected: (v) {
-          if (v == 'edit') {
-            _showEditParticipant(context, ref, participant);
-          } else if (v == 'delete') {
-            _showDeleteParticipant(context, ref, groupId, participant);
-          } else {
-            _onMemberAction(context, ref, v, linkedMember);
-          }
-        },
-        itemBuilder: (ctx) => [
-          PopupMenuItem(value: 'edit', child: Text('edit_name'.tr())),
-          if (myRole == GroupRole.owner) ...[
-            PopupMenuItem(value: 'role', child: Text('change_role'.tr())),
-            PopupMenuItem(
-              value: 'transfer',
-              child: Text('transfer_ownership'.tr()),
-            ),
-          ],
-          PopupMenuItem(value: 'kick', child: Text('kick_member'.tr())),
-        ],
+      return IconButton(
+        icon: const Icon(Icons.more_vert),
+        onPressed: () => _showActiveParticipantActions(
+          context,
+          ref,
+          participant,
+          linkedMember,
+          myRole,
+        ),
       );
     }
 
     // Left participant (had userId, no current member) — allow archive to remove from list
     if (isLeft && isOwnerOrAdmin) {
-      return PopupMenuButton<String>(
-        onSelected: (v) {
-          if (v == 'archive') {
-            _showArchiveParticipant(context, ref, groupId, participant);
-          }
-        },
-        itemBuilder: (ctx) => [
-          PopupMenuItem(
-            value: 'archive',
-            child: Text('archive_participant'.tr()),
-          ),
-        ],
+      return IconButton(
+        icon: const Icon(Icons.more_vert),
+        onPressed: () =>
+            _showLeftParticipantActions(context, ref, groupId, participant),
       );
     }
 
     // Standalone participant (no userId) or local-only mode — allow edit/delete/merge
     if (!isActive && !isLeft && isOwnerOrAdmin) {
-      return PopupMenuButton<String>(
-        onSelected: (v) {
-          if (v == 'edit') {
-            _showEditParticipant(context, ref, participant);
-          } else if (v == 'delete') {
-            _showDeleteParticipant(context, ref, groupId, participant);
-          } else if (v == 'merge') {
-            _showMergeWithUser(
-              context,
-              ref,
-              groupId,
-              participant,
-              members,
-              participants,
-            );
-          }
-        },
-        itemBuilder: (ctx) => [
-          PopupMenuItem(value: 'edit', child: Text('edit_name'.tr())),
-          if (!localOnly)
-            PopupMenuItem(value: 'merge', child: Text('merge_with_user'.tr())),
-          PopupMenuItem(
-            value: 'delete',
-            child: Text('delete_participant'.tr()),
-          ),
-        ],
+      return IconButton(
+        icon: const Icon(Icons.more_vert),
+        onPressed: () => _showStandaloneParticipantActions(
+          context,
+          ref,
+          groupId,
+          participant,
+          localOnly,
+          members,
+          participants,
+        ),
       );
     }
 
     return null;
+  }
+
+  Future<void> _showActiveParticipantActions(
+    BuildContext context,
+    WidgetRef ref,
+    Participant participant,
+    GroupMember linkedMember,
+    GroupRole? myRole,
+  ) async {
+    final action = await showResponsiveSheet<String>(
+      context: context,
+      title: participant.name,
+      isScrollControlled: true,
+      centerInFullViewport: true,
+      child: Builder(
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!LayoutBreakpoints.isTabletOrWider(context))
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    participant.name,
+                    style: Theme.of(ctx).textTheme.titleLarge,
+                  ),
+                ),
+              ListTile(
+                title: Text('edit_name'.tr()),
+                onTap: () => Navigator.pop(ctx, 'edit'),
+              ),
+              if (myRole == GroupRole.owner) ...[
+                ListTile(
+                  title: Text('change_role'.tr()),
+                  onTap: () => Navigator.pop(ctx, 'role'),
+                ),
+                ListTile(
+                  title: Text('transfer_ownership'.tr()),
+                  onTap: () => Navigator.pop(ctx, 'transfer'),
+                ),
+              ],
+              ListTile(
+                title: Text('kick_member'.tr()),
+                onTap: () => Navigator.pop(ctx, 'kick'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (action == null || !context.mounted) return;
+    if (action == 'edit') {
+      await _showEditParticipant(context, ref, participant);
+      return;
+    }
+    await _onMemberAction(context, ref, action, linkedMember);
+  }
+
+  Future<void> _showLeftParticipantActions(
+    BuildContext context,
+    WidgetRef ref,
+    String groupId,
+    Participant participant,
+  ) async {
+    final action = await showResponsiveSheet<String>(
+      context: context,
+      title: participant.name,
+      isScrollControlled: true,
+      centerInFullViewport: true,
+      child: Builder(
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!LayoutBreakpoints.isTabletOrWider(context))
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    participant.name,
+                    style: Theme.of(ctx).textTheme.titleLarge,
+                  ),
+                ),
+              ListTile(
+                title: Text('archive_participant'.tr()),
+                onTap: () => Navigator.pop(ctx, 'archive'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (action != 'archive' || !context.mounted) return;
+    await _showArchiveParticipant(context, ref, groupId, participant);
+  }
+
+  Future<void> _showStandaloneParticipantActions(
+    BuildContext context,
+    WidgetRef ref,
+    String groupId,
+    Participant participant,
+    bool localOnly,
+    List<GroupMember> members,
+    List<Participant> participants,
+  ) async {
+    final action = await showResponsiveSheet<String>(
+      context: context,
+      title: participant.name,
+      isScrollControlled: true,
+      centerInFullViewport: true,
+      child: Builder(
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!LayoutBreakpoints.isTabletOrWider(context))
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    participant.name,
+                    style: Theme.of(ctx).textTheme.titleLarge,
+                  ),
+                ),
+              ListTile(
+                title: Text('edit_name'.tr()),
+                onTap: () => Navigator.pop(ctx, 'edit'),
+              ),
+              if (!localOnly)
+                ListTile(
+                  title: Text('merge_with_user'.tr()),
+                  onTap: () => Navigator.pop(ctx, 'merge'),
+                ),
+              ListTile(
+                title: Text('delete_participant'.tr()),
+                onTap: () => Navigator.pop(ctx, 'delete'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (action == null || !context.mounted) return;
+    if (action == 'edit') {
+      await _showEditParticipant(context, ref, participant);
+      return;
+    }
+    if (action == 'delete') {
+      await _showDeleteParticipant(context, ref, groupId, participant);
+      return;
+    }
+    if (action == 'merge') {
+      await _showMergeWithUser(
+        context,
+        ref,
+        groupId,
+        participant,
+        members,
+        participants,
+      );
+    }
   }
 
   Future<void> _showArchiveParticipant(
@@ -1445,6 +1569,17 @@ class _PeopleTab extends ConsumerWidget {
       ),
     );
     if (chosen == null || !context.mounted) return;
+    final confirmed = await showConfirmSheet(
+      context,
+      title: 'merge_with_user'.tr(),
+      content: 'merge_with_user_confirm'.tr().replaceAll(
+        '{name}',
+        participant.name,
+      ),
+      confirmLabel: 'merge_with_user'.tr(),
+      centerInFullViewport: true,
+    );
+    if (confirmed != true || !context.mounted) return;
     try {
       await ref
           .read(groupMemberRepositoryProvider)
@@ -1531,6 +1666,9 @@ class _PeopleTab extends ConsumerWidget {
         await ref
             .read(groupMemberRepositoryProvider)
             .updateRole(groupId, member.id, role);
+        if (!ref.read(effectiveLocalOnlyProvider)) {
+          await ref.read(dataSyncServiceProvider.notifier).syncNow();
+        }
         ref.invalidate(membersByGroupProvider(groupId));
       } catch (e, st) {
         Log.warning('Change role failed', error: e, stackTrace: st);
@@ -1550,6 +1688,9 @@ class _PeopleTab extends ConsumerWidget {
       await ref
           .read(groupMemberRepositoryProvider)
           .transferOwnership(groupId, memberId);
+      if (!ref.read(effectiveLocalOnlyProvider)) {
+        await ref.read(dataSyncServiceProvider.notifier).syncNow();
+      }
       ref.invalidate(futureGroupProvider(groupId));
       ref.invalidate(membersByGroupProvider(groupId));
       ref.invalidate(myRoleInGroupProvider(groupId));
