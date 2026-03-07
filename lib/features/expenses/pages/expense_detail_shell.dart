@@ -9,6 +9,7 @@ import '../../../core/navigation/route_paths.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../domain/domain.dart';
+import '../../balance/providers/balance_provider.dart';
 import '../../groups/providers/groups_provider.dart';
 import '../providers/expense_navigation_direction.dart';
 
@@ -180,6 +181,7 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
       ),
       if (!widget.readOnlyPreview)
         PopupMenuButton<String>(
+          useRootNavigator: true,
           icon: const Icon(Icons.more_vert),
           enabled: expense != null,
           onSelected: expense != null
@@ -277,6 +279,9 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
     );
     if (ok == true && context.mounted) {
       await ref.read(expenseRepositoryProvider).delete(expense.id);
+      ref.invalidate(futureExpenseProvider(expense.id));
+      ref.invalidate(expensesByGroupProvider(widget.groupId));
+      ref.invalidate(groupBalanceProvider(widget.groupId));
       if (context.mounted) context.pop();
     }
   }
