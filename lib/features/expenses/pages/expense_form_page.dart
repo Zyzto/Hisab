@@ -33,6 +33,7 @@ import '../../../core/widgets/expandable_section.dart';
 import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../features/settings/providers/settings_framework_providers.dart';
+import '../../balance/providers/balance_provider.dart';
 import '../../groups/providers/group_member_provider.dart';
 import '../../groups/providers/groups_provider.dart';
 import '../constants/expense_form_constants.dart';
@@ -526,6 +527,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       );
       if (_initialExpense != null) {
         await ref.read(expenseRepositoryProvider).update(expense);
+        ref.invalidate(futureExpenseProvider(expense.id));
         Log.info(
           'Expense updated: id=${expense.id} title="${expense.title}" amountCents=${expense.amountCents}',
         );
@@ -565,6 +567,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           }, enabled: ref.read(telemetryEnabledProvider));
         } catch (_) {}
       }
+      ref.invalidate(expensesByGroupProvider(widget.groupId));
+      ref.invalidate(groupBalanceProvider(widget.groupId));
       if (!mounted) return;
       context.pop();
       didPop = true;

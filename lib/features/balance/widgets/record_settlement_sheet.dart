@@ -9,6 +9,8 @@ import '../../../core/repository/repository_providers.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../domain/domain.dart';
+import '../providers/balance_provider.dart';
+import '../../groups/providers/groups_provider.dart';
 
 /// Show a confirmation bottom sheet to record a settlement payment.
 /// Returns `true` if the settlement was recorded, `false` if cancelled.
@@ -55,6 +57,10 @@ Future<bool> showRecordSettlementSheet(
         toParticipantId: settlement.toParticipantId,
       );
       await ref.read(expenseRepositoryProvider).create(expense);
+      // Force an immediate refresh so the Balance tab reflects the new transfer
+      // even when repository stream updates arrive slightly later.
+      ref.invalidate(expensesByGroupProvider(groupId));
+      ref.invalidate(groupBalanceProvider(groupId));
       Log.info(
         'Settlement recorded: $fromName -> $toName for ${settlement.amountCents} cents',
       );
