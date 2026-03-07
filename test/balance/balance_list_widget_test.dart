@@ -200,6 +200,71 @@ void main() {
     expect(smallDebtorIndex, lessThan(bigDebtorIndex));
   });
 
+  testWidgets('BalanceList hides participants with zero balance', (
+    tester,
+  ) async {
+    fakeResult = GroupBalanceResult(
+      group: Group(
+        id: groupId,
+        name: 'Zero Balance Group',
+        currencyCode: 'USD',
+        createdAt: now,
+        updatedAt: now,
+      ),
+      participants: [
+        Participant(
+          id: 'p-pos',
+          groupId: groupId,
+          name: 'Creditor',
+          order: 0,
+          createdAt: now,
+          updatedAt: now,
+        ),
+        Participant(
+          id: 'p-zero',
+          groupId: groupId,
+          name: 'ZeroPerson',
+          order: 1,
+          createdAt: now,
+          updatedAt: now,
+        ),
+        Participant(
+          id: 'p-neg',
+          groupId: groupId,
+          name: 'Debtor',
+          order: 2,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      ],
+      balances: const [
+        ParticipantBalance(
+          participantId: 'p-pos',
+          balanceCents: 2000,
+          currencyCode: 'USD',
+        ),
+        ParticipantBalance(
+          participantId: 'p-zero',
+          balanceCents: 0,
+          currencyCode: 'USD',
+        ),
+        ParticipantBalance(
+          participantId: 'p-neg',
+          balanceCents: -2000,
+          currencyCode: 'USD',
+        ),
+      ],
+      settlements: const [],
+    );
+
+    await pumpBalanceList(tester);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Creditor'), findsOneWidget);
+    expect(find.text('Debtor'), findsOneWidget);
+    expect(find.text('ZeroPerson'), findsNothing);
+  });
+
   testWidgets('Settlement row handles mixed Arabic and English names', (
     tester,
   ) async {
@@ -256,7 +321,7 @@ void main() {
 
     expect(find.text('علي'), findsAny);
     expect(find.text('Bob'), findsAny);
-    expect(find.text('\u2192'), findsWidgets);
+    expect(find.textContaining('\u2192'), findsAny);
   });
 
   testWidgets('BalanceList disables record when not owner and not debtor', (

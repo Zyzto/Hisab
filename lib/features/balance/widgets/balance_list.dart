@@ -40,10 +40,14 @@ class BalanceList extends ConsumerWidget {
         final balances = result.balances;
         final sortedBalances = List<ParticipantBalance>.from(balances)
           ..sort((a, b) => b.balanceCents.compareTo(a.balanceCents));
+        final visibleBalances = sortedBalances
+            .where((b) => b.balanceCents != 0)
+            .toList();
         final settlements = result.settlements;
 
         final myMember = myMemberAsync.hasValue ? myMemberAsync.value : null;
         final myRole = myRoleAsync.hasValue ? myRoleAsync.value : null;
+        String bidiIsolate(String value) => '\u2068$value\u2069';
         bool canRecordSettlement(SettlementTransaction s) {
           if (readOnlyMode) return false;
           if (group.isSettlementFrozen) return false;
@@ -59,7 +63,7 @@ class BalanceList extends ConsumerWidget {
         // Flatten for ListView.builder: compute item count and build by index.
         // Keep frozen-state context visible in read-only preview too.
         final hasFrozen = group.isSettlementFrozen;
-        var itemCount = (hasFrozen ? 1 : 0) + 4 + sortedBalances.length;
+        var itemCount = (hasFrozen ? 1 : 0) + 4 + visibleBalances.length;
         itemCount += settlements.isEmpty ? 1 : settlements.length;
 
         final listView = ListView.builder(
@@ -128,8 +132,8 @@ class BalanceList extends ConsumerWidget {
               return const SizedBox(height: 8);
             }
             i--;
-            if (i < sortedBalances.length) {
-              final b = sortedBalances[i];
+            if (i < visibleBalances.length) {
+              final b = visibleBalances[i];
               final name = nameOf[b.participantId] ?? b.participantId;
               final isPositive = b.balanceCents >= 0;
               final color = isPositive
@@ -154,7 +158,7 @@ class BalanceList extends ConsumerWidget {
                 ),
               );
             }
-            i -= sortedBalances.length;
+            i -= visibleBalances.length;
             if (i == 0) {
               return Text('settle_up'.tr(), style: theme.textTheme.titleMedium);
             }
@@ -175,31 +179,16 @@ class BalanceList extends ConsumerWidget {
             final s = settlements[i];
             final from = nameOf[s.fromParticipantId] ?? s.fromParticipantId;
             final to = nameOf[s.toParticipantId] ?? s.toParticipantId;
+            final settlementTitle =
+                '${bidiIsolate(from)} \u200E\u2192\u200E ${bidiIsolate(to)}';
             final canRecord = canRecordSettlement(s);
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
               child: ListTile(
-                title: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        from,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8),
-                      child: Text('\u2192'),
-                    ),
-                    Expanded(
-                      child: Text(
-                        to,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
+                title: Text(
+                  settlementTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
