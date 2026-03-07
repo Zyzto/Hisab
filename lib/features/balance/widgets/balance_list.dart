@@ -38,6 +38,8 @@ class BalanceList extends ConsumerWidget {
         final group = result.group;
         final participants = result.participants;
         final balances = result.balances;
+        final sortedBalances = List<ParticipantBalance>.from(balances)
+          ..sort((a, b) => b.balanceCents.compareTo(a.balanceCents));
         final settlements = result.settlements;
 
         final myMember = myMemberAsync.hasValue ? myMemberAsync.value : null;
@@ -57,7 +59,7 @@ class BalanceList extends ConsumerWidget {
         // Flatten for ListView.builder: compute item count and build by index.
         // Keep frozen-state context visible in read-only preview too.
         final hasFrozen = group.isSettlementFrozen;
-        var itemCount = (hasFrozen ? 1 : 0) + 4 + balances.length;
+        var itemCount = (hasFrozen ? 1 : 0) + 4 + sortedBalances.length;
         itemCount += settlements.isEmpty ? 1 : settlements.length;
 
         final listView = ListView.builder(
@@ -126,8 +128,8 @@ class BalanceList extends ConsumerWidget {
               return const SizedBox(height: 8);
             }
             i--;
-            if (i < balances.length) {
-              final b = balances[i];
+            if (i < sortedBalances.length) {
+              final b = sortedBalances[i];
               final name = nameOf[b.participantId] ?? b.participantId;
               final isPositive = b.balanceCents >= 0;
               final color = isPositive
@@ -152,7 +154,7 @@ class BalanceList extends ConsumerWidget {
                 ),
               );
             }
-            i -= balances.length;
+            i -= sortedBalances.length;
             if (i == 0) {
               return Text('settle_up'.tr(), style: theme.textTheme.titleMedium);
             }
@@ -177,7 +179,28 @@ class BalanceList extends ConsumerWidget {
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
               child: ListTile(
-                title: Text('$from \u2192 $to'),
+                title: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        from,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8),
+                      child: Text('\u2192'),
+                    ),
+                    Expanded(
+                      child: Text(
+                        to,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

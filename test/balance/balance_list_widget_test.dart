@@ -122,6 +122,143 @@ void main() {
     expect(find.textContaining('50'), findsAny);
   });
 
+  testWidgets('BalanceList orders balances by amount descending', (
+    tester,
+  ) async {
+    fakeResult = GroupBalanceResult(
+      group: Group(
+        id: groupId,
+        name: 'Ordering Group',
+        currencyCode: 'USD',
+        createdAt: now,
+        updatedAt: now,
+      ),
+      participants: [
+        Participant(
+          id: 'p-1',
+          groupId: groupId,
+          name: 'LargestCreditor',
+          order: 0,
+          createdAt: now,
+          updatedAt: now,
+        ),
+        Participant(
+          id: 'p-2',
+          groupId: groupId,
+          name: 'SmallDebtor',
+          order: 1,
+          createdAt: now,
+          updatedAt: now,
+        ),
+        Participant(
+          id: 'p-3',
+          groupId: groupId,
+          name: 'BigDebtor',
+          order: 2,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      ],
+      // Intentionally unsorted input order to verify UI sorting.
+      balances: const [
+        ParticipantBalance(
+          participantId: 'p-3',
+          balanceCents: -3000,
+          currencyCode: 'USD',
+        ),
+        ParticipantBalance(
+          participantId: 'p-1',
+          balanceCents: 7000,
+          currencyCode: 'USD',
+        ),
+        ParticipantBalance(
+          participantId: 'p-2',
+          balanceCents: -500,
+          currencyCode: 'USD',
+        ),
+      ],
+      settlements: const [],
+    );
+
+    await pumpBalanceList(tester);
+    await tester.pumpAndSettle();
+
+    final allTexts = tester.widgetList<Text>(find.byType(Text)).toList();
+    int indexOfExactText(String value) => allTexts.indexWhere(
+      (t) => t.data == value,
+    );
+
+    final largestCreditorIndex = indexOfExactText('LargestCreditor');
+    final smallDebtorIndex = indexOfExactText('SmallDebtor');
+    final bigDebtorIndex = indexOfExactText('BigDebtor');
+
+    expect(largestCreditorIndex, greaterThanOrEqualTo(0));
+    expect(smallDebtorIndex, greaterThanOrEqualTo(0));
+    expect(bigDebtorIndex, greaterThanOrEqualTo(0));
+
+    expect(largestCreditorIndex, lessThan(smallDebtorIndex));
+    expect(smallDebtorIndex, lessThan(bigDebtorIndex));
+  });
+
+  testWidgets('Settlement row handles mixed Arabic and English names', (
+    tester,
+  ) async {
+    fakeResult = GroupBalanceResult(
+      group: Group(
+        id: groupId,
+        name: 'Mixed Script Group',
+        currencyCode: 'USD',
+        createdAt: now,
+        updatedAt: now,
+      ),
+      participants: [
+        Participant(
+          id: 'p-ar',
+          groupId: groupId,
+          name: 'علي',
+          order: 0,
+          createdAt: now,
+          updatedAt: now,
+        ),
+        Participant(
+          id: 'p-en',
+          groupId: groupId,
+          name: 'Bob',
+          order: 1,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      ],
+      balances: const [
+        ParticipantBalance(
+          participantId: 'p-ar',
+          balanceCents: -2500,
+          currencyCode: 'USD',
+        ),
+        ParticipantBalance(
+          participantId: 'p-en',
+          balanceCents: 2500,
+          currencyCode: 'USD',
+        ),
+      ],
+      settlements: const [
+        SettlementTransaction(
+          fromParticipantId: 'p-ar',
+          toParticipantId: 'p-en',
+          amountCents: 2500,
+          currencyCode: 'USD',
+        ),
+      ],
+    );
+
+    await pumpBalanceList(tester);
+    await tester.pumpAndSettle();
+
+    expect(find.text('علي'), findsAny);
+    expect(find.text('Bob'), findsAny);
+    expect(find.text('\u2192'), findsWidgets);
+  });
+
   testWidgets('BalanceList disables record when not owner and not debtor', (
     tester,
   ) async {
