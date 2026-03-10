@@ -1047,7 +1047,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                     contentAreaWidth: layoutConstraints.maxWidth,
                     leading: IconButton(
                       icon: const Icon(Icons.arrow_back),
-                      onPressed: () => context.pop(),
+                      onPressed: _saving ? null : () => context.pop(),
                     ),
                     title: Text(
                       (widget.expenseId != null
@@ -1072,11 +1072,15 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                           ]
                         : null,
                   ),
-                  body: ConstrainedContent(
-                    child: Form(
-                      key: _formKey,
-                      child: FocusTraversalGroup(
-                        child: ListView(
+                  body: Stack(
+                    children: [
+                      AbsorbPointer(
+                        absorbing: _saving,
+                        child: ConstrainedContent(
+                          child: Form(
+                            key: _formKey,
+                            child: FocusTraversalGroup(
+                              child: ListView(
                           padding: EdgeInsets.only(
                             left: 16,
                             right: 16,
@@ -1545,6 +1549,49 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                         ),
                       ),
                     ),
+                  ),
+                      ),
+                    if (_saving)
+                      Positioned.fill(
+                        child: ColoredBox(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .scrim
+                              .withValues(alpha: 0.24),
+                          child: Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 16,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.surface,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Text(
+                                    'services_status_loading'.tr(),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   bottomNavigationBar: SizedBox(
                     height:
