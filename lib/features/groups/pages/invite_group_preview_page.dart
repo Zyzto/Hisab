@@ -1,7 +1,9 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/navigation/route_paths.dart';
 import '../../../core/services/settle_up_service.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../../domain/domain.dart';
@@ -26,9 +28,20 @@ class InviteGroupPreviewPage extends ConsumerWidget {
         if (preview == null) {
           return Scaffold(
             body: Center(
-              child: Text(
-                'invite_expired'.tr(),
-                style: Theme.of(context).textTheme.bodyLarge,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'invite_expired'.tr(),
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                  const SizedBox(height: 24),
+                  TextButton.icon(
+                    onPressed: () => context.go(RoutePaths.home),
+                    icon: const Icon(Icons.home_outlined, size: 20),
+                    label: Text('go_home'.tr()),
+                  ),
+                ],
               ),
             ),
           );
@@ -43,15 +56,30 @@ class InviteGroupPreviewPage extends ConsumerWidget {
           ),
         );
       },
-      loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      loading: () => Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 24),
+              TextButton.icon(
+                onPressed: () => context.go(RoutePaths.home),
+                icon: const Icon(Icons.home_outlined, size: 20),
+                label: Text('go_home'.tr()),
+              ),
+            ],
+          ),
+        ),
+      ),
       error: (e, st) => Scaffold(
         body: Center(
           child: ErrorContentWidget(
-            message: null,
-            details: null,
-            stackTrace: null,
+            message: e.toString(),
+            details: e.toString(),
+            stackTrace: st,
             onRetry: () => ref.invalidate(invitePreviewDataProvider(token)),
+            onGoHome: () => context.go(RoutePaths.home),
           ),
         ),
       ),
@@ -77,9 +105,20 @@ class InvitePreviewExpenseDetailPage extends ConsumerWidget {
         if (preview == null) {
           return Scaffold(
             body: Center(
-              child: Text(
-                'invite_expired'.tr(),
-                style: Theme.of(context).textTheme.bodyLarge,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'invite_expired'.tr(),
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                  const SizedBox(height: 24),
+                  TextButton.icon(
+                    onPressed: () => context.go(RoutePaths.home),
+                    icon: const Icon(Icons.home_outlined, size: 20),
+                    label: Text('go_home'.tr()),
+                  ),
+                ],
               ),
             ),
           );
@@ -89,9 +128,20 @@ class InvitePreviewExpenseDetailPage extends ConsumerWidget {
         if (previewExpense == null) {
           return Scaffold(
             body: Center(
-              child: Text(
-                'invite_expired'.tr(),
-                style: Theme.of(context).textTheme.bodyLarge,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'invite_expired'.tr(),
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                  const SizedBox(height: 24),
+                  TextButton.icon(
+                    onPressed: () => context.go(RoutePaths.home),
+                    icon: const Icon(Icons.home_outlined, size: 20),
+                    label: Text('go_home'.tr()),
+                  ),
+                ],
               ),
             ),
           );
@@ -112,15 +162,30 @@ class InvitePreviewExpenseDetailPage extends ConsumerWidget {
           ),
         );
       },
-      loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      loading: () => Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 24),
+              TextButton.icon(
+                onPressed: () => context.go(RoutePaths.home),
+                icon: const Icon(Icons.home_outlined, size: 20),
+                label: Text('go_home'.tr()),
+              ),
+            ],
+          ),
+        ),
+      ),
       error: (e, st) => Scaffold(
         body: Center(
           child: ErrorContentWidget(
-            message: null,
-            details: null,
-            stackTrace: null,
+            message: e.toString(),
+            details: e.toString(),
+            stackTrace: st,
             onRetry: () => ref.invalidate(invitePreviewDataProvider(token)),
+            onGoHome: () => context.go(RoutePaths.home),
           ),
         ),
       ),
