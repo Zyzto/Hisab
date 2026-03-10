@@ -17,6 +17,7 @@ import '../../../core/navigation/route_paths.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/error_report_helper.dart';
+import '../../../core/utils/expense_totals.dart';
 import '../../../core/widgets/amount_with_secondary_display.dart';
 import '../../../core/widgets/async_value_builder.dart';
 import '../../../core/widgets/error_content.dart';
@@ -571,7 +572,7 @@ class _PersonalBudgetHeader extends ConsumerWidget {
       data: (expenses) {
         final totalSpentCents = expenses.fold<int>(
           0,
-          (s, e) => s + e.effectiveBaseAmountCents,
+          (s, e) => s + contributionToExpenseTotal(e),
         );
         final hasBudget = budgetCents != null && budgetCents > 0;
         final overBudget = hasBudget && totalSpentCents >= budgetCents;
@@ -728,10 +729,10 @@ class _ExpensesTab extends ConsumerWidget {
             for (final e in sorted) {
               final key = _dateOnly(e.date.isUtc ? e.date.toLocal() : e.date);
               byDate.putIfAbsent(key, () => []).add(e);
-              totalCents += e.effectiveBaseAmountCents;
+              totalCents += contributionToExpenseTotal(e);
               if (currentUserParticipantId != null &&
                   e.payerParticipantId == currentUserParticipantId) {
-                myExpensesCents += e.effectiveBaseAmountCents;
+                myExpensesCents += contributionToExpenseTotal(e);
               }
             }
             final dateKeys = byDate.keys.toList()
