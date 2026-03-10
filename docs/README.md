@@ -21,6 +21,10 @@ Quick links to setup, backend, product, and UI docs.
 - [PLAY_CONSOLE_DECLARATIONS.md](PLAY_CONSOLE_DECLARATIONS.md) — Play Console: privacy, ads, content ratings
 - [PERSONAL_FEATURE.md](PERSONAL_FEATURE.md) — Personal (my-expenses-only) mode: data model and flows
 
+## Web debugging
+
+- [WEB_DEBUGGING.md](WEB_DEBUGGING.md) — Dart Debug Chrome extension for meaningful console messages and DevTools when running the web app locally
+
 ## UI and layout
 
 - [ADAPTIVE_RESPONSIVE_PLAN.md](ADAPTIVE_RESPONSIVE_PLAN.md) — Plan for adaptive/responsive UI (breakpoints, SafeArea, large screens)
