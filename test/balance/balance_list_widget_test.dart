@@ -122,7 +122,7 @@ void main() {
     expect(find.textContaining('50'), findsAny);
   });
 
-  testWidgets('BalanceList orders balances by amount descending', (
+  testWidgets('BalanceList orders balances: most credited first, then most debited first', (
     tester,
   ) async {
     fakeResult = GroupBalanceResult(
@@ -196,8 +196,8 @@ void main() {
     expect(smallDebtorIndex, greaterThanOrEqualTo(0));
     expect(bigDebtorIndex, greaterThanOrEqualTo(0));
 
-    expect(largestCreditorIndex, lessThan(smallDebtorIndex));
-    expect(smallDebtorIndex, lessThan(bigDebtorIndex));
+    expect(largestCreditorIndex, lessThan(bigDebtorIndex));
+    expect(bigDebtorIndex, lessThan(smallDebtorIndex));
   });
 
   testWidgets('BalanceList hides participants with zero balance', (
