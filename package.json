@@ -1,0 +1,8 @@
+{
+  "name": "hisab",
+  "private": true,
+  "devDependencies": {
+    "chromedriver": "~145.0.0",
+    "firebase-tools": "latest"
+  }
+}
