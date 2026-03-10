@@ -56,6 +56,8 @@ Full-app integration tests live in `integration_test/`. They run the real UI (Ap
 
 **Platforms:** Integration tests target the **web app** (Chrome). CI runs them with `flutter drive` and `-d chrome`. You can also run on Android or iOS when a device/emulator is available.
 
+**Dart Debug Chrome extension:** For interactive web debugging (e.g. `flutter run -d web-server` or `flutter run -d chrome`), install the [Dart Debug Extension](https://chromewebstore.google.com/detail/dart-debug-extension/eljbmlghnomdjgdjmbdekegdkbabckhm) in Chrome to get meaningful console messages, Dart stack traces, and DevTools. See [docs/WEB_DEBUGGING.md](docs/WEB_DEBUGGING.md). Integration test runs (`flutter drive --release`) do not use the extension.
+
 Run on web — primary target (requires ChromeDriver on port **4444**; Flutter does not expose a flag to use another port):
 
 ```bash
@@ -113,6 +115,8 @@ flutter drive \
    ```bash
    export CHROME_EXECUTABLE=/usr/bin/google-chrome-stable
    ```
+
+**One-command local run (Chrome, no global ChromeDriver):** From repo root, `./scripts/run_web_integration_tests.sh` installs ChromeDriver via npm (`package.json`) and runs the web integration tests. **GitHub Actions do not use this script:** the release workflow uses `nanasess/setup-chromedriver@v2` and does not run `npm install`, so CI is unchanged.
 
 Run on Android when an emulator or device is available:
 
