@@ -14,6 +14,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 import 'package:feedback/feedback.dart';
+import 'package:flex_color_picker/flex_color_picker.dart';
 
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/auth/sign_in_sheet.dart';
@@ -1175,6 +1176,49 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                               title: Text(preset.$2.tr()),
                               onTap: () => Navigator.of(ctx).pop(preset.$1),
                             ),
+                          ),
+                          ListTile(
+                            leading: Icon(
+                              Icons.palette_outlined,
+                              color: Theme.of(ctx).colorScheme.primary,
+                            ),
+                            title: Text('pick_custom_theme_color'.tr()),
+                            onTap: () async {
+                              final picked = await showColorPickerDialog(
+                                ctx,
+                                Color(themeColorValue),
+                                barrierDismissible: true,
+                                pickersEnabled: const <ColorPickerType, bool>{
+                                  ColorPickerType.primary: false,
+                                  ColorPickerType.accent: false,
+                                  ColorPickerType.bw: false,
+                                  ColorPickerType.both: false,
+                                  ColorPickerType.custom: false,
+                                  ColorPickerType.wheel: true,
+                                },
+                              );
+                              if (!context.mounted || !ctx.mounted) return;
+                              // Only apply and close when user confirmed a choice (OK).
+                              // On Cancel/barrier dismiss the dialog returns initial color.
+                              final colorChanged =
+                                  picked.toARGB32() != themeColorValue;
+                              if (colorChanged) {
+                                ref
+                                    .read(
+                                        settings
+                                            .provider(themeColorSettingDef)
+                                            .notifier)
+                                    .set(picked.toARGB32());
+                                Log.info(
+                                  'Setting changed: ${themeColorSettingDef.key}=${picked.toARGB32()}',
+                                );
+                                if (ctx.mounted) {
+                                  Navigator.of(ctx).pop();
+                                }
+                              }
+                              // If same color (cancel/dismiss): leave sheet open so user
+                              // can pick a preset or try again.
+                            },
                           ),
                         ],
                       ),
