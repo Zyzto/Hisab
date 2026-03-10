@@ -39,7 +39,14 @@ class BalanceList extends ConsumerWidget {
         final participants = result.participants;
         final balances = result.balances;
         final sortedBalances = List<ParticipantBalance>.from(balances)
-          ..sort((a, b) => b.balanceCents.compareTo(a.balanceCents));
+          ..sort((a, b) {
+            final ac = a.balanceCents;
+            final bc = b.balanceCents;
+            if (ac >= 0 && bc < 0) return -1;
+            if (ac < 0 && bc >= 0) return 1;
+            if (ac >= 0 && bc >= 0) return bc.compareTo(ac);
+            return ac.compareTo(bc);
+          });
         final visibleBalances = sortedBalances
             .where((b) => b.balanceCents != 0)
             .toList();
