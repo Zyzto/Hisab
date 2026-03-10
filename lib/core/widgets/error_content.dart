@@ -20,6 +20,7 @@ class ErrorContentWidget extends StatelessWidget {
     this.message,
     this.titleKey = 'generic_error',
     this.onRetry,
+    this.onGoHome,
     this.details,
     this.stackTrace,
   });
@@ -32,6 +33,9 @@ class ErrorContentWidget extends StatelessWidget {
 
   /// When non-null, a retry button is shown.
   final VoidCallback? onRetry;
+
+  /// When non-null, a "Go home" button is shown so the user is never stuck.
+  final VoidCallback? onGoHome;
 
   /// Optional raw details for Share/Report payload (e.g. full error.toString()).
   final String? details;
@@ -69,6 +73,14 @@ class ErrorContentWidget extends StatelessWidget {
               onPressed: onRetry,
               icon: const Icon(Icons.refresh, size: 20),
               label: Text('retry'.tr()),
+            ),
+          ],
+          if (onGoHome != null) ...[
+            const SizedBox(height: 12),
+            TextButton.icon(
+              onPressed: onGoHome,
+              icon: const Icon(Icons.home_outlined, size: 20),
+              label: Text('go_home'.tr()),
             ),
           ],
           const SizedBox(height: 16),
