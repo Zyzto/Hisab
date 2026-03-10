@@ -20,6 +20,7 @@ import '../../../core/telemetry/telemetry_service.dart';
 import '../../../core/services/connectivity_service.dart';
 import '../../../domain/domain.dart';
 import '../providers/group_invite_provider.dart';
+import '../providers/invite_preview_provider.dart';
 import '../providers/groups_provider.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 import '../../settings/settings_definitions.dart';
@@ -37,6 +38,8 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
   bool _accepting = false;
   String? _error;
   bool _didAttemptWebPreviewRedirect = false;
+  bool _didAttemptPreviewRedirectForNotOnboarded = false;
+  bool _didAttemptOnboardingRedirectForNotOnboarded = false;
 
   /// Set when accept fails because user is already a member; enables "Open Group" action.
   String? _alreadyMemberGroupId;
@@ -102,7 +105,153 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
     final localOnly = ref.watch(effectiveLocalOnlyProvider);
     final hasNetwork = ref.watch(connectivityProvider);
     final isAuthenticated = ref.watch(isAuthenticatedProvider);
+    final onboardingCompleted = ref.watch(onboardingCompletedProvider);
     final inviteAsync = ref.watch(inviteByTokenProvider(widget.token));
+
+    // Not onboarded and not authenticated: resolve via preview (anon) and redirect to preview or onboarding
+    if (!onboardingCompleted &&
+        !isAuthenticated &&
+        supabaseConfigAvailable &&
+        !localOnly) {
+      if (widget.token.isEmpty) {
+        return LayoutBuilder(
+          builder: (context, layoutConstraints) {
+            return Scaffold(
+              appBar: ContentAlignedAppBar(
+                contentAreaWidth: layoutConstraints.maxWidth,
+                title: Text('invite'.tr()),
+                leading: IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => context.go(RoutePaths.home),
+                ),
+              ),
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.link_off,
+                      size: 64,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'invite_expired'.tr(),
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                    const SizedBox(height: 24),
+                    FilledButton(
+                      onPressed: () => context.go(RoutePaths.home),
+                      child: Text('go_home'.tr()),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      }
+      final previewAsync = ref.watch(invitePreviewDataProvider(widget.token));
+      return LayoutBuilder(
+        builder: (context, layoutConstraints) {
+          return Scaffold(
+            appBar: ContentAlignedAppBar(
+              contentAreaWidth: layoutConstraints.maxWidth,
+              title: Text('invite'.tr()),
+              leading: IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => context.go(RoutePaths.home),
+              ),
+            ),
+            body: previewAsync.when(
+              data: (preview) {
+                if (preview != null) {
+                  if (!_didAttemptPreviewRedirectForNotOnboarded) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (!mounted) return;
+                      if (_didAttemptPreviewRedirectForNotOnboarded) return;
+                      setState(
+                          () => _didAttemptPreviewRedirectForNotOnboarded = true);
+                      if (mounted) {
+                        context.go(RoutePaths.invitePreview(widget.token));
+                      }
+                    });
+                  }
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (preview == null &&
+                    !_didAttemptOnboardingRedirectForNotOnboarded) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted) return;
+                    if (_didAttemptOnboardingRedirectForNotOnboarded) return;
+                    setState(
+                        () => _didAttemptOnboardingRedirectForNotOnboarded = true);
+                    _persistPendingInviteToken();
+                    if (mounted) context.go(RoutePaths.onboarding);
+                  });
+                }
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const CircularProgressIndicator(),
+                      const SizedBox(height: 24),
+                      Text(
+                        'invite_taking_to_sign_in'.tr(),
+                        style: Theme.of(context).textTheme.bodyMedium,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      TextButton.icon(
+                        onPressed: () => context.go(RoutePaths.home),
+                        icon: const Icon(Icons.home_outlined, size: 20),
+                        label: Text('go_home'.tr()),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              loading: () => Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 24),
+                    TextButton.icon(
+                      onPressed: () => context.go(RoutePaths.home),
+                      icon: const Icon(Icons.home_outlined, size: 20),
+                      label: Text('go_home'.tr()),
+                    ),
+                  ],
+                ),
+              ),
+              error: (e, st) {
+                if (!_didAttemptOnboardingRedirectForNotOnboarded) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted) return;
+                    if (_didAttemptOnboardingRedirectForNotOnboarded) return;
+                    setState(
+                        () => _didAttemptOnboardingRedirectForNotOnboarded = true);
+                    _persistPendingInviteToken();
+                    if (mounted) context.go(RoutePaths.onboarding);
+                  });
+                }
+                return Center(
+                  child: ErrorContentWidget(
+                    message: e.toString(),
+                    details: e.toString(),
+                    stackTrace: st,
+                    onRetry: () =>
+                        ref.invalidate(invitePreviewDataProvider(widget.token)),
+                    onGoHome: () => context.go(RoutePaths.home),
+                  ),
+                );
+              },
+            ),
+          );
+        },
+      );
+    }
 
     // Local-only without backend configuration cannot resolve invites at all.
     if (localOnly) {
@@ -112,6 +261,10 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
             appBar: ContentAlignedAppBar(
               contentAreaWidth: layoutConstraints.maxWidth,
               title: Text('invite'.tr()),
+              leading: IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => context.go(RoutePaths.home),
+              ),
             ),
             body: (!supabaseConfigAvailable || !hasNetwork)
                 ? Center(
@@ -158,10 +311,13 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                         );
                       }
                       if (kIsWeb && !_didAttemptWebPreviewRedirect) {
-                        _didAttemptWebPreviewRedirect = true;
                         WidgetsBinding.instance.addPostFrameCallback((_) {
                           if (!mounted) return;
-                          context.go(RoutePaths.invitePreview(widget.token));
+                          if (_didAttemptWebPreviewRedirect) return;
+                          setState(() => _didAttemptWebPreviewRedirect = true);
+                          if (mounted) {
+                            context.go(RoutePaths.invitePreview(widget.token));
+                          }
                         });
                         return const Center(child: CircularProgressIndicator());
                       }
@@ -183,6 +339,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                           stackTrace: st,
                           onRetry: () =>
                               ref.invalidate(inviteByTokenProvider(widget.token)),
+                          onGoHome: () => context.go(RoutePaths.home),
                         ),
                       );
                     },
@@ -200,6 +357,10 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
             appBar: ContentAlignedAppBar(
               contentAreaWidth: layoutConstraints.maxWidth,
               title: Text('invite'.tr()),
+              leading: IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => context.go(RoutePaths.home),
+              ),
             ),
             body: inviteAsync.when(
               data: (data) {
@@ -217,6 +378,12 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                         Text(
                           'invite_expired'.tr(),
                           style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                        const SizedBox(height: 24),
+                        TextButton.icon(
+                          onPressed: () => context.go(RoutePaths.home),
+                          icon: const Icon(Icons.home_outlined, size: 20),
+                          label: Text('go_home'.tr()),
                         ),
                       ],
                     ),
@@ -253,10 +420,13 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                 }
                 final router = GoRouter.maybeOf(context);
                 if (router != null && !_didAttemptWebPreviewRedirect) {
-                  _didAttemptWebPreviewRedirect = true;
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     if (!mounted) return;
-                    context.go(RoutePaths.invitePreview(widget.token));
+                    if (_didAttemptWebPreviewRedirect) return;
+                    setState(() => _didAttemptWebPreviewRedirect = true);
+                    if (mounted) {
+                      context.go(RoutePaths.invitePreview(widget.token));
+                    }
                   });
                   return const Center(child: CircularProgressIndicator());
                 }
@@ -266,6 +436,16 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
               },
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, st) {
+                if (!isAuthenticated) {
+                  return _InvitePreviewFallbackOnError(
+                    token: widget.token,
+                    inviteError: e,
+                    inviteStack: st,
+                    onRetry: () =>
+                        ref.invalidate(inviteByTokenProvider(widget.token)),
+                    onGoHome: () => context.go(RoutePaths.home),
+                  );
+                }
                 sendErrorTelemetryIfOnline(
                   ref,
                   message: e.toString(),
@@ -278,6 +458,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                     stackTrace: st,
                     onRetry: () =>
                         ref.invalidate(inviteByTokenProvider(widget.token)),
+                    onGoHome: () => context.go(RoutePaths.home),
                   ),
                 );
               },
@@ -316,6 +497,12 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                           'invite_expired'.tr(),
                           style: Theme.of(context).textTheme.bodyLarge,
                         ),
+                        const SizedBox(height: 24),
+                        TextButton.icon(
+                          onPressed: () => context.go(RoutePaths.home),
+                          icon: const Icon(Icons.home_outlined, size: 20),
+                          label: Text('go_home'.tr()),
+                        ),
                       ],
                     ),
                   );
@@ -324,6 +511,16 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
               },
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, st) {
+                if (!isAuthenticated) {
+                  return _InvitePreviewFallbackOnError(
+                    token: widget.token,
+                    inviteError: e,
+                    inviteStack: st,
+                    onRetry: () =>
+                        ref.invalidate(inviteByTokenProvider(widget.token)),
+                    onGoHome: () => context.go(RoutePaths.home),
+                  );
+                }
                 sendErrorTelemetryIfOnline(
                   ref,
                   message: e.toString(),
@@ -336,6 +533,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                     stackTrace: st,
                     onRetry: () =>
                         ref.invalidate(inviteByTokenProvider(widget.token)),
+                    onGoHome: () => context.go(RoutePaths.home),
                   ),
                 );
               },
@@ -580,6 +778,99 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
         setState(() => _accepting = false);
       }
     }
+  }
+}
+
+/// When inviteByToken failed (e.g. 401) and user is not authenticated, try
+/// preview (anon-callable); if preview has data (readonly invite), redirect to
+/// group preview so returning users with readonly links still land on preview.
+class _InvitePreviewFallbackOnError extends ConsumerStatefulWidget {
+  const _InvitePreviewFallbackOnError({
+    required this.token,
+    required this.inviteError,
+    required this.inviteStack,
+    required this.onRetry,
+    required this.onGoHome,
+  });
+
+  final String token;
+  final Object inviteError;
+  final StackTrace? inviteStack;
+  final VoidCallback onRetry;
+  final VoidCallback onGoHome;
+
+  @override
+  ConsumerState<_InvitePreviewFallbackOnError> createState() =>
+      _InvitePreviewFallbackOnErrorState();
+}
+
+class _InvitePreviewFallbackOnErrorState
+    extends ConsumerState<_InvitePreviewFallbackOnError> {
+  bool _didRedirect = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.token.isEmpty) {
+      return Center(
+        child: ErrorContentWidget(
+          message: widget.inviteError.toString(),
+          details: widget.inviteError.toString(),
+          stackTrace: widget.inviteStack,
+          onRetry: widget.onRetry,
+          onGoHome: widget.onGoHome,
+        ),
+      );
+    }
+    final previewAsync = ref.watch(invitePreviewDataProvider(widget.token));
+    return previewAsync.when(
+      data: (preview) {
+        if (preview != null) {
+          if (!_didRedirect) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              if (_didRedirect) return;
+              setState(() => _didRedirect = true);
+              if (mounted) {
+                context.go(RoutePaths.invitePreview(widget.token));
+              }
+            });
+          }
+          return const Center(child: CircularProgressIndicator());
+        }
+        return Center(
+          child: ErrorContentWidget(
+            message: widget.inviteError.toString(),
+            details: widget.inviteError.toString(),
+            stackTrace: widget.inviteStack,
+            onRetry: widget.onRetry,
+            onGoHome: widget.onGoHome,
+          ),
+        );
+      },
+      loading: () => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 24),
+            TextButton.icon(
+              onPressed: widget.onGoHome,
+              icon: const Icon(Icons.home_outlined, size: 20),
+              label: Text('go_home'.tr()),
+            ),
+          ],
+        ),
+      ),
+      error: (_, _) => Center(
+        child: ErrorContentWidget(
+          message: widget.inviteError.toString(),
+          details: widget.inviteError.toString(),
+          stackTrace: widget.inviteStack,
+          onRetry: widget.onRetry,
+          onGoHome: widget.onGoHome,
+        ),
+      ),
+    );
   }
 }
 

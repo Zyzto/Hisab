@@ -153,7 +153,7 @@ GoRouter router(Ref ref) {
         final pendingToken = ref.read(
           settings.provider(pendingInviteTokenSettingDef),
         );
-        if (pendingToken.isNotEmpty && onboardingCompleted) {
+        if (pendingToken.isNotEmpty) {
           ref
               .read(settings.provider(pendingInviteTokenSettingDef).notifier)
               .set('');
@@ -164,6 +164,8 @@ GoRouter router(Ref ref) {
         }
       }
       if (!onboardingCompleted && !onOnboarding && !onPrivacyPolicy) {
+        // Allow staying on invite routes so readonly preview works without onboarding
+        if (state.uri.path.startsWith('/invite/')) return null;
         return RoutePaths.onboarding;
       }
       if (onboardingCompleted && onOnboarding) {
