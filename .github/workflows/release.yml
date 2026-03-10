@@ -51,6 +51,7 @@ jobs:
       - name: Install Chrome
         uses: browser-actions/setup-chrome@v1
 
+      # ChromeDriver here is from the action (matches Chrome). Do not use project package.json chromedriver.
       - name: Install ChromeDriver
         uses: nanasess/setup-chromedriver@v2
 
@@ -131,6 +132,7 @@ jobs:
       - name: Install Chrome
         uses: browser-actions/setup-chrome@v1
 
+      # ChromeDriver here is from the action (matches Chrome). Do not use project package.json chromedriver.
       - name: Install ChromeDriver
         uses: nanasess/setup-chromedriver@v2
 
