@@ -37,6 +37,7 @@ dependencies:
 
   # UI & animations
   flex_color_scheme: ^8.4.0
+  flex_color_picker: ^3.4.0
   google_fonts: ^8.0.2
   animations: ^2.1.0
   custom_sliding_segmented_control: ^1.8.5
