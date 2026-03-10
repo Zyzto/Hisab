@@ -88,15 +88,11 @@ class _InviteLinkHandlerState extends ConsumerState<InviteLinkHandler> {
       Log.info(
         'Setting changed: ${pendingInviteTokenSettingDef.key}=(set from link)',
       );
-      final onboardingCompleted = ref.read(onboardingCompletedProvider);
-      if (onboardingCompleted) {
-        // Let router redirect handle navigation (it reads pending token and redirects).
-        // Use postFrameCallback so navigator is ready; refresh() re-runs redirect.
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          ref.read(routerProvider).refresh();
-        });
-      }
+      // Always refresh so router redirect runs (readonly invite can skip onboarding).
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(routerProvider).refresh();
+      });
     }
 
     // Link stream (app opened from background with invite link)
@@ -107,9 +103,7 @@ class _InviteLinkHandlerState extends ConsumerState<InviteLinkHandler> {
         Log.info(
           'Setting changed: ${pendingInviteTokenSettingDef.key}=(set from stream)',
         );
-        if (mounted && ref.read(onboardingCompletedProvider)) {
-          ref.read(routerProvider).refresh();
-        }
+        if (mounted) ref.read(routerProvider).refresh();
       }
     });
   }
