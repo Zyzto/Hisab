@@ -80,12 +80,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # cache: false avoids "Failed to FinalizeCacheEntryUpload (404) cache entry not found"
+      # when this job is cancelled or runs under concurrency; save step is skipped.
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
-          cache: true
+          cache: false
 
       - name: Flutter pub get
         run: flutter pub get
