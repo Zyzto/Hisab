@@ -64,6 +64,18 @@ ios/Runner/GoogleService-Info.plist
 lib/core/constants/app_secrets.dart
 dart_defines_online.json
 
+# Firebase / Google credentials (sensitive)
+**/serviceAccount*.json
+**/*-firebase-adminsdk-*.json
+**/service-account*.json
+**/credentials*.json
+**/client_secret*.json
+firebase-debug.log
+firebase-debug.*.log
+*.pem
+*.p12
+*.key
+
 # Environment
 .env
 .env.*
