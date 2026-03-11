@@ -236,6 +236,7 @@ class ExpenseAmountSection extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: TextFormField(
+                  key: const Key('expense_form_base_amount'),
                   controller: baseAmountController,
                   decoration: InputDecoration(
                     hintText: '0',

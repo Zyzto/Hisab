@@ -87,6 +87,12 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   bool _fetchingRate = false;
   bool _groupCurrencyInitialized = false;
 
+  /// Listener for _amountController; runs base-amount recalc only when amount field changes.
+  late final VoidCallback _amountListener;
+
+  /// Coalesces recalc to at most once per frame when amount field changes rapidly.
+  bool _recalcBaseAmountPending = false;
+
   /// When editing, the loaded expense (for id and createdAt on update).
   Expense? _initialExpense;
   bool _editLoaded = false;
@@ -129,6 +135,15 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     super.initState();
     _transactionTypeSegmentController =
         CustomSegmentedController<TransactionType>(value: _transactionType);
+    _amountListener = () {
+      if (_recalcBaseAmountPending) return;
+      _recalcBaseAmountPending = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _recalcBaseAmountPending = false;
+        if (mounted) _onAmountChangedForExchangeRate();
+      });
+    };
+    _amountController.addListener(_amountListener);
     if (widget.expenseId != null) {
       _loadExpenseForEdit();
     }
@@ -148,6 +163,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         .read(participantRepositoryProvider)
         .getByGroupId(widget.groupId);
     if (!mounted) return;
+    _amountController.removeListener(_amountListener);
     setState(() {
       _initialExpense = expense;
       _currencyCode = expense.currencyCode;
@@ -211,10 +227,12 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       }
       _editLoaded = true;
     });
+    _amountController.addListener(_amountListener);
   }
 
   @override
   void dispose() {
+    _amountController.removeListener(_amountListener);
     _titleController.dispose();
     _descriptionController.dispose();
     _amountController.dispose();
@@ -1311,30 +1329,17 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                               ),
                               const SizedBox(height: 20),
                             ],
-                            ListenableBuilder(
-                              listenable: _amountController,
-                              builder: (context, _) {
-                                // Defer recalc to avoid setState/markNeedsBuild during build
-                                WidgetsBinding.instance.addPostFrameCallback((
-                                  _,
-                                ) {
-                                  if (mounted) {
-                                    _onAmountChangedForExchangeRate();
-                                  }
-                                });
-                                return ExpenseAmountSection(
-                                  controller: _amountController,
-                                  currencyCode: _currencyCode,
-                                  onCurrencyTap: _openExpenseCurrencyPicker,
-                                  groupCurrencyCode: _groupCurrencyCode,
-                                  exchangeRateController:
-                                      _exchangeRateController,
-                                  baseAmountController: _baseAmountController,
-                                  fetchingRate: _fetchingRate,
-                                  onExchangeRateChanged: _onExchangeRateChanged,
-                                  onBaseAmountChanged: _onBaseAmountChanged,
-                                );
-                              },
+                            ExpenseAmountSection(
+                              controller: _amountController,
+                              currencyCode: _currencyCode,
+                              onCurrencyTap: _openExpenseCurrencyPicker,
+                              groupCurrencyCode: _groupCurrencyCode,
+                              exchangeRateController:
+                                  _exchangeRateController,
+                              baseAmountController: _baseAmountController,
+                              fetchingRate: _fetchingRate,
+                              onExchangeRateChanged: _onExchangeRateChanged,
+                              onBaseAmountChanged: _onBaseAmountChanged,
                             ),
                             const SizedBox(height: 20),
                             if (isTransfer) ...[
