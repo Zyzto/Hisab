@@ -197,13 +197,13 @@ scripts/
 
 ## Online integration tests (local Supabase)
 
-Online integration tests run the app against a **local Supabase instance** via Docker. They cover authentication, data sync, and multi-user invite flows — all without touching production.
+Online integration tests run the app against a **local Supabase instance** via the Docker API (Docker Engine or Podman with `DOCKER_HOST`). They cover authentication, data sync, and multi-user invite flows — all without touching production.
 
 ### Prerequisites
 
 | Requirement | Check |
 |---|---|
-| Docker | `docker info` (must be running) |
+| Docker or Podman | `docker info` **or** `podman info`; for rootless Podman set `DOCKER_HOST` to the user socket (see [SUPABASE_SETUP.md](../docs/SUPABASE_SETUP.md#local-supabase-with-podman)) |
 | Supabase CLI | `supabase --version` (install: `npm i -g supabase` or [docs](https://supabase.com/docs/guides/cli/getting-started)) |
 | Chrome + ChromeDriver (web) | Same as local integration tests (version-matched); only needed for web |
 
@@ -218,7 +218,7 @@ dart run tool/run_online_tests.dart
 Optional: `dart run tool/run_online_tests.dart android` to run on a connected Android device. On Linux/macOS you can use the shell wrapper: `./scripts/run_online_tests.sh` or `./scripts/run_online_tests.sh android`.
 
 The runner:
-1. Checks prerequisites (Docker, Supabase CLI, ChromeDriver for web)
+1. Checks prerequisites (Docker or Podman + `DOCKER_HOST` when needed, Supabase CLI, ChromeDriver for web)
 2. Starts local Supabase (`supabase start`) and resets the database (migrations + seed)
 3. Parses credentials from `supabase status --output json` (no `jq` required)
 4. For web: starts ChromeDriver on port 4444 if needed, then runs `flutter drive` with the online test barrel
@@ -333,8 +333,8 @@ No additional GitHub secrets are needed — the local Supabase instance generate
 
 | Issue | Fix |
 |---|---|
-| `supabase start` hangs | Ensure Docker is running (`docker info`). First run pulls ~2 GB of images. |
-| `ERROR: Could not get SUPABASE_URL` | Supabase didn't start. Check `docker ps` and `supabase status`. |
+| `supabase start` hangs | Ensure the container engine is running (`docker info` or `podman info`). For Podman: `systemctl --user enable --now podman.socket` and set `DOCKER_HOST`. First run pulls ~2 GB of images. |
+| `ERROR: Could not get SUPABASE_URL` | Supabase didn't start. Check `docker ps` / `podman ps` and `supabase status`. |
 | Auth sign-in fails in test | Run `supabase db reset` to re-seed test users. |
 | `pg_net` extension error | Expected — migration 6 (notification triggers) is skipped locally. |
 | Rate limit hit during tests | Check `config.toml` rate limits are set to 1000. |
