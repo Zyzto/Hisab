@@ -249,7 +249,9 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
     final canAddExpense = isOwnerOrAdmin || widget.group.allowMemberAddExpense;
 
     if (index == 0) {
-      if (widget.group.isSettlementFrozen || !canAddExpense) return null;
+      if (widget.group.isArchived || widget.group.isSettlementFrozen || !canAddExpense) {
+        return null;
+      }
       return _FABWithLabel(
         icon: Icons.add,
         label: 'add_expense'.tr(),
@@ -340,6 +342,13 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
             ),
             title: _buildAppBarTitle(context),
             actions: [
+              if (!widget.readOnlyPreview)
+                IconButton(
+                  icon: const Icon(Icons.analytics_outlined),
+                  tooltip: 'analytics'.tr(),
+                  onPressed: () =>
+                      context.push(RoutePaths.groupAnalytics(widget.group.id)),
+                ),
               if (!localOnly &&
                   !widget.readOnlyPreview &&
                   (myRole == GroupRole.owner || myRole == GroupRole.admin) &&

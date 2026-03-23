@@ -57,6 +57,7 @@ class BalanceList extends ConsumerWidget {
         String bidiIsolate(String value) => '\u2068$value\u2069';
         bool canRecordSettlement(SettlementTransaction s) {
           if (readOnlyMode) return false;
+          if (group.isArchived) return false;
           if (group.isSettlementFrozen) return false;
           if (group.allowMemberSettleForOthers) return true;
           if (myRole == GroupRole.owner) return true;
@@ -69,7 +70,7 @@ class BalanceList extends ConsumerWidget {
 
         // Flatten for ListView.builder: compute item count and build by index.
         // Keep frozen-state context visible in read-only preview too.
-        final hasFrozen = group.isSettlementFrozen;
+        final hasFrozen = group.isSettlementFrozen || group.isArchived;
         var itemCount = (hasFrozen ? 1 : 0) + 4 + visibleBalances.length;
         itemCount += settlements.isEmpty ? 1 : settlements.length;
 
@@ -228,7 +229,7 @@ class BalanceList extends ConsumerWidget {
                     ],
                   ],
                 ),
-                trailing: !hasFrozen && !readOnlyMode
+                trailing: !readOnlyMode
                     ? Semantics(
                         label: canRecord
                             ? 'record_settlement'.tr()

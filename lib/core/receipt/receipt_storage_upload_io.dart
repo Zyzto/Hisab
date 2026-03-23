@@ -25,9 +25,11 @@ Future<String?> uploadReceiptToStorage(
     return null;
   }
   final bytes = await file.readAsBytes();
-  final ext = path.extension(localPath).isEmpty
-      ? 'jpg'
-      : path.extension(localPath).replaceFirst('.', '');
+  final ext = _normalizeReceiptExt(
+    path.extension(localPath).isEmpty
+        ? 'jpg'
+        : path.extension(localPath).replaceFirst('.', ''),
+  );
   return uploadReceiptBytesToStorage(bytes, groupId, expenseId, fileExt: ext);
 }
 
@@ -41,7 +43,7 @@ Future<String?> uploadReceiptBytesToStorage(
 }) async {
   final client = supabaseClientIfConfigured;
   if (client == null) return null;
-  final ext = fileExt ?? 'jpg';
+  final ext = _normalizeReceiptExt(fileExt ?? 'jpg');
   final bucketKey = '$groupId/$expenseId/${const Uuid().v4()}.$ext';
   try {
     await client.storage
@@ -49,7 +51,10 @@ Future<String?> uploadReceiptBytesToStorage(
         .uploadBinary(
           bucketKey,
           bytes,
-          fileOptions: const FileOptions(upsert: false),
+          fileOptions: FileOptions(
+            upsert: false,
+            contentType: _contentTypeForExt(ext),
+          ),
         );
     final url = client.storage.from(_bucket).getPublicUrl(bucketKey);
     Log.debug('Receipt uploaded: $bucketKey');
@@ -57,5 +62,31 @@ Future<String?> uploadReceiptBytesToStorage(
   } catch (e, st) {
     Log.error('Receipt upload failed', error: e, stackTrace: st);
     return null;
+  }
+}
+
+String _normalizeReceiptExt(String ext) {
+  switch (ext.toLowerCase()) {
+    case 'jpg':
+    case 'jpeg':
+      return 'jpg';
+    case 'png':
+      return 'png';
+    case 'webp':
+      return 'webp';
+    default:
+      return 'jpg';
+  }
+}
+
+String _contentTypeForExt(String ext) {
+  switch (_normalizeReceiptExt(ext)) {
+    case 'png':
+      return 'image/png';
+    case 'webp':
+      return 'image/webp';
+    case 'jpg':
+    default:
+      return 'image/jpeg';
   }
 }

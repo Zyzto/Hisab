@@ -10,6 +10,7 @@ import '../../features/onboarding/routes.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
 import '../../features/settings/settings_definitions.dart';
 import '../../features/groups/pages/group_create_page.dart';
+import '../../features/groups/pages/group_analytics_page.dart';
 import '../../features/groups/pages/group_detail_page.dart';
 import '../../features/groups/pages/group_settings_page.dart';
 import '../../features/groups/pages/invite_accept_page.dart';
@@ -259,6 +260,13 @@ GoRouter router(Ref ref) {
         builder: (context, state) {
           final groupId = state.pathParameters['id'] ?? '';
           return GroupSettingsPage(groupId: groupId);
+        },
+      ),
+      GoRoute(
+        path: '/groups/:id/analytics',
+        builder: (context, state) {
+          final groupId = state.pathParameters['id'] ?? '';
+          return GroupAnalyticsPage(groupId: groupId);
         },
       ),
       GoRoute(

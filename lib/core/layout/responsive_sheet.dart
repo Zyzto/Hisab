@@ -49,6 +49,7 @@ Future<T?> showResponsiveSheet<T>({
   required BuildContext context,
   required Widget child,
   String? title,
+  Widget? tabletTopBarAction,
   double? maxWidth,
   double? maxHeight,
   bool isScrollControlled = true,
@@ -136,6 +137,10 @@ Future<T?> showResponsiveSheet<T>({
                                 ),
                               ),
                             ),
+                          if (tabletTopBarAction != null) ...[
+                            tabletTopBarAction,
+                            const SizedBox(width: 8),
+                          ],
                           // Use InkWell instead of IconButton so the close control is not
                           // focusable; otherwise the focus manager can steal focus from
                           // sheet content (e.g. password fields) during applyFocusChangesIfNeeded.

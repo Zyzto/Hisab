@@ -4,13 +4,35 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 import '../layout/responsive_sheet.dart';
-import 'receipt_image_view_url.dart';
+import 'receipt_image_cache.dart';
 import 'receipt_utils.dart';
 
 /// Shows the receipt image full-screen (dialog). Tap or back to close.
 void showReceiptImageFullScreen(BuildContext context, String imagePath) {
   if (isReceiptImageUrl(imagePath)) {
-    showReceiptImageDialogForUrl(context, imagePath);
+    showAppDialog<void>(
+      context: context,
+      barrierColor: Theme.of(context).colorScheme.scrim,
+      barrierDismissible: true,
+      centerInFullViewport: true,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.zero,
+        child: InteractiveViewer(
+          minScale: 0.5,
+          maxScale: 4,
+          child: GestureDetector(
+            onTap: () => Navigator.of(ctx).pop(),
+            child: Center(
+              child: _ReceiptCachedOrNetworkImage(
+                imageUrl: imagePath,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
     return;
   }
   final file = File(imagePath);
@@ -59,21 +81,10 @@ Widget buildReceiptImageView(
         borderRadius: BorderRadius.circular(12),
         child: SizedBox(
           height: effectiveMaxHeight,
-          child: Image.network(
-            imagePath,
+          child: _ReceiptCachedOrNetworkImage(
+            imageUrl: imagePath,
             fit: fit,
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return Center(
-                child: CircularProgressIndicator(
-                  value: loadingProgress.expectedTotalBytes != null
-                      ? loadingProgress.cumulativeBytesLoaded /
-                            loadingProgress.expectedTotalBytes!
-                      : null,
-                ),
-              );
-            },
-            errorBuilder: (_, _, _) => unavailablePlaceholder,
+            unavailablePlaceholder: unavailablePlaceholder,
           ),
         ),
       ),
@@ -101,6 +112,81 @@ Widget buildReceiptImageView(
       ),
     ),
   );
+}
+
+class _ReceiptCachedOrNetworkImage extends StatefulWidget {
+  final String imageUrl;
+  final BoxFit fit;
+  final Widget? unavailablePlaceholder;
+
+  const _ReceiptCachedOrNetworkImage({
+    required this.imageUrl,
+    required this.fit,
+    this.unavailablePlaceholder,
+  });
+
+  @override
+  State<_ReceiptCachedOrNetworkImage> createState() =>
+      _ReceiptCachedOrNetworkImageState();
+}
+
+class _ReceiptCachedOrNetworkImageState extends State<_ReceiptCachedOrNetworkImage> {
+  late Future<String?> _cachedPathFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _cachedPathFuture = getOrFetchCachedReceiptPathForUrl(widget.imageUrl);
+  }
+
+  @override
+  void didUpdateWidget(covariant _ReceiptCachedOrNetworkImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageUrl != widget.imageUrl) {
+      _cachedPathFuture = getOrFetchCachedReceiptPathForUrl(widget.imageUrl);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<String?>(
+      future: _cachedPathFuture,
+      builder: (context, snapshot) {
+        final cachedPath = snapshot.data;
+        if (cachedPath != null && cachedPath.isNotEmpty) {
+          final file = File(cachedPath);
+          if (file.existsSync()) {
+            return Image.file(
+              file,
+              fit: widget.fit,
+              errorBuilder: (_, _, _) => _fallbackNetworkImage(),
+            );
+          }
+        }
+        return _fallbackNetworkImage();
+      },
+    );
+  }
+
+  Widget _fallbackNetworkImage() {
+    return Image.network(
+      widget.imageUrl,
+      fit: widget.fit,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return Center(
+          child: CircularProgressIndicator(
+            value: loadingProgress.expectedTotalBytes != null
+                ? loadingProgress.cumulativeBytesLoaded /
+                      loadingProgress.expectedTotalBytes!
+                : null,
+          ),
+        );
+      },
+      errorBuilder: (_, _, _) =>
+          widget.unavailablePlaceholder ?? const SizedBox.shrink(),
+    );
+  }
 }
 
 Widget _buildUnavailablePlaceholder(BuildContext context) {

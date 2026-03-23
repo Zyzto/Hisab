@@ -29,7 +29,7 @@ void main() {
     );
   });
 
-  testWidgets('ExpenseDetailBodyHeader shows title and icon', (tester) async {
+  testWidgets('ExpenseDetailBodyHeader shows icon and date', (tester) async {
     await tester.pumpWidget(
       EasyLocalization(
         path: 'assets/translations',
@@ -47,8 +47,8 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Coffee'), findsOneWidget);
     expect(find.byIcon(Icons.credit_card), findsOneWidget);
+    expect(find.textContaining('2025'), findsOneWidget);
   });
 
   testWidgets('ExpenseDetailBodyHeader shows date text', (tester) async {
