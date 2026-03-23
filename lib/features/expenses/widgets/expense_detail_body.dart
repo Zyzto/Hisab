@@ -59,15 +59,6 @@ class ExpenseDetailBody extends ConsumerWidget {
                 ),
                 if (expense.effectiveReceiptImageUrls.isNotEmpty) ...[
                   const SizedBox(height: 16),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(
-                      'receipt'.tr(),
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ),
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
@@ -241,14 +232,6 @@ class ExpenseDetailBodyHeader extends StatelessWidget {
       children: [
         Icon(icon, size: 48, color: theme.colorScheme.primary),
         const SizedBox(height: 12),
-        Text(
-          expense.title,
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 4),
         Text(
           dateFormat.format(localDate),
           style: theme.textTheme.bodyMedium?.copyWith(

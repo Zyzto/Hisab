@@ -11,6 +11,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../../../core/receipt/receipt_image_compress.dart';
+import '../../../core/receipt/receipt_image_cache.dart';
 import '../../../core/receipt/receipt_image_view.dart';
 import '../../../core/receipt/receipt_scan_service.dart';
 import '../../../core/receipt/receipt_storage_upload.dart';
@@ -257,7 +258,12 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
 
   bool get _isDifferentCurrency => _currencyCode != _groupCurrencyCode;
 
+  void _defocusFormInputs() {
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
   void _openExpenseCurrencyPicker() {
+    _defocusFormInputs();
     final stored = ref.read(favoriteCurrenciesProvider);
     final favorites = CurrencyHelpers.getEffectiveFavorites(stored);
     CurrencyHelpers.showPicker(
@@ -363,6 +369,10 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     final canAddExpense = isOwnerOrAdmin || group.allowMemberAddExpense;
     if (!canAddExpense) {
       context.showToast('add_expense_restricted'.tr());
+      return;
+    }
+    if (group.isArchived) {
+      context.showToast('add_expense_blocked_archived'.tr());
       return;
     }
     final restrictPayerToSelf =
@@ -514,8 +524,12 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
             item.bytes!,
             widget.groupId,
             uploadId,
+            fileExt: 'jpg',
           );
-          if (url != null) receiptUrls.add(url);
+          if (url != null) {
+            receiptUrls.add(url);
+            await warmReceiptImageCacheForUrl(url, item.bytes!, fileExt: 'jpg');
+          }
         }
       }
       final receiptImagePaths = receiptUrls.isEmpty ? null : receiptUrls;
@@ -560,8 +574,16 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
               item.bytes!,
               widget.groupId,
               id,
+              fileExt: 'jpg',
             );
-            if (url != null) createdUrls.add(url);
+            if (url != null) {
+              createdUrls.add(url);
+              await warmReceiptImageCacheForUrl(
+                url,
+                item.bytes!,
+                fileExt: 'jpg',
+              );
+            }
           }
         }
         if (createdUrls.isNotEmpty) {
@@ -891,7 +913,10 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'add_expense_blocked_frozen'.tr(),
+                          (group.isArchived
+                                  ? 'add_expense_blocked_archived'
+                                  : 'add_expense_blocked_frozen')
+                              .tr(),
                           textAlign: TextAlign.center,
                           style: theme.textTheme.bodyLarge,
                         ),
@@ -1556,46 +1581,6 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                     ),
                   ),
                       ),
-                    if (_saving)
-                      Positioned.fill(
-                        child: ColoredBox(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .scrim
-                              .withValues(alpha: 0.24),
-                          child: Center(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 24,
-                                vertical: 16,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.surface,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Text(
-                                    'services_status_loading'.tr(),
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                   bottomNavigationBar: SizedBox(
@@ -1707,6 +1692,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   }
 
   void _showExpenseFormInfoDialog(BuildContext context, Group group) {
+    _defocusFormInputs();
     final tooltipKey = group.isPersonal
         ? 'expense_form_full_features_tooltip_personal'
         : 'expense_form_full_features_tooltip';
@@ -1745,6 +1731,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   }
 
   void _showTagPicker(List<ExpenseTag> customTags) {
+    _defocusFormInputs();
     final theme = Theme.of(context);
     showResponsiveSheet<void>(
       context: context,
@@ -1921,6 +1908,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   }
 
   Future<ExpenseTag?> _showCreateTagDialog() async {
+    _defocusFormInputs();
     return showResponsiveSheet<ExpenseTag>(
       context: context,
       title: 'create_new_tag'.tr(),
@@ -1939,6 +1927,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
 
   /// Add photo from camera or gallery (all platforms). Compresses and appends to [_receiptPhotos].
   Future<void> _addPhoto() async {
+    _defocusFormInputs();
     if (_receiptPhotos.length >= _kMaxReceiptPhotos) return;
     final source = await showResponsiveSheet<ImageSource>(
       context: context,
@@ -2432,6 +2421,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
               InkWell(
                 onTap: () async {
                   if (others.isEmpty) return;
+                  _defocusFormInputs();
                   final chosen = await showResponsiveSheet<String>(
                     context: context,
                     title: 'to'.tr(),
@@ -2561,8 +2551,14 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
 
   /// Single dialog: calendar on top, time selector (hour/minute/AM-PM) below, Cancel/OK. No tabs.
   Future<DateTime?> _showDateTimePicker(BuildContext context) async {
+    _defocusFormInputs();
     final use24h = ref.read(use24HourFormatProvider);
-    return showDateTimePickerDialog(context, initial: _date, use24h: use24h);
+    return showDateTimePickerDialog(
+      context,
+      initial: _date,
+      use24h: use24h,
+      maxDate: DateTime.now(),
+    );
   }
 
   Widget _buildWhenSection(BuildContext context) {
@@ -2573,6 +2569,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     BuildContext context,
     List<Participant> participants,
   ) async {
+    _defocusFormInputs();
     final chosen = await showResponsiveSheet<String>(
       context: context,
       title: 'paid_by_label'.tr(),
@@ -2614,6 +2611,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   }
 
   Future<void> _showSplitTypePicker(BuildContext context) async {
+    _defocusFormInputs();
     final chosen = await showResponsiveSheet<SplitType>(
       context: context,
       title: 'split_type'.tr(),

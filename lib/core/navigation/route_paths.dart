@@ -13,6 +13,7 @@ class RoutePaths {
   static String groupExpenseEdit(String groupId, String expenseId) =>
       '/groups/$groupId/expenses/$expenseId/edit';
   static String groupBalance(String groupId) => '/groups/$groupId/balance';
+  static String groupAnalytics(String groupId) => '/groups/$groupId/analytics';
   static String groupParticipantEdit(String groupId, String participantId) =>
       '/groups/$groupId/participants/$participantId/edit';
 

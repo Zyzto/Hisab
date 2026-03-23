@@ -992,7 +992,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
       title: Text('settlement_freeze'.tr()),
       subtitle: Text(subtitle),
       value: isFrozen,
-      onChanged: _saving || !canEditSettings
+      onChanged: _saving || !canEditSettings || group.isArchived
           ? null
           : (v) {
               if (v) {

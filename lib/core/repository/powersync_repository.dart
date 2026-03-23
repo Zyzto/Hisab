@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:powersync/powersync.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -17,6 +17,10 @@ import 'group_member_repository.dart';
 import 'group_invite_repository.dart';
 
 const _uuid = Uuid();
+const _archiveAutoFreezeMarker = '__hisab_archive_auto_freeze__';
+
+@visibleForTesting
+const archiveAutoFreezeSnapshotMarker = _archiveAutoFreezeMarker;
 
 /// On web, PowerSync/sqlite3_web can emit raw JS objects (LegacyJavaScriptObject)
 /// in update streams instead of Dart UpdateNotification, causing type errors.
@@ -51,6 +55,26 @@ bool _parseBool(dynamic v) {
   if (v is bool) return v;
   if (v is int) return v == 1;
   return v.toString() == 'true' || v.toString() == '1';
+}
+
+bool _isFilledValue(dynamic v) {
+  if (v == null) return false;
+  final text = v.toString().trim();
+  return text.isNotEmpty;
+}
+
+bool _shouldAutoUnfreezeOnUnarchive(dynamic settlementSnapshotJson) {
+  return settlementSnapshotJson?.toString() == _archiveAutoFreezeMarker;
+}
+
+@visibleForTesting
+bool shouldAutoFreezeOnArchive(dynamic settlementFreezeAt) {
+  return !_isFilledValue(settlementFreezeAt);
+}
+
+@visibleForTesting
+bool shouldAutoUnfreezeOnUnarchive(dynamic settlementSnapshotJson) {
+  return _shouldAutoUnfreezeOnUnarchive(settlementSnapshotJson);
 }
 
 /// Convert an unsigned ARGB32 color int to a signed 32-bit int for Postgres.
@@ -662,11 +686,23 @@ class PowerSyncGroupRepository implements IGroupRepository {
   @override
   Future<void> archive(String groupId) async {
     final now = _nowIso();
+    final rows = await _db.getAll(
+      'SELECT settlement_freeze_at, settlement_snapshot_json FROM groups WHERE id = ?',
+      [groupId],
+    );
+    final current = rows.isNotEmpty ? rows.first : null;
+    final shouldAutoFreeze = shouldAutoFreezeOnArchive(
+      current?['settlement_freeze_at'],
+    );
+
+    final updateData = <String, Object?>{'archived_at': now, 'updated_at': now};
+    if (shouldAutoFreeze) {
+      updateData['settlement_freeze_at'] = now;
+      updateData['settlement_snapshot_json'] = _archiveAutoFreezeMarker;
+    }
+
     if (!_isLocalOnly && _isOnline && _client != null) {
-      await _client
-          .from('groups')
-          .update({'archived_at': now, 'updated_at': now})
-          .eq('id', groupId);
+      await _client.from('groups').update(updateData).eq('id', groupId);
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,
       isOnline: _isOnline,
@@ -676,23 +712,42 @@ class PowerSyncGroupRepository implements IGroupRepository {
         tableName: 'groups',
         operation: 'update',
         rowId: groupId,
-        data: {'archived_at': now, 'updated_at': now},
+        data: updateData,
       );
     }
-    await _db.execute(
-      'UPDATE groups SET archived_at = ?, updated_at = ? WHERE id = ?',
-      [now, now, groupId],
-    );
+    if (shouldAutoFreeze) {
+      await _db.execute(
+        'UPDATE groups SET archived_at = ?, settlement_freeze_at = ?, settlement_snapshot_json = ?, updated_at = ? WHERE id = ?',
+        [now, now, _archiveAutoFreezeMarker, now, groupId],
+      );
+    } else {
+      await _db.execute(
+        'UPDATE groups SET archived_at = ?, updated_at = ? WHERE id = ?',
+        [now, now, groupId],
+      );
+    }
   }
 
   @override
   Future<void> unarchive(String groupId) async {
     final now = _nowIso();
+    final rows = await _db.getAll(
+      'SELECT settlement_snapshot_json FROM groups WHERE id = ?',
+      [groupId],
+    );
+    final current = rows.isNotEmpty ? rows.first : null;
+    final shouldAutoUnfreeze = shouldAutoUnfreezeOnUnarchive(
+      current?['settlement_snapshot_json'],
+    );
+
+    final updateData = <String, Object?>{'archived_at': null, 'updated_at': now};
+    if (shouldAutoUnfreeze) {
+      updateData['settlement_freeze_at'] = null;
+      updateData['settlement_snapshot_json'] = null;
+    }
+
     if (!_isLocalOnly && _isOnline && _client != null) {
-      await _client
-          .from('groups')
-          .update({'archived_at': null, 'updated_at': now})
-          .eq('id', groupId);
+      await _client.from('groups').update(updateData).eq('id', groupId);
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,
       isOnline: _isOnline,
@@ -702,13 +757,20 @@ class PowerSyncGroupRepository implements IGroupRepository {
         tableName: 'groups',
         operation: 'update',
         rowId: groupId,
-        data: {'archived_at': null, 'updated_at': now},
+        data: updateData,
       );
     }
-    await _db.execute(
-      'UPDATE groups SET archived_at = NULL, updated_at = ? WHERE id = ?',
-      [now, groupId],
-    );
+    if (shouldAutoUnfreeze) {
+      await _db.execute(
+        'UPDATE groups SET archived_at = NULL, settlement_freeze_at = NULL, settlement_snapshot_json = NULL, updated_at = ? WHERE id = ?',
+        [now, groupId],
+      );
+    } else {
+      await _db.execute(
+        'UPDATE groups SET archived_at = NULL, updated_at = ? WHERE id = ?',
+        [now, groupId],
+      );
+    }
   }
 
   /// Local-only: not written to pending_writes or Supabase. Persists on device only.
