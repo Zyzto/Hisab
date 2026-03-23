@@ -1,7 +1,7 @@
 name: hisab
 description: "Group expense splitting and settle-up app."
 publish_to: 'none'
-version: 0.5.16+43
+version: 0.5.17+44
 
 environment:
   sdk: ^3.10.0
@@ -42,6 +42,7 @@ dependencies:
   animations: ^2.1.0
   custom_sliding_segmented_control: ^1.8.5
   toastification: ^3.0.3
+  fl_chart: ^1.1.1
 
   # Date & currency
   intl: ^0.20.2
