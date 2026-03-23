@@ -32,6 +32,7 @@ This guide walks you through setting up the Supabase backend for Hisab from scra
    - [Migration 18: Receipt image paths (multiple photos)](#migration-18-receipt-image-paths-multiple-photos)
    - [Migration 19: Groups allow_member_settle_for_others](#migration-19-groups-allow_member_settle_for_others)
    - [Migration 20: Fix accept_invite null-expiry validation](#migration-20-fix-accept_invite-null-expiry-validation)
+   - [Post–Migration 20: Invite access mode and read-only preview](#postmigration-20-invite-access-mode-and-read-only-preview)
 4. [Configure Authentication](#4-configure-authentication)
 5. [Deploy Edge Functions](#5-deploy-edge-functions)
    - [Push notifications: end-to-end flow and verification](#push-notifications-end-to-end-flow-and-verification)
@@ -46,7 +47,8 @@ This guide walks you through setting up the Supabase backend for Hisab from scra
 ## 1. Prerequisites
 
 - A [Supabase](https://supabase.com/) account (free tier works)
-- [Supabase CLI](https://supabase.com/docs/guides/cli) installed (optional, for Edge Functions)
+- [Supabase CLI](https://supabase.com/docs/guides/cli) (`npm i -g supabase` or `npx supabase` from the repo root)
+- A container engine with a **Docker-compatible API** for **local** `supabase start`: [Docker](https://docs.docker.com/desktop/) **or** [Podman](https://podman.io/) (see [Local Supabase with Podman](#local-supabase-with-podman)). Not required for hosted-only workflows.
 - Flutter SDK installed
 - A Google Cloud project (for Google OAuth, optional)
 - A GitHub OAuth app (for GitHub OAuth, optional)
@@ -82,13 +84,44 @@ Run this repo-level guard before opening a PR (and in CI):
 bash ./scripts/verify_supabase_config_as_code.sh
 ```
 
-For local reproducibility and drift detection:
+For local reproducibility and drift detection (Docker or Podman must be running—see below):
 
 ```bash
-supabase start
-supabase db reset
-supabase status
+supabase start          # or: npx supabase start
+supabase db reset       # applies migrations + seed.sql
+supabase status         # API URL and anon key for --dart-define / .env
 ```
+
+### Local Supabase with Podman
+
+The Supabase CLI talks to the Docker API. With **Podman**, point `DOCKER_HOST` at Podman’s socket so `supabase start` uses your containers.
+
+**Linux (rootless, common setup)**
+
+1. Enable the user socket (once): `systemctl --user enable --now podman.socket`
+2. From a new shell, either export the socket or use the repo helper:
+
+```bash
+export DOCKER_HOST=unix://${XDG_RUNTIME_DIR}/podman/podman.sock
+cd /path/to/Hisab
+npx supabase start
+```
+
+Or run any subcommand via:
+
+```bash
+./scripts/supabase_with_podman.sh start
+./scripts/supabase_with_podman.sh db reset
+./scripts/supabase_with_podman.sh status
+```
+
+The script sets `DOCKER_HOST` when it finds `${XDG_RUNTIME_DIR}/podman/podman.sock` or `/run/user/$(id -u)/podman/podman.sock`.
+
+**macOS**
+
+Run `podman machine start`, then set `DOCKER_HOST` to the path shown by `podman machine inspect` (Podman socket), or use a `podman`-backed `docker` CLI if you prefer.
+
+**Note:** Some distros ship `podman-docker` / `docker` as a wrapper to Podman; if `docker ps` already works, plain `supabase start` may succeed without setting `DOCKER_HOST`.
 
 If `supabase db reset` fails or requires manual SQL not present in `supabase/migrations/*.sql`, your local/live state has drifted from config-as-code and should be fixed by adding a migration.
 
@@ -1727,7 +1760,7 @@ ALTER TABLE public.groups
 
 Aligns `accept_invite` with `get_invite_by_token` so invites with `expires_at IS NULL` ("Never" expiry) are accepted. Also pre-filters inactive or max-used invites in the token lookup.
 
-Use the exact SQL from `supabase/migrations/20260306120000_fix_accept_invite_null_expiry_validation.sql` (source of truth). It matches production and redefines both overloads:
+Use the exact SQL from `supabase/migrations/20260306120000_fix_accept_invite_null_expiry_validation.sql` (source of truth). It redefines both overloads:
 
 - `accept_invite(TEXT)` (legacy signature)
 - `accept_invite(TEXT, UUID, TEXT)` (current app signature)
@@ -1738,6 +1771,41 @@ This migration preserves participant reuse (`left_at` restoration), invite usage
 -- Run the exact SQL in:
 -- supabase/migrations/20260306120000_fix_accept_invite_null_expiry_validation.sql
 ```
+
+### Post–Migration 20: Invite access mode and read-only preview
+
+**Cloud vs repo:** Hosted Supabase should expose the same **schema and RPC behavior** as this repository. The ordered source of truth is every file under [`supabase/migrations/`](../supabase/migrations/) (lexicographic order matches apply order). Dashboard **migration version strings** may differ from these filenames (e.g. applied via SQL Editor or squashed under another timestamp); use live checks below—not only the migration list—to detect drift.
+
+Use **Supabase CLI** (`supabase link` then `supabase db push`), **SQL Editor**, or **Supabase MCP** `apply_migration` (paste the SQL from the matching file under `supabase/migrations/`) to align a hosted project with the repo. MCP records new rows in the dashboard migration history with its own timestamped version (equivalent SQL to the files below). Local parity check:
+
+```bash
+supabase start
+supabase db reset   # applies all migrations + seed.sql
+```
+
+The following migrations extend invites for **access modes** (`standard`, `readonly_join`, `readonly_only`), **anonymous preview RPCs** (`get_invite_preview_group`, `get_invite_preview_participants`, `get_invite_preview_expenses` with `GRANT … TO anon`), **never-expiring invites** (`expires_at` nullable), and preview expense **receipt** columns. Apply them after Migration 20 (or in one shot via full migration set).
+
+| File | Purpose |
+|------|---------|
+| `20260306012804_invite_access_mode_readonly_preview_fixup.sql` | `create_invite` / `get_invite_by_token` / `accept_invite` updates for access modes and invite lifecycle |
+| `20260306012833_invite_access_mode_readonly_preview_column.sql` | `group_invites.access_mode` column and check constraint |
+| `20260306173000_invite_access_mode_readonly_preview.sql` | `create_invite` signature alignment; `get_invite_by_token` columns; `accept_invite` blocks `readonly_only` |
+| `20260306174500_invite_preview_token_rpcs.sql` | Initial token-based preview RPCs + `GRANT` to `anon` / `authenticated` |
+| `20260306193000_invite_preview_hardening.sql` | Preview limited to readonly invite modes; bounded preview expenses; `create_invite` interval / access_mode validation |
+| `20260306194000_invite_expiry_nullable.sql` | `group_invites.expires_at` nullable for never-expiring invites |
+| `20260306200000_invite_preview_expense_receipts.sql` | Preview expense rows include receipt paths for read-only expense detail |
+
+Do not duplicate Migration 20’s file (`20260306120000_fix_accept_invite_null_expiry_validation.sql`) in a second apply step—it is already documented above.
+
+**Validating a linked project (e.g. Supabase MCP or SQL Editor):**
+
+| Check | Notes |
+|-------|--------|
+| `group_invites.access_mode` | `text`, `NOT NULL`, default `standard`; check constraint on allowed values |
+| `group_invites.expires_at` | Nullable for never-expiring invites (`20260306194000`) |
+| Preview RPCs | `get_invite_preview_group`, `get_invite_preview_participants`, `get_invite_preview_expenses` in `public`; `GRANT EXECUTE` to `anon` and `authenticated` |
+| Preview hardening | After `20260306193000_invite_preview_hardening.sql`, `get_invite_preview_group` (and related preview RPCs) must filter with `access_mode IN ('readonly_join','readonly_only')` so **standard** invite tokens do not return preview data. |
+| `get_invite_preview_expenses` | The app calls RPC with **`p_token` and `p_limit`**. Postgres should expose `get_invite_preview_expenses(text, integer)` (`20260306193000` then `20260306200000_invite_preview_expense_receipts.sql` for receipt columns). |
 
 ---
 

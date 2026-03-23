@@ -347,6 +347,7 @@
   "invite_preview_readonly_only_message": "هذه الدعوة للمعاينة فقط. يمكنك عرض تفاصيل المجموعة لكن لا يمكنك الانضمام.",
   "invite_preview_join_cta": "الانضمام إلى المجموعة",
   "invite_preview_open_group": "فتح معاينة المجموعة",
+  "invite_navigation_stalled_hint": "لم تنتقل الصفحة تلقائياً. استخدم الزر أدناه للمتابعة.",
   "invite_preview_title": "معاينة المجموعة",
   "invite_preview_no_expenses": "لا توجد مصروفات بعد",
   "invite_expired": "انتهت صلاحية الدعوة أو غير صالحة",

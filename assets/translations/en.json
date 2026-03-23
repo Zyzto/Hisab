@@ -347,6 +347,7 @@
   "invite_preview_readonly_only_message": "This invite is preview-only. You can view group details but cannot join.",
   "invite_preview_join_cta": "Join this group",
   "invite_preview_open_group": "Open group preview",
+  "invite_navigation_stalled_hint": "This page did not advance automatically. Use the button below to continue.",
   "invite_preview_title": "Group Preview",
   "invite_preview_no_expenses": "No expenses yet",
   "invite_expired": "Invite expired or invalid",
