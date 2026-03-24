@@ -57,8 +57,14 @@ void main() {
         expect(find.text('My Budget'), findsWidgets);
         expect(find.text('Balance'), findsNothing);
         expect(find.text('People'), findsNothing);
-        // Budget set on create (500) is displayed in the header
-        expect(find.textContaining('500'), findsWidgets);
+        // Budget set on create (500) is displayed in the header; wait for expenses
+        // to load (_PersonalBudgetHeader shows loading until expensesByGroupProvider emits)
+        await waitForWidget(
+          tester,
+          find.byKey(const Key('personal_budget_amount')),
+          timeout: const Duration(seconds: 15),
+        );
+        expect(find.byKey(const Key('personal_budget_amount')), findsOneWidget);
       });
 
       // ── Stage: add expense ──

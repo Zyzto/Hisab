@@ -17,8 +17,8 @@ import 'package:hisab/features/settings/settings_definitions.dart';
 
 import 'test_db_path.dart';
 
-const testUserAEmail = 'test-a@example.com';
-const testUserBEmail = 'test-b@example.com';
+const testUserAEmail = 'test-a@hisab.test';
+const testUserBEmail = 'test-b@hisab.test';
 const testPassword = 'TestPass123!';
 String _lastOnlineBootstrapFailureReason = '';
 

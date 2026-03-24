@@ -131,7 +131,12 @@ void main() {
           find.text('Expenses'),
           timeout: const Duration(seconds: 20),
         );
-        expect(find.text('Display Currency Group'), findsWidgets);
+        await waitForWidget(
+          tester,
+          find.byKey(const Key('group_detail_title')),
+          timeout: const Duration(seconds: 5),
+        );
+        expect(find.byKey(const Key('group_detail_title')), findsOneWidget);
       });
 
       // ── Stage: add expense (group currency SAR by default) ──
