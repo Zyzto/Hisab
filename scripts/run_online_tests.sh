@@ -27,8 +27,78 @@ if [[ -z "${DOCKER_HOST:-}" ]]; then
 fi
 
 SUPABASE_STARTED=0
+WEBDRIVER_STARTED=0
+WEBDRIVER_PID=""
+WEBDRIVER_PORT="${WEBDRIVER_PORT:-4444}"
+
+kill_webdriver_on_port() {
+  if command -v fuser >/dev/null 2>&1; then
+    fuser -k "${WEBDRIVER_PORT}/tcp" >/dev/null 2>&1 || true
+    return
+  fi
+
+  if command -v lsof >/dev/null 2>&1; then
+    local pids
+    pids="$(lsof -ti ":${WEBDRIVER_PORT}" 2>/dev/null || true)"
+    if [ -n "$pids" ]; then
+      # shellcheck disable=SC2086
+      kill $pids 2>/dev/null || true
+    fi
+  fi
+}
+
+webdriver_ready() {
+  if ! command -v curl >/dev/null 2>&1; then
+    return 1
+  fi
+  curl --silent --show-error --fail "http://127.0.0.1:${WEBDRIVER_PORT}/status" >/dev/null 2>&1
+}
+
+ensure_webdriver() {
+  if [ "$PLATFORM" != "web" ]; then
+    return
+  fi
+
+  # Fresh WebDriver per run avoids stale-session crashes in flutter drive.
+  kill_webdriver_on_port
+  sleep 1
+
+  echo "==> Starting WebDriver on port ${WEBDRIVER_PORT}..."
+  if command -v chromedriver >/dev/null 2>&1; then
+    chromedriver --port="${WEBDRIVER_PORT}" >/tmp/hisab-chromedriver.log 2>&1 &
+  elif command -v npx >/dev/null 2>&1; then
+    npx --yes chromedriver@latest --port="${WEBDRIVER_PORT}" >/tmp/hisab-chromedriver.log 2>&1 &
+  else
+    echo "ERROR: chromedriver not found and npx is unavailable."
+    echo "Install chromedriver or Node.js/npm, then rerun."
+    exit 1
+  fi
+
+  WEBDRIVER_PID=$!
+  WEBDRIVER_STARTED=1
+
+  for _ in {1..20}; do
+    if webdriver_ready; then
+      echo "==> WebDriver is ready."
+      return
+    fi
+    sleep 1
+  done
+
+  echo "ERROR: WebDriver did not become ready on http://127.0.0.1:${WEBDRIVER_PORT}/status"
+  if [ -f /tmp/hisab-chromedriver.log ]; then
+    echo "Last WebDriver logs:"
+    sed -n '1,120p' /tmp/hisab-chromedriver.log
+  fi
+  exit 1
+}
+
 cleanup() {
   local exit_code=$?
+  if [ "$WEBDRIVER_STARTED" -eq 1 ] && [ -n "$WEBDRIVER_PID" ]; then
+    kill "$WEBDRIVER_PID" >/dev/null 2>&1 || true
+    kill_webdriver_on_port
+  fi
   if [ "$SUPABASE_STARTED" -eq 1 ]; then
     echo "==> Stopping local Supabase..."
     SB stop || echo "WARN: supabase stop failed"
@@ -41,7 +111,8 @@ echo "==> Verifying Supabase config-as-code invariants..."
 bash ./scripts/verify_supabase_config_as_code.sh
 
 echo "==> Starting local Supabase..."
-SB start
+# mailpit/studio are unnecessary for integration tests and can conflict on host ports.
+SB start -x studio,mailpit
 SUPABASE_STARTED=1
 
 # Extract credentials from the running instance
@@ -60,6 +131,7 @@ echo "==> Running online integration tests (platform=$PLATFORM)..."
 echo "    SUPABASE_URL=$SUPABASE_URL"
 
 if [ "$PLATFORM" = "web" ]; then
+  ensure_webdriver
   flutter drive \
     --driver=test_driver/integration_test.dart \
     --target=integration_test/online_app_test.dart \

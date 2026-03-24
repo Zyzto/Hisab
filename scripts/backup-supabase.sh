@@ -17,14 +17,14 @@
 # Output: supabase_backups/hisab_backup_YYYYMMDD_HHMMSS.sql
 # The directory supabase_backups/ is in .gitignore; do not commit backups.
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 BACKUP_DIR="${BACKUP_DIR:-$REPO_ROOT/supabase_backups}"
 MODE="${1:-full}"
 
-URL="${SUPABASE_DB_URL:-$DATABASE_URL}"
+URL="${SUPABASE_DB_URL:-${DATABASE_URL:-}}"
 if [ -z "$URL" ]; then
   echo "Error: Set SUPABASE_DB_URL or DATABASE_URL to your Postgres connection URI." >&2
   echo "Example: postgresql://postgres.[ref]:[PASSWORD]@aws-0-[region].pooler.supabase.com:5432/postgres" >&2
@@ -44,9 +44,13 @@ case "$MODE" in
     echo "Dumping data only to $FILE"
     pg_dump "$URL" --no-owner --no-acl --data-only -f "$FILE"
     ;;
-  full|*)
+  full)
     echo "Dumping full database to $FILE"
     pg_dump "$URL" --no-owner --no-acl -f "$FILE"
+    ;;
+  *)
+    echo "Error: invalid mode '$MODE'. Use one of: full, schema, data." >&2
+    exit 1
     ;;
 esac
 

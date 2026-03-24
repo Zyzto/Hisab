@@ -15,14 +15,25 @@ cd "$PROJECT_DIR"
 CHROMEDRIVER_PORT="${CHROMEDRIVER_PORT:-4444}"
 CHROMEDRIVER_PID=""
 
+kill_webdriver_on_port() {
+  if command -v fuser &>/dev/null; then
+    fuser -k "${CHROMEDRIVER_PORT}/tcp" >/dev/null 2>&1 || true
+    return
+  fi
+
+  if command -v lsof &>/dev/null; then
+    local pids
+    pids=$(lsof -ti ":${CHROMEDRIVER_PORT}" 2>/dev/null || true)
+    if [ -n "$pids" ]; then
+      # shellcheck disable=SC2086
+      kill $pids 2>/dev/null || true
+    fi
+  fi
+}
+
 # Free port if something is still bound from a previous run
-if command -v fuser &>/dev/null; then
-  fuser -k "$CHROMEDRIVER_PORT/tcp" 2>/dev/null || true
-  sleep 1
-elif command -v lsof &>/dev/null; then
-  pid=$(lsof -ti ":$CHROMEDRIVER_PORT" 2>/dev/null) && kill $pid 2>/dev/null || true
-  sleep 1
-fi
+kill_webdriver_on_port
+sleep 1
 
 cleanup() {
   local exit_code=$?
@@ -30,27 +41,23 @@ cleanup() {
     echo "==> Stopping ChromeDriver (PID $CHROMEDRIVER_PID)..."
     kill "$CHROMEDRIVER_PID" 2>/dev/null || true
   fi
+  kill_webdriver_on_port
   exit "$exit_code"
 }
 trap cleanup EXIT
 
-# Prefer npx chromedriver (from project's node_modules) so no global install is needed
-if command -v npx &>/dev/null && [ -f "package.json" ]; then
-  echo "==> Installing npm deps (chromedriver) if needed..."
-  npm install --no-audit --no-fund
-  echo "==> Starting ChromeDriver on port $CHROMEDRIVER_PORT (Chrome will be used for tests)..."
-  npx chromedriver --port="$CHROMEDRIVER_PORT" &
-  CHROMEDRIVER_PID=$!
-else
-  echo "==> Starting ChromeDriver on port $CHROMEDRIVER_PORT..."
-  if ! command -v chromedriver &>/dev/null; then
-    echo "ERROR: chromedriver not found. Either:"
-    echo "  1. Run from project root after 'npm install' (uses npx chromedriver), or"
-    echo "  2. Install ChromeDriver and ensure it is on PATH (see test/README.md)."
-    exit 1
-  fi
+# Prefer local/global chromedriver first; fallback to npx ephemeral install.
+echo "==> Starting ChromeDriver on port $CHROMEDRIVER_PORT..."
+if command -v chromedriver &>/dev/null; then
   chromedriver --port="$CHROMEDRIVER_PORT" &
   CHROMEDRIVER_PID=$!
+elif command -v npx &>/dev/null; then
+  npx --yes chromedriver@latest --port="$CHROMEDRIVER_PORT" &
+  CHROMEDRIVER_PID=$!
+else
+  echo "ERROR: chromedriver not found and npx is unavailable."
+  echo "Install chromedriver or Node.js/npm, then rerun."
+  exit 1
 fi
 
 # Wait for ChromeDriver to listen (give it a moment to bind)

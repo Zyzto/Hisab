@@ -10,7 +10,7 @@ import '../helpers/test_helpers.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-  final _skipInviteFlows = bool.fromEnvironment(
+  final skipInviteFlows = const bool.fromEnvironment(
     'HISAB_SKIP_INVITE_ONLINE',
     defaultValue: true,
   );
@@ -30,7 +30,7 @@ void main() {
     testWidgets(
       'User A creates group + invite → User B accepts → verify membership',
       (tester) async {
-        if (_skipInviteFlows) return;
+        if (skipInviteFlows) return;
         final groupName =
             'Invite Test Group ${DateTime.now().millisecondsSinceEpoch}';
         final ready = await runOnlineTestApp(
@@ -270,7 +270,7 @@ void main() {
     testWidgets(
       'readonly_only invite is blocked by backend',
       (tester) async {
-        if (_skipInviteFlows) return;
+        if (skipInviteFlows) return;
         final ready = await runOnlineTestApp(
           skipOnboarding: true,
           signInEmail: testUserAEmail,
@@ -388,7 +388,7 @@ void main() {
     testWidgets(
       'standard invite does not expose preview RPC data',
       (tester) async {
-        if (_skipInviteFlows) return;
+        if (skipInviteFlows) return;
         final ready = await runOnlineTestApp(
           skipOnboarding: true,
           signInEmail: testUserAEmail,
@@ -496,7 +496,7 @@ void main() {
     testWidgets(
       'invite with never expiry keeps expires_at null',
       (tester) async {
-        if (_skipInviteFlows) return;
+        if (skipInviteFlows) return;
         final ready = await runOnlineTestApp(
           skipOnboarding: true,
           signInEmail: testUserAEmail,
@@ -595,7 +595,7 @@ void main() {
     testWidgets(
       'readonly_join invite shows visible preview flow in UI',
       (tester) async {
-        if (_skipInviteFlows) return;
+        if (skipInviteFlows) return;
         final ready = await runOnlineTestApp(
           skipOnboarding: true,
           signInEmail: testUserAEmail,
@@ -789,7 +789,7 @@ void main() {
     testWidgets(
       'standard invite does not show preview CTA in UI',
       (tester) async {
-        if (_skipInviteFlows) return;
+        if (skipInviteFlows) return;
         final ready = await runOnlineTestApp(
           skipOnboarding: true,
           signInEmail: testUserAEmail,

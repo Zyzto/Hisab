@@ -320,23 +320,126 @@ Future<bool> _isPortInUse(int port) async {
   }
 }
 
+Future<bool> _isWebDriverReady(int port) async {
+  HttpClient? client;
+  try {
+    client = HttpClient()..connectionTimeout = const Duration(seconds: 2);
+    final request = await client.getUrl(
+      Uri.parse('http://127.0.0.1:$port/status'),
+    );
+    final response = await request.close();
+    await response.drain<void>();
+    return response.statusCode >= 200 && response.statusCode < 300;
+  } catch (_) {
+    return false;
+  } finally {
+    client?.close(force: true);
+  }
+}
+
+Future<Process?> _startWebDriverProcess(String projectRoot, int port) async {
+  Future<Process?> tryStart(String executable, List<String> args) async {
+    try {
+      final proc = await Process.start(
+        executable,
+        args,
+        workingDirectory: projectRoot,
+        environment: Platform.environment,
+        runInShell: false,
+      );
+      unawaited(proc.stdout.drain<void>());
+      unawaited(proc.stderr.drain<void>());
+      return proc;
+    } on ProcessException {
+      return null;
+    }
+  }
+
+  final chromeDriver = await tryStart('chromedriver', ['--port=$port']);
+  if (chromeDriver != null) return chromeDriver;
+
+  return tryStart('npx', ['--yes', 'chromedriver@latest', '--port=$port']);
+}
+
+Future<bool> _waitForWebDriverReady(int port, Duration timeout) async {
+  final deadline = DateTime.now().add(timeout);
+  while (DateTime.now().isBefore(deadline)) {
+    if (await _isWebDriverReady(port)) return true;
+    await Future<void>.delayed(const Duration(seconds: 1));
+  }
+  return false;
+}
+
 Future<int> _runIntegrationWeb(
   String projectRoot,
   Directory logDir,
   void Function(Process?) setChromeDriver,
 ) async {
   print('==> Phase 2b: Web integration');
-  final portInUse = await _isPortInUse(4444);
-  if (!portInUse) {
-    final proc = await Process.start(
-      'chromedriver',
-      ['--port=4444'],
-      workingDirectory: projectRoot,
-      environment: Platform.environment,
-      runInShell: true,
+  const webDriverPort = 4444;
+  final webDriverAlreadyReady = await _isWebDriverReady(webDriverPort);
+  if (!webDriverAlreadyReady) {
+    final portInUse = await _isPortInUse(webDriverPort);
+    if (!portInUse) {
+      final proc = await _startWebDriverProcess(projectRoot, webDriverPort);
+      if (proc == null) {
+        print(
+          'Web integration precheck failed: neither `chromedriver` nor `npx` is available.',
+        );
+        return 1;
+      }
+      setChromeDriver(proc);
+      var exitedEarly = false;
+      int? earlyExitCode;
+      unawaited(
+        proc.exitCode.then((code) {
+          exitedEarly = true;
+          earlyExitCode = code;
+        }),
+      );
+
+      final ready = await _waitForWebDriverReady(
+        webDriverPort,
+        const Duration(seconds: 120),
+      );
+      if (!ready) {
+        if (exitedEarly) {
+          print(
+            'Web integration precheck failed: WebDriver process exited before readiness (exit $earlyExitCode).',
+          );
+        } else {
+          print(
+            'Web integration precheck failed: WebDriver did not become ready on port $webDriverPort.',
+          );
+        }
+        return 1;
+      }
+    } else {
+      print(
+        'Web integration precheck: port $webDriverPort is in use but /status is not ready; waiting briefly...',
+      );
+      final ready = await _waitForWebDriverReady(
+        webDriverPort,
+        const Duration(seconds: 120),
+      );
+      if (!ready) {
+        print(
+          'Web integration precheck failed: WebDriver did not become ready on port $webDriverPort.',
+        );
+        return 1;
+      }
+    }
+  } else {
+    final ready = await _waitForWebDriverReady(
+      webDriverPort,
+      const Duration(seconds: 2),
     );
-    setChromeDriver(proc);
-    await Future<void>.delayed(const Duration(seconds: 3));
+    if (!ready) {
+      print(
+        'Web integration precheck failed: WebDriver did not become ready on port $webDriverPort.',
+      );
+      return 1;
+    }
   }
   final logFile = File(p.join(logDir.path, 'integration_web.log'));
   final exitCode = await _runProcess(

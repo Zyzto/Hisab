@@ -138,6 +138,12 @@ Add to `.vscode/launch.json`:
 
 ## Web-Specific Notes
 
+### Flutter default service worker deprecation
+
+Flutter web is deprecating/removing the default `flutter_service_worker.js` behavior. This project uses a custom [`web/flutter_bootstrap.js`](../web/flutter_bootstrap.js) that calls `_flutter.loader.load()` without default service-worker settings, so web updates rely on normal browser/CDN caching behavior.
+
+For context, see Flutter issue [#156910](https://github.com/flutter/flutter/issues/156910).
+
 ### iOS Safari performance and accessibility semantics
 
 Flutter web accessibility semantics are opt-in for performance reasons. In this project, semantics are disabled by default on web to avoid known iOS Safari jank. If you need always-on screen reader semantics, build with:
@@ -235,6 +241,8 @@ firebase deploy --only hosting
 ```
 
 Your `firebase.json` already points `hosting.public` to `build/web`, so the built output (including `privacy/index.html` and `delete-account/index.html`) is deployed as-is.
+
+The checked-in [`firebase.json`](../firebase.json) also sets `Cache-Control: public, max-age=0, must-revalidate` for web entry files (`index.html`, `flutter_bootstrap.js`, `flutter.js`, `main.dart.js`, `manifest.json`, `version.json`) so redeploys pick up reliably without depending on Flutter's deprecated default service worker cache flow.
 
 ### 3. Keeping secrets out of your shell history
 

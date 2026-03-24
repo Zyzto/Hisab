@@ -31,6 +31,60 @@
         ],
         "headers": [
             {
+                "source": "/index.html",
+                "headers": [
+                    {
+                        "key": "Cache-Control",
+                        "value": "public, max-age=0, must-revalidate"
+                    }
+                ]
+            },
+            {
+                "source": "/flutter_bootstrap.js",
+                "headers": [
+                    {
+                        "key": "Cache-Control",
+                        "value": "public, max-age=0, must-revalidate"
+                    }
+                ]
+            },
+            {
+                "source": "/flutter.js",
+                "headers": [
+                    {
+                        "key": "Cache-Control",
+                        "value": "public, max-age=0, must-revalidate"
+                    }
+                ]
+            },
+            {
+                "source": "/main.dart.js",
+                "headers": [
+                    {
+                        "key": "Cache-Control",
+                        "value": "public, max-age=0, must-revalidate"
+                    }
+                ]
+            },
+            {
+                "source": "/manifest.json",
+                "headers": [
+                    {
+                        "key": "Cache-Control",
+                        "value": "public, max-age=0, must-revalidate"
+                    }
+                ]
+            },
+            {
+                "source": "/version.json",
+                "headers": [
+                    {
+                        "key": "Cache-Control",
+                        "value": "public, max-age=0, must-revalidate"
+                    }
+                ]
+            },
+            {
                 "source": "**/*.wasm",
                 "headers": [
                     {

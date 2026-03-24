@@ -134,11 +134,12 @@ void main() {
     WidgetTester tester,
     _FakeGroupInviteRepository repo, {
     bool authenticated = false,
+    bool localOnly = false,
   }) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          effectiveLocalOnlyProvider.overrideWith((ref) => false),
+          effectiveLocalOnlyProvider.overrideWith((ref) => localOnly),
           isAuthenticatedProvider.overrideWith((ref) => authenticated),
           authServiceProvider.overrideWith((ref) => _FakeAuthService()),
           groupInviteRepositoryProvider.overrideWithValue(repo),
@@ -163,6 +164,17 @@ void main() {
                     body: Center(
                       child: Text('PREVIEW_PAGE_${state.pathParameters['token']}'),
                     ),
+                  ),
+                ),
+                GoRoute(
+                  path: '/settings',
+                  builder: (context, state) =>
+                      const Scaffold(body: Center(child: Text('SETTINGS_PAGE'))),
+                ),
+                GoRoute(
+                  path: '/onboarding',
+                  builder: (context, state) => const Scaffold(
+                    body: Center(child: Text('ONBOARDING_PAGE')),
                   ),
                 ),
               ],
@@ -313,7 +325,7 @@ void main() {
     );
   });
 
-  testWidgets('unauthenticated readonly_join routes directly to preview', (
+  testWidgets('unauthenticated readonly_join stays on invite choice page', (
     tester,
   ) async {
     final repo = _FakeGroupInviteRepository(
@@ -322,7 +334,24 @@ void main() {
     );
     await pumpWithRouter(tester, repo, authenticated: false);
 
-    expect(find.text('PREVIEW_PAGE_token-1'), findsOneWidget);
+    expect(find.text('PREVIEW_PAGE_token-1'), findsNothing);
+    expect(find.textContaining('preview'), findsWidgets);
+    expect(find.textContaining('join'), findsWidgets);
+  }, skip: !kIsWeb);
+
+  testWidgets('readonly_join unauthenticated join CTA goes to onboarding', (
+    tester,
+  ) async {
+    final repo = _FakeGroupInviteRepository(
+      invite: makeInvite().copyWith(accessMode: InviteAccessMode.readonlyJoin),
+      group: makeGroup(),
+    );
+    await pumpWithRouter(tester, repo, authenticated: false);
+
+    await tester.tap(find.textContaining('join').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('ONBOARDING_PAGE'), findsOneWidget);
   }, skip: !kIsWeb);
 
   testWidgets('unauthenticated readonly_only routes directly to preview', (
@@ -335,5 +364,25 @@ void main() {
     await pumpWithRouter(tester, repo, authenticated: false);
 
     expect(find.text('PREVIEW_PAGE_token-1'), findsOneWidget);
+  }, skip: !kIsWeb);
+
+  testWidgets('local-only readonly_join authenticated join CTA routes to settings', (
+    tester,
+  ) async {
+    final repo = _FakeGroupInviteRepository(
+      invite: makeInvite().copyWith(accessMode: InviteAccessMode.readonlyJoin),
+      group: makeGroup(),
+    );
+    await pumpWithRouter(
+      tester,
+      repo,
+      authenticated: true,
+      localOnly: true,
+    );
+
+    await tester.tap(find.textContaining('join').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('SETTINGS_PAGE'), findsOneWidget);
   }, skip: !kIsWeb);
 }
