@@ -715,12 +715,11 @@ class _TrendChartCard extends StatelessWidget {
         return _buildLineChart(
           context: context,
           series: visibleSeries.asMap().entries.map((entry) {
-            final index = entry.key;
             final series = entry.value;
             return _LineSeries(
               label: series.label,
               points: series.points,
-              color: _seriesPalette[index % _seriesPalette.length],
+              color: _seriesColorForId(series.id),
             );
           }).toList(),
         );
@@ -976,6 +975,9 @@ class _TrendChartCard extends StatelessWidget {
     final pointCount = series.first.points.length;
     final step = _xLabelStep(pointCount);
     final maxY = _maxStackedAmount(series);
+    final colorBySeriesId = {
+      for (final item in series) item.id: _seriesColorForId(item.id),
+    };
 
     final groups = <BarChartGroupData>[];
     for (int i = 0; i < pointCount; i++) {
@@ -989,7 +991,8 @@ class _TrendChartCard extends StatelessWidget {
           BarChartRodStackItem(
             cursor,
             next,
-            _seriesPalette[seriesIndex % _seriesPalette.length],
+            colorBySeriesId[series[seriesIndex].id] ??
+                _seriesPalette[seriesIndex % _seriesPalette.length],
           ),
         );
         cursor = next;
@@ -1020,7 +1023,8 @@ class _TrendChartCard extends StatelessWidget {
               .entries
               .map(
                 (entry) => _LegendChip(
-                  color: _seriesPalette[entry.key % _seriesPalette.length],
+                  color: colorBySeriesId[entry.value.id] ??
+                      _seriesPalette[entry.key % _seriesPalette.length],
                   label: _displayLabel(entry.value.label),
                 ),
               )
@@ -1125,6 +1129,15 @@ class _TrendChartCard extends StatelessWidget {
   int _xLabelStep(int count) {
     if (count <= 1) return 1;
     return math.max(1, (count / 4).ceil());
+  }
+
+  Color _seriesColorForId(String id) {
+    int hash = 17;
+    for (final unit in id.codeUnits) {
+      hash = 37 * hash + unit;
+    }
+    final index = hash.abs() % _seriesPalette.length;
+    return _seriesPalette[index];
   }
 
   bool _shouldShowXAxisLabel({
@@ -1397,13 +1410,39 @@ class _BreakdownBarsCard extends StatelessWidget {
     final visibleRows = allRows
         .where((row) => !excludedCategoryIds.contains(row.id))
         .toList();
+    final hasExcluded = excludedCategoryIds.isNotEmpty;
+    final colorByCategoryId = <String, Color>{};
+    for (final entry in allRows.asMap().entries) {
+      colorByCategoryId.putIfAbsent(
+        entry.value.id,
+        () => palette[entry.key % palette.length],
+      );
+    }
     final total = visibleRows.fold<int>(0, (sum, row) => sum + row.amountCents.abs());
     if (total <= 0) {
-      return Text(
-        emptyLabel,
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            emptyLabel,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          if (hasExcluded && onToggleCategory != null)
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: TextButton.icon(
+                onPressed: () {
+                  for (final id in excludedCategoryIds.toList()) {
+                    onToggleCategory!.call(id);
+                  }
+                },
+                icon: const Icon(Icons.refresh),
+                label: Text('analytics_show_all_categories'.tr()),
+              ),
+            ),
+        ],
       );
     }
 
@@ -1436,7 +1475,7 @@ class _BreakdownBarsCard extends StatelessWidget {
                 final showOutsidePct = pct > 0 && pct < 8;
                 return PieChartSectionData(
                   value: value,
-                  color: palette[index % palette.length],
+                  color: colorByCategoryId[row.id] ?? palette[index % palette.length],
                   radius: 42,
                   title: showOutsidePct ? '' : (pct >= 8 ? '${pct.toStringAsFixed(0)}%' : ''),
                   titleStyle: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -1462,7 +1501,8 @@ class _BreakdownBarsCard extends StatelessWidget {
                               Container(
                                 width: 1.6,
                                 height: 12,
-                                color: palette[index % palette.length],
+                                color:
+                                    colorByCategoryId[row.id] ?? palette[index % palette.length],
                               ),
                               const SizedBox(height: 3),
                               Text(
@@ -1491,13 +1531,13 @@ class _BreakdownBarsCard extends StatelessWidget {
             row.amountCents,
             currencyCode,
           );
+          final isLastVisible = !isExcluded && visibleRows.length <= 1;
+          final canToggle = onToggleCategory != null && (isExcluded || !isLastVisible);
           return Opacity(
             opacity: isExcluded ? 0.45 : 1,
             child: InkWell(
               borderRadius: BorderRadius.circular(8),
-              onTap: onToggleCategory == null
-                  ? null
-                  : () => onToggleCategory!.call(row.id),
+              onTap: canToggle ? () => onToggleCategory!.call(row.id) : null,
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Row(
@@ -1506,7 +1546,7 @@ class _BreakdownBarsCard extends StatelessWidget {
                       width: 10,
                       height: 10,
                       decoration: BoxDecoration(
-                        color: palette[index % palette.length],
+                        color: colorByCategoryId[row.id] ?? palette[index % palette.length],
                         borderRadius: BorderRadius.circular(3),
                       ),
                     ),
@@ -1529,8 +1569,14 @@ class _BreakdownBarsCard extends StatelessWidget {
                         Icons.visibility_off_rounded,
                         size: 16,
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      )
+                    else if (isLastVisible)
+                      Icon(
+                        Icons.lock_outline_rounded,
+                        size: 16,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
-                    if (isExcluded) const SizedBox(width: 6),
+                    if (isExcluded || isLastVisible) const SizedBox(width: 6),
                     Text(
                       value,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -1544,12 +1590,12 @@ class _BreakdownBarsCard extends StatelessWidget {
             ),
           );
         }),
-        if (excludedCategoryIds.isNotEmpty && onToggleCategory != null)
+        if (hasExcluded && onToggleCategory != null)
           Align(
             alignment: AlignmentDirectional.centerEnd,
             child: TextButton.icon(
               onPressed: () {
-                for (final id in excludedCategoryIds) {
+                for (final id in excludedCategoryIds.toList()) {
                   onToggleCategory!.call(id);
                 }
               },
