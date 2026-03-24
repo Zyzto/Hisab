@@ -225,6 +225,7 @@ The following MCP (Model Context Protocol) servers are enabled in this project. 
 | **Dart** (`user-dart`) | Dart/Flutter development: prefer over running tools in a shell. Includes `analyze_files`, `run_tests`, `dart_format`, `dart_fix`, `pub`, `pub_dev_search`, `create_project`; running apps (`launch_app`, `stop_app`, `hot_reload`, `hot_restart`), `list_devices`, `list_running_apps`, `get_app_logs`, `get_runtime_errors`; widget inspector (`get_widget_tree`, `get_selected_widget`, `set_widget_selection_mode`); and daemon/symbols (`connect_dart_tooling_daemon`, `resolve_workspace_symbol`, `hover`, `signature_help`). |
 | **cursor-ide-browser** | Web automation and testing: navigate, lock/unlock tab, snapshot page, click/type/scroll/drag, handle dialogs; `browser_tabs`, `browser_snapshot`, `browser_take_screenshot`, `browser_console_messages`, `browser_network_requests`, `browser_profile_start`/`browser_profile_stop` (CPU profiling). Lock before interactions; unlock when done. |
 | **Firebase** (`project-0-hisab-firebase`) | Firebase project (FCM, Hosting, etc.): developer knowledge docs, Realtime Database get/set, Remote Config, Auth (users, SMS policy), Messaging send, plus prompts/resources for init, deploy, rules, Crashlytics, etc. |
+| **jj** (`user-jj`) | Jujutsu VCS: repo status, log, diff, show; bookmarks (list/create/set/delete/move); commit, describe, edit, new; rebase, squash, split, duplicate, abandon; file list/show; git clone/fetch/push; config; workspace list/add; operation log/undo; resolve. Prefer over running `jj` in a shell when the AI needs to inspect or modify the repo. |
 | **Supabase Author** (`plugin-supabase-author`, if enabled) | Authoring/editorial support for Supabase-related content. |
 
 Tool descriptors (names and parameters) live under `.cursor/projects/.../mcps/<server>/tools/*.json`. Check each tool’s schema before calling.
@@ -283,6 +284,38 @@ The Firebase MCP server is configured in `.cursor/mcp.json` as `firebase` (comma
 
 3. **Other capabilities**  
    The Firebase MCP also exposes tools for Firestore, Auth, Remote Config, Crashlytics, Realtime Database, Hosting, and prompts/resources for init and deploy. Check the tool list in the server’s `tools/` folder.
+
+### How to use jj MCP
+
+The **jj** (Jujutsu) MCP server (`user-jj`) exposes Jujutsu VCS operations so the AI (or you) can query and modify the repo without running `jj` in a shell. The server runs from the workspace root (or use `working_directory` on tools that support it).
+
+1. **Server and repo**  
+   In Cursor the server appears as **`user-jj`**. Use that name when calling jj MCP tools. The repo root is shown by `jj_root` (optional `working_directory` to override).
+
+2. **Common operations**
+   - **Status and history:** `jj_status` — working copy and conflicts; `jj_log` — revision history (optional `revisions`, `paths`, `limit`, `patch`, `summary`); `jj_show` — one revision’s description and patch; `jj_diff` — compare between revisions (`from`/`to` or `revisions`).
+   - **Commits and changes:** `jj_commit` — create/update change (e.g. `message`); `jj_describe`, `jj_edit`, `jj_new`; `jj_rebase`, `jj_squash`, `jj_split`, `jj_duplicate`, `jj_abandon`.
+   - **Bookmarks:** `jj_bookmark_list`, `jj_bookmark_create`, `jj_bookmark_set`, `jj_bookmark_delete`, `jj_bookmark_move`.
+   - **Files:** `jj_file_list`, `jj_file_show`.
+   - **Git:** `jj_git_clone`, `jj_git_fetch`, `jj_git_push`.
+   - **Other:** `jj_config_get` / `jj_config_set` / `jj_config_list`; `jj_workspace_list` / `jj_workspace_add`; `jj_operation_log` / `jj_operation_undo`; `jj_resolve`; `jj_version`.
+
+3. **Tool schemas**  
+   Before calling a tool, read its descriptor under `.cursor/projects/<workspace>/mcps/user-jj/tools/<tool_name>.json` for required/optional arguments (e.g. `working_directory`, revsets, paths).
+
+4. **When to use**  
+   Prefer jj MCP for status, log, diff, commit, and bookmark operations from the IDE so the AI can reason about and change the repo without manual terminal steps.
+
+5. **Step-by-step: when the AI (or you) edit something**  
+   Use this flow so edits are reflected in jj and recorded as a change:
+
+   - **Step 1 (optional):** `jj_status` — see working copy and any conflicts before editing.
+   - **Step 2:** Edit files (StrReplace, Write, etc.). Changes exist only on disk until jj records them.
+   - **Step 3:** `jj_status` — confirm which files/changes jj sees in the working copy.
+   - **Step 4:** `jj_show` — review the current change (revision `@` = working copy). Or `jj_diff` with `revisions: "@"` to see the diff. Fix anything if needed.
+   - **Step 5:** `jj_commit` with `message: "Short description of the edit"` — creates/updates the change and attaches that description. The change is now in the repo history.
+
+   The AI calls these via `call_mcp_tool` with `server: "user-jj"` and `toolName` (e.g. `jj_status`, `jj_commit`) plus the tool’s `arguments` from its JSON descriptor. To start a new change before editing (e.g. for a separate branch/change), use `jj_new` first, then edit, then `jj_commit`.
 
 ## Configuration
 
@@ -357,7 +390,7 @@ The `test-online` job requires no additional secrets — it uses the local Supab
 ## Development
 
 - **Codegen:** Use `dart run build_runner build` after changing Riverpod providers, settings, or other annotated code so `.g.dart` files stay in sync.
-- **Tooling:** Prefer the Dart and Supabase MCP servers (see “MCP available in the IDE” above) for analysis, format, schema checks, and migrations instead of running CLI tools manually.
+- **Tooling:** Prefer the Dart, Supabase, and jj MCP servers (see “MCP available in the IDE” above) for analysis, format, schema checks, migrations, and version control (status, log, commit, bookmarks) instead of running CLI tools manually.
 
 ## Recent improvements (documented changes)
 
