@@ -96,8 +96,8 @@ RETURNS TABLE(
   to_participant_id UUID,
   tag TEXT,
   line_items_json TEXT,
-  receipt_image_path TEXT,
-  receipt_image_paths TEXT,
+  image_path TEXT,
+  image_paths TEXT,
   created_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ
 ) AS $$
@@ -129,8 +129,8 @@ BEGIN
     e.to_participant_id,
     e.tag,
     e.line_items_json,
-    e.receipt_image_path,
-    e.receipt_image_paths,
+    e.image_path,
+    e.image_paths,
     e.created_at,
     e.updated_at
   FROM public.expenses e

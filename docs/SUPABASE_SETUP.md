@@ -1,5 +1,7 @@
 # Supabase Backend Setup Guide
 
+<!-- markdownlint-disable MD007 MD029 MD031 MD032 MD036 MD040 MD060 -->
+
 This guide walks you through setting up the Supabase backend for Hisab from scratch. Follow these steps if you are self-hosting or contributing to the project and need your own Supabase instance.
 
 > **Offline mode**: Hisab works fully offline without any Supabase configuration. Online features (sync, auth, invites, telemetry) are only available when Supabase is configured.
@@ -26,10 +28,10 @@ This guide walks you through setting up the Supabase backend for Hisab from scra
    - [Migration 12: Groups archive (archived_at)](#migration-12-groups-archive-archived_at)
    - [Migration 13: merge_participant_with_member (merge manual participant with user)](#migration-13-merge_participant_with_member-merge-manual-participant-with-user)
    - [Migration 14: Participants left/archived (left_at) and re-join reuse](#migration-14-participants-leftarchived-left_at-and-re-join-reuse)
-   - [Migration 15: Receipt images Storage bucket](#migration-15-receipt-images-storage-bucket)
+   - [Migration 15: Expense images Storage bucket](#migration-15-expense-images-storage-bucket)
    - [Migration 16: Groups personal and budget (is_personal, budget_amount_cents)](#migration-16-groups-personal-and-budget-is_personal-budget_amount_cents)
    - [Migration 17: Anonymize only on account delete](#migration-17-anonymize-only-on-account-delete)
-   - [Migration 18: Receipt image paths (multiple photos)](#migration-18-receipt-image-paths-multiple-photos)
+   - [Migration 18: Expense image paths (multiple photos)](#migration-18-expense-image-paths-multiple-photos)
    - [Migration 19: Groups allow_member_settle_for_others](#migration-19-groups-allow_member_settle_for_others)
    - [Migration 20: Fix accept_invite null-expiry validation](#migration-20-fix-accept_invite-null-expiry-validation)
    - [Post–Migration 20: Invite access mode and read-only preview](#postmigration-20-invite-access-mode-and-read-only-preview)
@@ -203,7 +205,7 @@ CREATE TABLE public.expenses (
   to_participant_id UUID REFERENCES public.participants(id) ON DELETE SET NULL,
   tag TEXT,
   line_items_json TEXT,
-  receipt_image_path TEXT,
+  image_path TEXT,
   created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
@@ -461,10 +463,25 @@ CREATE POLICY "group_invites_delete" ON public.group_invites
 
 -- =============================================
 -- Telemetry Policies (insert-only, any user including anonymous)
--- Intentional: anonymous usage events; WITH CHECK (true) is deliberate.
+-- Anonymous inserts stay allowed, but payloads are constrained.
 -- =============================================
 CREATE POLICY "telemetry_insert" ON public.telemetry
-  FOR INSERT WITH CHECK (true);
+  FOR INSERT TO anon, authenticated
+  WITH CHECK (
+    length(btrim(event)) >= 1
+    AND length(event) <= 120
+    AND event ~ '^[a-z0-9]+([._:-][a-z0-9]+)*$'
+    AND "timestamp" IS NOT NULL
+    AND "timestamp" >= (now() - interval '1 day')
+    AND "timestamp" <= (now() + interval '5 minutes')
+    AND (
+      data IS NULL
+      OR (
+        jsonb_typeof(data) = 'object'
+        AND pg_column_size(data) <= 16384
+      )
+    )
+  );
 ```
 
 ### Migration 3: RPC Functions
@@ -1706,12 +1723,12 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 
 **Note:** RLS already allows owner/admin to update participants; `left_at` is included. New RPC `archive_participant` is callable by owner/admin. Grant execute to authenticated if needed: `GRANT EXECUTE ON FUNCTION public.archive_participant(UUID, UUID) TO authenticated;` (typically RPCs are granted in Migration 4 or your project’s RPC grants).
 
-### Migration 15: Receipt images Storage bucket
+### Migration 15: Expense images Storage bucket
 
-Expense receipt images are uploaded to Supabase Storage so all group members can see them. The app stores the public URL in `expenses.receipt_image_path`.
+Expense images are uploaded to Supabase Storage so all group members can see them. The app stores the public URL in `expenses.image_path`.
 
-1. **Create the bucket in the Dashboard**: Go to **Storage** → **New bucket**. Name: `receipt-images`. Set **Public bucket** to **Yes** (so `getPublicUrl()` works without signed URLs). Optionally set file size limit (e.g. 10 MB) and allowed MIME types (e.g. `image/jpeg`, `image/png`, `image/webp`, `image/heic`).
-2. **Apply the migration** (run the SQL in `supabase/migrations/20250101000015_receipt_images_bucket.sql`) to add RLS policies on `storage.objects`:
+1. **Create the bucket in the Dashboard**: Go to **Storage** → **New bucket**. Name: `expense-images`. Set **Public bucket** to **Yes** (so `getPublicUrl()` works without signed URLs). Optionally set file size limit (e.g. 10 MB) and allowed MIME types (e.g. `image/jpeg`, `image/png`, `image/webp`, `image/heic`).
+2. **Apply the migration** (run the SQL in `supabase/migrations/20250101000015_receipt_images_bucket.sql` — legacy filename, now configures `expense-images`) to add RLS policies on `storage.objects`:
    - **INSERT**: Authenticated users can upload only into paths whose first folder is a group they belong to (`group_id/expense_id/filename`).
    - **SELECT**: Authenticated users can read objects in groups they belong to.
 
@@ -1737,14 +1754,14 @@ Reverts anonymization from leave/kick/archive. Names are anonymized **only when 
 
 Apply the migration file `supabase/migrations/20250101000017_anonymize_on_delete.sql`. It keeps `leave_group`, `kick_member`, and `archive_participant` focused on membership state (`left_at`) and adds `public.anonymize_participants_on_user_delete()` plus trigger `trigger_anonymize_participants_on_user_delete` on `auth.users`.
 
-### Migration 18: Receipt image paths (multiple photos)
+### Migration 18: Expense image paths (multiple photos)
 
-Adds `receipt_image_paths` (TEXT, JSON array of URLs) to `expenses` for up to 5 photos per expense. `receipt_image_path` remains for backward compatibility (first image).
+Adds `image_paths` (TEXT, JSON array of URLs) to `expenses` for up to 5 photos per expense. `image_path` remains the first image.
 
 **Apply:**
 
-- **SQL Editor:** Run the contents of `supabase/migrations/20250101000018_receipt_image_paths.sql`.
-- **Supabase MCP:** `apply_migration` with `project_id`, `name`: `receipt_image_paths`, and `query` from that file (or the one-liner: `ALTER TABLE public.expenses ADD COLUMN IF NOT EXISTS receipt_image_paths TEXT;`).
+- **SQL Editor:** Run the contents of `supabase/migrations/20250101000018_receipt_image_paths.sql` (legacy filename; this migration now adds `image_paths`).
+- **Supabase MCP:** `apply_migration` with `project_id`, `name`: `image_paths`, and `query` from that file (or the one-liner: `ALTER TABLE public.expenses ADD COLUMN IF NOT EXISTS image_paths TEXT;`).
 - **CLI:** From repo root, `supabase db push` (or link project and run migrations).
 
 ### Migration 19: Groups allow_member_settle_for_others
@@ -1783,7 +1800,7 @@ supabase start
 supabase db reset   # applies all migrations + seed.sql
 ```
 
-The following migrations extend invites for **access modes** (`standard`, `readonly_join`, `readonly_only`), **anonymous preview RPCs** (`get_invite_preview_group`, `get_invite_preview_participants`, `get_invite_preview_expenses` with `GRANT … TO anon`), **never-expiring invites** (`expires_at` nullable), and preview expense **receipt** columns. Apply them after Migration 20 (or in one shot via full migration set).
+The following migrations extend invites for **access modes** (`standard`, `readonly_join`, `readonly_only`), **anonymous preview RPCs** (`get_invite_preview_group`, `get_invite_preview_participants`, `get_invite_preview_expenses` with `GRANT … TO anon`), **never-expiring invites** (`expires_at` nullable), and preview expense **image** columns. Apply them after Migration 20 (or in one shot via full migration set).
 
 | File | Purpose |
 |------|---------|
@@ -1793,7 +1810,7 @@ The following migrations extend invites for **access modes** (`standard`, `reado
 | `20260306174500_invite_preview_token_rpcs.sql` | Initial token-based preview RPCs + `GRANT` to `anon` / `authenticated` |
 | `20260306193000_invite_preview_hardening.sql` | Preview limited to readonly invite modes; bounded preview expenses; `create_invite` interval / access_mode validation |
 | `20260306194000_invite_expiry_nullable.sql` | `group_invites.expires_at` nullable for never-expiring invites |
-| `20260306200000_invite_preview_expense_receipts.sql` | Preview expense rows include receipt paths for read-only expense detail |
+| `20260306200000_invite_preview_expense_receipts.sql` | Preview expense rows include image paths for read-only expense detail |
 
 Do not duplicate Migration 20’s file (`20260306120000_fix_accept_invite_null_expiry_validation.sql`) in a second apply step—it is already documented above.
 
@@ -1805,7 +1822,7 @@ Do not duplicate Migration 20’s file (`20260306120000_fix_accept_invite_null_e
 | `group_invites.expires_at` | Nullable for never-expiring invites (`20260306194000`) |
 | Preview RPCs | `get_invite_preview_group`, `get_invite_preview_participants`, `get_invite_preview_expenses` in `public`; `GRANT EXECUTE` to `anon` and `authenticated` |
 | Preview hardening | After `20260306193000_invite_preview_hardening.sql`, `get_invite_preview_group` (and related preview RPCs) must filter with `access_mode IN ('readonly_join','readonly_only')` so **standard** invite tokens do not return preview data. |
-| `get_invite_preview_expenses` | The app calls RPC with **`p_token` and `p_limit`**. Postgres should expose `get_invite_preview_expenses(text, integer)` (`20260306193000` then `20260306200000_invite_preview_expense_receipts.sql` for receipt columns). |
+| `get_invite_preview_expenses` | The app calls RPC with **`p_token` and `p_limit`**. Postgres should expose `get_invite_preview_expenses(text, integer)` (`20260306193000` then `20260306200000_invite_preview_expense_receipts.sql` for image columns). |
 
 ---
 
@@ -2154,7 +2171,7 @@ The following matches the live schema when Migrations 1–8 (or equivalent) are 
 | **groups** | id, name, currency_code, owner_id, settlement_method, treasurer_participant_id, settlement_freeze_at, settlement_snapshot_json, allow_member_add_expense, allow_member_add_participant, allow_member_change_settings, require_participant_assignment, allow_expense_as_other_participant, allow_member_settle_for_others, icon, color, created_at, updated_at |
 | **participants** | id, group_id, name, sort_order, user_id, avatar_id, left_at, created_at, updated_at |
 | **group_members** | id, group_id, user_id, role, participant_id, joined_at |
-| **expenses** | id, group_id, payer_participant_id, amount_cents, currency_code, exchange_rate, base_amount_cents, title, description, date, split_type, split_shares_json, type, to_participant_id, tag, line_items_json, receipt_image_path, receipt_image_paths, created_at, updated_at |
+| **expenses** | id, group_id, payer_participant_id, amount_cents, currency_code, exchange_rate, base_amount_cents, title, description, date, split_type, split_shares_json, type, to_participant_id, tag, line_items_json, image_path, image_paths, created_at, updated_at |
 | **expense_tags** | id, group_id, label, icon_name, created_at, updated_at |
 | **group_invites** | id, group_id, token, invitee_email, role, created_at, expires_at, created_by, label, max_uses, use_count, is_active |
 | **invite_usages** | id, invite_id, user_id, accepted_at |

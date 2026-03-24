@@ -238,7 +238,7 @@ final localDataFromOnlineUserIdSettingDef = const StringSetting(
   order: -1, // Internal, not shown in settings UI
 );
 
-/// When true, run OCR on receipt images (and optionally AI). When false, only attach the picture.
+/// When true, run OCR on scanned images (and optionally AI). When false, only attach the picture.
 final receiptOcrEnabledSettingDef = const BoolSetting(
   'receipt_ocr_enabled',
   defaultValue: false,

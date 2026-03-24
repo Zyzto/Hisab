@@ -168,7 +168,7 @@ List<ReceiptLineItem>? _parseLineItems(dynamic v) {
   return null;
 }
 
-List<String>? _parseReceiptImagePaths(dynamic v) {
+List<String>? _parseImagePaths(dynamic v) {
   if (v == null || v.toString().trim().isEmpty) return null;
   try {
     final decoded = jsonDecode(v.toString());
@@ -183,16 +183,16 @@ List<String>? _parseReceiptImagePaths(dynamic v) {
   return null;
 }
 
-String? _effectiveReceiptImagePathFromRow(Map<String, dynamic> row) {
-  final paths = _parseReceiptImagePaths(row['receipt_image_paths']);
+String? _effectiveImagePathFromRow(Map<String, dynamic> row) {
+  final paths = _parseImagePaths(row['image_paths']);
   if (paths != null && paths.isNotEmpty) return paths.first;
-  return row['receipt_image_path'] as String?;
+  return row['image_path'] as String?;
 }
 
-List<String>? _effectiveReceiptImagePathsFromRow(Map<String, dynamic> row) {
-  final paths = _parseReceiptImagePaths(row['receipt_image_paths']);
+List<String>? _effectiveImagePathsFromRow(Map<String, dynamic> row) {
+  final paths = _parseImagePaths(row['image_paths']);
   if (paths != null && paths.isNotEmpty) return paths;
-  final single = row['receipt_image_path'] as String?;
+  final single = row['image_path'] as String?;
   if (single != null && single.isNotEmpty) return [single];
   return null;
 }
@@ -255,8 +255,8 @@ Expense _expenseFromRow(Map<String, dynamic> row) => Expense(
   toParticipantId: row['to_participant_id'] as String?,
   tag: row['tag'] as String?,
   lineItems: _parseLineItems(row['line_items_json']),
-  receiptImagePath: _effectiveReceiptImagePathFromRow(row),
-  receiptImagePaths: _effectiveReceiptImagePathsFromRow(row),
+  imagePath: _effectiveImagePathFromRow(row),
+  imagePaths: _effectiveImagePathsFromRow(row),
 );
 
 ExpenseTag _tagFromRow(Map<String, dynamic> row) => ExpenseTag(
@@ -1243,14 +1243,14 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
         ? jsonEncode(expense.lineItems!.map((e) => e.toJson()).toList())
         : null;
 
-    final receiptPaths =
-        expense.receiptImagePaths ??
-        (expense.receiptImagePath != null ? [expense.receiptImagePath!] : null);
-    final receiptPath = receiptPaths != null && receiptPaths.isNotEmpty
-        ? receiptPaths.first
-        : expense.receiptImagePath;
-    final receiptPathsJson = receiptPaths != null
-        ? jsonEncode(receiptPaths)
+    final imagePaths =
+        expense.imagePaths ??
+        (expense.imagePath != null ? [expense.imagePath!] : null);
+    final imagePath = imagePaths != null && imagePaths.isNotEmpty
+        ? imagePaths.first
+        : expense.imagePath;
+    final imagePathsJson = imagePaths != null
+        ? jsonEncode(imagePaths)
         : null;
     final data = <String, dynamic>{
       'id': id,
@@ -1269,8 +1269,8 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
       'to_participant_id': expense.toParticipantId,
       'tag': expense.tag,
       'line_items_json': lineItemsJson,
-      'receipt_image_path': receiptPath,
-      'receipt_image_paths': receiptPathsJson,
+      'image_path': imagePath,
+      'image_paths': imagePathsJson,
       'created_at': now,
       'updated_at': now,
     };
@@ -1294,7 +1294,7 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
       '''INSERT INTO expenses (id, group_id, payer_participant_id, amount_cents,
         currency_code, exchange_rate, base_amount_cents,
         title, description, date, split_type, split_shares_json,
-        type, to_participant_id, tag, line_items_json, receipt_image_path, receipt_image_paths,
+        type, to_participant_id, tag, line_items_json, image_path, image_paths,
         created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
       [
@@ -1314,8 +1314,8 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
         expense.toParticipantId,
         expense.tag,
         lineItemsJson,
-        receiptPath,
-        receiptPathsJson,
+        imagePath,
+        imagePathsJson,
         now,
         now,
       ],
@@ -1330,14 +1330,14 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
     final lineItemsJson = expense.lineItems != null
         ? jsonEncode(expense.lineItems!.map((e) => e.toJson()).toList())
         : null;
-    final receiptPaths =
-        expense.receiptImagePaths ??
-        (expense.receiptImagePath != null ? [expense.receiptImagePath!] : null);
-    final receiptPath = receiptPaths != null && receiptPaths.isNotEmpty
-        ? receiptPaths.first
-        : expense.receiptImagePath;
-    final receiptPathsJson = receiptPaths != null
-        ? jsonEncode(receiptPaths)
+    final imagePaths =
+        expense.imagePaths ??
+        (expense.imagePath != null ? [expense.imagePath!] : null);
+    final imagePath = imagePaths != null && imagePaths.isNotEmpty
+        ? imagePaths.first
+        : expense.imagePath;
+    final imagePathsJson = imagePaths != null
+        ? jsonEncode(imagePaths)
         : null;
 
     if (!_isLocalOnly && _isOnline && _client != null) {
@@ -1358,8 +1358,8 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
             'to_participant_id': expense.toParticipantId,
             'tag': expense.tag,
             'line_items_json': lineItemsJson,
-            'receipt_image_path': receiptPath,
-            'receipt_image_paths': receiptPathsJson,
+            'image_path': imagePath,
+            'image_paths': imagePathsJson,
             'updated_at': now,
           })
           .eq('id', expense.id);
@@ -1387,8 +1387,8 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
           'to_participant_id': expense.toParticipantId,
           'tag': expense.tag,
           'line_items_json': lineItemsJson,
-          'receipt_image_path': receiptPath,
-          'receipt_image_paths': receiptPathsJson,
+          'image_path': imagePath,
+          'image_paths': imagePathsJson,
           'updated_at': now,
         },
       );
@@ -1401,7 +1401,7 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
         payer_participant_id = ?,
         description = ?, date = ?, split_type = ?, split_shares_json = ?,
         type = ?, to_participant_id = ?, tag = ?,
-        line_items_json = ?, receipt_image_path = ?, receipt_image_paths = ?, updated_at = ?
+        line_items_json = ?, image_path = ?, image_paths = ?, updated_at = ?
       WHERE id = ?''',
       [
         expense.title,
@@ -1418,8 +1418,8 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
         expense.toParticipantId,
         expense.tag,
         lineItemsJson,
-        receiptPath,
-        receiptPathsJson,
+        imagePath,
+        imagePathsJson,
         now,
         expense.id,
       ],

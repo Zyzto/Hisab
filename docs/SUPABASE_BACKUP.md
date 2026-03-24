@@ -1,5 +1,7 @@
 # Supabase database backup
 
+<!-- markdownlint-disable MD031 MD060 -->
+
 This document describes how to create a backup of your Hisab Supabase database (schema + data). Use this for disaster recovery, cloning a project, or migrating to another Supabase project.
 
 ## Options

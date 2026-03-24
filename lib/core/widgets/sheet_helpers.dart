@@ -43,7 +43,12 @@ Widget buildSheetShell(
                   children: [
                     for (int i = 0; i < actions.length; i++) ...[
                       if (i > 0) const SizedBox(width: _kSheetActionsSpacing),
-                      actions[i],
+                      Focus(
+                        canRequestFocus: false,
+                        skipTraversal: true,
+                        descendantsAreFocusable: false,
+                        child: actions[i],
+                      ),
                     ],
                   ],
                 ),

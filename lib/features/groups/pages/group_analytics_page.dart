@@ -15,18 +15,6 @@ import '../../../core/utils/currency_formatter.dart';
 import '../../../core/widgets/error_content.dart';
 import '../providers/group_analytics_provider.dart';
 
-enum _TrendChartMode {
-  totalBar,
-  totalLine,
-  userComparison,
-  categoryComparison,
-}
-
-enum _CategoryChartMode {
-  bars,
-  pie,
-}
-
 class _ModalSelectOption<T> {
   const _ModalSelectOption({required this.value, required this.label});
 
@@ -87,17 +75,28 @@ Future<T?> _showModalSelectSheet<T>({
   );
 }
 
-extension on _TrendChartMode {
-  String get englishLabel {
+extension on AnalyticsTrendChartMode {
+  String get labelKey {
     switch (this) {
-      case _TrendChartMode.totalBar:
-        return 'Total trend (bar)';
-      case _TrendChartMode.totalLine:
-        return 'Total trend (line)';
-      case _TrendChartMode.userComparison:
-        return 'User comparison over time';
-      case _TrendChartMode.categoryComparison:
-        return 'Category comparison (combined)';
+      case AnalyticsTrendChartMode.totalBar:
+        return 'analytics_chart_mode_total_bar';
+      case AnalyticsTrendChartMode.totalLine:
+        return 'analytics_chart_mode_total_line';
+      case AnalyticsTrendChartMode.userComparison:
+        return 'analytics_chart_mode_users_line';
+      case AnalyticsTrendChartMode.categoryComparison:
+        return 'analytics_chart_mode_categories_combined';
+    }
+  }
+}
+
+extension on AnalyticsCategoryChartMode {
+  String get labelKey {
+    switch (this) {
+      case AnalyticsCategoryChartMode.bars:
+        return 'analytics_chart_mode_bar';
+      case AnalyticsCategoryChartMode.pie:
+        return 'analytics_chart_mode_pie';
     }
   }
 }
@@ -115,11 +114,10 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
   AnalyticsRangePreset _range = AnalyticsRangePreset.days90;
   String? _participantId;
   String? _tagId;
-  _TrendChartMode _trendMode = _TrendChartMode.totalBar;
-  _CategoryChartMode _categoryChartMode = _CategoryChartMode.bars;
 
   @override
   Widget build(BuildContext context) {
+    final uiState = ref.watch(groupAnalyticsUiStateByGroupProvider(widget.groupId));
     final query = GroupAnalyticsQuery(
       groupId: widget.groupId,
       range: _range,
@@ -159,7 +157,7 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
                 if (data == null) {
                   return Center(child: Text('group_not_found'.tr()));
                 }
-                return _buildContent(context, data);
+                return _buildContent(context, data, uiState);
               },
             ),
           ),
@@ -168,10 +166,15 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
     );
   }
 
-  Widget _buildContent(BuildContext context, GroupAnalyticsData data) {
+  Widget _buildContent(
+    BuildContext context,
+    GroupAnalyticsData data,
+    GroupAnalyticsUiState uiState,
+  ) {
     final theme = Theme.of(context);
     final currency = data.group.currencyCode;
     final hasData = data.filteredExpenses.isNotEmpty;
+    final uiNotifier = ref.read(groupAnalyticsUiStateProvider.notifier);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -205,8 +208,9 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
           _TrendChartCard(
             title: 'analytics_trend_title'.tr(),
             subtitle: _trendSubtitle(_range, data.trendGranularity),
-            mode: _trendMode,
-            onModeChanged: (mode) => setState(() => _trendMode = mode),
+            mode: uiState.trendChartMode,
+            onModeChanged: (mode) =>
+                uiNotifier.setTrendChartMode(widget.groupId, mode),
             isPersonal: data.group.isPersonal,
             points: data.trendPoints,
             participantSeries: data.participantTrendSeries,
@@ -216,9 +220,9 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
           const SizedBox(height: 12),
         ],
         _KpiGrid(
-          total: CurrencyFormatter.formatWithCode(data.totalAmountCents, currency),
-          mine: CurrencyFormatter.formatWithCode(data.myAmountCents, currency),
-          avgPerDay: CurrencyFormatter.formatWithCode(
+          total: CurrencyFormatter.formatCents(data.totalAmountCents, currency),
+          mine: CurrencyFormatter.formatCents(data.myAmountCents, currency),
+          avgPerDay: CurrencyFormatter.formatCents(
             data.averagePerDayCents,
             currency,
           ),
@@ -234,8 +238,19 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
             currencyCode: currency,
             translateUntagged: true,
             allowPieMode: true,
-            mode: _categoryChartMode,
-            onModeChanged: (mode) => setState(() => _categoryChartMode = mode),
+            mode: uiState.categoryChartMode,
+            onModeChanged: (mode) =>
+                uiNotifier.setCategoryChartMode(widget.groupId, mode),
+            excludedCategoryIds: uiState.excludedCategoryIds,
+            onToggleCategory: (categoryId) =>
+                uiNotifier.toggleExcludedCategory(widget.groupId, categoryId),
+            onOpenCategoryExpenses: (categoryId, categoryLabel) =>
+                _showCategoryExpensesSheet(
+                  context,
+                  data,
+                  categoryId: categoryId,
+                  categoryLabel: categoryLabel,
+                ),
           ),
           if (!data.group.isPersonal) ...[
             const SizedBox(height: 12),
@@ -288,7 +303,11 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
         _DropdownOption(id: tagId, label: resolveTagLabel(tagId, data.tags)),
       );
     }
-    allTagOptions.sort((a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()));
+    allTagOptions.sort(
+      (a, b) => _translateCategoryLike(
+        a.label,
+      ).toLowerCase().compareTo(_translateCategoryLike(b.label).toLowerCase()),
+    );
 
     return Card(
       child: Padding(
@@ -357,7 +376,10 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
                         ...allTagOptions
                             .where((o) => o.id.isNotEmpty)
                             .map(
-                              (o) => _DropdownMenuItemData(value: o.id, label: o.label),
+                              (o) => _DropdownMenuItemData(
+                                value: o.id,
+                                label: _translateCategoryLike(o.label),
+                              ),
                             ),
                       ],
                       onChanged: (v) => setState(() => _tagId = v.isEmpty ? null : v),
@@ -377,13 +399,90 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
                   ...allTagOptions
                       .where((o) => o.id.isNotEmpty)
                       .map(
-                        (o) => _DropdownMenuItemData(value: o.id, label: o.label),
+                        (o) => _DropdownMenuItemData(
+                          value: o.id,
+                          label: _translateCategoryLike(o.label),
+                        ),
                       ),
                 ],
                 onChanged: (v) => setState(() => _tagId = v.isEmpty ? null : v),
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  String _translateCategoryLike(String rawLabel) {
+    if (rawLabel == 'untagged') return 'analytics_untagged'.tr();
+    if (rawLabel.startsWith('category_')) return rawLabel.tr();
+    return rawLabel;
+  }
+
+  Future<void> _showCategoryExpensesSheet(
+    BuildContext context,
+    GroupAnalyticsData data, {
+    required String categoryId,
+    required String categoryLabel,
+  }) async {
+    final expenses = data.filteredExpenses.where((expense) {
+      final normalizedTag = (expense.tag == null || expense.tag!.isEmpty)
+          ? 'untagged'
+          : expense.tag!;
+      return normalizedTag == categoryId;
+    }).toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+    final participantNames = {
+      for (final participant in data.participants) participant.id: participant.name,
+    };
+
+    await showResponsiveSheet<void>(
+      context: context,
+      title: 'analytics_category_expenses_title'.tr(
+        namedArgs: {'category': _translateCategoryLike(categoryLabel)},
+      ),
+      maxHeight: MediaQuery.of(context).size.height * 0.8,
+      isScrollControlled: true,
+      centerInFullViewport: true,
+      child: SafeArea(
+        child: expenses.isEmpty
+            ? Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                child: Text(
+                  'analytics_category_expenses_empty'.tr(),
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              )
+            : ListView.separated(
+                shrinkWrap: true,
+                itemCount: expenses.length,
+                separatorBuilder: (_, _) => const Divider(height: 1),
+                itemBuilder: (ctx, index) {
+                  final expense = expenses[index];
+                  final payerName = participantNames[expense.payerParticipantId] ??
+                      expense.payerParticipantId;
+                  final amount = CurrencyFormatter.formatCents(
+                    expense.amountCents,
+                    data.group.currencyCode,
+                  );
+                  return ListTile(
+                    title: Text(
+                      expense.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      '$payerName • ${DateFormat.yMMMd().format(expense.date)}',
+                    ),
+                    trailing: Text(
+                      amount,
+                      style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  );
+                },
+              ),
       ),
     );
   }
@@ -480,8 +579,8 @@ class _TrendChartCard extends StatelessWidget {
 
   final String title;
   final String subtitle;
-  final _TrendChartMode mode;
-  final ValueChanged<_TrendChartMode> onModeChanged;
+  final AnalyticsTrendChartMode mode;
+  final ValueChanged<AnalyticsTrendChartMode> onModeChanged;
   final bool isPersonal;
   final List<TrendPoint> points;
   final List<TrendSeries> participantSeries;
@@ -507,15 +606,16 @@ class _TrendChartCard extends StatelessWidget {
                 InkWell(
                   borderRadius: BorderRadius.circular(8),
                   onTap: () async {
-                    final selected = await _showModalSelectSheet<_TrendChartMode>(
+                    final selected =
+                        await _showModalSelectSheet<AnalyticsTrendChartMode>(
                       context: context,
                       title: 'analytics_chart_mode_menu'.tr(),
                       selectedValue: activeMode,
                       options: availableModes
                           .map(
-                            (mode) => _ModalSelectOption<_TrendChartMode>(
+                            (mode) => _ModalSelectOption<AnalyticsTrendChartMode>(
                               value: mode,
-                              label: mode.englishLabel,
+                              label: mode.labelKey.tr(),
                             ),
                           )
                           .toList(),
@@ -527,7 +627,7 @@ class _TrendChartCard extends StatelessWidget {
                     children: [
                       Flexible(
                         child: Text(
-                          activeMode.englishLabel,
+                          activeMode.labelKey.tr(),
                           maxLines: 1,
                           overflow: TextOverflow.fade,
                           softWrap: false,
@@ -572,15 +672,15 @@ class _TrendChartCard extends StatelessWidget {
     Color(0xFF7C3AED),
   ];
 
-  List<_TrendChartMode> get _availableModes => isPersonal
+  List<AnalyticsTrendChartMode> get _availableModes => isPersonal
       ? const [
-          _TrendChartMode.totalBar,
-          _TrendChartMode.totalLine,
-          _TrendChartMode.categoryComparison,
+          AnalyticsTrendChartMode.totalBar,
+          AnalyticsTrendChartMode.totalLine,
+          AnalyticsTrendChartMode.categoryComparison,
         ]
-      : _TrendChartMode.values;
+      : AnalyticsTrendChartMode.values;
 
-  _TrendChartMode _resolveMode(_TrendChartMode candidate) {
+  AnalyticsTrendChartMode _resolveMode(AnalyticsTrendChartMode candidate) {
     if (_availableModes.contains(candidate)) return candidate;
     return _availableModes.first;
   }
@@ -588,12 +688,12 @@ class _TrendChartCard extends StatelessWidget {
   Widget _buildChartContent(
     BuildContext context,
     ThemeData theme,
-    _TrendChartMode activeMode,
+    AnalyticsTrendChartMode activeMode,
   ) {
     switch (activeMode) {
-      case _TrendChartMode.totalBar:
+      case AnalyticsTrendChartMode.totalBar:
         return _buildBarTrend(theme);
-      case _TrendChartMode.totalLine:
+      case AnalyticsTrendChartMode.totalLine:
         return _buildLineChart(
           context: context,
           series: [
@@ -605,7 +705,7 @@ class _TrendChartCard extends StatelessWidget {
           ],
           showLegend: false,
         );
-      case _TrendChartMode.userComparison:
+      case AnalyticsTrendChartMode.userComparison:
         final visibleSeries = participantSeries
             .where((series) => series.points.any((point) => point.amountCents != 0))
             .toList();
@@ -624,7 +724,7 @@ class _TrendChartCard extends StatelessWidget {
             );
           }).toList(),
         );
-      case _TrendChartMode.categoryComparison:
+      case AnalyticsTrendChartMode.categoryComparison:
         final visibleSeries = categorySeries
             .where((series) => series.points.any((point) => point.amountCents != 0))
             .toList();
@@ -792,7 +892,7 @@ class _TrendChartCard extends StatelessWidget {
                         return null;
                       }
                       final seriesLabel = _displayLabel(series[spot.barIndex].label);
-                      final value = CurrencyFormatter.formatWithCode(
+                      final value = CurrencyFormatter.formatCents(
                         spot.y.round(),
                         currencyCode,
                       );
@@ -999,15 +1099,15 @@ class _TrendChartCard extends StatelessWidget {
     );
   }
 
-  String _modeHint(_TrendChartMode mode) {
+  String _modeHint(AnalyticsTrendChartMode mode) {
     switch (mode) {
-      case _TrendChartMode.totalBar:
+      case AnalyticsTrendChartMode.totalBar:
         return 'analytics_chart_mode_total_bar_hint';
-      case _TrendChartMode.totalLine:
+      case AnalyticsTrendChartMode.totalLine:
         return 'analytics_chart_mode_total_line_hint';
-      case _TrendChartMode.userComparison:
+      case AnalyticsTrendChartMode.userComparison:
         return 'analytics_chart_mode_users_line_hint';
-      case _TrendChartMode.categoryComparison:
+      case AnalyticsTrendChartMode.categoryComparison:
         return 'analytics_chart_mode_categories_combined_hint';
     }
   }
@@ -1018,6 +1118,7 @@ class _TrendChartCard extends StatelessWidget {
 
   String _displayLabel(String rawLabel) {
     if (rawLabel == 'untagged') return 'analytics_untagged'.tr();
+    if (rawLabel.startsWith('category_')) return rawLabel.tr();
     return rawLabel;
   }
 
@@ -1132,8 +1233,11 @@ class _BreakdownBarsCard extends StatelessWidget {
     required this.currencyCode,
     this.translateUntagged = false,
     this.allowPieMode = false,
-    this.mode = _CategoryChartMode.bars,
+    this.mode = AnalyticsCategoryChartMode.pie,
     this.onModeChanged,
+    this.excludedCategoryIds = const <String>{},
+    this.onToggleCategory,
+    this.onOpenCategoryExpenses,
   });
 
   final String title;
@@ -1142,8 +1246,12 @@ class _BreakdownBarsCard extends StatelessWidget {
   final String currencyCode;
   final bool translateUntagged;
   final bool allowPieMode;
-  final _CategoryChartMode mode;
-  final ValueChanged<_CategoryChartMode>? onModeChanged;
+  final AnalyticsCategoryChartMode mode;
+  final ValueChanged<AnalyticsCategoryChartMode>? onModeChanged;
+  final Set<String> excludedCategoryIds;
+  final ValueChanged<String>? onToggleCategory;
+  final void Function(String categoryId, String categoryLabel)?
+      onOpenCategoryExpenses;
 
   @override
   Widget build(BuildContext context) {
@@ -1167,18 +1275,19 @@ class _BreakdownBarsCard extends StatelessWidget {
                   InkWell(
                     borderRadius: BorderRadius.circular(8),
                     onTap: () async {
-                      final selected = await _showModalSelectSheet<_CategoryChartMode>(
+                      final selected =
+                          await _showModalSelectSheet<AnalyticsCategoryChartMode>(
                         context: context,
                         title: 'analytics_category_chart_mode_menu'.tr(),
                         selectedValue: mode,
                         options: [
-                          _ModalSelectOption<_CategoryChartMode>(
-                            value: _CategoryChartMode.bars,
-                            label: 'analytics_chart_mode_bar'.tr(),
+                          _ModalSelectOption<AnalyticsCategoryChartMode>(
+                            value: AnalyticsCategoryChartMode.bars,
+                            label: AnalyticsCategoryChartMode.bars.labelKey.tr(),
                           ),
-                          _ModalSelectOption<_CategoryChartMode>(
-                            value: _CategoryChartMode.pie,
-                            label: 'analytics_chart_mode_pie'.tr(),
+                          _ModalSelectOption<AnalyticsCategoryChartMode>(
+                            value: AnalyticsCategoryChartMode.pie,
+                            label: AnalyticsCategoryChartMode.pie.labelKey.tr(),
                           ),
                         ],
                       );
@@ -1190,9 +1299,7 @@ class _BreakdownBarsCard extends StatelessWidget {
                         ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 100),
                           child: Text(
-                            mode == _CategoryChartMode.bars
-                                ? 'analytics_chart_mode_bar'.tr()
-                                : 'analytics_chart_mode_pie'.tr(),
+                            mode.labelKey.tr(),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.labelMedium?.copyWith(
@@ -1215,7 +1322,7 @@ class _BreakdownBarsCard extends StatelessWidget {
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               )
-            else if (allowPieMode && mode == _CategoryChartMode.pie)
+            else if (allowPieMode && mode == AnalyticsCategoryChartMode.pie)
               _buildPieChart(context, rows)
             else
               ...rows.map((row) {
@@ -1240,7 +1347,7 @@ class _BreakdownBarsCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            CurrencyFormatter.formatWithCode(
+                            CurrencyFormatter.formatCents(
                               row.amountCents,
                               currencyCode,
                             ),
@@ -1270,9 +1377,11 @@ class _BreakdownBarsCard extends StatelessWidget {
   }
 
   String _resolvedRowLabel(AmountBreakdownItem row) {
-    return translateUntagged && row.id == 'untagged'
-        ? 'analytics_untagged'.tr()
-        : row.label;
+    if (translateUntagged && row.id == 'untagged') {
+      return 'analytics_untagged'.tr();
+    }
+    if (row.label.startsWith('category_')) return row.label.tr();
+    return row.label;
   }
 
   Widget _buildPieChart(BuildContext context, List<AmountBreakdownItem> rows) {
@@ -1284,7 +1393,11 @@ class _BreakdownBarsCard extends StatelessWidget {
       const Color(0xFF0EA5E9),
       const Color(0xFFEF4444),
     ];
-    final total = rows.fold<int>(0, (sum, row) => sum + row.amountCents.abs());
+    final allRows = rows;
+    final visibleRows = allRows
+        .where((row) => !excludedCategoryIds.contains(row.id))
+        .toList();
+    final total = visibleRows.fold<int>(0, (sum, row) => sum + row.amountCents.abs());
     if (total <= 0) {
       return Text(
         emptyLabel,
@@ -1302,7 +1415,20 @@ class _BreakdownBarsCard extends StatelessWidget {
             PieChartData(
               centerSpaceRadius: 34,
               sectionsSpace: 2,
-              sections: rows.asMap().entries.map((entry) {
+              pieTouchData: PieTouchData(
+                touchCallback: (event, response) {
+                  if (event is! FlTapUpEvent) return;
+                  final touched = response?.touchedSection;
+                  final index = touched?.touchedSectionIndex;
+                  if (index == null || index < 0 || index >= visibleRows.length) return;
+                  final selectedRow = visibleRows[index];
+                  onOpenCategoryExpenses?.call(
+                    selectedRow.id,
+                    selectedRow.label,
+                  );
+                },
+              ),
+              sections: visibleRows.asMap().entries.map((entry) {
                 final index = entry.key;
                 final row = entry.value;
                 final value = row.amountCents.abs().toDouble();
@@ -1326,23 +1452,28 @@ class _BreakdownBarsCard extends StatelessWidget {
                   ),
                   badgePositionPercentageOffset: 1.22,
                   badgeWidget: showOutsidePct
-                      ? Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 12,
-                              height: 1.5,
-                              color: palette[index % palette.length],
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${pct.toStringAsFixed(0)}%',
-                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurface,
-                                fontWeight: FontWeight.w700,
+                      ? GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () =>
+                              onOpenCategoryExpenses?.call(row.id, row.label),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 1.6,
+                                height: 12,
+                                color: palette[index % palette.length],
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 3),
+                              Text(
+                                '${pct.toStringAsFixed(0)}%',
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurface,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
                         )
                       : null,
                 );
@@ -1351,50 +1482,81 @@ class _BreakdownBarsCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        ...rows.asMap().entries.map((entry) {
+        ...allRows.asMap().entries.map((entry) {
           final index = entry.key;
           final row = entry.value;
+          final isExcluded = excludedCategoryIds.contains(row.id);
           final label = _resolvedRowLabel(row);
-          final value = CurrencyFormatter.formatWithCode(
+          final value = CurrencyFormatter.formatCents(
             row.amountCents,
             currencyCode,
           );
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Row(
-              children: [
-                Container(
-                  width: 10,
-                  height: 10,
-                  decoration: BoxDecoration(
-                    color: palette[index % palette.length],
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.onSurface,
+          return Opacity(
+            opacity: isExcluded ? 0.45 : 1,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: onToggleCategory == null
+                  ? null
+                  : () => onToggleCategory!.call(row.id),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: palette[index % palette.length],
+                        borderRadius: BorderRadius.circular(3),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.onSurface,
+                          decoration: isExcluded ? TextDecoration.lineThrough : null,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    if (isExcluded)
+                      Icon(
+                        Icons.visibility_off_rounded,
+                        size: 16,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    if (isExcluded) const SizedBox(width: 6),
+                    Text(
+                      value,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  value,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
+              ),
             ),
           );
         }),
+        if (excludedCategoryIds.isNotEmpty && onToggleCategory != null)
+          Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: TextButton.icon(
+              onPressed: () {
+                for (final id in excludedCategoryIds) {
+                  onToggleCategory!.call(id);
+                }
+              },
+              icon: const Icon(Icons.refresh),
+              label: Text('analytics_show_all_categories'.tr()),
+            ),
+          ),
       ],
     );
   }

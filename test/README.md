@@ -1,5 +1,7 @@
 # Hisab tests
 
+<!-- markdownlint-disable MD031 MD032 MD036 MD040 MD060 -->
+
 ## Running tests
 
 Run the full suite:
@@ -281,7 +283,7 @@ This check fails if required files are missing/untracked or if migration filenam
 - `auth.email.double_confirm_changes = false` — no dual confirmation for email changes
 - `auth.email.max_frequency = "0s"` — no cooldown between email sends
 - `auth.rate_limit.*` = `1000` — high limits to prevent throttling during test runs
-- `storage.buckets.receipt-images` — pre-created bucket for receipt image uploads
+- `storage.buckets.expense-images` — pre-created bucket for expense image uploads
 
 **Migrations:** The migration files consolidate the complete Supabase schema from `docs/SUPABASE_SETUP.md`:
 
@@ -299,10 +301,10 @@ This check fails if required files are missing/untracked or if migration filenam
 12. `groups_archive` — archive support
 13. `merge_participant` — participant merge RPC
 14. `participants_left` — left_at tracking
-15. `receipt_images_bucket` — storage bucket + policies
+15. `expense_images_bucket` — storage bucket + policies
 16. `groups_personal_budget` — personal budget columns
 17. `anonymize_on_delete` — name anonymization on account delete
-18. `receipt_image_paths` — receipt image path columns
+18. `expense_image_paths` — expense image path columns
 19. `groups_allow_member_settle_for_others` — settlement permission (owner or debtor only by default)
 20. `fix_accept_invite_null_expiry_validation` — invite acceptance supports never-expiring links (`expires_at IS NULL`) and aligns token validation with `get_invite_by_token` (corresponds to Migration 21 in `docs/SUPABASE_SETUP.md`; local numbering differs because notification-trigger migration is intentionally skipped in local Docker setup)
 

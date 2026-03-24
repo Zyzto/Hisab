@@ -8,6 +8,108 @@ import 'groups_provider.dart';
 
 enum AnalyticsRangePreset { days30, days90, all }
 enum TrendGranularity { daily, weekly, monthly }
+enum AnalyticsTrendChartMode { totalBar, totalLine, userComparison, categoryComparison }
+enum AnalyticsCategoryChartMode { bars, pie }
+
+class GroupAnalyticsUiState {
+  const GroupAnalyticsUiState({
+    this.trendChartMode = AnalyticsTrendChartMode.totalBar,
+    this.categoryChartMode = AnalyticsCategoryChartMode.pie,
+    this.excludedCategoryIds = const <String>{},
+  });
+
+  final AnalyticsTrendChartMode trendChartMode;
+  final AnalyticsCategoryChartMode categoryChartMode;
+  final Set<String> excludedCategoryIds;
+
+  GroupAnalyticsUiState copyWith({
+    AnalyticsTrendChartMode? trendChartMode,
+    AnalyticsCategoryChartMode? categoryChartMode,
+    Set<String>? excludedCategoryIds,
+  }) {
+    return GroupAnalyticsUiState(
+      trendChartMode: trendChartMode ?? this.trendChartMode,
+      categoryChartMode: categoryChartMode ?? this.categoryChartMode,
+      excludedCategoryIds: excludedCategoryIds ?? this.excludedCategoryIds,
+    );
+  }
+}
+
+class GroupAnalyticsUiStateNotifier
+    extends Notifier<Map<String, GroupAnalyticsUiState>> {
+  static const int _maxGroupsInMemory = 20;
+
+  @override
+  Map<String, GroupAnalyticsUiState> build() => const {};
+
+  GroupAnalyticsUiState _stateFor(String groupId) =>
+      state[groupId] ?? const GroupAnalyticsUiState();
+
+  void setTrendChartMode(String groupId, AnalyticsTrendChartMode mode) {
+    final current = _stateFor(groupId);
+    _upsert(
+      groupId,
+      current.copyWith(trendChartMode: mode),
+    );
+  }
+
+  void setCategoryChartMode(String groupId, AnalyticsCategoryChartMode mode) {
+    final current = _stateFor(groupId);
+    _upsert(
+      groupId,
+      current.copyWith(categoryChartMode: mode),
+    );
+  }
+
+  void toggleExcludedCategory(String groupId, String categoryId) {
+    final current = _stateFor(groupId);
+    final next = current.excludedCategoryIds.toSet();
+    if (next.contains(categoryId)) {
+      next.remove(categoryId);
+    } else {
+      next.add(categoryId);
+    }
+    _upsert(
+      groupId,
+      current.copyWith(excludedCategoryIds: next),
+    );
+  }
+
+  void clearExcludedCategories(String groupId) {
+    final current = _stateFor(groupId);
+    if (current.excludedCategoryIds.isEmpty) return;
+    _upsert(
+      groupId,
+      current.copyWith(excludedCategoryIds: const <String>{}),
+    );
+  }
+
+  void _upsert(String groupId, GroupAnalyticsUiState value) {
+    final next = Map<String, GroupAnalyticsUiState>.from(state);
+    if (next.containsKey(groupId)) {
+      // Reinsert to keep this group as most-recent for eviction ordering.
+      next.remove(groupId);
+    }
+    next[groupId] = value;
+
+    while (next.length > _maxGroupsInMemory) {
+      final firstKey = next.keys.first;
+      next.remove(firstKey);
+    }
+    state = next;
+  }
+}
+
+final groupAnalyticsUiStateProvider = NotifierProvider<
+  GroupAnalyticsUiStateNotifier,
+  Map<String, GroupAnalyticsUiState>
+>(GroupAnalyticsUiStateNotifier.new);
+
+final groupAnalyticsUiStateByGroupProvider =
+    Provider.family<GroupAnalyticsUiState, String>((ref, groupId) {
+      final map = ref.watch(groupAnalyticsUiStateProvider);
+      return map[groupId] ?? const GroupAnalyticsUiState();
+    });
 
 class GroupAnalyticsQuery {
   const GroupAnalyticsQuery({
@@ -260,10 +362,12 @@ String resolveTagLabel(String tagId, List<ExpenseTag> tags) {
     if (custom.id == tagId) return custom.label;
   }
   for (final preset in presetCategoryTags) {
-    if (preset.id == tagId) return preset.label;
+    if (preset.id == tagId) return _presetCategoryLabelKey(preset.id);
   }
   return tagId;
 }
+
+String _presetCategoryLabelKey(String presetId) => 'category_$presetId';
 
 bool _isTransferOnly(Expense expense) =>
     contributionToExpenseTotal(expense) == 0;

@@ -57,13 +57,13 @@ class ExpenseDetailBody extends ConsumerWidget {
                   expense: expense,
                   use24HourFormat: ref.watch(use24HourFormatProvider),
                 ),
-                if (expense.effectiveReceiptImageUrls.isNotEmpty) ...[
+                if (expense.effectiveImageUrls.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: expense.effectiveReceiptImageUrls
+                      children: expense.effectiveImageUrls
                           .map(
                             (url) => Padding(
                               padding: const EdgeInsets.only(right: 8),
@@ -71,8 +71,8 @@ class ExpenseDetailBody extends ConsumerWidget {
                                 width: 200,
                                 child: GestureDetector(
                                   onTap: () =>
-                                      showReceiptImageFullScreen(context, url),
-                                  child: buildReceiptImageView(
+                                      showExpenseImageFullScreen(context, url),
+                                  child: buildExpenseImageView(
                                     context,
                                     url,
                                     maxHeight: 280,

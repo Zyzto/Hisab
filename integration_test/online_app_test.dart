@@ -14,9 +14,11 @@
 import 'online/auth_online_test.dart' as auth_online;
 import 'online/sync_online_test.dart' as sync_online;
 import 'online/invite_online_test.dart' as invite_online;
+import 'online/telemetry_rls_online_test.dart' as telemetry_rls_online;
 
 void main() {
   auth_online.main();
   sync_online.main();
   invite_online.main();
+  telemetry_rls_online.main();
 }
