@@ -31,6 +31,14 @@ GoRouter _buildRouter(String initialLocation) {
         ),
       ),
       GoRoute(
+        path: '${RoutePaths.homeModeBase}/:mode',
+        builder: (context, state) => MainScaffold(
+          selectedIndex: 0,
+          location: state.uri.path,
+          child: const Center(child: Text('Home mode child')),
+        ),
+      ),
+      GoRoute(
         path: RoutePaths.archivedGroups,
         builder: (context, state) => MainScaffold(
           selectedIndex: 0,
@@ -88,6 +96,25 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(router.routerDelegate.currentConfiguration.uri.path, RoutePaths.home);
+  });
+
+  testWidgets('Back on /home mode path shows home back behavior', (tester) async {
+    final router = _buildRouter('${RoutePaths.homeModeBase}/combined');
+    await pumpRouterApp(tester, router: router);
+
+    expect(
+      router.routerDelegate.currentConfiguration.uri.path,
+      '${RoutePaths.homeModeBase}/combined',
+    );
+
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+
+    expect(
+      router.routerDelegate.currentConfiguration.uri.path,
+      '${RoutePaths.homeModeBase}/combined',
+    );
+    await tester.pump(const Duration(seconds: 5));
   });
 
   testWidgets('Back on home shows warning toast', (tester) async {
