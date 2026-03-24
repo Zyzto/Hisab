@@ -268,6 +268,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
         Flexible(
           child: Text(
             widget.group.name,
+            key: const Key('group_detail_title'),
             style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
             ),
@@ -702,6 +703,7 @@ class _PersonalBudgetHeader extends ConsumerWidget {
                                   currencyCode,
                                 )
                               : '—',
+                          key: const Key('personal_budget_amount'),
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: attentionColor ?? colorScheme.onSurface,

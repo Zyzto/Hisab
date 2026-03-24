@@ -444,7 +444,11 @@ void main() {
           await tapSubmitExpenseButton(tester);
           await ensureFormClosed(tester);
 
-          await waitForWidget(tester, find.text('Expense Test Group'));
+          await waitForWidget(
+            tester,
+            find.byKey(const Key('group_detail_title')),
+            timeout: const Duration(seconds: 15),
+          );
         });
 
         // ── Stage: capture image and attach 4 photos ──
@@ -532,9 +536,12 @@ void main() {
 
         // ── Stage: delete expense ──
         await stage('delete expense', () async {
+          await waitForWidget(tester, find.text('Updated Dinner'));
+          await scrollUntilVisible(tester, find.text('Updated Dinner'));
           await tapAndSettle(tester, find.text('Updated Dinner'));
           await pumpAndSettleWithTimeout(tester);
 
+          await waitForWidget(tester, find.byIcon(Icons.more_vert));
           await tapAndSettle(tester, find.byIcon(Icons.more_vert));
           await waitForWidget(tester, find.text('Delete'));
           await tapAndSettle(tester, find.text('Delete'));
@@ -545,10 +552,12 @@ void main() {
 
           await waitForWidget(tester, find.text('Expenses'));
           // Wait for list to update (Web can be slower)
-          for (var i = 0; i < 50; i++) {
-            await tester.pump(const Duration(milliseconds: 200));
-            if (find.text('Updated Dinner').evaluate().isEmpty) break;
-          }
+          await waitForCondition(
+            tester,
+            condition: () => find.text('Updated Dinner').evaluate().isEmpty,
+            timeout: const Duration(seconds: 25),
+            reason: 'Updated Dinner should be removed from list after delete',
+          );
           expect(find.text('Updated Dinner'), findsNothing);
         });
       },

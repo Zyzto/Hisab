@@ -90,13 +90,13 @@ dependencies:
   pretty_qr_code: ^3.6.0
   mobile_scanner: ^7.2.0
   connectivity_plus: ^7.0.0
-  app_links: ^6.3.2
+  app_links: ^7.0.0
   currency_picker: ^2.0.21
 
   # Push notifications
   firebase_core: ^4.4.0
   firebase_messaging: ^16.1.1
-  flutter_local_notifications: ^20.1.0
+  flutter_local_notifications: ^21.0.0
   pwa_install: ^0.0.6
 
   # Permissions
