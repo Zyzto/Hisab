@@ -543,14 +543,17 @@ void main() {
 
           await waitForWidget(tester, find.byIcon(Icons.more_vert));
           await tapAndSettle(tester, find.byIcon(Icons.more_vert));
-          await waitForWidget(tester, find.text('Delete'));
-          await tapAndSettle(tester, find.text('Delete'));
+          await tapAnyText(tester, ['Delete', 'حذف']);
 
-          await waitForWidget(tester, find.text('Delete Expense?'));
-          final confirmButton = find.text('Delete');
+          await waitForAnyText(tester, ['Delete Expense?', 'حذف المصروف؟']);
+          // In some layouts there can be multiple "Delete" labels (menu + sheet),
+          // so tap the last one which is the sheet confirm action.
+          final confirmButton = find.text('Delete').evaluate().isNotEmpty
+              ? find.text('Delete')
+              : find.text('حذف');
           await tapAndSettle(tester, confirmButton.last);
 
-          await waitForWidget(tester, find.text('Expenses'));
+          await waitForAnyText(tester, ['Expenses', 'المصروفات']);
           // Wait for list to update (Web can be slower)
           await waitForCondition(
             tester,

@@ -1,11 +1,12 @@
 // ignore_for_file: avoid_print
 //
-// Cross-platform test runner: (1) flutter test (unit/widget), (2) in parallel:
-// Android integration (AVD + flutter test integration_test/app_test.dart) and
+// Cross-platform test runner: (1) flutter test (unit/widget), (2) sequential:
+// Android integration (AVD + flutter test integration_test/app_test.dart) then
 // web integration (ChromeDriver + flutter drive). (3) Summary and log paths.
 //
 // Run from repo root: dart run tool/run_all_tests.dart
-// Options: --skip-unit, --skip-android, --skip-web, --no-avd, --android-drive. Example: only Android = --skip-unit --skip-web (add --android-drive if VM connection fails).
+// Options: --skip-unit, --skip-android, --skip-web, --no-avd, --android-drive, --help.
+// Example: only Android = --skip-unit --skip-web (add --android-drive if VM connection fails).
 //
 // Logs: logs/test_run_<timestamp>/
 // Fail-safes: timeouts (unit 15min, integration 25min), line length cap (64KB), top-level catch.
@@ -15,6 +16,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:args/args.dart';
 import 'package:path/path.dart' as p;
 
 /// Exit code used when a process is killed due to timeout.
@@ -31,7 +33,17 @@ const Duration _integrationTimeout = Duration(minutes: 25);
 
 Future<void> main(List<String> args) async {
   try {
-    await _run(args);
+    final cli = _parseRunAllCliOptions(args);
+    if (cli.showHelp) {
+      print(_runAllUsage());
+      return;
+    }
+    await _run(cli);
+  } on _CliUsageError catch (e) {
+    stderr.writeln('Error: ${e.message}');
+    stderr.writeln('');
+    stderr.writeln(_runAllUsage());
+    exit(64);
   } catch (e, st) {
     print('Fatal error: $e');
     print(st);
@@ -39,12 +51,103 @@ Future<void> main(List<String> args) async {
   }
 }
 
-Future<void> _run(List<String> args) async {
-  final skipUnit = args.contains('--skip-unit');
-  final skipAndroid = args.contains('--skip-android');
-  final skipWeb = args.contains('--skip-web');
-  final noAvd = args.contains('--no-avd');
-  final androidDrive = args.contains('--android-drive');
+final ArgParser _runAllArgParser =
+    ArgParser(allowTrailingOptions: false)
+      ..addFlag(
+        'skip-unit',
+        help: 'Skip unit and widget tests phase.',
+        negatable: false,
+      )
+      ..addFlag(
+        'skip-android',
+        help: 'Skip Android integration phase.',
+        negatable: false,
+      )
+      ..addFlag(
+        'skip-web',
+        help: 'Skip web integration phase.',
+        negatable: false,
+      )
+      ..addFlag(
+        'no-avd',
+        help: 'Do not auto-launch AVD when no Android device is detected.',
+        negatable: false,
+      )
+      ..addFlag(
+        'android-drive',
+        help: 'Run Android integration with flutter drive instead of flutter test.',
+        negatable: false,
+      )
+      ..addFlag(
+        'help',
+        abbr: 'h',
+        help: 'Show this help message.',
+        negatable: false,
+      );
+
+class _RunAllCliOptions {
+  const _RunAllCliOptions({
+    required this.skipUnit,
+    required this.skipAndroid,
+    required this.skipWeb,
+    required this.noAvd,
+    required this.androidDrive,
+    required this.showHelp,
+  });
+
+  final bool skipUnit;
+  final bool skipAndroid;
+  final bool skipWeb;
+  final bool noAvd;
+  final bool androidDrive;
+  final bool showHelp;
+}
+
+class _CliUsageError implements Exception {
+  const _CliUsageError(this.message);
+  final String message;
+}
+
+_RunAllCliOptions _parseRunAllCliOptions(List<String> rawArgs) {
+  late final ArgResults parsed;
+  try {
+    parsed = _runAllArgParser.parse(rawArgs);
+  } on FormatException catch (e) {
+    throw _CliUsageError(e.message);
+  }
+  return _RunAllCliOptions(
+    skipUnit: parsed.flag('skip-unit'),
+    skipAndroid: parsed.flag('skip-android'),
+    skipWeb: parsed.flag('skip-web'),
+    noAvd: parsed.flag('no-avd'),
+    androidDrive: parsed.flag('android-drive'),
+    showHelp: parsed.flag('help'),
+  );
+}
+
+String _runAllUsage() {
+  final usage = _runAllArgParser.usage;
+  return '''
+Run all tests with staged output and logs.
+
+Usage:
+  dart run tool/run_all_tests.dart [options]
+
+Options:
+$usage
+Examples:
+  dart run tool/run_all_tests.dart
+  dart run tool/run_all_tests.dart --skip-unit --skip-web
+  dart run tool/run_all_tests.dart --android-drive --no-avd
+''';
+}
+
+Future<void> _run(_RunAllCliOptions options) async {
+  final skipUnit = options.skipUnit;
+  final skipAndroid = options.skipAndroid;
+  final skipWeb = options.skipWeb;
+  final noAvd = options.noAvd;
+  final androidDrive = options.androidDrive;
 
   final projectRoot = _projectRoot();
   final timestamp = _timestamp();
@@ -55,7 +158,6 @@ Future<void> _run(List<String> args) async {
   int androidExitCode = 0;
   int webExitCode = 0;
   Process? chromedriverProcess;
-
   try {
     // ----- Phase 1: Unit & widget tests -----
     if (skipUnit) {
@@ -78,27 +180,32 @@ Future<void> _run(List<String> args) async {
       }
     }
 
-    // ----- Phase 2: Integration (Android + Web in parallel unless skipped) -----
+    // ----- Phase 2: Integration (Android then Web, strictly sequential) -----
     if (skipAndroid) {
       print('==> Phase 2a: Android integration (skipped)');
     }
-    final androidFuture = skipAndroid
-        ? Future<int>.value(-1)
-        : _runIntegrationAndroid(projectRoot, logDir, noAvd, androidDrive);
     if (skipWeb) {
       print('==> Phase 2b: Web integration (skipped)');
     }
-    final webFuture = skipWeb
-        ? Future<int>.value(-1)
-        : _runIntegrationWeb(
-            projectRoot,
-            logDir,
-            (p) => chromedriverProcess = p,
-          );
-
-    final results = await Future.wait([androidFuture, webFuture]);
-    if (!skipAndroid) androidExitCode = results[0];
-    if (!skipWeb) webExitCode = results[1];
+    if (!skipAndroid) {
+      androidExitCode = await _runIntegrationAndroid(
+        projectRoot,
+        logDir,
+        noAvd,
+        androidDrive,
+      );
+    } else {
+      androidExitCode = -1;
+    }
+    if (!skipWeb) {
+      webExitCode = await _runIntegrationWeb(
+        projectRoot,
+        logDir,
+        (p) => chromedriverProcess = p,
+      );
+    } else {
+      webExitCode = -1;
+    }
   } finally {
     chromedriverProcess?.kill(ProcessSignal.sigterm);
     if (chromedriverProcess != null) print('Stopped ChromeDriver.');

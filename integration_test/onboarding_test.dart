@@ -12,7 +12,7 @@ void main() {
     testWidgets('complete onboarding flow lands on home', (tester) async {
       recordStage('onboarding: bootstrap', 'STARTED');
       final ready = await runIntegrationTestApp(skipOnboarding: false);
-      ensureBootstrapReady(ready);
+      ensureBootstrapReady(ready, reason: lastBootstrapFailureReason);
       await pumpAndSettleWithTimeout(tester);
       recordStage('onboarding: bootstrap', 'PASSED');
 

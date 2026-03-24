@@ -61,6 +61,10 @@ Future<void> main() async {
     if (lastStage != null) {
       print('Last stage: $lastStage\n');
     }
+    final bootstrapError = response.data!['bootstrap_error'];
+    if (bootstrapError != null) {
+      print('Bootstrap Error:\n$bootstrapError\n');
+    }
   }
 
   if (response.allTestsPassed) {

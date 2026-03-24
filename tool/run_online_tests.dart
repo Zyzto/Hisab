@@ -4,8 +4,9 @@
 // runs integration_test/online_app_test.dart on web (with ChromeDriver) or Android,
 // then stops Supabase. Logs to logs/online_tests_<timestamp>.log.
 //
-// Run from repo root: dart run tool/run_online_tests.dart [web|android]
-// Default: web.
+// Run from repo root: dart run tool/run_online_tests.dart [options]
+// Preferred platform flag: --platform web|android (default: web).
+// Legacy positional platform is still supported: [web|android].
 //
 // Fail-safes: timeouts (supabase 5min, flutter 25min), line length cap (64KB), top-level catch.
 // Prerequisites: Docker or Podman (Supabase CLI uses the Docker API; Podman: set DOCKER_HOST or use auto-detect below), Supabase CLI. For web: Chrome + ChromeDriver (port 4444). Set CHROME_EXECUTABLE if needed.
@@ -14,6 +15,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:args/args.dart';
 import 'package:path/path.dart' as p;
 
 const int _maxLineLength = 65536;
@@ -29,7 +31,17 @@ String _safeLine(String line) {
 
 Future<void> main(List<String> args) async {
   try {
-    await _run(args);
+    final cli = _parseOnlineCliOptions(args);
+    if (cli.showHelp) {
+      print(_onlineUsage());
+      return;
+    }
+    await _run(cli);
+  } on _CliUsageError catch (e) {
+    stderr.writeln('Error: ${e.message}');
+    stderr.writeln('');
+    stderr.writeln(_onlineUsage());
+    exit(64);
   } catch (e, st) {
     print('Fatal error: $e');
     print(st);
@@ -37,12 +49,91 @@ Future<void> main(List<String> args) async {
   }
 }
 
-Future<void> _run(List<String> args) async {
-  final platform = args.isNotEmpty ? args.first.toLowerCase() : 'web';
-  if (platform != 'web' && platform != 'android') {
-    print('Usage: dart run tool/run_online_tests.dart [web|android]');
-    exit(1);
+final ArgParser _onlineArgParser =
+    ArgParser(allowTrailingOptions: false)
+      ..addOption(
+        'platform',
+        abbr: 'p',
+        help: 'Target platform for online integration tests.',
+        defaultsTo: 'web',
+        allowed: <String>['web', 'android'],
+        allowedHelp: <String, String>{
+          'web': 'Run web tests (default).',
+          'android': 'Run on a connected Android device.',
+        },
+      )
+      ..addFlag(
+        'help',
+        abbr: 'h',
+        help: 'Show this help message.',
+        negatable: false,
+      );
+
+class _OnlineCliOptions {
+  const _OnlineCliOptions({required this.platform, required this.showHelp});
+
+  final String platform;
+  final bool showHelp;
+}
+
+class _CliUsageError implements Exception {
+  const _CliUsageError(this.message);
+  final String message;
+}
+
+_OnlineCliOptions _parseOnlineCliOptions(List<String> rawArgs) {
+  late final ArgResults parsed;
+  try {
+    parsed = _onlineArgParser.parse(rawArgs);
+  } on FormatException catch (e) {
+    throw _CliUsageError(e.message);
   }
+
+  String platform = parsed.option('platform') ?? 'web';
+  final rest = parsed.rest;
+  if (rest.isNotEmpty) {
+    if (rest.length > 1) {
+      throw const _CliUsageError(
+        'Too many positional arguments. Expected at most one legacy platform argument.',
+      );
+    }
+    if (parsed.wasParsed('platform')) {
+      throw const _CliUsageError(
+        'Do not pass both --platform and a positional platform argument.',
+      );
+    }
+    final positionalPlatform = rest.single.toLowerCase();
+    if (positionalPlatform != 'web' && positionalPlatform != 'android') {
+      throw _CliUsageError('Unsupported platform "$positionalPlatform".');
+    }
+    platform = positionalPlatform;
+  }
+
+  return _OnlineCliOptions(
+    platform: platform,
+    showHelp: parsed.flag('help'),
+  );
+}
+
+String _onlineUsage() {
+  final usage = _onlineArgParser.usage;
+  return '''
+Run online integration tests against local Supabase.
+
+Usage:
+  dart run tool/run_online_tests.dart [options]
+  dart run tool/run_online_tests.dart [web|android]    (legacy positional form)
+
+Options:
+$usage
+Examples:
+  dart run tool/run_online_tests.dart
+  dart run tool/run_online_tests.dart --platform android
+''';
+}
+
+Future<void> _run(_OnlineCliOptions options) async {
+  final platform = options.platform;
 
   final projectRoot = _projectRoot();
   final timestamp = _timestamp();
