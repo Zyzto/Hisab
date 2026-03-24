@@ -1824,6 +1824,33 @@ Do not duplicate Migration 20’s file (`20260306120000_fix_accept_invite_null_e
 | Preview hardening | After `20260306193000_invite_preview_hardening.sql`, `get_invite_preview_group` (and related preview RPCs) must filter with `access_mode IN ('readonly_join','readonly_only')` so **standard** invite tokens do not return preview data. |
 | `get_invite_preview_expenses` | The app calls RPC with **`p_token` and `p_limit`**. Postgres should expose `get_invite_preview_expenses(text, integer)` (`20260306193000` then `20260306200000_invite_preview_expense_receipts.sql` for image columns). |
 
+**Drift verification SQL (recommended):**
+
+```sql
+-- 1) Confirm expenses table columns are aligned.
+SELECT column_name
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'expenses'
+  AND column_name IN ('image_path', 'image_paths', 'receipt_image_path', 'receipt_image_paths')
+ORDER BY column_name;
+
+-- 2) Inspect the live RPC body (source of truth in DB runtime).
+SELECT pg_get_functiondef('public.get_invite_preview_expenses(text, integer)'::regprocedure) AS fn_sql;
+
+-- 3) Guardrail check: no hard legacy column references.
+-- has_hard_legacy_ref should be false.
+WITH fn AS (
+  SELECT pg_get_functiondef('public.get_invite_preview_expenses(text, integer)'::regprocedure) AS body
+)
+SELECT
+  body LIKE '%e.receipt_image_path%' AS has_hard_legacy_ref,
+  body LIKE '%e.receipt_image_paths%' AS has_hard_legacy_refs_plural,
+  body LIKE '%to_jsonb(e)->>''image_path''%' AS has_image_path_lookup,
+  body LIKE '%to_jsonb(e)->>''receipt_image_path''%' AS has_compat_fallback_lookup
+FROM fn;
+```
+
 ---
 
 ## 4. Configure Authentication
