@@ -98,8 +98,8 @@ Map<String, dynamic> _expenseToMap(Expense e) => {
   'toParticipantId': e.toParticipantId,
   'tag': e.tag,
   'lineItems': e.lineItems?.map((l) => l.toJson()).toList(),
-  'receiptImagePath': e.receiptImagePath,
-  'receiptImagePaths': e.receiptImagePaths,
+  'imagePath': e.imagePath,
+  'imagePaths': e.imagePaths,
 };
 
 Map<String, dynamic> _tagToMap(ExpenseTag t) => {
@@ -272,24 +272,24 @@ Expense _mapToExpense(Map<String, dynamic> m) {
     lineItems: lineItems
         ?.map((e) => ReceiptLineItem.fromJson(e as Map<String, dynamic>))
         .toList(),
-    receiptImagePath: _backupReceiptImagePath(m),
-    receiptImagePaths: _backupReceiptImagePaths(m),
+    imagePath: _backupImagePath(m),
+    imagePaths: _backupImagePaths(m),
   );
 }
 
-String? _backupReceiptImagePath(Map<String, dynamic> m) {
-  final paths = _backupReceiptImagePaths(m);
+String? _backupImagePath(Map<String, dynamic> m) {
+  final paths = _backupImagePaths(m);
   if (paths != null && paths.isNotEmpty) return paths.first;
-  return m['receiptImagePath'] as String?;
+  return (m['imagePath'] ?? m['receiptImagePath']) as String?;
 }
 
-List<String>? _backupReceiptImagePaths(Map<String, dynamic> m) {
-  final raw = m['receiptImagePaths'];
+List<String>? _backupImagePaths(Map<String, dynamic> m) {
+  final raw = m['imagePaths'] ?? m['receiptImagePaths'];
   if (raw is List) {
     final list = raw.whereType<String>().where((s) => s.isNotEmpty).toList();
     return list.isEmpty ? null : list;
   }
-  final single = m['receiptImagePath'] as String?;
+  final single = (m['imagePath'] ?? m['receiptImagePath']) as String?;
   return single != null && single.isNotEmpty ? [single] : null;
 }
 

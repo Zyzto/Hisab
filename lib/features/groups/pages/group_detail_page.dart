@@ -34,11 +34,14 @@ import '../utils/group_icon_utils.dart';
 const double _kTabFabBottomClearance = 96.0;
 const double _kTabListBottomSpacing = 16.0;
 
+enum GroupDetailTab { expenses, balance, people }
+
 class GroupDetailPage extends ConsumerStatefulWidget {
   final String groupId;
   final bool readOnlyPreview;
   final String? previewToken;
   final InviteAccessMode? previewAccessMode;
+  final GroupDetailTab initialTab;
 
   const GroupDetailPage({
     super.key,
@@ -46,6 +49,7 @@ class GroupDetailPage extends ConsumerStatefulWidget {
     this.readOnlyPreview = false,
     this.previewToken,
     this.previewAccessMode,
+    this.initialTab = GroupDetailTab.expenses,
   });
 
   @override
@@ -91,6 +95,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
           readOnlyPreview: widget.readOnlyPreview,
           previewToken: widget.previewToken,
           previewAccessMode: widget.previewAccessMode,
+          initialTab: widget.initialTab,
         );
       },
       loading: (context) =>
@@ -104,12 +109,14 @@ class _GroupDetailContent extends ConsumerStatefulWidget {
   final bool readOnlyPreview;
   final String? previewToken;
   final InviteAccessMode? previewAccessMode;
+  final GroupDetailTab initialTab;
 
   const _GroupDetailContent({
     required this.group,
     required this.readOnlyPreview,
     required this.previewToken,
     required this.previewAccessMode,
+    required this.initialTab,
   });
 
   @override
@@ -127,12 +134,77 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
   /// intermediate [onPageChanged] until we reach this index.
   int? _programmaticTargetPage;
 
+  int _tabIndexFromInitialTab() {
+    switch (widget.initialTab) {
+      case GroupDetailTab.expenses:
+        return 0;
+      case GroupDetailTab.balance:
+        return 1;
+      case GroupDetailTab.people:
+        return 2;
+    }
+  }
+
+  String _targetPathForTabIndex(int index) {
+    if (widget.readOnlyPreview) {
+      final token = widget.previewToken ?? '';
+      if (token.isEmpty) return RoutePaths.home;
+      switch (index) {
+        case 1:
+          return RoutePaths.invitePreviewBalance(token);
+        case 2:
+          return RoutePaths.invitePreviewPeople(token);
+        case 0:
+        default:
+          return RoutePaths.invitePreviewExpenses(token);
+      }
+    }
+    switch (index) {
+      case 1:
+        return RoutePaths.groupBalance(widget.group.id);
+      case 2:
+        return RoutePaths.groupPeople(widget.group.id);
+      case 0:
+      default:
+        return RoutePaths.groupExpenses(widget.group.id);
+    }
+  }
+
+  void _navigateToTabIfNeeded(int index) {
+    final targetPath = _targetPathForTabIndex(index);
+    final currentPath =
+        GoRouter.of(context).routerDelegate.currentConfiguration.uri.path;
+    if (currentPath != targetPath) {
+      context.go(targetPath);
+    }
+  }
+
+  void _syncTabFromRoute() {
+    final targetIndex = _tabIndexFromInitialTab();
+    if (_selectedTabIndex == targetIndex) return;
+    _selectedTabIndex = targetIndex;
+    _tabIndexNotifier.value = targetIndex;
+    _segmentController.value = targetIndex;
+    if (_pageController.hasClients) {
+      _pageController.jumpToPage(targetIndex);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    _tabIndexNotifier = ValueNotifier<int>(0);
-    _pageController = PageController(initialPage: 0);
-    _segmentController = CustomSegmentedController<int>(value: 0);
+    _selectedTabIndex = _tabIndexFromInitialTab();
+    _tabIndexNotifier = ValueNotifier<int>(_selectedTabIndex);
+    _pageController = PageController(initialPage: _selectedTabIndex);
+    _segmentController = CustomSegmentedController<int>(value: _selectedTabIndex);
+  }
+
+  @override
+  void didUpdateWidget(covariant _GroupDetailContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialTab != widget.initialTab) {
+      setState(_syncTabFromRoute);
+    }
   }
 
   @override
@@ -249,7 +321,9 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
     final canAddExpense = isOwnerOrAdmin || widget.group.allowMemberAddExpense;
 
     if (index == 0) {
-      if (widget.group.isSettlementFrozen || !canAddExpense) return null;
+      if (widget.group.isArchived || widget.group.isSettlementFrozen || !canAddExpense) {
+        return null;
+      }
       return _FABWithLabel(
         icon: Icons.add,
         label: 'add_expense'.tr(),
@@ -340,6 +414,13 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
             ),
             title: _buildAppBarTitle(context),
             actions: [
+              if (!widget.readOnlyPreview)
+                IconButton(
+                  icon: const Icon(Icons.analytics_outlined),
+                  tooltip: 'analytics'.tr(),
+                  onPressed: () =>
+                      context.push(RoutePaths.groupAnalytics(widget.group.id)),
+                ),
               if (!localOnly &&
                   !widget.readOnlyPreview &&
                   (myRole == GroupRole.owner || myRole == GroupRole.admin) &&
@@ -467,6 +548,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
                               duration: const Duration(milliseconds: 200),
                               curve: Curves.easeInOut,
                               onValueChanged: (v) {
+                                _navigateToTabIfNeeded(v);
                                 setState(() {
                                   _selectedTabIndex = v;
                                   _programmaticTargetPage = v;
@@ -508,6 +590,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
                         setState(() => _selectedTabIndex = i);
                         _tabIndexNotifier.value = i;
                         _segmentController.value = i;
+                        _navigateToTabIfNeeded(i);
                       },
                       children: [
                         _ExpensesTab(

@@ -25,6 +25,41 @@ import '../providers/groups_provider.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 import '../../settings/settings_definitions.dart';
 
+/// Shown when a post-frame [GoRouter.go] did not leave the page (web/router edge cases).
+Widget _inviteStalledNavigationBody(
+  BuildContext context, {
+  required VoidCallback onPrimary,
+  required String primaryLabelKey,
+  required VoidCallback onGoHome,
+}) {
+  return Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            'invite_navigation_stalled_hint'.tr(),
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 24),
+          FilledButton(
+            onPressed: onPrimary,
+            child: Text(primaryLabelKey.tr()),
+          ),
+          const SizedBox(height: 12),
+          TextButton.icon(
+            onPressed: onGoHome,
+            icon: const Icon(Icons.home_outlined, size: 20),
+            label: Text('go_home'.tr()),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 class InviteAcceptPage extends ConsumerStatefulWidget {
   final String token;
 
@@ -177,6 +212,15 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                       }
                     });
                   }
+                  if (_didAttemptPreviewRedirectForNotOnboarded) {
+                    return _inviteStalledNavigationBody(
+                      context,
+                      onPrimary: () =>
+                          context.go(RoutePaths.invitePreview(widget.token)),
+                      primaryLabelKey: 'invite_preview_open_group',
+                      onGoHome: () => context.go(RoutePaths.home),
+                    );
+                  }
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (preview == null &&
@@ -189,6 +233,18 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                     _persistPendingInviteToken();
                     if (mounted) context.go(RoutePaths.onboarding);
                   });
+                }
+                if (preview == null &&
+                    _didAttemptOnboardingRedirectForNotOnboarded) {
+                  return _inviteStalledNavigationBody(
+                    context,
+                    onPrimary: () {
+                      _persistPendingInviteToken();
+                      context.go(RoutePaths.onboarding);
+                    },
+                    primaryLabelKey: 'onboarding_next',
+                    onGoHome: () => context.go(RoutePaths.home),
+                  );
                 }
                 return Center(
                   child: Column(
@@ -834,6 +890,15 @@ class _InvitePreviewFallbackOnErrorState
                 context.go(RoutePaths.invitePreview(widget.token));
               }
             });
+          }
+          if (_didRedirect) {
+            return _inviteStalledNavigationBody(
+              context,
+              onPrimary: () =>
+                  context.go(RoutePaths.invitePreview(widget.token)),
+              primaryLabelKey: 'invite_preview_open_group',
+              onGoHome: widget.onGoHome,
+            );
           }
           return const Center(child: CircularProgressIndicator());
         }

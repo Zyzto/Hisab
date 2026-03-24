@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hisab/features/expenses/pages/expense_detail_shell.dart';
+import 'package:hisab/features/groups/pages/group_detail_page.dart';
 
 import 'package:hisab/features/groups/pages/invite_group_preview_page.dart';
 import 'package:hisab/features/groups/providers/invite_preview_provider.dart';
@@ -48,6 +49,46 @@ void main() {
       'get_invite_preview_expenses': <Map<String, dynamic>>[],
     };
 
+    final router = GoRouter(
+      initialLocation: '/invite/token-1/preview/expenses',
+      routes: [
+        GoRoute(
+          path: '/invite/:token/preview',
+          redirect: (context, state) {
+            final token = state.pathParameters['token']!;
+            return '/invite/$token/preview/expenses';
+          },
+        ),
+        GoRoute(
+          path: '/invite/:token/preview/expenses',
+          builder: (context, state) => InviteGroupPreviewPage(
+            token: state.pathParameters['token']!,
+          ),
+        ),
+        GoRoute(
+          path: '/invite/:token/preview/balance',
+          builder: (context, state) => InviteGroupPreviewPage(
+            token: state.pathParameters['token']!,
+            initialTab: GroupDetailTab.balance,
+          ),
+        ),
+        GoRoute(
+          path: '/invite/:token/preview/people',
+          builder: (context, state) => InviteGroupPreviewPage(
+            token: state.pathParameters['token']!,
+            initialTab: GroupDetailTab.people,
+          ),
+        ),
+        GoRoute(
+          path: '/invite/:token/preview/expenses/:eid',
+          builder: (context, state) => InvitePreviewExpenseDetailPage(
+            token: state.pathParameters['token']!,
+            expenseId: state.pathParameters['eid']!,
+          ),
+        ),
+      ],
+    );
+
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -60,25 +101,7 @@ void main() {
           supportedLocales: testSupportedLocales,
           fallbackLocale: const Locale('en'),
           startLocale: const Locale('en'),
-          child: MaterialApp.router(
-            routerConfig: GoRouter(
-              initialLocation: '/invite/token-1/preview',
-              routes: [
-                GoRoute(
-                  path: '/invite/:token/preview',
-                  builder: (context, state) =>
-                      InviteGroupPreviewPage(token: state.pathParameters['token']!),
-                ),
-                GoRoute(
-                  path: '/invite/:token/preview/expenses/:eid',
-                  builder: (context, state) => InvitePreviewExpenseDetailPage(
-                    token: state.pathParameters['token']!,
-                    expenseId: state.pathParameters['eid']!,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          child: MaterialApp.router(routerConfig: router),
         ),
       ),
     );
@@ -111,6 +134,10 @@ void main() {
       ).first,
     );
     await tester.pumpAndSettle();
+    expect(
+      router.routerDelegate.currentConfiguration.uri.path,
+      '/invite/token-1/preview/balance',
+    );
     expect(find.text('Group not found'), findsNothing);
     expect(
       find.byWidgetPredicate(
@@ -125,7 +152,7 @@ void main() {
     expect(find.text('Join this group'), findsNothing);
   });
 
-  testWidgets('opens read-only expense detail and shows receipt section', (
+  testWidgets('opens read-only expense detail and shows image section', (
     tester,
   ) async {
     final dataByRpc = <String, dynamic>{
@@ -184,13 +211,39 @@ void main() {
           'split_shares_json': '{"p1":500,"p2":500}',
           'type': 'expense',
           'to_participant_id': null,
-          'receipt_image_path': '/tmp/fake-receipt.jpg',
-          'receipt_image_paths': '["/tmp/fake-receipt.jpg"]',
+          'image_path': '/tmp/fake-image.jpg',
+          'image_paths': '["/tmp/fake-image.jpg"]',
           'created_at': '2026-01-02T00:00:00Z',
           'updated_at': '2026-01-02T00:00:00Z',
         },
       ],
     };
+
+    final router = GoRouter(
+      initialLocation: '/invite/token-1/preview/expenses',
+      routes: [
+        GoRoute(
+          path: '/invite/:token/preview',
+          redirect: (context, state) {
+            final token = state.pathParameters['token']!;
+            return '/invite/$token/preview/expenses';
+          },
+        ),
+        GoRoute(
+          path: '/invite/:token/preview/expenses',
+          builder: (context, state) => InviteGroupPreviewPage(
+            token: state.pathParameters['token']!,
+          ),
+        ),
+        GoRoute(
+          path: '/invite/:token/preview/expenses/:eid',
+          builder: (context, state) => InvitePreviewExpenseDetailPage(
+            token: state.pathParameters['token']!,
+            expenseId: state.pathParameters['eid']!,
+          ),
+        ),
+      ],
+    );
 
     await tester.pumpWidget(
       ProviderScope(
@@ -204,25 +257,7 @@ void main() {
           supportedLocales: testSupportedLocales,
           fallbackLocale: const Locale('en'),
           startLocale: const Locale('en'),
-          child: MaterialApp.router(
-            routerConfig: GoRouter(
-              initialLocation: '/invite/token-1/preview',
-              routes: [
-                GoRoute(
-                  path: '/invite/:token/preview',
-                  builder: (context, state) =>
-                      InviteGroupPreviewPage(token: state.pathParameters['token']!),
-                ),
-                GoRoute(
-                  path: '/invite/:token/preview/expenses/:eid',
-                  builder: (context, state) => InvitePreviewExpenseDetailPage(
-                    token: state.pathParameters['token']!,
-                    expenseId: state.pathParameters['eid']!,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          child: MaterialApp.router(routerConfig: router),
         ),
       ),
     );

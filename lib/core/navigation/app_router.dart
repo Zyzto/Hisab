@@ -10,6 +10,7 @@ import '../../features/onboarding/routes.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
 import '../../features/settings/settings_definitions.dart';
 import '../../features/groups/pages/group_create_page.dart';
+import '../../features/groups/pages/group_analytics_page.dart';
 import '../../features/groups/pages/group_detail_page.dart';
 import '../../features/groups/pages/group_settings_page.dart';
 import '../../features/groups/pages/invite_accept_page.dart';
@@ -134,7 +135,9 @@ GoRouter router(Ref ref) {
     refreshListenable: refreshNotifier,
     initialLocation: RoutePaths.home,
     redirect: (context, state) {
-      final onOnboarding = state.matchedLocation == RoutePaths.onboarding;
+      final onOnboarding =
+          state.matchedLocation == RoutePaths.onboarding ||
+          state.matchedLocation.startsWith('${RoutePaths.onboarding}/');
       final onPrivacyPolicy = state.matchedLocation == RoutePaths.privacyPolicy;
       final settings = ref.read(hisabSettingsProvidersProvider);
       if (settings != null) {
@@ -217,9 +220,40 @@ GoRouter router(Ref ref) {
       ),
       GoRoute(
         path: '/invite/:token/preview',
+        redirect: (context, state) {
+          final token = state.pathParameters['token'] ?? '';
+          if (token.isEmpty) return RoutePaths.home;
+          return RoutePaths.invitePreviewExpenses(token);
+        },
+      ),
+      GoRoute(
+        path: '/invite/:token/preview/expenses',
         builder: (context, state) {
           final token = state.pathParameters['token'] ?? '';
-          return InviteGroupPreviewPage(token: token);
+          return InviteGroupPreviewPage(
+            token: token,
+            initialTab: GroupDetailTab.expenses,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/invite/:token/preview/balance',
+        builder: (context, state) {
+          final token = state.pathParameters['token'] ?? '';
+          return InviteGroupPreviewPage(
+            token: token,
+            initialTab: GroupDetailTab.balance,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/invite/:token/preview/people',
+        builder: (context, state) {
+          final token = state.pathParameters['token'] ?? '';
+          return InviteGroupPreviewPage(
+            token: token,
+            initialTab: GroupDetailTab.people,
+          );
         },
       ),
       GoRoute(
@@ -241,17 +275,67 @@ GoRouter router(Ref ref) {
       ),
       GoRoute(
         path: '/groups/create',
-        builder: (context, state) => const GroupCreatePage(isPersonal: false),
+        redirect: (context, state) => RoutePaths.groupCreateDetails,
       ),
       GoRoute(
         path: '/groups/create-personal',
-        builder: (context, state) => const GroupCreatePage(isPersonal: true),
+        redirect: (context, state) => RoutePaths.groupCreatePersonalDetails,
+      ),
+      GoRoute(
+        path: RoutePaths.groupCreateDetails,
+        builder: (context, state) =>
+            const GroupCreatePage(isPersonal: false, initialStep: 0),
+      ),
+      GoRoute(
+        path: RoutePaths.groupCreateParticipants,
+        builder: (context, state) =>
+            const GroupCreatePage(isPersonal: false, initialStep: 1),
+      ),
+      GoRoute(
+        path: RoutePaths.groupCreateStyle,
+        builder: (context, state) =>
+            const GroupCreatePage(isPersonal: false, initialStep: 2),
+      ),
+      GoRoute(
+        path: RoutePaths.groupCreateReview,
+        builder: (context, state) =>
+            const GroupCreatePage(isPersonal: false, initialStep: 3),
+      ),
+      GoRoute(
+        path: RoutePaths.groupCreatePersonalDetails,
+        builder: (context, state) =>
+            const GroupCreatePage(isPersonal: true, initialStep: 0),
+      ),
+      GoRoute(
+        path: RoutePaths.groupCreatePersonalStyle,
+        builder: (context, state) =>
+            const GroupCreatePage(isPersonal: true, initialStep: 1),
+      ),
+      GoRoute(
+        path: RoutePaths.groupCreatePersonalReview,
+        builder: (context, state) =>
+            const GroupCreatePage(isPersonal: true, initialStep: 2),
       ),
       GoRoute(
         path: '/groups/:id',
+        redirect: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          if (id.isEmpty) return RoutePaths.home;
+          return RoutePaths.groupExpenses(id);
+        },
+      ),
+      GoRoute(
+        path: '/groups/:id/people',
         builder: (context, state) {
           final id = state.pathParameters['id'] ?? '';
-          return GroupDetailPage(groupId: id);
+          return GroupDetailPage(groupId: id, initialTab: GroupDetailTab.people);
+        },
+      ),
+      GoRoute(
+        path: '/groups/:id/balance',
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return GroupDetailPage(groupId: id, initialTab: GroupDetailTab.balance);
         },
       ),
       GoRoute(
@@ -259,6 +343,13 @@ GoRouter router(Ref ref) {
         builder: (context, state) {
           final groupId = state.pathParameters['id'] ?? '';
           return GroupSettingsPage(groupId: groupId);
+        },
+      ),
+      GoRoute(
+        path: '/groups/:id/analytics',
+        builder: (context, state) {
+          final groupId = state.pathParameters['id'] ?? '';
+          return GroupAnalyticsPage(groupId: groupId);
         },
       ),
       GoRoute(
@@ -277,7 +368,13 @@ GoRouter router(Ref ref) {
       ),
       GoRoute(
         path: '/groups/:id/expenses',
-        builder: (context, state) => const SizedBox.shrink(),
+        builder: (context, state) {
+          final groupId = state.pathParameters['id'] ?? '';
+          return GroupDetailPage(
+            groupId: groupId,
+            initialTab: GroupDetailTab.expenses,
+          );
+        },
         routes: [
           ShellRoute(
             builder: (context, state, child) {

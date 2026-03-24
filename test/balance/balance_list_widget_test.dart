@@ -354,4 +354,31 @@ void main() {
     final btn = tester.widget<IconButton>(paymentButton.first);
     expect(btn.onPressed, isNull);
   });
+
+  testWidgets('BalanceList disables record when group is archived', (tester) async {
+    fakeResult = GroupBalanceResult(
+      group: Group(
+        id: groupId,
+        name: 'Archived Group',
+        currencyCode: 'USD',
+        createdAt: now,
+        updatedAt: now,
+        archivedAt: now,
+      ),
+      participants: fakeResult.participants,
+      balances: fakeResult.balances,
+      settlements: fakeResult.settlements,
+    );
+
+    await pumpBalanceList(tester);
+    await tester.pumpAndSettle();
+
+    final paymentButton = find.ancestor(
+      of: find.byIcon(Icons.payments_outlined),
+      matching: find.byType(IconButton),
+    );
+    expect(paymentButton.evaluate().isNotEmpty, isTrue);
+    final btn = tester.widget<IconButton>(paymentButton.first);
+    expect(btn.onPressed, isNull);
+  });
 }

@@ -179,7 +179,7 @@ class SyncEngine {
           '''INSERT INTO expenses (id, group_id, payer_participant_id, amount_cents,
             currency_code, exchange_rate, base_amount_cents, title, description, date,
             split_type, split_shares_json, type, to_participant_id, tag, line_items_json,
-            receipt_image_path, receipt_image_paths, created_at, updated_at)
+            image_path, image_paths, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
           [
             e['id'],
@@ -204,8 +204,8 @@ class SyncEngine {
                 : (e['line_items_json'] != null
                       ? jsonEncode(e['line_items_json'])
                       : null),
-            e['receipt_image_path'],
-            e['receipt_image_paths'],
+            e['image_path'],
+            e['image_paths'],
             e['created_at'],
             e['updated_at'],
           ],

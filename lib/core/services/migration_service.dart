@@ -131,8 +131,8 @@ class MigrationService {
           'to_participant_id': e['to_participant_id'],
           'tag': e['tag'],
           'line_items_json': e['line_items_json'],
-          'receipt_image_path': e['receipt_image_path'],
-          'receipt_image_paths': e['receipt_image_paths'],
+          'image_path': e['image_path'],
+          'image_paths': e['image_paths'],
           'created_at': e['created_at'],
           'updated_at': e['updated_at'],
         });

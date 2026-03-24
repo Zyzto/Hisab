@@ -21,7 +21,23 @@ import '../providers/home_list_provider.dart';
 import '../../../domain/domain.dart';
 
 class HomePage extends ConsumerWidget {
-  const HomePage({super.key});
+  const HomePage({super.key, this.routeDisplayMode});
+
+  final String? routeDisplayMode;
+
+  static String _modePathForDisplay(String display) {
+    return switch (display) {
+      'list_combined' => 'combined',
+      _ => 'separate',
+    };
+  }
+
+  static String? _displayModeFromPath(String path) {
+    if (!path.startsWith('${RoutePaths.homeModeBase}/')) return null;
+    if (path.endsWith('/combined')) return 'list_combined';
+    if (path.endsWith('/separate')) return 'list_separate';
+    return null;
+  }
 
   Future<void> _onRefresh(WidgetRef ref) async {
     await ref.read(dataSyncServiceProvider.notifier).syncNow();
@@ -130,6 +146,7 @@ class HomePage extends ConsumerWidget {
                           Log.info(
                             'Setting changed: ${homeListDisplaySettingDef.key}=$v',
                           );
+                          context.go(RoutePaths.homeMode(_modePathForDisplay(v)));
                         }
                       },
                     ),
@@ -205,9 +222,15 @@ class HomePage extends ConsumerWidget {
     final localOnly = ref.watch(effectiveLocalOnlyProvider);
     final rawDisplay = ref.watch(homeListDisplayProvider);
     const validDisplays = {'list_separate', 'list_combined'};
-    final display = validDisplays.contains(rawDisplay)
-        ? rawDisplay
-        : 'list_separate';
+    final router = GoRouter.maybeOf(context);
+    final routeDisplay =
+        _displayModeFromPath(
+          router?.routerDelegate.currentConfiguration.uri.path ?? '',
+        ) ??
+        routeDisplayMode;
+    final display = validDisplays.contains(routeDisplay)
+        ? routeDisplay!
+        : (validDisplays.contains(rawDisplay) ? rawDisplay : 'list_separate');
     final displaySeparate = display == 'list_separate';
     final sortCustom = ref.watch(homeListSortProvider) == 'custom';
     final showCreatedAt = ref.watch(homeListShowCreatedAtProvider);

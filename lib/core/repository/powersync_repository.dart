@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:powersync/powersync.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -17,6 +17,10 @@ import 'group_member_repository.dart';
 import 'group_invite_repository.dart';
 
 const _uuid = Uuid();
+const _archiveAutoFreezeMarker = '__hisab_archive_auto_freeze__';
+
+@visibleForTesting
+const archiveAutoFreezeSnapshotMarker = _archiveAutoFreezeMarker;
 
 /// On web, PowerSync/sqlite3_web can emit raw JS objects (LegacyJavaScriptObject)
 /// in update streams instead of Dart UpdateNotification, causing type errors.
@@ -51,6 +55,26 @@ bool _parseBool(dynamic v) {
   if (v is bool) return v;
   if (v is int) return v == 1;
   return v.toString() == 'true' || v.toString() == '1';
+}
+
+bool _isFilledValue(dynamic v) {
+  if (v == null) return false;
+  final text = v.toString().trim();
+  return text.isNotEmpty;
+}
+
+bool _shouldAutoUnfreezeOnUnarchive(dynamic settlementSnapshotJson) {
+  return settlementSnapshotJson?.toString() == _archiveAutoFreezeMarker;
+}
+
+@visibleForTesting
+bool shouldAutoFreezeOnArchive(dynamic settlementFreezeAt) {
+  return !_isFilledValue(settlementFreezeAt);
+}
+
+@visibleForTesting
+bool shouldAutoUnfreezeOnUnarchive(dynamic settlementSnapshotJson) {
+  return _shouldAutoUnfreezeOnUnarchive(settlementSnapshotJson);
 }
 
 /// Convert an unsigned ARGB32 color int to a signed 32-bit int for Postgres.
@@ -144,7 +168,7 @@ List<ReceiptLineItem>? _parseLineItems(dynamic v) {
   return null;
 }
 
-List<String>? _parseReceiptImagePaths(dynamic v) {
+List<String>? _parseImagePaths(dynamic v) {
   if (v == null || v.toString().trim().isEmpty) return null;
   try {
     final decoded = jsonDecode(v.toString());
@@ -159,16 +183,16 @@ List<String>? _parseReceiptImagePaths(dynamic v) {
   return null;
 }
 
-String? _effectiveReceiptImagePathFromRow(Map<String, dynamic> row) {
-  final paths = _parseReceiptImagePaths(row['receipt_image_paths']);
+String? _effectiveImagePathFromRow(Map<String, dynamic> row) {
+  final paths = _parseImagePaths(row['image_paths']);
   if (paths != null && paths.isNotEmpty) return paths.first;
-  return row['receipt_image_path'] as String?;
+  return row['image_path'] as String?;
 }
 
-List<String>? _effectiveReceiptImagePathsFromRow(Map<String, dynamic> row) {
-  final paths = _parseReceiptImagePaths(row['receipt_image_paths']);
+List<String>? _effectiveImagePathsFromRow(Map<String, dynamic> row) {
+  final paths = _parseImagePaths(row['image_paths']);
   if (paths != null && paths.isNotEmpty) return paths;
-  final single = row['receipt_image_path'] as String?;
+  final single = row['image_path'] as String?;
   if (single != null && single.isNotEmpty) return [single];
   return null;
 }
@@ -231,8 +255,8 @@ Expense _expenseFromRow(Map<String, dynamic> row) => Expense(
   toParticipantId: row['to_participant_id'] as String?,
   tag: row['tag'] as String?,
   lineItems: _parseLineItems(row['line_items_json']),
-  receiptImagePath: _effectiveReceiptImagePathFromRow(row),
-  receiptImagePaths: _effectiveReceiptImagePathsFromRow(row),
+  imagePath: _effectiveImagePathFromRow(row),
+  imagePaths: _effectiveImagePathsFromRow(row),
 );
 
 ExpenseTag _tagFromRow(Map<String, dynamic> row) => ExpenseTag(
@@ -662,11 +686,23 @@ class PowerSyncGroupRepository implements IGroupRepository {
   @override
   Future<void> archive(String groupId) async {
     final now = _nowIso();
+    final rows = await _db.getAll(
+      'SELECT settlement_freeze_at, settlement_snapshot_json FROM groups WHERE id = ?',
+      [groupId],
+    );
+    final current = rows.isNotEmpty ? rows.first : null;
+    final shouldAutoFreeze = shouldAutoFreezeOnArchive(
+      current?['settlement_freeze_at'],
+    );
+
+    final updateData = <String, Object?>{'archived_at': now, 'updated_at': now};
+    if (shouldAutoFreeze) {
+      updateData['settlement_freeze_at'] = now;
+      updateData['settlement_snapshot_json'] = _archiveAutoFreezeMarker;
+    }
+
     if (!_isLocalOnly && _isOnline && _client != null) {
-      await _client
-          .from('groups')
-          .update({'archived_at': now, 'updated_at': now})
-          .eq('id', groupId);
+      await _client.from('groups').update(updateData).eq('id', groupId);
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,
       isOnline: _isOnline,
@@ -676,23 +712,42 @@ class PowerSyncGroupRepository implements IGroupRepository {
         tableName: 'groups',
         operation: 'update',
         rowId: groupId,
-        data: {'archived_at': now, 'updated_at': now},
+        data: updateData,
       );
     }
-    await _db.execute(
-      'UPDATE groups SET archived_at = ?, updated_at = ? WHERE id = ?',
-      [now, now, groupId],
-    );
+    if (shouldAutoFreeze) {
+      await _db.execute(
+        'UPDATE groups SET archived_at = ?, settlement_freeze_at = ?, settlement_snapshot_json = ?, updated_at = ? WHERE id = ?',
+        [now, now, _archiveAutoFreezeMarker, now, groupId],
+      );
+    } else {
+      await _db.execute(
+        'UPDATE groups SET archived_at = ?, updated_at = ? WHERE id = ?',
+        [now, now, groupId],
+      );
+    }
   }
 
   @override
   Future<void> unarchive(String groupId) async {
     final now = _nowIso();
+    final rows = await _db.getAll(
+      'SELECT settlement_snapshot_json FROM groups WHERE id = ?',
+      [groupId],
+    );
+    final current = rows.isNotEmpty ? rows.first : null;
+    final shouldAutoUnfreeze = shouldAutoUnfreezeOnUnarchive(
+      current?['settlement_snapshot_json'],
+    );
+
+    final updateData = <String, Object?>{'archived_at': null, 'updated_at': now};
+    if (shouldAutoUnfreeze) {
+      updateData['settlement_freeze_at'] = null;
+      updateData['settlement_snapshot_json'] = null;
+    }
+
     if (!_isLocalOnly && _isOnline && _client != null) {
-      await _client
-          .from('groups')
-          .update({'archived_at': null, 'updated_at': now})
-          .eq('id', groupId);
+      await _client.from('groups').update(updateData).eq('id', groupId);
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,
       isOnline: _isOnline,
@@ -702,13 +757,20 @@ class PowerSyncGroupRepository implements IGroupRepository {
         tableName: 'groups',
         operation: 'update',
         rowId: groupId,
-        data: {'archived_at': null, 'updated_at': now},
+        data: updateData,
       );
     }
-    await _db.execute(
-      'UPDATE groups SET archived_at = NULL, updated_at = ? WHERE id = ?',
-      [now, groupId],
-    );
+    if (shouldAutoUnfreeze) {
+      await _db.execute(
+        'UPDATE groups SET archived_at = NULL, settlement_freeze_at = NULL, settlement_snapshot_json = NULL, updated_at = ? WHERE id = ?',
+        [now, groupId],
+      );
+    } else {
+      await _db.execute(
+        'UPDATE groups SET archived_at = NULL, updated_at = ? WHERE id = ?',
+        [now, groupId],
+      );
+    }
   }
 
   /// Local-only: not written to pending_writes or Supabase. Persists on device only.
@@ -1181,14 +1243,14 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
         ? jsonEncode(expense.lineItems!.map((e) => e.toJson()).toList())
         : null;
 
-    final receiptPaths =
-        expense.receiptImagePaths ??
-        (expense.receiptImagePath != null ? [expense.receiptImagePath!] : null);
-    final receiptPath = receiptPaths != null && receiptPaths.isNotEmpty
-        ? receiptPaths.first
-        : expense.receiptImagePath;
-    final receiptPathsJson = receiptPaths != null
-        ? jsonEncode(receiptPaths)
+    final imagePaths =
+        expense.imagePaths ??
+        (expense.imagePath != null ? [expense.imagePath!] : null);
+    final imagePath = imagePaths != null && imagePaths.isNotEmpty
+        ? imagePaths.first
+        : expense.imagePath;
+    final imagePathsJson = imagePaths != null
+        ? jsonEncode(imagePaths)
         : null;
     final data = <String, dynamic>{
       'id': id,
@@ -1207,8 +1269,8 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
       'to_participant_id': expense.toParticipantId,
       'tag': expense.tag,
       'line_items_json': lineItemsJson,
-      'receipt_image_path': receiptPath,
-      'receipt_image_paths': receiptPathsJson,
+      'image_path': imagePath,
+      'image_paths': imagePathsJson,
       'created_at': now,
       'updated_at': now,
     };
@@ -1232,7 +1294,7 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
       '''INSERT INTO expenses (id, group_id, payer_participant_id, amount_cents,
         currency_code, exchange_rate, base_amount_cents,
         title, description, date, split_type, split_shares_json,
-        type, to_participant_id, tag, line_items_json, receipt_image_path, receipt_image_paths,
+        type, to_participant_id, tag, line_items_json, image_path, image_paths,
         created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
       [
@@ -1252,8 +1314,8 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
         expense.toParticipantId,
         expense.tag,
         lineItemsJson,
-        receiptPath,
-        receiptPathsJson,
+        imagePath,
+        imagePathsJson,
         now,
         now,
       ],
@@ -1268,14 +1330,14 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
     final lineItemsJson = expense.lineItems != null
         ? jsonEncode(expense.lineItems!.map((e) => e.toJson()).toList())
         : null;
-    final receiptPaths =
-        expense.receiptImagePaths ??
-        (expense.receiptImagePath != null ? [expense.receiptImagePath!] : null);
-    final receiptPath = receiptPaths != null && receiptPaths.isNotEmpty
-        ? receiptPaths.first
-        : expense.receiptImagePath;
-    final receiptPathsJson = receiptPaths != null
-        ? jsonEncode(receiptPaths)
+    final imagePaths =
+        expense.imagePaths ??
+        (expense.imagePath != null ? [expense.imagePath!] : null);
+    final imagePath = imagePaths != null && imagePaths.isNotEmpty
+        ? imagePaths.first
+        : expense.imagePath;
+    final imagePathsJson = imagePaths != null
+        ? jsonEncode(imagePaths)
         : null;
 
     if (!_isLocalOnly && _isOnline && _client != null) {
@@ -1296,8 +1358,8 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
             'to_participant_id': expense.toParticipantId,
             'tag': expense.tag,
             'line_items_json': lineItemsJson,
-            'receipt_image_path': receiptPath,
-            'receipt_image_paths': receiptPathsJson,
+            'image_path': imagePath,
+            'image_paths': imagePathsJson,
             'updated_at': now,
           })
           .eq('id', expense.id);
@@ -1325,8 +1387,8 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
           'to_participant_id': expense.toParticipantId,
           'tag': expense.tag,
           'line_items_json': lineItemsJson,
-          'receipt_image_path': receiptPath,
-          'receipt_image_paths': receiptPathsJson,
+          'image_path': imagePath,
+          'image_paths': imagePathsJson,
           'updated_at': now,
         },
       );
@@ -1339,7 +1401,7 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
         payer_participant_id = ?,
         description = ?, date = ?, split_type = ?, split_shares_json = ?,
         type = ?, to_participant_id = ?, tag = ?,
-        line_items_json = ?, receipt_image_path = ?, receipt_image_paths = ?, updated_at = ?
+        line_items_json = ?, image_path = ?, image_paths = ?, updated_at = ?
       WHERE id = ?''',
       [
         expense.title,
@@ -1356,8 +1418,8 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
         expense.toParticipantId,
         expense.tag,
         lineItemsJson,
-        receiptPath,
-        receiptPathsJson,
+        imagePath,
+        imagePathsJson,
         now,
         expense.id,
       ],

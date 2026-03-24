@@ -28,6 +28,13 @@ import 'features/settings/providers/settings_framework_providers.dart';
 import 'features/settings/settings_definitions.dart';
 import 'app.dart';
 
+/// Web accessibility semantics are expensive on iOS Safari.
+/// Keep disabled by default and allow explicit opt-in per build.
+const bool enableWebSemantics = bool.fromEnvironment(
+  'ENABLE_WEB_SEMANTICS',
+  defaultValue: false,
+);
+
 void main() {
   runZonedGuarded(
     () async {
@@ -345,10 +352,17 @@ void main() {
             ),
           ),
         );
-        if (kIsWeb) {
+        if (kIsWeb && enableWebSemantics) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             SemanticsBinding.instance.ensureSemantics();
           });
+          Log.info(
+            'main: Web semantics enabled via ENABLE_WEB_SEMANTICS=true',
+          );
+        } else if (kIsWeb) {
+          Log.info(
+            'main: Web semantics disabled by default (set ENABLE_WEB_SEMANTICS=true to enable)',
+          );
         }
       }
 

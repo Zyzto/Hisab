@@ -6,13 +6,13 @@ import '../../../domain/domain.dart';
 import '../constants/expense_form_constants.dart';
 
 /// Title input with category tag button and optional add-photos button.
-/// When [onPickReceipt] is null, the camera button is hidden (e.g. when Photos section is visible).
+/// When [onPickImage] is null, the camera button is hidden (e.g. when Photos section is visible).
 class ExpenseTitleSection extends StatelessWidget {
   final TextEditingController controller;
   final String? selectedTag;
   final List<ExpenseTag> customTags;
   final VoidCallback onTagPicker;
-  final VoidCallback? onPickReceipt;
+  final VoidCallback? onPickImage;
   final String? Function(String?)? validator;
 
   const ExpenseTitleSection({
@@ -21,7 +21,7 @@ class ExpenseTitleSection extends StatelessWidget {
     required this.selectedTag,
     required this.customTags,
     required this.onTagPicker,
-    this.onPickReceipt,
+    this.onPickImage,
     this.validator,
   });
 
@@ -80,13 +80,13 @@ class ExpenseTitleSection extends StatelessWidget {
                   onPressed: onTagPicker,
                   tooltip: tagLabel ?? 'category'.tr(),
                 ),
-                if (onPickReceipt != null)
+                if (onPickImage != null)
                   IconButton(
                     icon: Icon(
                       Icons.camera_alt_outlined,
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
-                    onPressed: onPickReceipt,
+                    onPressed: onPickImage,
                     tooltip: 'add_photos'.tr(),
                   ),
               ],

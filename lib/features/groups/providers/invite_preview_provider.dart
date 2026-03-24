@@ -55,6 +55,66 @@ DateTime _parseDateTime(Object? value) => DateTime.parse(value.toString());
 DateTime? _parseDateTimeNullable(Object? value) =>
     value == null ? null : DateTime.tryParse(value.toString());
 
+Map<String, dynamic>? _extractFirstRow(dynamic value) {
+  if (value == null) return null;
+  if (value is List) {
+    if (value.isEmpty) return null;
+    final first = value.first;
+    if (first is Map<String, dynamic>) return first;
+    if (first is Map) return first.cast<String, dynamic>();
+    return null;
+  }
+  if (value is Map<String, dynamic>) return value;
+  if (value is Map) return value.cast<String, dynamic>();
+  return null;
+}
+
+bool _isMissingSettleColumnError(Object error) {
+  final text = error.toString().toLowerCase();
+  return text.contains('allow_member_settle_for_others') &&
+      (text.contains('does not exist') || text.contains('42703'));
+}
+
+bool _isReadonlyPreviewMode(String? accessMode) =>
+    accessMode == InviteAccessMode.readonlyJoin.value ||
+    accessMode == InviteAccessMode.readonlyOnly.value;
+
+Future<Map<String, dynamic>?> _loadInvitePreviewGroupRow({
+  required InvitePreviewRpc rpc,
+  required String token,
+}) async {
+  try {
+    final result = await rpc('get_invite_preview_group', {'p_token': token});
+    return _extractFirstRow(result);
+  } catch (error) {
+    if (!_isMissingSettleColumnError(error)) rethrow;
+  }
+
+  // Legacy backend fallback: older projects may not have
+  // groups.allow_member_settle_for_others yet.
+  final legacyResult = await rpc('get_invite_by_token', {'p_token': token});
+  final legacyRow = _extractFirstRow(legacyResult);
+  if (legacyRow == null) return null;
+
+  final accessMode = legacyRow['access_mode'] as String?;
+  if (!_isReadonlyPreviewMode(accessMode)) return null;
+
+  return <String, dynamic>{
+    'invite_id': legacyRow['invite_id'],
+    'invite_access_mode': accessMode,
+    'group_id': legacyRow['group_id'],
+    'group_name': legacyRow['group_name'],
+    'group_currency_code': legacyRow['group_currency_code'],
+    'group_settlement_method': 'greedy',
+    'group_treasurer_participant_id': null,
+    'group_allow_member_settle_for_others': false,
+    'group_created_at':
+        legacyRow['group_created_at'] ?? DateTime.now().toUtc().toIso8601String(),
+    'group_updated_at':
+        legacyRow['group_updated_at'] ?? DateTime.now().toUtc().toIso8601String(),
+  };
+}
+
 Map<String, int> _parseSplitShares(Object? value) {
   if (value == null) return {};
   dynamic parsed = value;
@@ -108,7 +168,7 @@ TransactionType _parseTransactionType(String? value) {
   }
 }
 
-List<String>? _parseReceiptImagePaths(Object? value) {
+List<String>? _parseImagePaths(Object? value) {
   if (value == null) return null;
   if (value is List) {
     final items = value.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
@@ -138,12 +198,8 @@ final invitePreviewDataProvider = FutureProvider.family<InvitePreviewData?, Stri
 ) async {
   final rpc = ref.read(invitePreviewRpcProvider);
 
-  final groupResult = await rpc('get_invite_preview_group', {'p_token': token});
-  if (groupResult == null || (groupResult is List && groupResult.isEmpty)) {
-    return null;
-  }
-  final groupRow = (groupResult is List ? groupResult.first : groupResult)
-      as Map<String, dynamic>;
+  final groupRow = await _loadInvitePreviewGroupRow(rpc: rpc, token: token);
+  if (groupRow == null) return null;
 
   final participantsResult = await rpc('get_invite_preview_participants', {
     'p_token': token,
@@ -227,8 +283,8 @@ final invitePreviewDataProvider = FutureProvider.family<InvitePreviewData?, Stri
           toParticipantId: row['to_participant_id'] as String?,
           tag: null,
           lineItems: null,
-          receiptImagePath: row['receipt_image_path'] as String?,
-          receiptImagePaths: _parseReceiptImagePaths(row['receipt_image_paths']),
+          imagePath: row['image_path'] as String?,
+          imagePaths: _parseImagePaths(row['image_paths']),
         ),
       )
       .toList();

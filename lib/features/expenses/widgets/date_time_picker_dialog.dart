@@ -12,10 +12,23 @@ Future<DateTime?> showDateTimePickerDialog(
   BuildContext context, {
   required DateTime initial,
   bool? use24h,
+  DateTime? maxDate,
 }) async {
+  final controller = _DateTimePickerTopBarController();
+  final isTabletOrWider = LayoutBreakpoints.isTabletOrWider(context);
+  final effectiveMaxDate = maxDate ?? DateTime.now();
   return showResponsiveSheet<DateTime>(
     context: context,
     title: 'date_and_time'.tr(),
+    tabletTopBarAction: isTabletOrWider
+        ? FilledButton(
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              controller.setToNow();
+            },
+            child: Text('today'.tr()),
+          )
+        : null,
     maxHeight: MediaQuery.of(context).size.height * 0.85,
     isScrollControlled: true,
     centerInFullViewport: true,
@@ -23,10 +36,28 @@ Future<DateTime?> showDateTimePickerDialog(
       builder: (ctx) => _DateTimePickerSheetContent(
         initial: initial,
         use24h: use24h,
+        maxDate: effectiveMaxDate,
+        topBarController: controller,
         sheetContext: ctx,
       ),
     ),
   );
+}
+
+class _DateTimePickerTopBarController {
+  VoidCallback? _setToNow;
+
+  void bindSetToNow(VoidCallback callback) {
+    _setToNow = callback;
+  }
+
+  void unbindSetToNow() {
+    _setToNow = null;
+  }
+
+  void setToNow() {
+    _setToNow?.call();
+  }
 }
 
 /// Sheet content: calendar, time selector, Today, Cancel/OK.
@@ -34,11 +65,15 @@ class _DateTimePickerSheetContent extends StatefulWidget {
   const _DateTimePickerSheetContent({
     required this.initial,
     this.use24h,
+    required this.maxDate,
+    required this.topBarController,
     required this.sheetContext,
   });
 
   final DateTime initial;
   final bool? use24h;
+  final DateTime maxDate;
+  final _DateTimePickerTopBarController topBarController;
   final BuildContext sheetContext;
 
   @override
@@ -49,6 +84,7 @@ class _DateTimePickerSheetContent extends StatefulWidget {
 class _DateTimePickerSheetContentState
     extends State<_DateTimePickerSheetContent> {
   late DateTime _selectedDate;
+  late DateTime _maxDateOnly;
 
   /// Hour in 24h (0-23). Used for both 24h and 12h; in 12h we derive display from this.
   late int _hour24;
@@ -59,10 +95,22 @@ class _DateTimePickerSheetContentState
   void initState() {
     super.initState();
     final i = widget.initial;
-    _selectedDate = DateTime(i.year, i.month, i.day);
+    final maxDate = widget.maxDate;
+    _maxDateOnly = DateTime(maxDate.year, maxDate.month, maxDate.day);
+    final initialDateOnly = DateTime(i.year, i.month, i.day);
+    _selectedDate = initialDateOnly.isAfter(_maxDateOnly)
+        ? _maxDateOnly
+        : initialDateOnly;
     _hour24 = i.hour;
     _minute = i.minute;
     _isAm = i.hour < 12;
+    widget.topBarController.bindSetToNow(_setToNow);
+  }
+
+  @override
+  void dispose() {
+    widget.topBarController.unbindSetToNow();
+    super.dispose();
   }
 
   void _setToNow() {
@@ -89,33 +137,35 @@ class _DateTimePickerSheetContentState
   Widget build(BuildContext context) {
     final ctx = widget.sheetContext;
     final use24h = widget.use24h ?? MediaQuery.alwaysUse24HourFormatOf(context);
+    final isTabletOrWider = LayoutBreakpoints.isTabletOrWider(context);
     return buildSheetShell(
       ctx,
       title: 'date_and_time'.tr(),
-      showTitleInBody: !LayoutBreakpoints.isTabletOrWider(context),
+      showTitleInBody: !isTabletOrWider,
       body: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                _setToNow();
-              },
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
+          if (!isTabletOrWider)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  _setToNow();
+                },
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                icon: const Icon(Icons.today_outlined, size: 18),
+                label: Text('today'.tr()),
               ),
-              icon: const Icon(Icons.today_outlined, size: 18),
-              label: Text('today'.tr()),
             ),
-          ),
           SizedBox(
             width: 320,
             child: Column(
@@ -126,7 +176,7 @@ class _DateTimePickerSheetContentState
                   key: ValueKey('${_selectedDate.year}-${_selectedDate.month}'),
                   initialDate: _selectedDate,
                   firstDate: DateTime(2000),
-                  lastDate: DateTime(2100),
+                  lastDate: _maxDateOnly,
                   currentDate: _selectedDate,
                   onDateChanged: (d) => setState(() => _selectedDate = d),
                 ),
@@ -195,7 +245,7 @@ class _DateTimePickerSheetContentState
         ],
       ),
       actions: [
-        if (!LayoutBreakpoints.isTabletOrWider(context))
+        if (!isTabletOrWider)
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
             child: Text('cancel'.tr()),
