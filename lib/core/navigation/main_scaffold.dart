@@ -37,6 +37,11 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
   DateTime? _lastBackPressAt;
   static const _doubleBackExitWindow = Duration(seconds: 2);
 
+  bool _isHomePath(String path) {
+    return path == RoutePaths.home ||
+        path.startsWith('${RoutePaths.homeModeBase}/');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -48,7 +53,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
         currentPath == RoutePaths.settings ||
         currentPath.startsWith('${RoutePaths.settings}/');
     final isAtArchived = currentPath == RoutePaths.archivedGroups;
-    final isAtHome = currentPath == RoutePaths.home;
+    final isAtHome = _isHomePath(currentPath);
     return isAtSettings || isAtArchived || isAtHome;
   }
 
@@ -57,7 +62,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
         currentPath == RoutePaths.settings ||
         currentPath.startsWith('${RoutePaths.settings}/');
     final isAtArchived = currentPath == RoutePaths.archivedGroups;
-    final isAtHome = currentPath == RoutePaths.home;
+    final isAtHome = _isHomePath(currentPath);
     if (isAtSettings || isAtArchived) {
       context.go(RoutePaths.home);
       return;
@@ -76,7 +81,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
   }
 
   bool _shouldShowNavBar() {
-    return widget.location == RoutePaths.home ||
+    return _isHomePath(widget.location) ||
         widget.location == RoutePaths.settings;
   }
 
@@ -299,8 +304,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
   }
 
   Widget _buildMainContent() {
-    final isMainPage =
-        widget.location == RoutePaths.home ||
+    final isMainPage = _isHomePath(widget.location) ||
         widget.location == RoutePaths.settings;
 
     if (isMainPage) {
