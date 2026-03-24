@@ -1,5 +1,7 @@
 # Configuration
 
+<!-- markdownlint-disable MD031 MD032 MD034 MD060 -->
+
 Hisab uses **Supabase** for authentication, database, and edge functions. Local data is stored in **SQLite** (via the PowerSync package) for offline use. All configuration is provided at build time via `--dart-define` — no secrets are committed to the repository.
 
 For the full backend setup guide (creating the Supabase project, applying migrations, deploying edge functions), see [SUPABASE_SETUP.md](SUPABASE_SETUP.md).
@@ -48,6 +50,7 @@ The app works fully offline with no configuration. Authentication, sync, invites
 | `SITE_URL` | Optional | Redirect URL for auth emails (magic link, sign-up confirmation). When set (e.g. `https://yourdomain.com`), verification and magic links in emails point here instead of the Supabase default (e.g. localhost). Must be in Supabase **Redirect URLs**. |
 | `FCM_VAPID_KEY` | Optional | VAPID key for Firebase Cloud Messaging on web (Web Push certificates in Firebase Console). Required for web push token. |
 | `FIREBASE_*` | Web only | Firebase web SDK options (`FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_PROJECT_ID`, `FIREBASE_STORAGE_BUCKET`, `FIREBASE_MESSAGING_SENDER_ID`, `FIREBASE_APP_ID`). No defaults are committed. **Debug:** provide via launch options using `--dart-define-from-file=dart_defines_online.json` (see example file). **CI:** GitHub Actions secrets are passed as `--dart-define` and injected into `web/index.html` and `web/firebase-messaging-sw.js` at build time. |
+| `ENABLE_WEB_SEMANTICS` | Web only, optional | Enables `SemanticsBinding.instance.ensureSemantics()` at startup. Default is `false` because iOS Safari may show severe scroll/input jank when semantics is always enabled. Turn on only for accessibility-focused builds. |
 
 **VSCode / development:** Copy `dart_defines_online.example.json` to `dart_defines_online.json` (gitignored). Put your real values only in `dart_defines_online.json`; the example file contains placeholders only. Fill in `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and optionally `FCM_VAPID_KEY` and all `FIREBASE_*` keys. For local dev, `INVITE_BASE_URL` and `SITE_URL` are set to `http://localhost:8080` so magic links and invite links open your dev app; the launch configs use `--web-port=8080` so the app always runs on that port. Add **http://localhost:8080** to **Supabase Dashboard → Authentication → URL Configuration → Redirect URLs**. Use the **Hisab (Online)** or **Hisab (Chrome Web)** launch configuration. The Dart app reads Firebase config from these dart-defines; for **web** runs, `web/index.html` and `web/firebase-messaging-sw.js` contain placeholders—replace them (e.g. with a local script that injects from `dart_defines_online.json`) before running web if you need FCM in debug, or rely on CI for production builds.
 
@@ -135,6 +138,16 @@ Add to `.vscode/launch.json`:
 
 ## Web-Specific Notes
 
+### iOS Safari performance and accessibility semantics
+
+Flutter web accessibility semantics are opt-in for performance reasons. In this project, semantics are disabled by default on web to avoid known iOS Safari jank. If you need always-on screen reader semantics, build with:
+
+```bash
+flutter build web --dart-define=ENABLE_WEB_SEMANTICS=true
+```
+
+Use this only for accessibility-targeted builds because it can reduce scroll smoothness on iOS Safari.
+
 ### OPFS for Better Performance
 
 For faster SQLite performance on web, serve with these headers:
@@ -203,6 +216,7 @@ flutter build web \
   --dart-define=SUPABASE_ANON_KEY=eyJhbGci... \
   --dart-define=INVITE_BASE_URL=https://yourdomain.com \
   --dart-define=SITE_URL=https://yourdomain.com \
+  --dart-define=ENABLE_WEB_SEMANTICS=false \
   --dart-define=FIREBASE_API_KEY=... \
   --dart-define=FIREBASE_PROJECT_ID=... \
   # ... other FIREBASE_* as in dart_defines_online.example.json

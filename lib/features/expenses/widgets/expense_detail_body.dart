@@ -57,22 +57,13 @@ class ExpenseDetailBody extends ConsumerWidget {
                   expense: expense,
                   use24HourFormat: ref.watch(use24HourFormatProvider),
                 ),
-                if (expense.effectiveReceiptImageUrls.isNotEmpty) ...[
+                if (expense.effectiveImageUrls.isNotEmpty) ...[
                   const SizedBox(height: 16),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(
-                      'receipt'.tr(),
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ),
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: expense.effectiveReceiptImageUrls
+                      children: expense.effectiveImageUrls
                           .map(
                             (url) => Padding(
                               padding: const EdgeInsets.only(right: 8),
@@ -80,8 +71,8 @@ class ExpenseDetailBody extends ConsumerWidget {
                                 width: 200,
                                 child: GestureDetector(
                                   onTap: () =>
-                                      showReceiptImageFullScreen(context, url),
-                                  child: buildReceiptImageView(
+                                      showExpenseImageFullScreen(context, url),
+                                  child: buildExpenseImageView(
                                     context,
                                     url,
                                     maxHeight: 280,
@@ -241,14 +232,6 @@ class ExpenseDetailBodyHeader extends StatelessWidget {
       children: [
         Icon(icon, size: 48, color: theme.colorScheme.primary),
         const SizedBox(height: 12),
-        Text(
-          expense.title,
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 4),
         Text(
           dateFormat.format(localDate),
           style: theme.textTheme.bodyMedium?.copyWith(

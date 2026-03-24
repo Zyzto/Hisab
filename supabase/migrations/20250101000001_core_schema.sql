@@ -64,7 +64,7 @@ CREATE TABLE public.expenses (
   to_participant_id UUID REFERENCES public.participants(id) ON DELETE SET NULL,
   tag TEXT,
   line_items_json TEXT,
-  receipt_image_path TEXT,
+  image_path TEXT,
   created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );

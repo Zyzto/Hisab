@@ -41,5 +41,5 @@ We do not retain deleted user data. After deletion, we have no additional retent
 
 ## See also
 
-- The app’s Privacy Policy (Settings → Privacy Policy in the app, or at https://hisab.shenepoy.com/privacy).
-- Short summary of deletion options on the web: https://hisab.shenepoy.com/delete-account (Firebase Hosting, same deploy as the app).
+- The app’s Privacy Policy (Settings → Privacy Policy in the app, or at [https://hisab.shenepoy.com/privacy](https://hisab.shenepoy.com/privacy)).
+- Short summary of deletion options on the web: [https://hisab.shenepoy.com/delete-account](https://hisab.shenepoy.com/delete-account) (Firebase Hosting, same deploy as the app).

@@ -72,6 +72,30 @@ void main() {
     expect(find.byIcon(Icons.arrow_forward), findsOneWidget);
   });
 
+  testWidgets('OnboardingPage supports deep-linked initial step', (tester) async {
+    final settings = await initializeHisabSettings();
+    if (settings == null) {
+      throw Exception('initializeHisabSettings returned null');
+    }
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [hisabSettingsProvidersProvider.overrideWithValue(settings)],
+        child: EasyLocalization(
+          path: 'assets/translations',
+          supportedLocales: testSupportedLocales,
+          fallbackLocale: const Locale('en'),
+          startLocale: const Locale('en'),
+          child: const MaterialApp(home: OnboardingPage(initialPage: 2)),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.byType(PageView), findsOneWidget);
+    expect(find.byIcon(Icons.arrow_back), findsOneWidget);
+  });
+
   testWidgets(
     'OnboardingPage disables next action while completion lock is active',
     (tester) async {

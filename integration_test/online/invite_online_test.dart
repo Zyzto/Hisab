@@ -596,8 +596,8 @@ void main() {
               userCParticipantId!: 300,
             },
             'type': 'expense',
-            'receipt_image_path': '/tmp/fake-receipt.jpg',
-            'receipt_image_paths': '["/tmp/fake-receipt.jpg"]',
+            'image_path': '/tmp/fake-image.jpg',
+            'image_paths': '["/tmp/fake-image.jpg"]',
           });
           await client.from('expenses').insert({
             'group_id': groupId,

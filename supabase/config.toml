@@ -106,8 +106,14 @@ file_size_limit = "50MiB"
 # [storage.image_transformation]
 # enabled = true
 
+[storage.buckets.expense-images]
+public = true
+file_size_limit = "50MiB"
+allowed_mime_types = ["image/png", "image/jpeg", "image/webp"]
+
+# Legacy bucket kept for backward compatibility with already-uploaded URLs.
 [storage.buckets.receipt-images]
-public = false
+public = true
 file_size_limit = "50MiB"
 allowed_mime_types = ["image/png", "image/jpeg", "image/webp"]
 

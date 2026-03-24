@@ -16,9 +16,14 @@ import '../providers/invite_preview_provider.dart';
 import 'group_detail_page.dart';
 
 class InviteGroupPreviewPage extends ConsumerWidget {
-  const InviteGroupPreviewPage({super.key, required this.token});
+  const InviteGroupPreviewPage({
+    super.key,
+    required this.token,
+    this.initialTab = GroupDetailTab.expenses,
+  });
 
   final String token;
+  final GroupDetailTab initialTab;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -53,6 +58,7 @@ class InviteGroupPreviewPage extends ConsumerWidget {
             readOnlyPreview: true,
             previewToken: token,
             previewAccessMode: preview.invite.accessMode,
+            initialTab: initialTab,
           ),
         );
       },

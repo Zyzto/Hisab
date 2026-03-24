@@ -47,11 +47,11 @@ class Expense {
   /// Optional detailed breakdown of the cost (bill/receipt line items).
   final List<ReceiptLineItem>? lineItems;
 
-  /// Optional path or URL to the first receipt image (backward compatibility).
-  final String? receiptImagePath;
+  /// Optional path or URL to the first attached image (backward compatibility).
+  final String? imagePath;
 
-  /// Optional ordered list of receipt image URLs (or paths). When non-null, [receiptImagePath] is the first element.
-  final List<String>? receiptImagePaths;
+  /// Optional ordered list of attached image URLs (or paths). When non-null, [imagePath] is the first element.
+  final List<String>? imagePaths;
 
   const Expense({
     required this.id,
@@ -72,16 +72,16 @@ class Expense {
     this.toParticipantId,
     this.tag,
     this.lineItems,
-    this.receiptImagePath,
-    this.receiptImagePaths,
+    this.imagePath,
+    this.imagePaths,
   });
 
-  /// Effective list of receipt image URLs: [receiptImagePaths] if non-empty, else single [receiptImagePath] if set.
-  List<String> get effectiveReceiptImageUrls =>
-      (receiptImagePaths != null && receiptImagePaths!.isNotEmpty)
-      ? receiptImagePaths!
-      : (receiptImagePath != null && receiptImagePath!.isNotEmpty)
-      ? [receiptImagePath!]
+  /// Effective list of attached image URLs: [imagePaths] if non-empty, else single [imagePath] if set.
+  List<String> get effectiveImageUrls =>
+      (imagePaths != null && imagePaths!.isNotEmpty)
+      ? imagePaths!
+      : (imagePath != null && imagePath!.isNotEmpty)
+      ? [imagePath!]
       : [];
 
   /// Returns the effective amount in the group's base currency (in cents).
@@ -107,8 +107,8 @@ class Expense {
     String? toParticipantId,
     String? tag,
     List<ReceiptLineItem>? lineItems,
-    String? receiptImagePath,
-    List<String>? receiptImagePaths,
+    String? imagePath,
+    List<String>? imagePaths,
   }) {
     return Expense(
       id: id ?? this.id,
@@ -129,8 +129,8 @@ class Expense {
       toParticipantId: toParticipantId ?? this.toParticipantId,
       tag: tag ?? this.tag,
       lineItems: lineItems ?? this.lineItems,
-      receiptImagePath: receiptImagePath ?? this.receiptImagePath,
-      receiptImagePaths: receiptImagePaths ?? this.receiptImagePaths,
+      imagePath: imagePath ?? this.imagePath,
+      imagePaths: imagePaths ?? this.imagePaths,
     );
   }
 }

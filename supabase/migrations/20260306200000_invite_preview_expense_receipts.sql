@@ -1,4 +1,4 @@
--- Allow read-only preview expense detail to include receipt images.
+-- Allow read-only preview expense detail to include attached images.
 
 DROP FUNCTION IF EXISTS public.get_invite_preview_expenses(TEXT, INT);
 
@@ -20,8 +20,8 @@ RETURNS TABLE(
   split_shares_json TEXT,
   type TEXT,
   to_participant_id UUID,
-  receipt_image_path TEXT,
-  receipt_image_paths TEXT,
+  image_path TEXT,
+  image_paths TEXT,
   created_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ
 ) AS $$
@@ -51,8 +51,8 @@ BEGIN
     e.split_shares_json,
     e.type,
     e.to_participant_id,
-    e.receipt_image_path,
-    e.receipt_image_paths,
+    e.image_path,
+    e.image_paths,
     e.created_at,
     e.updated_at
   FROM public.expenses e

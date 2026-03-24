@@ -323,6 +323,15 @@ class _SignInSheetState extends State<_SignInSheet> {
     return 'auth_generic_error'.tr();
   }
 
+  Widget _nonFocusableAction(Widget child) {
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      descendantsAreFocusable: false,
+      child: child,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -503,10 +512,12 @@ class _SignInSheetState extends State<_SignInSheet> {
                         const SizedBox(height: 12),
                         SizedBox(
                           width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: _loading ? null : _resendConfirmation,
-                            icon: const Icon(Icons.send, size: 18),
-                            label: Text('auth_resend_confirmation'.tr()),
+                          child: _nonFocusableAction(
+                            OutlinedButton.icon(
+                              onPressed: _loading ? null : _resendConfirmation,
+                              icon: const Icon(Icons.send, size: 18),
+                              label: Text('auth_resend_confirmation'.tr()),
+                            ),
                           ),
                         ),
                       ],
@@ -550,27 +561,31 @@ class _SignInSheetState extends State<_SignInSheet> {
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _loading
-                          ? null
-                          : () => _signInWithOAuth(OAuthProvider.google),
-                      icon: const Icon(Icons.g_mobiledata, size: 22),
-                      label: Text('auth_provider_google'.tr()),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: _nonFocusableAction(
+                      OutlinedButton.icon(
+                        onPressed: _loading
+                            ? null
+                            : () => _signInWithOAuth(OAuthProvider.google),
+                        icon: const Icon(Icons.g_mobiledata, size: 22),
+                        label: Text('auth_provider_google'.tr()),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _loading
-                          ? null
-                          : () => _signInWithOAuth(OAuthProvider.github),
-                      icon: const Icon(Icons.code, size: 20),
-                      label: Text('auth_provider_github'.tr()),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: _nonFocusableAction(
+                      OutlinedButton.icon(
+                        onPressed: _loading
+                            ? null
+                            : () => _signInWithOAuth(OAuthProvider.github),
+                        icon: const Icon(Icons.code, size: 20),
+                        label: Text('auth_provider_github'.tr()),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
                       ),
                     ),
                   ),
@@ -634,31 +649,35 @@ class _SignInSheetState extends State<_SignInSheet> {
               const SizedBox(height: 16),
 
               // Sign in / Sign up button
-              FilledButton(
-                onPressed: _loading ? null : _signInWithEmail,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: _loading
-                    ? SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: colorScheme.onPrimary,
+              _nonFocusableAction(
+                FilledButton(
+                  onPressed: _loading ? null : _signInWithEmail,
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: _loading
+                      ? SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: colorScheme.onPrimary,
+                          ),
+                        )
+                      : Text(
+                          _isSignUp ? 'auth_sign_up'.tr() : 'sign_in'.tr(),
+                          style: const TextStyle(fontSize: 16),
                         ),
-                      )
-                    : Text(
-                        _isSignUp ? 'auth_sign_up'.tr() : 'sign_in'.tr(),
-                        style: const TextStyle(fontSize: 16),
-                      ),
+                ),
               ),
               const SizedBox(height: 8),
 
               // Magic link button
-              TextButton(
-                onPressed: _loading ? null : _sendMagicLink,
-                child: Text('auth_magic_link'.tr()),
+              _nonFocusableAction(
+                TextButton(
+                  onPressed: _loading ? null : _sendMagicLink,
+                  child: Text('auth_magic_link'.tr()),
+                ),
               ),
 
               // Toggle sign-in / sign-up
@@ -673,18 +692,20 @@ class _SignInSheetState extends State<_SignInSheet> {
                       color: colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  TextButton(
-                    onPressed: _loading
-                        ? null
-                        : () => setState(() {
-                            _isSignUp = !_isSignUp;
-                            _error = null;
-                            if (_isSignUp) {
-                              _selectedAvatarId = defaultAvatarId;
-                            }
-                          }),
-                    child: Text(
-                      _isSignUp ? 'sign_in'.tr() : 'auth_sign_up'.tr(),
+                  _nonFocusableAction(
+                    TextButton(
+                      onPressed: _loading
+                          ? null
+                          : () => setState(() {
+                              _isSignUp = !_isSignUp;
+                              _error = null;
+                              if (_isSignUp) {
+                                _selectedAvatarId = defaultAvatarId;
+                              }
+                            }),
+                      child: Text(
+                        _isSignUp ? 'sign_in'.tr() : 'auth_sign_up'.tr(),
+                      ),
                     ),
                   ),
                 ],

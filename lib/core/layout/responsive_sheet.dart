@@ -49,6 +49,7 @@ Future<T?> showResponsiveSheet<T>({
   required BuildContext context,
   required Widget child,
   String? title,
+  Widget? tabletTopBarAction,
   double? maxWidth,
   double? maxHeight,
   bool isScrollControlled = true,
@@ -136,6 +137,15 @@ Future<T?> showResponsiveSheet<T>({
                                 ),
                               ),
                             ),
+                          if (tabletTopBarAction != null) ...[
+                            Focus(
+                              canRequestFocus: false,
+                              skipTraversal: true,
+                              descendantsAreFocusable: false,
+                              child: tabletTopBarAction,
+                            ),
+                            const SizedBox(width: 8),
+                          ],
                           // Use InkWell instead of IconButton so the close control is not
                           // focusable; otherwise the focus manager can steal focus from
                           // sheet content (e.g. password fields) during applyFocusChangesIfNeeded.
@@ -396,7 +406,7 @@ Future<T?> _showWebBottomSheet<T>({
 /// Shows a dialog that is centered in the content area on tablet when the
 /// navigation rail is visible (home or settings), otherwise centered in the
 /// full screen. Use for dialogs that must stay as dialog (e.g. full-screen
-/// receipt image) but should not overlap the rail on tablet.
+/// image viewer) but should not overlap the rail on tablet.
 ///
 /// Tapping/clicking outside the dialog (on the barrier) closes it when
 /// [barrierDismissible] is true (default), same as on mobile.

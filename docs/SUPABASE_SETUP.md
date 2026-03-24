@@ -1,5 +1,7 @@
 # Supabase Backend Setup Guide
 
+<!-- markdownlint-disable MD007 MD029 MD031 MD032 MD036 MD040 MD060 -->
+
 This guide walks you through setting up the Supabase backend for Hisab from scratch. Follow these steps if you are self-hosting or contributing to the project and need your own Supabase instance.
 
 > **Offline mode**: Hisab works fully offline without any Supabase configuration. Online features (sync, auth, invites, telemetry) are only available when Supabase is configured.
@@ -26,12 +28,13 @@ This guide walks you through setting up the Supabase backend for Hisab from scra
    - [Migration 12: Groups archive (archived_at)](#migration-12-groups-archive-archived_at)
    - [Migration 13: merge_participant_with_member (merge manual participant with user)](#migration-13-merge_participant_with_member-merge-manual-participant-with-user)
    - [Migration 14: Participants left/archived (left_at) and re-join reuse](#migration-14-participants-leftarchived-left_at-and-re-join-reuse)
-   - [Migration 15: Receipt images Storage bucket](#migration-15-receipt-images-storage-bucket)
+   - [Migration 15: Expense images Storage bucket](#migration-15-expense-images-storage-bucket)
    - [Migration 16: Groups personal and budget (is_personal, budget_amount_cents)](#migration-16-groups-personal-and-budget-is_personal-budget_amount_cents)
    - [Migration 17: Anonymize only on account delete](#migration-17-anonymize-only-on-account-delete)
-   - [Migration 18: Receipt image paths (multiple photos)](#migration-18-receipt-image-paths-multiple-photos)
+   - [Migration 18: Expense image paths (multiple photos)](#migration-18-expense-image-paths-multiple-photos)
    - [Migration 19: Groups allow_member_settle_for_others](#migration-19-groups-allow_member_settle_for_others)
    - [Migration 20: Fix accept_invite null-expiry validation](#migration-20-fix-accept_invite-null-expiry-validation)
+   - [Post–Migration 20: Invite access mode and read-only preview](#postmigration-20-invite-access-mode-and-read-only-preview)
 4. [Configure Authentication](#4-configure-authentication)
 5. [Deploy Edge Functions](#5-deploy-edge-functions)
    - [Push notifications: end-to-end flow and verification](#push-notifications-end-to-end-flow-and-verification)
@@ -46,7 +49,8 @@ This guide walks you through setting up the Supabase backend for Hisab from scra
 ## 1. Prerequisites
 
 - A [Supabase](https://supabase.com/) account (free tier works)
-- [Supabase CLI](https://supabase.com/docs/guides/cli) installed (optional, for Edge Functions)
+- [Supabase CLI](https://supabase.com/docs/guides/cli) (`npm i -g supabase` or `npx supabase` from the repo root)
+- A container engine with a **Docker-compatible API** for **local** `supabase start`: [Docker](https://docs.docker.com/desktop/) **or** [Podman](https://podman.io/) (see [Local Supabase with Podman](#local-supabase-with-podman)). Not required for hosted-only workflows.
 - Flutter SDK installed
 - A Google Cloud project (for Google OAuth, optional)
 - A GitHub OAuth app (for GitHub OAuth, optional)
@@ -82,13 +86,44 @@ Run this repo-level guard before opening a PR (and in CI):
 bash ./scripts/verify_supabase_config_as_code.sh
 ```
 
-For local reproducibility and drift detection:
+For local reproducibility and drift detection (Docker or Podman must be running—see below):
 
 ```bash
-supabase start
-supabase db reset
-supabase status
+supabase start          # or: npx supabase start
+supabase db reset       # applies migrations + seed.sql
+supabase status         # API URL and anon key for --dart-define / .env
 ```
+
+### Local Supabase with Podman
+
+The Supabase CLI talks to the Docker API. With **Podman**, point `DOCKER_HOST` at Podman’s socket so `supabase start` uses your containers.
+
+**Linux (rootless, common setup)**
+
+1. Enable the user socket (once): `systemctl --user enable --now podman.socket`
+2. From a new shell, either export the socket or use the repo helper:
+
+```bash
+export DOCKER_HOST=unix://${XDG_RUNTIME_DIR}/podman/podman.sock
+cd /path/to/Hisab
+npx supabase start
+```
+
+Or run any subcommand via:
+
+```bash
+./scripts/supabase_with_podman.sh start
+./scripts/supabase_with_podman.sh db reset
+./scripts/supabase_with_podman.sh status
+```
+
+The script sets `DOCKER_HOST` when it finds `${XDG_RUNTIME_DIR}/podman/podman.sock` or `/run/user/$(id -u)/podman/podman.sock`.
+
+**macOS**
+
+Run `podman machine start`, then set `DOCKER_HOST` to the path shown by `podman machine inspect` (Podman socket), or use a `podman`-backed `docker` CLI if you prefer.
+
+**Note:** Some distros ship `podman-docker` / `docker` as a wrapper to Podman; if `docker ps` already works, plain `supabase start` may succeed without setting `DOCKER_HOST`.
 
 If `supabase db reset` fails or requires manual SQL not present in `supabase/migrations/*.sql`, your local/live state has drifted from config-as-code and should be fixed by adding a migration.
 
@@ -170,7 +205,7 @@ CREATE TABLE public.expenses (
   to_participant_id UUID REFERENCES public.participants(id) ON DELETE SET NULL,
   tag TEXT,
   line_items_json TEXT,
-  receipt_image_path TEXT,
+  image_path TEXT,
   created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
 );
@@ -428,10 +463,25 @@ CREATE POLICY "group_invites_delete" ON public.group_invites
 
 -- =============================================
 -- Telemetry Policies (insert-only, any user including anonymous)
--- Intentional: anonymous usage events; WITH CHECK (true) is deliberate.
+-- Anonymous inserts stay allowed, but payloads are constrained.
 -- =============================================
 CREATE POLICY "telemetry_insert" ON public.telemetry
-  FOR INSERT WITH CHECK (true);
+  FOR INSERT TO anon, authenticated
+  WITH CHECK (
+    length(btrim(event)) >= 1
+    AND length(event) <= 120
+    AND event ~ '^[a-z0-9]+([._:-][a-z0-9]+)*$'
+    AND "timestamp" IS NOT NULL
+    AND "timestamp" >= (now() - interval '1 day')
+    AND "timestamp" <= (now() + interval '5 minutes')
+    AND (
+      data IS NULL
+      OR (
+        jsonb_typeof(data) = 'object'
+        AND pg_column_size(data) <= 16384
+      )
+    )
+  );
 ```
 
 ### Migration 3: RPC Functions
@@ -1673,12 +1723,12 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 
 **Note:** RLS already allows owner/admin to update participants; `left_at` is included. New RPC `archive_participant` is callable by owner/admin. Grant execute to authenticated if needed: `GRANT EXECUTE ON FUNCTION public.archive_participant(UUID, UUID) TO authenticated;` (typically RPCs are granted in Migration 4 or your project’s RPC grants).
 
-### Migration 15: Receipt images Storage bucket
+### Migration 15: Expense images Storage bucket
 
-Expense receipt images are uploaded to Supabase Storage so all group members can see them. The app stores the public URL in `expenses.receipt_image_path`.
+Expense images are uploaded to Supabase Storage so all group members can see them. The app stores the public URL in `expenses.image_path`.
 
-1. **Create the bucket in the Dashboard**: Go to **Storage** → **New bucket**. Name: `receipt-images`. Set **Public bucket** to **Yes** (so `getPublicUrl()` works without signed URLs). Optionally set file size limit (e.g. 10 MB) and allowed MIME types (e.g. `image/jpeg`, `image/png`, `image/webp`, `image/heic`).
-2. **Apply the migration** (run the SQL in `supabase/migrations/20250101000015_receipt_images_bucket.sql`) to add RLS policies on `storage.objects`:
+1. **Create the bucket in the Dashboard**: Go to **Storage** → **New bucket**. Name: `expense-images`. Set **Public bucket** to **Yes** (so `getPublicUrl()` works without signed URLs). Optionally set file size limit (e.g. 10 MB) and allowed MIME types (e.g. `image/jpeg`, `image/png`, `image/webp`, `image/heic`).
+2. **Apply the migration** (run the SQL in `supabase/migrations/20250101000015_receipt_images_bucket.sql` — legacy filename, now configures `expense-images`) to add RLS policies on `storage.objects`:
    - **INSERT**: Authenticated users can upload only into paths whose first folder is a group they belong to (`group_id/expense_id/filename`).
    - **SELECT**: Authenticated users can read objects in groups they belong to.
 
@@ -1704,14 +1754,14 @@ Reverts anonymization from leave/kick/archive. Names are anonymized **only when 
 
 Apply the migration file `supabase/migrations/20250101000017_anonymize_on_delete.sql`. It keeps `leave_group`, `kick_member`, and `archive_participant` focused on membership state (`left_at`) and adds `public.anonymize_participants_on_user_delete()` plus trigger `trigger_anonymize_participants_on_user_delete` on `auth.users`.
 
-### Migration 18: Receipt image paths (multiple photos)
+### Migration 18: Expense image paths (multiple photos)
 
-Adds `receipt_image_paths` (TEXT, JSON array of URLs) to `expenses` for up to 5 photos per expense. `receipt_image_path` remains for backward compatibility (first image).
+Adds `image_paths` (TEXT, JSON array of URLs) to `expenses` for up to 5 photos per expense. `image_path` remains the first image.
 
 **Apply:**
 
-- **SQL Editor:** Run the contents of `supabase/migrations/20250101000018_receipt_image_paths.sql`.
-- **Supabase MCP:** `apply_migration` with `project_id`, `name`: `receipt_image_paths`, and `query` from that file (or the one-liner: `ALTER TABLE public.expenses ADD COLUMN IF NOT EXISTS receipt_image_paths TEXT;`).
+- **SQL Editor:** Run the contents of `supabase/migrations/20250101000018_receipt_image_paths.sql` (legacy filename; this migration now adds `image_paths`).
+- **Supabase MCP:** `apply_migration` with `project_id`, `name`: `image_paths`, and `query` from that file (or the one-liner: `ALTER TABLE public.expenses ADD COLUMN IF NOT EXISTS image_paths TEXT;`).
 - **CLI:** From repo root, `supabase db push` (or link project and run migrations).
 
 ### Migration 19: Groups allow_member_settle_for_others
@@ -1727,7 +1777,7 @@ ALTER TABLE public.groups
 
 Aligns `accept_invite` with `get_invite_by_token` so invites with `expires_at IS NULL` ("Never" expiry) are accepted. Also pre-filters inactive or max-used invites in the token lookup.
 
-Use the exact SQL from `supabase/migrations/20260306120000_fix_accept_invite_null_expiry_validation.sql` (source of truth). It matches production and redefines both overloads:
+Use the exact SQL from `supabase/migrations/20260306120000_fix_accept_invite_null_expiry_validation.sql` (source of truth). It redefines both overloads:
 
 - `accept_invite(TEXT)` (legacy signature)
 - `accept_invite(TEXT, UUID, TEXT)` (current app signature)
@@ -1737,6 +1787,68 @@ This migration preserves participant reuse (`left_at` restoration), invite usage
 ```sql
 -- Run the exact SQL in:
 -- supabase/migrations/20260306120000_fix_accept_invite_null_expiry_validation.sql
+```
+
+### Post–Migration 20: Invite access mode and read-only preview
+
+**Cloud vs repo:** Hosted Supabase should expose the same **schema and RPC behavior** as this repository. The ordered source of truth is every file under [`supabase/migrations/`](../supabase/migrations/) (lexicographic order matches apply order). Dashboard **migration version strings** may differ from these filenames (e.g. applied via SQL Editor or squashed under another timestamp); use live checks below—not only the migration list—to detect drift.
+
+Use **Supabase CLI** (`supabase link` then `supabase db push`), **SQL Editor**, or **Supabase MCP** `apply_migration` (paste the SQL from the matching file under `supabase/migrations/`) to align a hosted project with the repo. MCP records new rows in the dashboard migration history with its own timestamped version (equivalent SQL to the files below). Local parity check:
+
+```bash
+supabase start
+supabase db reset   # applies all migrations + seed.sql
+```
+
+The following migrations extend invites for **access modes** (`standard`, `readonly_join`, `readonly_only`), **anonymous preview RPCs** (`get_invite_preview_group`, `get_invite_preview_participants`, `get_invite_preview_expenses` with `GRANT … TO anon`), **never-expiring invites** (`expires_at` nullable), and preview expense **image** columns. Apply them after Migration 20 (or in one shot via full migration set).
+
+| File | Purpose |
+|------|---------|
+| `20260306012804_invite_access_mode_readonly_preview_fixup.sql` | `create_invite` / `get_invite_by_token` / `accept_invite` updates for access modes and invite lifecycle |
+| `20260306012833_invite_access_mode_readonly_preview_column.sql` | `group_invites.access_mode` column and check constraint |
+| `20260306173000_invite_access_mode_readonly_preview.sql` | `create_invite` signature alignment; `get_invite_by_token` columns; `accept_invite` blocks `readonly_only` |
+| `20260306174500_invite_preview_token_rpcs.sql` | Initial token-based preview RPCs + `GRANT` to `anon` / `authenticated` |
+| `20260306193000_invite_preview_hardening.sql` | Preview limited to readonly invite modes; bounded preview expenses; `create_invite` interval / access_mode validation |
+| `20260306194000_invite_expiry_nullable.sql` | `group_invites.expires_at` nullable for never-expiring invites |
+| `20260306200000_invite_preview_expense_receipts.sql` | Preview expense rows include image paths for read-only expense detail |
+
+Do not duplicate Migration 20’s file (`20260306120000_fix_accept_invite_null_expiry_validation.sql`) in a second apply step—it is already documented above.
+
+**Validating a linked project (e.g. Supabase MCP or SQL Editor):**
+
+| Check | Notes |
+|-------|--------|
+| `group_invites.access_mode` | `text`, `NOT NULL`, default `standard`; check constraint on allowed values |
+| `group_invites.expires_at` | Nullable for never-expiring invites (`20260306194000`) |
+| Preview RPCs | `get_invite_preview_group`, `get_invite_preview_participants`, `get_invite_preview_expenses` in `public`; `GRANT EXECUTE` to `anon` and `authenticated` |
+| Preview hardening | After `20260306193000_invite_preview_hardening.sql`, `get_invite_preview_group` (and related preview RPCs) must filter with `access_mode IN ('readonly_join','readonly_only')` so **standard** invite tokens do not return preview data. |
+| `get_invite_preview_expenses` | The app calls RPC with **`p_token` and `p_limit`**. Postgres should expose `get_invite_preview_expenses(text, integer)` (`20260306193000` then `20260306200000_invite_preview_expense_receipts.sql` for image columns). |
+
+**Drift verification SQL (recommended):**
+
+```sql
+-- 1) Confirm expenses table columns are aligned.
+SELECT column_name
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'expenses'
+  AND column_name IN ('image_path', 'image_paths', 'receipt_image_path', 'receipt_image_paths')
+ORDER BY column_name;
+
+-- 2) Inspect the live RPC body (source of truth in DB runtime).
+SELECT pg_get_functiondef('public.get_invite_preview_expenses(text, integer)'::regprocedure) AS fn_sql;
+
+-- 3) Guardrail check: no hard legacy column references.
+-- has_hard_legacy_ref should be false.
+WITH fn AS (
+  SELECT pg_get_functiondef('public.get_invite_preview_expenses(text, integer)'::regprocedure) AS body
+)
+SELECT
+  body LIKE '%e.receipt_image_path%' AS has_hard_legacy_ref,
+  body LIKE '%e.receipt_image_paths%' AS has_hard_legacy_refs_plural,
+  body LIKE '%to_jsonb(e)->>''image_path''%' AS has_image_path_lookup,
+  body LIKE '%to_jsonb(e)->>''receipt_image_path''%' AS has_compat_fallback_lookup
+FROM fn;
 ```
 
 ---
@@ -2086,7 +2198,7 @@ The following matches the live schema when Migrations 1–8 (or equivalent) are 
 | **groups** | id, name, currency_code, owner_id, settlement_method, treasurer_participant_id, settlement_freeze_at, settlement_snapshot_json, allow_member_add_expense, allow_member_add_participant, allow_member_change_settings, require_participant_assignment, allow_expense_as_other_participant, allow_member_settle_for_others, icon, color, created_at, updated_at |
 | **participants** | id, group_id, name, sort_order, user_id, avatar_id, left_at, created_at, updated_at |
 | **group_members** | id, group_id, user_id, role, participant_id, joined_at |
-| **expenses** | id, group_id, payer_participant_id, amount_cents, currency_code, exchange_rate, base_amount_cents, title, description, date, split_type, split_shares_json, type, to_participant_id, tag, line_items_json, receipt_image_path, receipt_image_paths, created_at, updated_at |
+| **expenses** | id, group_id, payer_participant_id, amount_cents, currency_code, exchange_rate, base_amount_cents, title, description, date, split_type, split_shares_json, type, to_participant_id, tag, line_items_json, image_path, image_paths, created_at, updated_at |
 | **expense_tags** | id, group_id, label, icon_name, created_at, updated_at |
 | **group_invites** | id, group_id, token, invitee_email, role, created_at, expires_at, created_by, label, max_uses, use_count, is_active |
 | **invite_usages** | id, invite_id, user_id, accepted_at |

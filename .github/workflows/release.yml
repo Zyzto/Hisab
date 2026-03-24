@@ -14,6 +14,13 @@ on:
         description: "Deploy web build to Firebase Hosting"
         type: boolean
         default: true
+      web_build_mode:
+        description: "Web build mode: default (CanvasKit) or wasm (Skwasm with fallback)"
+        type: choice
+        options:
+          - default
+          - wasm
+        default: default
 
 # Cancel previous runs on the same ref so we don't waste minutes.
 concurrency:
@@ -23,6 +30,7 @@ concurrency:
 env:
   FLUTTER_VERSION: "3.38.2" # keep in sync with your local SDK
   JAVA_VERSION: "17"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   # ──────────────────────────────────────────────
@@ -33,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -49,7 +57,7 @@ jobs:
         run: flutter test
 
       - name: Install Chrome
-        uses: browser-actions/setup-chrome@v1
+        uses: browser-actions/setup-chrome@v2
 
       # ChromeDriver here is from the action (matches Chrome). Do not use project package.json chromedriver.
       - name: Install ChromeDriver
@@ -78,7 +86,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # cache: false avoids "Failed to FinalizeCacheEntryUpload (404) cache entry not found"
       # when this job is cancelled or runs under concurrency; save step is skipped.
@@ -132,7 +140,7 @@ jobs:
           echo "anon_key=$(supabase status --output json | jq -r '.ANON_KEY')" >> "$GITHUB_OUTPUT"
 
       - name: Install Chrome
-        uses: browser-actions/setup-chrome@v1
+        uses: browser-actions/setup-chrome@v2
 
       # ChromeDriver here is from the action (matches Chrome). Do not use project package.json chromedriver.
       - name: Install ChromeDriver
@@ -168,10 +176,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Java ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
@@ -224,13 +232,13 @@ jobs:
             --dart-define=FCM_VAPID_KEY=${{ secrets.FCM_VAPID_KEY }}
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
 
       - name: Upload AAB artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-aab
           path: build/app/outputs/bundle/release/app-release.aab
@@ -247,7 +255,7 @@ jobs:
       contents: write
     steps:
       - name: Download APK
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-apk
 
@@ -269,7 +277,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download AAB
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-aab
 
@@ -294,7 +302,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -317,11 +325,17 @@ jobs:
 
       - name: Build web
         run: |
+          WEB_WASM_FLAG=""
+          if [ "${{ github.event.inputs.web_build_mode }}" = "wasm" ]; then
+            WEB_WASM_FLAG="--wasm"
+          fi
           flutter build web \
+            $WEB_WASM_FLAG \
             --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
             --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
             --dart-define=INVITE_BASE_URL=${{ secrets.INVITE_BASE_URL }} \
             --dart-define=SITE_URL=${{ secrets.SITE_URL }} \
+            --dart-define=ENABLE_WEB_SEMANTICS=false \
             --dart-define=FCM_VAPID_KEY=${{ secrets.FCM_VAPID_KEY }} \
             --dart-define=FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }} \
             --dart-define=FIREBASE_AUTH_DOMAIN=${{ secrets.FIREBASE_AUTH_DOMAIN }} \

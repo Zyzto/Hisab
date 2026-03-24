@@ -1790,8 +1790,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             toParticipantId: toId,
             tag: e.tag,
             lineItems: e.lineItems,
-            receiptImagePath: e.receiptImagePath,
-            receiptImagePaths: e.receiptImagePaths,
+            imagePath: e.imagePath,
+            imagePaths: e.imagePaths,
           );
           await expenseRepo.create(expense);
         }

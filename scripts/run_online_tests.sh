@@ -2,8 +2,8 @@
 # Run online integration tests against a local Supabase instance.
 #
 # Prerequisites:
-#   - Docker running
-#   - Supabase CLI installed (supabase --version)
+#   - Docker or Podman (Supabase CLI uses the Docker API; Podman: see docs/SUPABASE_SETUP.md)
+#   - Supabase CLI installed (supabase --version) or npx supabase
 #
 # Usage:
 #   ./scripts/run_online_tests.sh            # web (default)
@@ -15,12 +15,23 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_DIR"
 
+SB() { command -v supabase >/dev/null 2>&1 && supabase "$@" || npx supabase "$@"; }
+
+# Rootless Podman: point Supabase at the user socket when DOCKER_HOST is unset.
+if [[ -z "${DOCKER_HOST:-}" ]]; then
+  if [[ -n "${XDG_RUNTIME_DIR:-}" && -S "${XDG_RUNTIME_DIR}/podman/podman.sock" ]]; then
+    export DOCKER_HOST="unix://${XDG_RUNTIME_DIR}/podman/podman.sock"
+  elif [[ -S "/run/user/$(id -u)/podman/podman.sock" ]]; then
+    export DOCKER_HOST="unix:///run/user/$(id -u)/podman/podman.sock"
+  fi
+fi
+
 SUPABASE_STARTED=0
 cleanup() {
   local exit_code=$?
   if [ "$SUPABASE_STARTED" -eq 1 ]; then
     echo "==> Stopping local Supabase..."
-    supabase stop || echo "WARN: supabase stop failed"
+    SB stop || echo "WARN: supabase stop failed"
   fi
   exit "$exit_code"
 }
@@ -30,12 +41,12 @@ echo "==> Verifying Supabase config-as-code invariants..."
 bash ./scripts/verify_supabase_config_as_code.sh
 
 echo "==> Starting local Supabase..."
-supabase start
+SB start
 SUPABASE_STARTED=1
 
 # Extract credentials from the running instance
-SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')
-SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')
+SUPABASE_URL=$(SB status --output json | jq -r '.API_URL')
+SUPABASE_ANON_KEY=$(SB status --output json | jq -r '.ANON_KEY')
 
 if [ -z "$SUPABASE_URL" ] || [ "$SUPABASE_URL" = "null" ]; then
   echo "ERROR: Could not get SUPABASE_URL from supabase status"
@@ -43,7 +54,7 @@ if [ -z "$SUPABASE_URL" ] || [ "$SUPABASE_URL" = "null" ]; then
 fi
 
 echo "==> Resetting database (apply migrations + seed)..."
-supabase db reset
+SB db reset
 
 echo "==> Running online integration tests (platform=$PLATFORM)..."
 echo "    SUPABASE_URL=$SUPABASE_URL"

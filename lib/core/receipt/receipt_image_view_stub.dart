@@ -8,25 +8,25 @@ import 'receipt_image_view_url.dart';
 import 'receipt_utils.dart';
 
 /// Full-screen view: URLs open in dialog with Image.network; local paths show message (web has no file access).
-void showReceiptImageFullScreen(BuildContext context, String imagePath) {
-  if (isReceiptImageUrl(imagePath)) {
-    showReceiptImageDialogForUrl(context, imagePath);
+void showExpenseImageFullScreen(BuildContext context, String imagePath) {
+  if (isImageUrl(imagePath)) {
+    showImageDialogForUrl(context, imagePath);
     return;
   }
   showResponsiveSheet<void>(
     context: context,
-    title: 'receipt'.tr(),
+    title: 'image'.tr(),
     maxHeight: MediaQuery.of(context).size.height * 0.35,
     isScrollControlled: true,
     centerInFullViewport: true,
     child: Builder(
       builder: (ctx) => buildSheetShell(
         ctx,
-        title: 'receipt'.tr(),
+        title: 'image'.tr(),
         showTitleInBody: !LayoutBreakpoints.isTabletOrWider(context),
         body: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text('receipt_preview_web'.tr()),
+          child: Text('image_preview_web'.tr()),
         ),
         actions: LayoutBreakpoints.isTabletOrWider(context)
             ? []
@@ -41,8 +41,8 @@ void showReceiptImageFullScreen(BuildContext context, String imagePath) {
   );
 }
 
-/// When dart:io is not available (e.g. web): show Image.network for URLs, else a chip that receipt is attached.
-Widget buildReceiptImageView(
+/// When dart:io is not available (e.g. web): show Image.network for URLs, else a chip that an image is attached.
+Widget buildExpenseImageView(
   BuildContext context,
   String? imagePath, {
   double? maxHeight,
@@ -51,7 +51,7 @@ Widget buildReceiptImageView(
   if (imagePath == null || imagePath.isEmpty) return const SizedBox.shrink();
   final theme = Theme.of(context);
   final colorScheme = theme.colorScheme;
-  if (isReceiptImageUrl(imagePath)) {
+  if (isImageUrl(imagePath)) {
     final effectiveMaxHeight = maxHeight ?? 200;
     return Padding(
       padding: const EdgeInsets.only(top: 8),
@@ -64,14 +64,7 @@ Widget buildReceiptImageView(
             fit: fit,
             loadingBuilder: (context, child, loadingProgress) {
               if (loadingProgress == null) return child;
-              return Center(
-                child: CircularProgressIndicator(
-                  value: loadingProgress.expectedTotalBytes != null
-                      ? loadingProgress.cumulativeBytesLoaded /
-                            loadingProgress.expectedTotalBytes!
-                      : null,
-                ),
-              );
+              return _buildImageLoadingSkeleton(context);
             },
             errorBuilder: (_, _, _) => Material(
               color: colorScheme.surfaceContainerHighest,
@@ -87,7 +80,7 @@ Widget buildReceiptImageView(
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      'receipt_image_unavailable'.tr(),
+                      'image_unavailable'.tr(),
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
@@ -111,14 +104,14 @@ Widget buildReceiptImageView(
         child: Row(
           children: [
             Icon(
-              Icons.receipt_long,
+              Icons.image_outlined,
               size: 40,
               color: colorScheme.onSurfaceVariant,
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'receipt_attached'.tr(),
+                'image_attached'.tr(),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
@@ -126,6 +119,40 @@ Widget buildReceiptImageView(
             ),
           ],
         ),
+      ),
+    ),
+  );
+}
+
+@Deprecated('Use showExpenseImageFullScreen instead.')
+void showReceiptImageFullScreen(BuildContext context, String imagePath) =>
+    showExpenseImageFullScreen(context, imagePath);
+
+@Deprecated('Use buildExpenseImageView instead.')
+Widget buildReceiptImageView(
+  BuildContext context,
+  String? imagePath, {
+  double? maxHeight,
+  BoxFit fit = BoxFit.cover,
+}) => buildExpenseImageView(
+  context,
+  imagePath,
+  maxHeight: maxHeight,
+  fit: fit,
+);
+
+Widget _buildImageLoadingSkeleton(BuildContext context) {
+  final colorScheme = Theme.of(context).colorScheme;
+  return DecoratedBox(
+    decoration: BoxDecoration(
+      color: colorScheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Center(
+      child: Icon(
+        Icons.image_outlined,
+        size: 30,
+        color: colorScheme.onSurfaceVariant,
       ),
     ),
   );

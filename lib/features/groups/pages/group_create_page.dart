@@ -24,8 +24,13 @@ import '../widgets/group_color_picker.dart';
 
 class GroupCreatePage extends ConsumerStatefulWidget {
   final bool isPersonal;
+  final int initialStep;
 
-  const GroupCreatePage({super.key, this.isPersonal = false});
+  const GroupCreatePage({
+    super.key,
+    this.isPersonal = false,
+    this.initialStep = 0,
+  });
 
   @override
   ConsumerState<GroupCreatePage> createState() => _GroupCreatePageState();
@@ -63,11 +68,56 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
   // ── Step 4 state ──
   bool _saving = false;
 
+  String _routeForPage(int page) {
+    if (widget.isPersonal) {
+      switch (page) {
+        case 1:
+          return RoutePaths.groupCreatePersonalStyle;
+        case 2:
+          return RoutePaths.groupCreatePersonalReview;
+        case 0:
+        default:
+          return RoutePaths.groupCreatePersonalDetails;
+      }
+    }
+    switch (page) {
+      case 1:
+        return RoutePaths.groupCreateParticipants;
+      case 2:
+        return RoutePaths.groupCreateStyle;
+      case 3:
+        return RoutePaths.groupCreateReview;
+      case 0:
+      default:
+        return RoutePaths.groupCreateDetails;
+    }
+  }
+
+  void _syncRouteWithPage(int page) {
+    final targetPath = _routeForPage(page);
+    final currentPath =
+        GoRouter.of(context).routerDelegate.currentConfiguration.uri.path;
+    if (currentPath != targetPath) {
+      context.go(targetPath);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    _pageController = PageController();
+    _currentPage = widget.initialStep.clamp(0, _pageCount - 1);
+    _pageController = PageController(initialPage: _currentPage);
     _selectedCurrency = CurrencyHelpers.defaultCurrency();
+  }
+
+  @override
+  void didUpdateWidget(covariant GroupCreatePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final targetPage = widget.initialStep.clamp(0, _pageCount - 1);
+    if (oldWidget.initialStep != widget.initialStep && targetPage != _currentPage) {
+      _currentPage = targetPage;
+      _pageController.jumpToPage(targetPage);
+    }
   }
 
   @override
@@ -229,6 +279,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                         onPageChanged: (i) {
                           final fromPage = _currentPage;
                           setState(() => _currentPage = i);
+                          _syncRouteWithPage(i);
                           // Clear focus after returning to step 0 so keyboard does not reopen.
                           if (i == 0 && fromPage > 0) {
                             WidgetsBinding.instance.addPostFrameCallback((_) {

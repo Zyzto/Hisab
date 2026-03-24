@@ -80,7 +80,7 @@ void main() {
           participantsByGroupProvider(groupId).overrideWithValue(AsyncValue.data([participant])),
           activeParticipantsByGroupProvider(groupId).overrideWithValue(AsyncValue.data([participant])),
           tagsByGroupProvider(groupId).overrideWithValue(const AsyncValue.data(<ExpenseTag>[])),
-          myRoleInGroupProvider(groupId).overrideWithValue(AsyncValue.data(GroupRole.owner)),
+          myRoleInGroupProvider(groupId).overrideWithValue(const AsyncValue.data(GroupRole.owner)),
           myMemberInGroupProvider(groupId).overrideWithValue(AsyncValue.data(member)),
         ],
         child: EasyLocalization(
@@ -145,7 +145,7 @@ void main() {
           participantsByGroupProvider(groupId).overrideWithValue(AsyncValue.data([participant])),
           activeParticipantsByGroupProvider(groupId).overrideWithValue(AsyncValue.data([participant])),
           tagsByGroupProvider(groupId).overrideWithValue(const AsyncValue.data(<ExpenseTag>[])),
-          myRoleInGroupProvider(groupId).overrideWithValue(AsyncValue.data(GroupRole.owner)),
+          myRoleInGroupProvider(groupId).overrideWithValue(const AsyncValue.data(GroupRole.owner)),
           myMemberInGroupProvider(groupId).overrideWithValue(AsyncValue.data(member)),
         ],
         child: EasyLocalization(

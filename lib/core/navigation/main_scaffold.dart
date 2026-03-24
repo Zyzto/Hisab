@@ -1,4 +1,4 @@
-import 'package:back_button_interceptor/back_button_interceptor.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -37,43 +37,39 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
   DateTime? _lastBackPressAt;
   static const _doubleBackExitWindow = Duration(seconds: 2);
 
+  bool _isHomePath(String path) {
+    return path == RoutePaths.home ||
+        path.startsWith('${RoutePaths.homeModeBase}/');
+  }
+
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.selectedIndex;
-    BackButtonInterceptor.add(_onBackInterceptor, context: context);
   }
 
-  @override
-  void dispose() {
-    BackButtonInterceptor.remove(_onBackInterceptor);
-    super.dispose();
-  }
-
-  bool _onBackInterceptor(bool stopDefaultButtonEvent, RouteInfo info) {
-    // Use the actual top route from GoRouter so we only intercept when the user
-    // is really on home/settings, not when they are on group/expense (pushed on top).
-    final currentPath = GoRouter.of(
-      context,
-    ).routerDelegate.currentConfiguration.uri.path;
+  bool _isManagedBackPath(String currentPath) {
     final isAtSettings =
         currentPath == RoutePaths.settings ||
         currentPath.startsWith('${RoutePaths.settings}/');
     final isAtArchived = currentPath == RoutePaths.archivedGroups;
-    final isAtHome = currentPath == RoutePaths.home;
-    if (isAtSettings) {
+    final isAtHome = _isHomePath(currentPath);
+    return isAtSettings || isAtArchived || isAtHome;
+  }
+
+  void _handleManagedBack(String currentPath) {
+    final isAtSettings =
+        currentPath == RoutePaths.settings ||
+        currentPath.startsWith('${RoutePaths.settings}/');
+    final isAtArchived = currentPath == RoutePaths.archivedGroups;
+    final isAtHome = _isHomePath(currentPath);
+    if (isAtSettings || isAtArchived) {
       context.go(RoutePaths.home);
-      return true;
-    }
-    if (isAtArchived) {
-      context.go(RoutePaths.home);
-      return true;
+      return;
     }
     if (isAtHome) {
-      _onBackPressed(context);
-      return true;
+      _onBackPressed();
     }
-    return false;
   }
 
   @override
@@ -85,19 +81,51 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
   }
 
   bool _shouldShowNavBar() {
-    return widget.location == RoutePaths.home ||
+    return _isHomePath(widget.location) ||
         widget.location == RoutePaths.settings;
   }
 
-  void _onBackPressed(BuildContext context) {
+  void _exitApp() {
+    // Browser tabs cannot be force-closed; try history pop first.
+    if (kIsWeb) {
+      final router = GoRouter.of(context);
+      if (router.canPop()) {
+        router.pop();
+        return;
+      }
+    }
+    SystemNavigator.pop();
+  }
+
+  void _onBackPressed() {
     final now = DateTime.now();
     if (_lastBackPressAt != null &&
         now.difference(_lastBackPressAt!) < _doubleBackExitWindow) {
-      SystemNavigator.pop();
+      _exitApp();
       return;
     }
     setState(() => _lastBackPressAt = now);
     context.showToast('press_back_again_to_exit'.tr());
+  }
+
+  Widget _wrapWithBackHandler(Widget child) {
+    final currentPath = GoRouter.of(
+      context,
+    ).routerDelegate.currentConfiguration.uri.path;
+    final shouldIntercept = _isManagedBackPath(currentPath);
+    return PopScope(
+      canPop: !shouldIntercept,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        final latestPath = GoRouter.of(
+          context,
+        ).routerDelegate.currentConfiguration.uri.path;
+        if (_isManagedBackPath(latestPath)) {
+          _handleManagedBack(latestPath);
+        }
+      },
+      child: child,
+    );
   }
 
   @override
@@ -111,7 +139,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     final useRail = LayoutBreakpoints.isTabletOrWider(context) && showNavBar;
 
     if (useRail) {
-      return Scaffold(
+      final scaffold = Scaffold(
         body: Row(
           children: [
             NavigationRail(
@@ -190,9 +218,10 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
           ],
         ),
       );
+      return _wrapWithBackHandler(scaffold);
     }
 
-    return Scaffold(
+    final scaffold = Scaffold(
       body: Stack(
         children: [
           Padding(
@@ -271,11 +300,11 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
         ],
       ),
     );
+    return _wrapWithBackHandler(scaffold);
   }
 
   Widget _buildMainContent() {
-    final isMainPage =
-        widget.location == RoutePaths.home ||
+    final isMainPage = _isHomePath(widget.location) ||
         widget.location == RoutePaths.settings;
 
     if (isMainPage) {

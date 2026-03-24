@@ -44,7 +44,7 @@ void main() {
     ];
   });
 
-  testWidgets('ExpenseDetailBody shows header and section labels', (
+  testWidgets('ExpenseDetailBody shows header without duplicate title', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -72,7 +72,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Test expense'), findsOneWidget);
+    expect(find.text('Test expense'), findsNothing);
     expect(find.byType(ExpenseDetailBodyHeader), findsOneWidget);
   });
 }

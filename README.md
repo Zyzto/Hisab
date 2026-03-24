@@ -1,5 +1,8 @@
 # Hisab
-<img src="assets/Hisab.png" width="150" />
+
+<!-- markdownlint-disable MD060 -->
+
+![Hisab logo](assets/Hisab.png)
 
 Group expense splitting and settle-up app. Built with Flutter, Riverpod, GoRouter, and Supabase.
 
@@ -23,35 +26,32 @@ When in Online mode and temporarily offline, you can still add expenses (queued 
 
 ## Screenshots
 
-<img src="screenshots/2.png" width="180" /><img src="screenshots/6.gif" width="180" /><details>
-<summary>Click to expand/hide</summary>
-<img src="screenshots/3.png" width="180" /><img src="screenshots/4.png" width="180" />
-
-<img src="screenshots/5.png" width="180" /><img src="screenshots/7.png" width="180" /><img src="screenshots/8.png" width="180" />
-</details>
+![Screenshot 2](screenshots/2.png)
+![Demo GIF](screenshots/6.gif)
+![Screenshot 3](screenshots/3.png)
+![Screenshot 4](screenshots/4.png)
+![Screenshot 5](screenshots/5.png)
+![Screenshot 7](screenshots/7.png)
+![Screenshot 8](screenshots/8.png)
 
 ## Install
 
 ### 🌐 Web / PWA
 
 The app is deployed as a **Progressive Web App (PWA)** and is hosted on Firebase Hosting. New versions are deployed via the [Release workflow](.github/workflows/release.yml) (on version tags `v*` or manual run). It works locally and offline.
-<h3>
-  <a href="https://hisab.shenepoy.com">
-    👉 Visit Hisab Web App
-  </a>
-</h3>
+
+### Visit the Web App
+
+[👉 Open Hisab Web App](https://hisab.shenepoy.com)
 
 - **Install:** Add to Home Screen via Chrome, Edge, or Safari.
 - **Offline:** Works perfectly without an internet connection.
 
-#
 ### Android
 
-**Option 1: Obtainium (Recommended) - Automatic Updates**
+#### Option 1: Obtainium (Recommended) - Automatic Updates
 
-<a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/Zyzto/Hisab">
-<img src="https://raw.githubusercontent.com/ImranR98/Obtainium/refs/heads/main/assets/graphics/badge_obtainium.png" alt="Get it on Obtainium" height="60"/>
-</a>
+[![Get it on Obtainium](https://raw.githubusercontent.com/ImranR98/Obtainium/refs/heads/main/assets/graphics/badge_obtainium.png)](https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/Zyzto/Hisab)
 
 - **Manual Setup**: Install [Obtainium](https://github.com/ImranR98/Obtainium) from [F-Droid](https://f-droid.org/packages/com.imranr98.obtainium/) or [GitHub Releases](https://github.com/ImranR98/Obtainium/releases), then:
   - Open Obtainium and tap the "+" button
@@ -59,11 +59,13 @@ The app is deployed as a **Progressive Web App (PWA)** and is hosted on Firebase
   - Enter repository: `Zyzto/Hisab`
 - Obtainium will automatically track new releases and notify you of updates
 
-**Option 2: Google Play Store** **WIP**
+#### Option 2: Google Play Store (WIP)
+
 - Available on [Google Play Store](https://play.google.com/store/apps/details?id=com.shenepoy.hisab) (when published)
 - Automatic updates through Play Store
 
-**Option 3: Direct Install (APK)**
+#### Option 3: Direct Install (APK)
+
 - Download the APK (e.g. `app-release.apk`) from [GitHub Releases](https://github.com/Zyzto/Hisab/releases/latest)
 - Enable "Install from unknown sources" in your Android settings
 - Tap the downloaded APK file to install

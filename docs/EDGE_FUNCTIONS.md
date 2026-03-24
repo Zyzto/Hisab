@@ -1,5 +1,7 @@
 # Supabase Edge Functions
 
+<!-- markdownlint-disable MD060 -->
+
 The **source of truth** for Edge Function code is this repo. Deploy with the Supabase CLI to keep the project in sync.
 
 ## Functions in this repo

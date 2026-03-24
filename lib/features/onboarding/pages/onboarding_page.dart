@@ -27,9 +27,14 @@ import '../widgets/onboarding_preferences_page.dart';
 import '../widgets/onboarding_welcome_page.dart';
 
 class OnboardingPage extends ConsumerStatefulWidget {
-  const OnboardingPage({super.key, this.forceBusyForTest = false});
+  const OnboardingPage({
+    super.key,
+    this.forceBusyForTest = false,
+    this.initialPage = 0,
+  });
 
   final bool forceBusyForTest;
+  final int initialPage;
 
   @override
   ConsumerState<OnboardingPage> createState() => _OnboardingPageState();
@@ -69,11 +74,35 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
   int _currentPage = 0;
   bool _isCompleting = false;
 
+  String _routeForPage(int page) {
+    switch (page) {
+      case 1:
+        return RoutePaths.onboardingPreferences;
+      case 2:
+        return RoutePaths.onboardingPermissions;
+      case 3:
+        return RoutePaths.onboardingConnect;
+      case 0:
+      default:
+        return RoutePaths.onboardingWelcome;
+    }
+  }
+
+  void _syncRouteWithPage(int page) {
+    final targetPath = _routeForPage(page);
+    final currentPath =
+        GoRouter.of(context).routerDelegate.currentConfiguration.uri.path;
+    if (currentPath != targetPath) {
+      context.go(targetPath);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _isCompleting = widget.forceBusyForTest;
-    _pageController = PageController(initialPage: 0);
+    _currentPage = widget.initialPage;
+    _pageController = PageController(initialPage: widget.initialPage);
     _languagePulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2000),
@@ -103,6 +132,16 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
         });
       }
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant OnboardingPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialPage != widget.initialPage &&
+        widget.initialPage != _currentPage) {
+      _currentPage = widget.initialPage;
+      _pageController.jumpToPage(widget.initialPage);
+    }
   }
 
   @override
@@ -166,6 +205,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                               _permissionStatusFuture = _loadPermissionStatus();
                             }
                           });
+                          _syncRouteWithPage(i);
                         },
                         children: [
                           const RepaintBoundary(child: OnboardingWelcomePage()),

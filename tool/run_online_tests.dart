@@ -8,7 +8,7 @@
 // Default: web.
 //
 // Fail-safes: timeouts (supabase 5min, flutter 25min), line length cap (64KB), top-level catch.
-// Prerequisites: Docker, Supabase CLI. For web: Chrome + ChromeDriver (port 4444). Set CHROME_EXECUTABLE if needed.
+// Prerequisites: Docker or Podman (Supabase CLI uses the Docker API; Podman: set DOCKER_HOST or use auto-detect below), Supabase CLI. For web: Chrome + ChromeDriver (port 4444). Set CHROME_EXECUTABLE if needed.
 
 import 'dart:async';
 import 'dart:convert';
@@ -53,6 +53,7 @@ Future<void> _run(List<String> args) async {
 
   Process? chromedriverProcess;
   int exitCode = 1;
+  Map<String, String>? supabaseProcessEnv;
 
   void tee(String line) {
     print(line);
@@ -66,19 +67,28 @@ Future<void> _run(List<String> args) async {
     final configAsCodeError = await _verifySupabaseConfigAsCode(projectRoot);
     if (configAsCodeError != null) {
       tee('ERROR: $configAsCodeError');
-    } else if (!await _checkDocker()) {
-      tee(
-        'ERROR: Docker is not running or not installed. Run "docker info" to check.',
-      );
-    } else if (!await _checkSupabaseCli()) {
-      tee(
-        'ERROR: Supabase CLI not found. Install: https://supabase.com/docs/guides/cli',
-      );
-    } else if (platform == 'web' && !await _checkChromeDriver()) {
-      tee(
-        'ERROR: ChromeDriver not on PATH (required for web). Version must match Chrome.',
-      );
     } else {
+      final env = await _supabaseProcessEnvironment();
+      supabaseProcessEnv = env;
+      final dh = env['DOCKER_HOST'];
+      if (dh != null && dh.isNotEmpty) {
+        tee('    DOCKER_HOST=$dh (for Supabase CLI)');
+      }
+      if (!await _checkContainerRuntime(env)) {
+        tee(
+          'ERROR: No container engine reachable (docker info / podman info failed). '
+          'Use Docker, or Podman with: systemctl --user enable --now podman.socket '
+          'and see docs/SUPABASE_SETUP.md — Local Supabase with Podman.',
+        );
+      } else if (!await _checkSupabaseCli()) {
+        tee(
+          'ERROR: Supabase CLI not found. Install: https://supabase.com/docs/guides/cli',
+        );
+      } else if (platform == 'web' && !await _checkChromeDriver()) {
+        tee(
+          'ERROR: ChromeDriver not on PATH (required for web). Version must match Chrome.',
+        );
+      } else {
       // ----- Start Supabase -----
       tee('==> Starting local Supabase...');
       final startExit = await _runProcessTeeWithTimeout(
@@ -87,6 +97,7 @@ Future<void> _run(List<String> args) async {
         workingDirectory: projectRoot,
         tee: tee,
         timeout: _supabaseTimeout,
+        environment: supabaseProcessEnv,
       );
       if (startExit != 0 && startExit != _exitTimeout) {
         tee('ERROR: supabase start failed');
@@ -102,6 +113,7 @@ Future<void> _run(List<String> args) async {
           tee: tee,
           timeout: _supabaseStatusTimeout,
           collectStdout: statusBuffer,
+          environment: supabaseProcessEnv,
         );
         if (statusExit != 0 && statusExit != _exitTimeout) {
           tee('ERROR: supabase status failed');
@@ -132,6 +144,7 @@ Future<void> _run(List<String> args) async {
               workingDirectory: projectRoot,
               tee: tee,
               timeout: _supabaseTimeout,
+              environment: supabaseProcessEnv,
             );
             if (resetExit != 0 && resetExit != _exitTimeout) {
               tee('ERROR: supabase db reset failed');
@@ -203,13 +216,16 @@ Future<void> _run(List<String> args) async {
           }
         }
       }
+      }
     }
   } finally {
     tee('==> Stopping local Supabase...');
+    final stopEnv = supabaseProcessEnv ?? Platform.environment;
     final stopProc = await Process.start(
       'supabase',
       ['stop'],
       workingDirectory: projectRoot,
+      environment: stopEnv,
       runInShell: true,
     );
     await Future.any(<Future<void>>[
@@ -246,9 +262,49 @@ String _timestamp() {
       '${now.second.toString().padLeft(2, '0')}';
 }
 
-Future<bool> _checkDocker() async {
-  final r = await Process.run('docker', ['info'], runInShell: true);
-  return r.exitCode == 0;
+/// Resolves [DOCKER_HOST] for rootless Podman when unset (Linux user socket).
+Future<Map<String, String>> _supabaseProcessEnvironment() async {
+  final env = Map<String, String>.from(Platform.environment);
+  final existing = env['DOCKER_HOST']?.trim();
+  if (existing != null && existing.isNotEmpty) {
+    return env;
+  }
+  final xdg = env['XDG_RUNTIME_DIR'];
+  if (xdg != null) {
+    final sock = '$xdg/podman/podman.sock';
+    if (await File(sock).exists()) {
+      env['DOCKER_HOST'] = 'unix://$sock';
+      return env;
+    }
+  }
+  final idResult = await Process.run('id', ['-u'], runInShell: true);
+  if (idResult.exitCode == 0) {
+    final uid = idResult.stdout.toString().trim();
+    final sock = '/run/user/$uid/podman/podman.sock';
+    if (await File(sock).exists()) {
+      env['DOCKER_HOST'] = 'unix://$sock';
+      return env;
+    }
+  }
+  return env;
+}
+
+/// True if `docker info` or `podman info` succeeds with [environment].
+Future<bool> _checkContainerRuntime(Map<String, String> environment) async {
+  final docker = await Process.run(
+    'docker',
+    ['info'],
+    environment: environment,
+    runInShell: true,
+  );
+  if (docker.exitCode == 0) return true;
+  final podman = await Process.run(
+    'podman',
+    ['info'],
+    environment: environment,
+    runInShell: true,
+  );
+  return podman.exitCode == 0;
 }
 
 Future<bool> _checkSupabaseCli() async {
@@ -284,12 +340,13 @@ Future<int> _runProcessTeeWithTimeout(
   required void Function(String) tee,
   required Duration timeout,
   StringBuffer? collectStdout,
+  Map<String, String>? environment,
 }) async {
   final process = await Process.start(
     executable,
     arguments,
     workingDirectory: workingDirectory,
-    environment: Platform.environment,
+    environment: environment ?? Platform.environment,
     runInShell: true,
   );
   void onLine(String line) {

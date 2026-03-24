@@ -1,5 +1,7 @@
 # GitHub Actions – Repository secrets
 
+<!-- markdownlint-disable MD060 -->
+
 Add these in **GitHub → Your repo → Settings → Secrets and variables → Actions**. Create each name exactly as below.
 
 ---
@@ -11,7 +13,7 @@ Add these in **GitHub → Your repo → Settings → Secrets and variables → A
 | `SUPABASE_URL` | Supabase project URL | Supabase Dashboard → Settings → API → Project URL (e.g. `https://xxxxx.supabase.co`) |
 | `SUPABASE_ANON_KEY` | Supabase anon/public key | Supabase Dashboard → Settings → API → Project API keys → `anon` `public` |
 | `FCM_VAPID_KEY` | Web push VAPID key (optional for Android; used if you build web too) | Firebase Console → Project Settings → Cloud Messaging → Web Push certificates → Key pair |
-| `KEYSTORE_BASE64` | Android release keystore, base64-encoded | `base64 -w 0 android/app/release-keystore.jks | pbcopy` (or equivalent) |
+| `KEYSTORE_BASE64` | Android release keystore, base64-encoded | `base64 -w 0 android/app/release-keystore.jks \| pbcopy` (or equivalent) |
 | `KEYSTORE_PASSWORD` | Keystore password | The password you set when creating the keystore |
 | `KEY_ALIAS` | Key alias in the keystore | e.g. `upload` |
 | `KEY_PASSWORD` | Key password | The password for the key entry |
@@ -46,6 +48,7 @@ Add these in **GitHub → Your repo → Settings → Secrets and variables → A
 The `test-online` job in `.github/workflows/release.yml` runs end-to-end tests against a **local Supabase Docker instance**. It does **not** require any additional secrets — the local Supabase instance generates its own URL and anon key at startup.
 
 What the job does:
+
 1. Sets up Flutter and Supabase CLI
 2. Starts local Supabase containers (`supabase start`)
 3. Resets the database — applies all migrations from `supabase/migrations/` (currently 20 SQL files) and seeds test users from `supabase/seed.sql`

@@ -1,5 +1,7 @@
 # Modal centering and responsive sheet
 
+<!-- markdownlint-disable MD060 -->
+
 This document describes modal/dialog centering on web (tablet and desktop), **click-outside-to-close** behavior, and how modals behave when opened from shell vs non–shell routes. For the broader adaptive/responsive plan (breakpoints, SafeArea, large screens), see [ADAPTIVE_RESPONSIVE_PLAN.md](ADAPTIVE_RESPONSIVE_PLAN.md).
 
 ## Problems addressed
@@ -28,12 +30,12 @@ This document describes modal/dialog centering on web (tablet and desktop), **cl
 ### Modals with `centerInFullViewport: true` (non–home/settings)
 
 - **Groups:** `create_invite_sheet.dart`, `invite_management_page.dart` (QR sheet, revoke confirm), `group_detail_page.dart` (merge, change role, archive/delete/kick participant, edit name, add participant), `group_settings_page.dart` (my_budget, change_currency confirm, settlement_method, edit name, change_icon_color, transfer_ownership, share/use_as_personal/archive/hide confirm, delete_group, leave_group).
-- **Expenses:** `expense_form_page.dart` (full features tooltip, category, create_new_tag, add_photo, receipt dialog, to, paid_by, split_type), `expense_detail_shell.dart` (delete expense confirm), `date_time_picker_dialog.dart`.
+- **Expenses:** `expense_form_page.dart` (full features tooltip, category, create_new_tag, add_photo, image dialog, to, paid_by, split_type), `expense_detail_shell.dart` (delete expense confirm), `date_time_picker_dialog.dart`.
 - **Balance:** `record_settlement_sheet.dart`.
 - **Onboarding:** `onboarding_page.dart` (language picker).
 - **Auth:** `sign_in_sheet.dart`.
 - **Permission:** `permission_service.dart` (permission denied sheet).
-- **Receipt:** `receipt_image_view_stub.dart`, `receipt_image_view_io.dart` (full-screen receipt dialogs and fallback sheet).
+- **Images:** `receipt_image_view_stub.dart`, `receipt_image_view_io.dart` (full-screen image dialogs and fallback sheet).
 - **Currency:** `currency_helpers.dart` – `CurrencyHelpers.showPicker(..., centerInFullViewport: true)` from group settings / group create; **`centerInFullViewport: false`** from app settings (favorite currencies) so the picker is centered in the content area next to the rail.
 
 ### Unchanged (home/settings only)
