@@ -76,6 +76,9 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
   bool _didAttemptPreviewRedirectForNotOnboarded = false;
   bool _didAttemptOnboardingRedirectForNotOnboarded = false;
 
+  bool _shouldAutoRedirectToPreview(InviteAccessMode? mode) =>
+      mode == InviteAccessMode.readonlyOnly;
+
   /// Set when accept fails because user is already a member; enables "Open Group" action.
   String? _alreadyMemberGroupId;
 
@@ -201,24 +204,34 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
             body: previewAsync.when(
               data: (preview) {
                 if (preview != null) {
-                  if (!_didAttemptPreviewRedirectForNotOnboarded) {
+                  final shouldAutoPreview = _shouldAutoRedirectToPreview(
+                    preview.invite.accessMode,
+                  );
+                  if (shouldAutoPreview && !_didAttemptPreviewRedirectForNotOnboarded) {
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       if (!mounted) return;
                       if (_didAttemptPreviewRedirectForNotOnboarded) return;
                       setState(
-                          () => _didAttemptPreviewRedirectForNotOnboarded = true);
+                        () => _didAttemptPreviewRedirectForNotOnboarded = true,
+                      );
                       if (mounted) {
                         context.go(RoutePaths.invitePreview(widget.token));
                       }
                     });
                   }
-                  if (_didAttemptPreviewRedirectForNotOnboarded) {
+                  if (shouldAutoPreview && _didAttemptPreviewRedirectForNotOnboarded) {
                     return _inviteStalledNavigationBody(
                       context,
                       onPrimary: () =>
                           context.go(RoutePaths.invitePreview(widget.token)),
                       primaryLabelKey: 'invite_preview_open_group',
                       onGoHome: () => context.go(RoutePaths.home),
+                    );
+                  }
+                  if (preview.invite.accessMode == InviteAccessMode.readonlyJoin ||
+                      preview.invite.accessMode == InviteAccessMode.standard) {
+                    return ConstrainedContent(
+                      child: _buildInviteContent(context, preview.invite, preview.group),
                     );
                   }
                   return const Center(child: CircularProgressIndicator());
@@ -366,7 +379,12 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                           ),
                         );
                       }
-                      if (kIsWeb && !_didAttemptWebPreviewRedirect) {
+                      final shouldAutoPreview = _shouldAutoRedirectToPreview(
+                        data.invite.accessMode,
+                      );
+                      if (kIsWeb &&
+                          shouldAutoPreview &&
+                          !_didAttemptWebPreviewRedirect) {
                         WidgetsBinding.instance.addPostFrameCallback((_) {
                           if (!mounted) return;
                           if (_didAttemptWebPreviewRedirect) return;
@@ -474,8 +492,13 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                     ),
                   );
                 }
+                final shouldAutoPreview = _shouldAutoRedirectToPreview(
+                  data.invite.accessMode,
+                );
                 final router = GoRouter.maybeOf(context);
-                if (router != null && !_didAttemptWebPreviewRedirect) {
+                if (router != null &&
+                    shouldAutoPreview &&
+                    !_didAttemptWebPreviewRedirect) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     if (!mounted) return;
                     if (_didAttemptWebPreviewRedirect) return;
@@ -607,11 +630,14 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
   ) {
     final theme = Theme.of(context);
     final isAuthenticated = ref.watch(isAuthenticatedProvider);
+    final localOnly = ref.watch(effectiveLocalOnlyProvider);
     final isReadonlyJoin = invite.accessMode == InviteAccessMode.readonlyJoin;
     final isReadonlyOnly = invite.accessMode == InviteAccessMode.readonlyOnly;
     final showReadonlyBanner = isReadonlyJoin || isReadonlyOnly;
     final canAcceptInvite = !isReadonlyOnly;
-    final showJoinOnboardingCta = isReadonlyJoin && !isAuthenticated;
+    final showJoinRequiresOnlineCta = isReadonlyJoin && localOnly;
+    final showJoinOnboardingCta =
+        isReadonlyJoin && !isAuthenticated && !localOnly;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -689,7 +715,12 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                   ),
                   const SizedBox(height: 12),
                 ],
-                if (showJoinOnboardingCta)
+                if (showJoinRequiresOnlineCta)
+                  FilledButton(
+                    onPressed: () => _goToOnlineRequiredForInvite(context),
+                    child: Text('invite_preview_join_cta'.tr()),
+                  )
+                else if (showJoinOnboardingCta)
                   FilledButton(
                     onPressed: () => _goToOnboardingForInvite(context),
                     child: Text('invite_preview_join_cta'.tr()),
@@ -727,6 +758,16 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
 
   void _goToOnboardingForInvite(BuildContext context) {
     _persistPendingInviteToken();
+    context.go(RoutePaths.onboarding);
+  }
+
+  void _goToOnlineRequiredForInvite(BuildContext context) {
+    _persistPendingInviteToken();
+    final isAuthenticated = ref.read(isAuthenticatedProvider);
+    if (isAuthenticated) {
+      context.go(RoutePaths.settings);
+      return;
+    }
     context.go(RoutePaths.onboarding);
   }
 
@@ -804,8 +845,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
       ref.invalidate(groupsProvider);
       ref.invalidate(futureGroupProvider(groupId));
       if (context.mounted) {
-        context.go(RoutePaths.home);
-        if (context.mounted) context.push(RoutePaths.groupDetail(groupId));
+        context.go(RoutePaths.groupDetail(groupId));
       }
     } catch (e, st) {
       Log.warning('Invite accept or sync failed', error: e, stackTrace: st);
@@ -864,6 +904,14 @@ class _InvitePreviewFallbackOnErrorState
     extends ConsumerState<_InvitePreviewFallbackOnError> {
   bool _didRedirect = false;
 
+  void _persistPendingInviteToken() {
+    final settings = ref.read(hisabSettingsProvidersProvider);
+    if (settings == null) return;
+    ref.read(settings.provider(pendingInviteTokenSettingDef).notifier).set(
+      widget.token,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.token.isEmpty) {
@@ -881,6 +929,42 @@ class _InvitePreviewFallbackOnErrorState
     return previewAsync.when(
       data: (preview) {
         if (preview != null) {
+          if (preview.invite.accessMode == InviteAccessMode.readonlyJoin) {
+            return Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          'invite_preview_readonly_join_message'.tr(),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton(
+                      onPressed: () =>
+                          context.go(RoutePaths.invitePreview(widget.token)),
+                      child: Text('invite_preview_open_group'.tr()),
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton(
+                      onPressed: () {
+                        _persistPendingInviteToken();
+                        context.go(RoutePaths.onboarding);
+                      },
+                      child: Text('invite_preview_join_cta'.tr()),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
           if (!_didRedirect) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!mounted) return;

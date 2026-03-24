@@ -189,6 +189,7 @@ Major persisted keys include:
 ## Web and PWA
 
 - PWA manifest: `web/manifest.json`
+- Web bootstrap: `web/flutter_bootstrap.js` (custom bootstrap; loads Flutter without default service-worker settings)
 - PowerSync workers: `web/powersync_db.worker.js`, `web/powersync_sync.worker.js`
 - Install prompt integration: `pwa_install` package + `PwaInstallBanner` widget
 - Invite links use the web app domain (e.g. hisab.shenepoy.com) when `INVITE_BASE_URL` is set. On deploy, the route `/functions/v1/invite-redirect` is served by **Firebase Hosting** via a rewrite to static `invite-redirect.html` (built from `web/invite-redirect-template.html`); that page redirects to the Supabase Edge Function, which validates the token and redirects the user to `redirect.html`. This works on the Firebase free (Spark) plan with no Cloud Function. When the user is already inside the web app, the same path is handled by the Flutter app (GoRouter), which redirects to the Supabase Edge Function.
@@ -198,6 +199,7 @@ Major persisted keys include:
 - Invite/OG assets: `web/invite-redirect-template.html`, `web/og-invite.png` (used in invite link and OG image flow; see [EDGE_FUNCTIONS.md](EDGE_FUNCTIONS.md)).
 - Public privacy page: `web/privacy/index.html`
 - Account deletion is described in `docs/DELETE_ACCOUNT.md`; the in-app options are Delete local data and Delete cloud data under Settings > Advanced (and a public page at `web/delete-account/index.html` when deployed).
+- Deployment cache control for web entry files is configured in `firebase.json` headers (`max-age=0, must-revalidate`) to keep web updates predictable as Flutter phases out the default `flutter_service_worker.js` flow.
 
 ## Supabase Backend Contract
 
