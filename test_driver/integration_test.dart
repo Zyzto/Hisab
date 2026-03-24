@@ -76,7 +76,10 @@ Future<void> main() async {
   if (response.failureDetails != null) {
     for (final failure in response.failureDetails!) {
       print('\n=== FAILED: ${failure.methodName} ===');
-      print(failure.details ?? '(no details captured)');
+      final details = failure.details;
+      print((details != null && details.trim().isNotEmpty)
+          ? details
+          : '(no details captured — check Stage Log above for last stage)');
       print('=== END ===');
     }
   }
