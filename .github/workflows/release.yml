@@ -28,7 +28,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  FLUTTER_VERSION: "3.38.2" # keep in sync with your local SDK
+  FLUTTER_VERSION: "3.41.5" # keep in sync with your local SDK
   JAVA_VERSION: "17"
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
