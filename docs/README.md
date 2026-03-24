@@ -24,6 +24,7 @@ Quick links to setup, backend, product, and UI docs.
 ## Web debugging
 
 - [WEB_DEBUGGING.md](WEB_DEBUGGING.md) — Dart Debug Chrome extension for meaningful console messages and DevTools when running the web app locally
+- [WEB_IOS_SAFARI_PERFORMANCE.md](WEB_IOS_SAFARI_PERFORMANCE.md) — iOS Safari Flutter web performance diagnosis, semantics tradeoff, renderer rollout, and verification checklist
 
 ## UI and layout
 

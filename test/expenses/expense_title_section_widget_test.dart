@@ -34,7 +34,7 @@ void main() {
               selectedTag: null,
               customTags: const [],
               onTagPicker: () {},
-              onPickReceipt: () {},
+              onPickImage: () {},
             ),
           ),
         ),

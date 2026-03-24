@@ -125,7 +125,7 @@ void main() {
     expect(find.text('Join this group'), findsNothing);
   });
 
-  testWidgets('opens read-only expense detail and shows receipt section', (
+  testWidgets('opens read-only expense detail and shows image section', (
     tester,
   ) async {
     final dataByRpc = <String, dynamic>{
@@ -184,8 +184,8 @@ void main() {
           'split_shares_json': '{"p1":500,"p2":500}',
           'type': 'expense',
           'to_participant_id': null,
-          'receipt_image_path': '/tmp/fake-receipt.jpg',
-          'receipt_image_paths': '["/tmp/fake-receipt.jpg"]',
+          'image_path': '/tmp/fake-image.jpg',
+          'image_paths': '["/tmp/fake-image.jpg"]',
           'created_at': '2026-01-02T00:00:00Z',
           'updated_at': '2026-01-02T00:00:00Z',
         },

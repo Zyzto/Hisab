@@ -7,9 +7,9 @@ import '../layout/responsive_sheet.dart';
 import 'receipt_image_cache.dart';
 import 'receipt_utils.dart';
 
-/// Shows the receipt image full-screen (dialog). Tap or back to close.
-void showReceiptImageFullScreen(BuildContext context, String imagePath) {
-  if (isReceiptImageUrl(imagePath)) {
+/// Shows an attached image full-screen (dialog). Tap or back to close.
+void showExpenseImageFullScreen(BuildContext context, String imagePath) {
+  if (isImageUrl(imagePath)) {
     showAppDialog<void>(
       context: context,
       barrierColor: Theme.of(context).colorScheme.scrim,
@@ -63,8 +63,8 @@ void showReceiptImageFullScreen(BuildContext context, String imagePath) {
   );
 }
 
-/// Shows the receipt image from a URL or local file path. Use when dart:io is available.
-Widget buildReceiptImageView(
+/// Shows an attached image from a URL or local file path. Use when dart:io is available.
+Widget buildExpenseImageView(
   BuildContext context,
   String? imagePath, {
   double? maxHeight,
@@ -74,7 +74,7 @@ Widget buildReceiptImageView(
   final effectiveMaxHeight = maxHeight ?? 200;
   final unavailablePlaceholder = _buildUnavailablePlaceholder(context);
 
-  if (isReceiptImageUrl(imagePath)) {
+  if (isImageUrl(imagePath)) {
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: ClipRRect(
@@ -174,14 +174,7 @@ class _ReceiptCachedOrNetworkImageState extends State<_ReceiptCachedOrNetworkIma
       fit: widget.fit,
       loadingBuilder: (context, child, loadingProgress) {
         if (loadingProgress == null) return child;
-        return Center(
-          child: CircularProgressIndicator(
-            value: loadingProgress.expectedTotalBytes != null
-                ? loadingProgress.cumulativeBytesLoaded /
-                      loadingProgress.expectedTotalBytes!
-                : null,
-          ),
-        );
+        return _buildImageLoadingSkeleton(context);
       },
       errorBuilder: (_, _, _) =>
           widget.unavailablePlaceholder ?? const SizedBox.shrink(),
@@ -207,13 +200,47 @@ Widget _buildUnavailablePlaceholder(BuildContext context) {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'receipt_image_unavailable'.tr(),
+              'image_unavailable'.tr(),
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
             ),
           ),
         ],
+      ),
+    ),
+  );
+}
+
+@Deprecated('Use showExpenseImageFullScreen instead.')
+void showReceiptImageFullScreen(BuildContext context, String imagePath) =>
+    showExpenseImageFullScreen(context, imagePath);
+
+@Deprecated('Use buildExpenseImageView instead.')
+Widget buildReceiptImageView(
+  BuildContext context,
+  String? imagePath, {
+  double? maxHeight,
+  BoxFit fit = BoxFit.cover,
+}) => buildExpenseImageView(
+  context,
+  imagePath,
+  maxHeight: maxHeight,
+  fit: fit,
+);
+
+Widget _buildImageLoadingSkeleton(BuildContext context) {
+  final colorScheme = Theme.of(context).colorScheme;
+  return DecoratedBox(
+    decoration: BoxDecoration(
+      color: colorScheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Center(
+      child: Icon(
+        Icons.image_outlined,
+        size: 30,
+        color: colorScheme.onSurfaceVariant,
       ),
     ),
   );

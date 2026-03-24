@@ -1,5 +1,7 @@
 # Release Setup Guide
 
+<!-- markdownlint-disable MD031 MD040 MD060 -->
+
 This document covers every manual step needed **outside the codebase** to make the CI/CD pipeline work. The pipeline lives in `.github/workflows/release.yml` and does three things:
 
 1. Builds a signed Android APK and AAB, attaches the APK to a GitHub Release.

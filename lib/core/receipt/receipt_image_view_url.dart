@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../layout/responsive_sheet.dart';
 
-/// Shows a full-screen dialog with [Image.network] for a receipt image URL.
+/// Shows a full-screen dialog with [Image.network] for an image URL.
 /// Shared by [receipt_image_view_io.dart] and [receipt_image_view_stub.dart].
-void showReceiptImageDialogForUrl(BuildContext context, String url) {
+void showImageDialogForUrl(BuildContext context, String url) {
   showAppDialog<void>(
     context: context,
     barrierColor: Theme.of(context).colorScheme.scrim,
@@ -34,3 +34,7 @@ void showReceiptImageDialogForUrl(BuildContext context, String url) {
     ),
   );
 }
+
+@Deprecated('Use showImageDialogForUrl instead.')
+void showReceiptImageDialogForUrl(BuildContext context, String url) =>
+    showImageDialogForUrl(context, url);

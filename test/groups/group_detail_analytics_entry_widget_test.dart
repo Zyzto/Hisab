@@ -203,12 +203,126 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Total trend (bar)'), findsOneWidget);
-    await tester.tap(find.text('Total trend (bar)'));
+    final totalBarLabel = 'analytics_chart_mode_total_bar'.tr();
+    final userComparisonLabel = 'analytics_chart_mode_users_line'.tr();
+    expect(find.text(totalBarLabel), findsOneWidget);
+    await tester.tap(find.text(totalBarLabel));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('User comparison over time'));
+    await tester.tap(find.text(userComparisonLabel));
     await tester.pumpAndSettle();
 
-    expect(find.text('User comparison over time'), findsOneWidget);
+    expect(find.text(userComparisonLabel), findsWidgets);
+  });
+
+  testWidgets('category analytics renders with expense data', (
+    tester,
+  ) async {
+    const groupId = 'g3';
+    final now = DateTime(2026, 3, 20);
+    final group = Group(
+      id: groupId,
+      name: 'Trip',
+      currencyCode: 'USD',
+      createdAt: now,
+      updatedAt: now,
+    );
+    final participants = [
+      Participant(
+        id: 'p1',
+        groupId: groupId,
+        name: 'Ali',
+        order: 0,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      Participant(
+        id: 'p2',
+        groupId: groupId,
+        name: 'Sara',
+        order: 1,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    ];
+    final expenses = [
+      Expense(
+        id: 'e1',
+        groupId: groupId,
+        payerParticipantId: 'p1',
+        amountCents: 2200,
+        currencyCode: 'USD',
+        title: 'Groceries',
+        date: DateTime(2026, 3, 18),
+        splitType: SplitType.equal,
+        splitShares: const {},
+        createdAt: now,
+        updatedAt: now,
+        tag: 'groceries',
+      ),
+      Expense(
+        id: 'e2',
+        groupId: groupId,
+        payerParticipantId: 'p2',
+        amountCents: 900,
+        currencyCode: 'USD',
+        title: 'Taxi',
+        date: DateTime(2026, 3, 19),
+        splitType: SplitType.equal,
+        splitShares: const {},
+        createdAt: now,
+        updatedAt: now,
+        tag: 'transport',
+      ),
+    ];
+
+    final router = GoRouter(
+      initialLocation: '/groups/$groupId/analytics',
+      routes: [
+        GoRoute(
+          path: '/groups/:id',
+          builder: (context, state) {
+            return GroupDetailPage(groupId: state.pathParameters['id']!);
+          },
+        ),
+        GoRoute(
+          path: '/groups/:id/analytics',
+          builder: (context, state) {
+            return GroupAnalyticsPage(groupId: state.pathParameters['id']!);
+          },
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          effectiveLocalOnlyProvider.overrideWith((ref) => true),
+          futureGroupProvider(groupId).overrideWithValue(AsyncValue.data(group)),
+          expensesByGroupProvider(
+            groupId,
+          ).overrideWithValue(AsyncValue.data(expenses)),
+          participantsByGroupProvider(
+            groupId,
+          ).overrideWithValue(AsyncValue.data(participants)),
+          tagsByGroupProvider(
+            groupId,
+          ).overrideWithValue(const AsyncValue.data(<ExpenseTag>[])),
+          myMemberInGroupProvider(
+            groupId,
+          ).overrideWithValue(const AsyncValue.data(null)),
+        ],
+        child: EasyLocalization(
+          path: 'assets/translations',
+          supportedLocales: testSupportedLocales,
+          fallbackLocale: const Locale('en'),
+          startLocale: const Locale('en'),
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(GroupAnalyticsPage), findsOneWidget);
+    expect(find.byType(Card), findsWidgets);
   });
 }

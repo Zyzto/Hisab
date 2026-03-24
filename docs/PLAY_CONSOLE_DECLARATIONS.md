@@ -1,5 +1,7 @@
 # Google Play Console — Policy declarations reference
 
+<!-- markdownlint-disable MD060 -->
+
 Use this when filling the **App content** and related declaration forms for Hisab. Answers are accurate for the current app behavior.
 
 ---
@@ -62,13 +64,13 @@ Declare what the app **collects** and **shares**. Below matches current behavior
 | **App activity** (e.g. events) | Yes, if user enables | Anonymous telemetry (Settings → Privacy) | No | Yes (toggle off) |
 | **Device or other IDs** (FCM token) | Yes (online, if notifications on) | Push notifications | With Firebase / FCM only for delivery | Yes (user can disable notifications) |
 
-- **Camera / Photos:** Used only for receipt scanning and picking images; no ongoing collection of photo library. On Android, the app uses the **Android Photo Picker** for gallery access (no `READ_MEDIA_IMAGES`); receipt images are selected on demand when the user taps "Scan receipt" → Gallery. Declare as needed by the form (e.g. “Photos” or “User content” if the form asks).
+- **Camera / Photos:** Used only for optional receipt scanning and picking expense images; no ongoing collection of photo library. On Android, the app uses the **Android Photo Picker** for gallery access (no `READ_MEDIA_IMAGES`); images are selected on demand from the expense form. Declare as needed by the form (e.g. “Photos” or “User content” if the form asks).
 - **Data is not sold or shared for ads.** Data is **not** used for advertising purposes.
 - **Data encryption:** Data in transit is encrypted (HTTPS). Data at rest on servers is not end-to-end encrypted (state this if the form asks).
 
 Fill the Data safety form step-by-step; the above table maps to the questions you’ll get.
 
-**Photo and video permissions (if the form asks):** The app uses the **Android Photo Picker** for infrequent receipt attachment. When the user taps to attach a receipt and chooses "Gallery", the system photo picker is shown; no `READ_MEDIA_IMAGES` permission is used. You can state: "We use the Android Photo Picker for one-time selection of a receipt image when the user taps to attach a receipt to an expense. We do not use READ_MEDIA_IMAGES."
+**Photo and video permissions (if the form asks):** The app uses the **Android Photo Picker** for infrequent expense image attachment. When the user chooses "Gallery" in the expense form, the system photo picker is shown; no `READ_MEDIA_IMAGES` permission is used. You can state: "We use the Android Photo Picker for one-time selection of an expense image when the user attaches an image to an expense. We do not use READ_MEDIA_IMAGES."
 
 ---
 
@@ -103,7 +105,7 @@ Fill the Data safety form step-by-step; the above table maps to the questions yo
 
 ## Checklist
 
-- [ ] Privacy policy: URL set and publicly reachable (e.g. https://hisab.shenepoy.com/privacy); text matches in-app policy (including permissions). Account deletion URL set if required (e.g. https://hisab.shenepoy.com/delete-account).
+- [ ] Privacy policy: URL set and publicly reachable (e.g. [https://hisab.shenepoy.com/privacy](https://hisab.shenepoy.com/privacy)); text matches in-app policy (including permissions). Account deletion URL set if required (e.g. [https://hisab.shenepoy.com/delete-account](https://hisab.shenepoy.com/delete-account)).
 - [ ] Ads: Declared as “No”.
 - [ ] App access: Instructions provided for restricted (online) parts.
 - [ ] Content ratings: Questionnaire completed; certificate received.

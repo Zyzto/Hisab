@@ -1,5 +1,7 @@
 # Personal (my-expenses-only) feature
 
+<!-- markdownlint-disable MD060 -->
+
 This document describes the **personal** mode in Hisab: a minimal, single-user view for tracking your own expenses and optional budget, with the ability to convert to or from a shared group.
 
 ## Overview

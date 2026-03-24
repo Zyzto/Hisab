@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hisab/domain/domain.dart';
 import 'package:hisab/features/groups/providers/group_analytics_provider.dart';
 
@@ -104,7 +105,7 @@ void main() {
     expect(result.totalAmountCents, 3600);
     expect(result.myAmountCents, 1200);
     expect(result.byParticipant.first.id, 'p2');
-    expect(result.byTag.first.label, 'Groceries');
+    expect(result.byTag.first.label, 'category_groceries');
   });
 
   test('applies participant and tag filters', () {
@@ -213,6 +214,58 @@ void main() {
     );
 
     expect(all.trendGranularity, TrendGranularity.monthly);
-    expect(all.trendPoints.length, lessThanOrEqualTo(24));
+    expect(all.trendPoints.length, greaterThanOrEqualTo(12));
+  });
+
+  test('resolveTagLabel keeps custom tags and localizes preset tags', () {
+    final tags = makeTags();
+
+    expect(resolveTagLabel('t1', tags), 'Coffee');
+    expect(resolveTagLabel('groceries', tags), 'category_groceries');
+  });
+
+  test('analytics ui state defaults to pie and persists by group', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    expect(
+      container.read(groupAnalyticsUiStateByGroupProvider('g-default')).categoryChartMode,
+      AnalyticsCategoryChartMode.pie,
+    );
+    expect(
+      container.read(groupAnalyticsUiStateByGroupProvider('g-default')).trendChartMode,
+      AnalyticsTrendChartMode.totalBar,
+    );
+
+    final notifier = container.read(groupAnalyticsUiStateProvider.notifier);
+    notifier.setTrendChartMode('g-default', AnalyticsTrendChartMode.userComparison);
+    notifier.setCategoryChartMode('g-default', AnalyticsCategoryChartMode.bars);
+    notifier.toggleExcludedCategory('g-default', 'food');
+    notifier.toggleExcludedCategory('g-default', 'transport');
+
+    final updated = container.read(groupAnalyticsUiStateByGroupProvider('g-default'));
+    expect(updated.trendChartMode, AnalyticsTrendChartMode.userComparison);
+    expect(updated.categoryChartMode, AnalyticsCategoryChartMode.bars);
+    expect(updated.excludedCategoryIds, {'food', 'transport'});
+  });
+
+  test('analytics ui state cache evicts oldest and resets on restart', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final notifier = container.read(groupAnalyticsUiStateProvider.notifier);
+
+    for (int i = 0; i < 22; i++) {
+      notifier.setCategoryChartMode('g$i', AnalyticsCategoryChartMode.bars);
+    }
+
+    final stateMap = container.read(groupAnalyticsUiStateProvider);
+    expect(stateMap.length, 20);
+    expect(stateMap.containsKey('g0'), isFalse);
+    expect(stateMap.containsKey('g1'), isFalse);
+    expect(stateMap.containsKey('g21'), isTrue);
+
+    final restarted = ProviderContainer();
+    addTearDown(restarted.dispose);
+    expect(restarted.read(groupAnalyticsUiStateProvider), isEmpty);
   });
 }

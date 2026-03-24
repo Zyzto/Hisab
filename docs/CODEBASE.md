@@ -1,5 +1,7 @@
 # Hisab Codebase Overview
 
+<!-- markdownlint-disable MD060 -->
+
 `Hisab` is a Flutter app for group expense splitting and settlement. It is offline-first: local SQLite (via the PowerSync package) is always initialized, and Supabase is optional for online auth/sync/invites/notifications.
 
 ## Stack
@@ -100,9 +102,9 @@ Shared widgets in `lib/core/widgets/`: **AsyncValueBuilder**, **BackButtonKeyboa
 - **ConstrainedContent** (`constrained_content.dart`) — on tablet+ wraps [child] in a centered band using `contentBandMetrics`; on narrow screens returns [child] unchanged. Body content is wrapped in this so it does not span full width on large screens.
 - **ContentAlignedAppBar** (`content_aligned_app_bar.dart`) — a `PreferredSizeWidget` that places the title in the same horizontal band as the body (via `contentBandMetrics`). The title is absolutely positioned so it is not affected by leading/actions width. Use with a **LayoutBuilder** around the scaffold and pass `layoutConstraints.maxWidth` as `contentAreaWidth`. Used on all pages that have an app bar and `ConstrainedContent` body (home, settings, group detail/settings/create, invite management/scan/accept, archived groups, expense form, privacy policy).
 
-### Receipt (core/receipt)
+### Images + Receipt AI (core/receipt)
 
-Expense form **photos**: add up to 5 images (camera or gallery on all platforms, including web). Client-side compression (`receipt_image_compress`) before upload; upload from bytes (`receipt_storage_upload`: `uploadReceiptBytesToStorage` in io/stub) so web can upload without file paths. Optional **Scan receipt** (mobile): long-press a photo to run OCR/LLM (`processReceiptBytes` → `receipt_scan_service`). Receipt storage (`receipt_storage` for scan temp copy), **scan** (`receipt_scan_service`), **LLM** (`receipt_llm_service`), **image view** (`receipt_image_view`), **providers** (`receipt_providers`). Used by expense form and settings (Receipt AI). Platform-specific impls in `*_io.dart` / `*_stub.dart`.
+Expense form **photos**: add up to 5 images (camera or gallery on all platforms, including web). Client-side compression (`receipt_image_compress`) before upload; upload from bytes (`receipt_storage_upload`: `uploadExpenseImageBytesToStorage` in io/stub) so web can upload without file paths. Optional **Scan receipt** (mobile): long-press a photo to run OCR/LLM (`processReceiptBytes` → `receipt_scan_service`). Local image storage helper (`receipt_storage`) is used for scan temp copies. The `core/receipt` package contains generic expense image handling plus scan-specific OCR/LLM flow: **scan** (`receipt_scan_service`), **LLM** (`receipt_llm_service`), **image view** (`receipt_image_view`), **providers** (`receipt_providers`). Used by expense form and settings (Receipt AI). Platform-specific impls in `*_io.dart` / `*_stub.dart`.
 
 ## Navigation and Deep Links
 
@@ -159,8 +161,8 @@ Push notifications are sent when expenses are added/edited or members join a gro
 ## Feature Modules
 
 - `features/home`: groups list (Personal and Groups sections) via **home_list_provider** (ordered list, pinned/custom order), **routes**, create FAB + modal (Create group / Create personal), manual refresh trigger
-- `features/groups`: create/detail/settings (including personal vs group branches and convert flows), invite management, invite acceptance; group settings include permission toggles (e.g. Members can add expenses, Members can record settlements for others). **invite_redirect_proxy** (and _web, _stub, _page) for web/invite redirect; **create_invite_sheet** (invite creation UI)
-- `features/expenses`: create/edit/detail expenses (**expense_detail_shell**), split logic UI, receipt input hooks; **expense_navigation_direction** (provider), **expense_form_constants**, **category_icons**
+- `features/groups`: create/detail/settings (including personal vs group branches and convert flows), invite management, invite acceptance; group settings include permission toggles (e.g. Members can add expenses, Members can record settlements for others). `invite_redirect_proxy` (and `invite_redirect_proxy_web`, `invite_redirect_proxy_stub`, `invite_redirect_proxy_page`) for web/invite redirect; **create_invite_sheet** (invite creation UI)
+- `features/expenses`: create/edit/detail expenses (**expense_detail_shell**), split logic UI, image input hooks; **expense_navigation_direction** (provider), **expense_form_constants**, **category_icons**
 - `features/balance`: settlement list and record settlement flow. By default only the group owner or the debtor (participant who owes) can record a settlement; group setting **Members can record settlements for others** (Group.allowMemberSettleForOthers) allows any member to record. Balance list (`balance_list.dart`) uses `myMemberInGroupProvider` and `myRoleInGroupProvider` to enable or disable the record button per row.
 - `features/settings`:
   - account mode and auth controls; **edit_profile_sheet**

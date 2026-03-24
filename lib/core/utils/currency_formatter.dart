@@ -16,13 +16,6 @@ class CurrencyFormatter {
   static String formatWithCode(int amountCents, String currencyCode) {
     final p = _currencyParams(currencyCode);
     final formatted = _formatNumber(amountCents, p.$1);
-    if (_isSaudiRiyal(currencyCode)) {
-      // UX rule: for SAR show symbol in Arabic locale, otherwise show ISO code.
-      if (_isArabicLocale()) {
-        return p.$3 ? '${p.$2} $formatted' : '$formatted ${p.$2}';
-      }
-      return '$formatted ${currencyCode.toUpperCase()}';
-    }
     if (p.$2.isNotEmpty && p.$3) {
       return '${p.$2} $formatted $currencyCode';
     }
@@ -69,14 +62,6 @@ class CurrencyFormatter {
       decimalDigits: decimalDigits,
     );
     return formatter.format(amount);
-  }
-
-  static bool _isSaudiRiyal(String currencyCode) =>
-      currencyCode.toUpperCase() == 'SAR';
-
-  static bool _isArabicLocale() {
-    final locale = Intl.getCurrentLocale().toLowerCase();
-    return locale.startsWith('ar');
   }
 
   /// Get the divisor for converting smallest unit to main unit.

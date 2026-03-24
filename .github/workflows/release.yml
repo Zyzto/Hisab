@@ -14,6 +14,13 @@ on:
         description: "Deploy web build to Firebase Hosting"
         type: boolean
         default: true
+      web_build_mode:
+        description: "Web build mode: default (CanvasKit) or wasm (Skwasm with fallback)"
+        type: choice
+        options:
+          - default
+          - wasm
+        default: default
 
 # Cancel previous runs on the same ref so we don't waste minutes.
 concurrency:
@@ -317,11 +324,17 @@ jobs:
 
       - name: Build web
         run: |
+          WEB_WASM_FLAG=""
+          if [ "${{ github.event.inputs.web_build_mode }}" = "wasm" ]; then
+            WEB_WASM_FLAG="--wasm"
+          fi
           flutter build web \
+            $WEB_WASM_FLAG \
             --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
             --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
             --dart-define=INVITE_BASE_URL=${{ secrets.INVITE_BASE_URL }} \
             --dart-define=SITE_URL=${{ secrets.SITE_URL }} \
+            --dart-define=ENABLE_WEB_SEMANTICS=false \
             --dart-define=FCM_VAPID_KEY=${{ secrets.FCM_VAPID_KEY }} \
             --dart-define=FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }} \
             --dart-define=FIREBASE_AUTH_DOMAIN=${{ secrets.FIREBASE_AUTH_DOMAIN }} \

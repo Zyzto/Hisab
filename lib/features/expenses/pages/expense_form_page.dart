@@ -50,10 +50,10 @@ const double _kSubmitBarHeight = 76.0;
 const double _kSubmitBarExtraBottomPadding = 20.0;
 
 /// Max number of photos per expense.
-const int _kMaxReceiptPhotos = 5;
+const int _kMaxExpenseImages = 5;
 
 /// One photo in the form: either pending bytes or stored URL.
-typedef _ReceiptPhotoItem = ({Uint8List? bytes, String? url});
+typedef _ExpenseImageItem = ({Uint8List? bytes, String? url});
 
 class ExpenseFormPage extends ConsumerStatefulWidget {
   final String groupId;
@@ -128,8 +128,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   final List<({TextEditingController desc, TextEditingController amount})>
   _lineItemControllers = [];
 
-  /// Photos: pending bytes (before upload) or stored URL. Max [_kMaxReceiptPhotos].
-  final List<_ReceiptPhotoItem> _receiptPhotos = [];
+  /// Photos: pending bytes (before upload) or stored URL. Max [_kMaxExpenseImages].
+  final List<_ExpenseImageItem> _expenseImages = [];
 
   @override
   void initState() {
@@ -222,9 +222,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           ),
         ));
       }
-      _receiptPhotos.clear();
-      for (final url in expense.effectiveReceiptImageUrls) {
-        _receiptPhotos.add((bytes: null, url: url));
+      _expenseImages.clear();
+      for (final url in expense.effectiveImageUrls) {
+        _expenseImages.add((bytes: null, url: url));
       }
       _editLoaded = true;
     });
@@ -511,29 +511,29 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       final isOnline = ref.read(connectivityProvider);
       final shouldUploadPhotos = !localOnly && isOnline;
 
-      final List<String> receiptUrls = [];
-      for (final item in _receiptPhotos) {
+      final List<String> imageUrls = [];
+      for (final item in _expenseImages) {
         if (item.url != null && item.url!.isNotEmpty) {
-          receiptUrls.add(item.url!);
+          imageUrls.add(item.url!);
         } else if (item.bytes != null && shouldUploadPhotos) {
           final uploadId = existingExpenseId.isNotEmpty
               ? existingExpenseId
               : '';
           if (uploadId.isEmpty) continue;
-          final url = await uploadReceiptBytesToStorage(
+          final url = await uploadExpenseImageBytesToStorage(
             item.bytes!,
             widget.groupId,
             uploadId,
             fileExt: 'jpg',
           );
           if (url != null) {
-            receiptUrls.add(url);
+            imageUrls.add(url);
             await warmReceiptImageCacheForUrl(url, item.bytes!, fileExt: 'jpg');
           }
         }
       }
-      final receiptImagePaths = receiptUrls.isEmpty ? null : receiptUrls;
-      final receiptPath = receiptUrls.isNotEmpty ? receiptUrls.first : null;
+      final imagePaths = imageUrls.isEmpty ? null : imageUrls;
+      final imagePath = imageUrls.isNotEmpty ? imageUrls.first : null;
 
       final expense = Expense(
         id: existingExpenseId,
@@ -554,8 +554,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         toParticipantId: isTransfer ? _toParticipantId : null,
         tag: _selectedTag,
         lineItems: _effectiveLineItemsForSave(),
-        receiptImagePath: receiptPath,
-        receiptImagePaths: receiptImagePaths,
+        imagePath: imagePath,
+        imagePaths: imagePaths,
       );
       if (_initialExpense != null) {
         await ref.read(expenseRepositoryProvider).update(expense);
@@ -566,11 +566,11 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       } else {
         final id = await ref.read(expenseRepositoryProvider).create(expense);
         final createdUrls = <String>[];
-        for (final item in _receiptPhotos) {
+        for (final item in _expenseImages) {
           if (item.url != null && item.url!.isNotEmpty) {
             createdUrls.add(item.url!);
           } else if (item.bytes != null && shouldUploadPhotos) {
-            final url = await uploadReceiptBytesToStorage(
+            final url = await uploadExpenseImageBytesToStorage(
               item.bytes!,
               widget.groupId,
               id,
@@ -592,8 +592,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
               .update(
                 expense.copyWith(
                   id: id,
-                  receiptImagePath: createdUrls.first,
-                  receiptImagePaths: createdUrls,
+                  imagePath: createdUrls.first,
+                  imagePaths: createdUrls,
                 ),
               );
         }
@@ -1325,11 +1325,11 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                 selectedTag: _selectedTag,
                                 customTags: customTags,
                                 onTagPicker: () => _showTagPicker(customTags),
-                                onPickReceipt: _receiptPhotos.isEmpty
+                                onPickImage: _expenseImages.isEmpty
                                     ? _addPhoto
                                     : null,
                               ),
-                              if (_receiptPhotos.isNotEmpty)
+                              if (_expenseImages.isNotEmpty)
                                 _buildPhotosSection(context),
                               const SizedBox(height: 20),
                               ListenableBuilder(
@@ -1925,10 +1925,10 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     );
   }
 
-  /// Add photo from camera or gallery (all platforms). Compresses and appends to [_receiptPhotos].
+  /// Add photo from camera or gallery (all platforms). Compresses and appends to [_expenseImages].
   Future<void> _addPhoto() async {
     _defocusFormInputs();
-    if (_receiptPhotos.length >= _kMaxReceiptPhotos) return;
+    if (_expenseImages.length >= _kMaxExpenseImages) return;
     final source = await showResponsiveSheet<ImageSource>(
       context: context,
       title: 'add_photo'.tr(),
@@ -1983,8 +1983,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       if (!mounted) return;
       final toAdd = compressed ?? bytes;
       setState(() {
-        if (_receiptPhotos.length < _kMaxReceiptPhotos) {
-          _receiptPhotos.add((bytes: toAdd, url: null));
+        if (_expenseImages.length < _kMaxExpenseImages) {
+          _expenseImages.add((bytes: toAdd, url: null));
         }
       });
     } catch (e, stack) {
@@ -1998,7 +1998,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
 
   Widget _buildPhotosSection(BuildContext context) {
     final theme = Theme.of(context);
-    final count = _receiptPhotos.length;
+    final count = _expenseImages.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -2014,7 +2014,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
             ),
             const SizedBox(width: 8),
             Text(
-              'photos_count'.tr(args: ['$count', '$_kMaxReceiptPhotos']),
+              'photos_count'.tr(args: ['$count', '$_kMaxExpenseImages']),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.primary,
               ),
@@ -2026,12 +2026,12 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            ..._receiptPhotos.asMap().entries.map((entry) {
+            ..._expenseImages.asMap().entries.map((entry) {
               final i = entry.key;
               final item = entry.value;
               return _buildPhotoThumbnail(context, item, i);
             }),
-            if (count < _kMaxReceiptPhotos) _buildAddPhotoChip(context),
+            if (count < _kMaxExpenseImages) _buildAddPhotoChip(context),
           ],
         ),
         const SizedBox(height: 20),
@@ -2056,9 +2056,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     );
   }
 
-  void _showPhotoFullScreen(_ReceiptPhotoItem item) {
+  void _showPhotoFullScreen(_ExpenseImageItem item) {
     if (item.url != null && item.url!.isNotEmpty) {
-      showReceiptImageFullScreen(context, item.url!);
+      showExpenseImageFullScreen(context, item.url!);
       return;
     }
     if (item.bytes != null) {
@@ -2087,7 +2087,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
 
   Widget _buildPhotoThumbnail(
     BuildContext context,
-    _ReceiptPhotoItem item,
+    _ExpenseImageItem item,
     int index,
   ) {
     final theme = Theme.of(context);
@@ -2156,7 +2156,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
               padding: const EdgeInsets.all(4),
               minimumSize: const Size(28, 28),
             ),
-            onPressed: () => setState(() => _receiptPhotos.removeAt(index)),
+            onPressed: () => setState(() => _expenseImages.removeAt(index)),
           ),
         ),
       ],
@@ -2189,7 +2189,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
               _descriptionController.text = result.ocrText;
             }
           });
-          context.showSuccess('receipt_attached'.tr());
+          context.showSuccess('image_attached'.tr());
       }
     } catch (e, stack) {
       if (mounted) {
