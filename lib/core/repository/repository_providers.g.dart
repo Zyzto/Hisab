@@ -285,4 +285,4 @@ final class GroupInviteRepositoryProvider
 }
 
 String _$groupInviteRepositoryHash() =>
-    r'6e819df75291c288ca90445c45b5ff105acd603d';
+    r'ede426a0e48b19e44327451f98ad211504d15565';
