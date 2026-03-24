@@ -56,12 +56,10 @@ jobs:
       - name: Run unit and widget tests
         run: flutter test
 
-      - name: Install Chrome
+      - name: Install Chrome + ChromeDriver
         uses: browser-actions/setup-chrome@v2
-
-      # ChromeDriver here is from the action (matches Chrome). Do not use project package.json chromedriver.
-      - name: Install ChromeDriver
-        uses: nanasess/setup-chromedriver@v2
+        with:
+          install-chromedriver: true
 
       - name: Start ChromeDriver
         run: |
@@ -139,12 +137,10 @@ jobs:
           echo "url=$(supabase status --output json | jq -r '.API_URL')" >> "$GITHUB_OUTPUT"
           echo "anon_key=$(supabase status --output json | jq -r '.ANON_KEY')" >> "$GITHUB_OUTPUT"
 
-      - name: Install Chrome
+      - name: Install Chrome + ChromeDriver
         uses: browser-actions/setup-chrome@v2
-
-      # ChromeDriver here is from the action (matches Chrome). Do not use project package.json chromedriver.
-      - name: Install ChromeDriver
-        uses: nanasess/setup-chromedriver@v2
+        with:
+          install-chromedriver: true
 
       - name: Start ChromeDriver
         run: |
