@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run all tests (unit/widget, then Android + web integration in parallel).
+# Run all tests (unit/widget, then Android + web integration sequentially).
 # Wrapper for: dart run tool/run_all_tests.dart
 # Options: --skip-unit, --skip-android, --skip-web, --no-avd
 set -euo pipefail

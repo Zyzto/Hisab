@@ -62,6 +62,43 @@ Finder actionByLabel(WidgetTester tester, String label) {
   return find.text(label);
 }
 
+/// Returns the first text finder that exists from [labels], or falls back to
+/// the first label so expectations fail with a meaningful finder.
+Finder textAnyOf(WidgetTester tester, List<String> labels) {
+  for (final label in labels) {
+    final f = find.text(label);
+    if (f.evaluate().isNotEmpty) return f.first;
+  }
+  return find.text(labels.first);
+}
+
+/// Wait for any text in [labels] to appear and return its finder.
+Future<Finder> waitForAnyText(
+  WidgetTester tester,
+  List<String> labels, {
+  Duration timeout = const Duration(seconds: 15),
+}) async {
+  final end = DateTime.now().add(timeout);
+  while (DateTime.now().isBefore(end)) {
+    await tester.pump(const Duration(milliseconds: 200));
+    for (final label in labels) {
+      final f = find.text(label);
+      if (f.evaluate().isNotEmpty) return f.first;
+    }
+  }
+  throw TestFailure('Timed out waiting for any of: ${labels.join(", ")}');
+}
+
+/// Tap the first visible text match from [labels], then settle.
+Future<void> tapAnyText(
+  WidgetTester tester,
+  List<String> labels, {
+  Duration timeout = const Duration(seconds: 15),
+}) async {
+  final target = await waitForAnyText(tester, labels, timeout: timeout);
+  await tapAndSettle(tester, target, timeout: timeout);
+}
+
 /// Tap a widget and pump manually (no pumpAndSettle). Use this for buttons
 /// that trigger async operations like DB writes + navigation, where
 /// pumpAndSettle would return before the Future completes.
@@ -303,7 +340,7 @@ Future<void> ensureIntegrationTestReady(
 }) async {
   recordStage('ensureIntegrationTestReady', 'STARTED');
   final ready = await runIntegrationTestApp(skipOnboarding: skipOnboarding);
-  ensureBootstrapReady(ready);
+  ensureBootstrapReady(ready, reason: lastBootstrapFailureReason);
   await waitForWidget(
     tester,
     find.byIcon(Icons.add),

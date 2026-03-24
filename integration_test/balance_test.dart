@@ -111,7 +111,7 @@ void main() {
 
       // ── Stage: balance tab shows debts ──
       await stage('balance tab shows debts', () async {
-        await tapAndSettle(tester, find.text('Balance'));
+        await tapAnyText(tester, ['Balance', 'الحسابات']);
         await pumpAndSettleWithTimeout(tester);
 
         // With 3 expenses totaling 255, split 3 ways (85 each),
@@ -131,9 +131,9 @@ void main() {
       await stage('verify settlement UI', () async {
         await tester.pump(const Duration(milliseconds: 2000));
         // Wait for "Settle Up" section (balance list builds in stages).
-        await waitForWidget(
+        await waitForAnyText(
           tester,
-          find.text('Settle Up'),
+          ['Settle Up', 'تسوية الحساب'],
           timeout: const Duration(seconds: 20),
         );
         // Scroll to reveal settlement rows; payment icons or arrows may be off-screen.
@@ -153,7 +153,9 @@ void main() {
             .byIcon(Icons.payments_outlined)
             .evaluate()
             .isNotEmpty;
-        final hasSettleUp = find.text('Settle Up').evaluate().isNotEmpty;
+        final hasSettleUp =
+            find.text('Settle Up').evaluate().isNotEmpty ||
+            find.text('تسوية الحساب').evaluate().isNotEmpty;
         expect(
           hasArrows || hasPaymentIcons || hasSettleUp,
           isTrue,
@@ -169,7 +171,9 @@ void main() {
           await tapAndSettle(tester, paymentIcon.first);
           await pumpAndSettleWithTimeout(tester);
 
-          final confirmButton = find.text('Record Payment');
+          final confirmButton = find.text('Record Payment').evaluate().isNotEmpty
+              ? find.text('Record Payment')
+              : find.text('تسجيل الدفعة');
           if (confirmButton.evaluate().isNotEmpty) {
             await tapAndSettle(
               tester,
@@ -188,7 +192,9 @@ void main() {
           await tapAndSettle(tester, paymentIcon.first);
           await pumpAndSettleWithTimeout(tester);
 
-          final confirmButton = find.text('Record Payment');
+          final confirmButton = find.text('Record Payment').evaluate().isNotEmpty
+              ? find.text('Record Payment')
+              : find.text('تسجيل الدفعة');
           if (confirmButton.evaluate().isNotEmpty) {
             await tapAndSettle(
               tester,
@@ -221,7 +227,7 @@ void main() {
 
       // ── Stage: People tab loads ──
       await stage('people tab loads', () async {
-        await tapAndSettle(tester, find.text('People'));
+        await tapAnyText(tester, ['People', 'الأشخاص']);
         await pumpAndSettleWithTimeout(tester);
         await tester.pump(const Duration(milliseconds: 2500));
         // Tab should show content (participants or add-participants prompt)
@@ -235,7 +241,7 @@ void main() {
 
       // ── Stage: switch to Expenses and verify all expenses ──
       await stage('expenses tab shows all expenses', () async {
-        await tapAndSettle(tester, find.text('Expenses'));
+        await tapAnyText(tester, ['Expenses', 'المصروفات']);
         await pumpAndSettleWithTimeout(tester);
 
         expect(find.text('Group Dinner'), findsWidgets);

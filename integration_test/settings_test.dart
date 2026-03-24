@@ -12,30 +12,34 @@ void main() {
       'theme → language → font size → export → import → telemetry → about → persist',
       (tester) async {
         await ensureIntegrationTestReady(tester);
-        await waitForWidget(
+        await waitForAnyText(
           tester,
-          find.text('Settings'),
+          ['Settings', 'الإعدادات'],
           timeout: const Duration(seconds: 30),
         );
-
-        await tapAndSettle(tester, find.text('Settings'));
+        await tapAnyText(tester, ['Settings', 'الإعدادات']);
 
         // ── Stage: change theme ──
         await stage('change theme', () async {
-          await scrollUntilVisible(tester, find.text('Theme'));
-          await tapAndSettle(tester, find.text('Theme'));
+          final themeTile = textAnyOf(tester, ['Theme', 'المظهر']);
+          await scrollUntilVisible(tester, themeTile);
+          await tapAndSettle(tester, themeTile);
 
-          await waitForWidget(tester, find.text('Light'));
-          await tapAndSettle(tester, find.text('Light'));
+          await tapAnyText(tester, ['Light', 'فاتح']);
 
-          await scrollUntilVisible(tester, find.text('Theme'));
-          expect(find.text('Light'), findsWidgets);
+          await scrollUntilVisible(tester, textAnyOf(tester, ['Theme', 'المظهر']));
+          expect(
+            find.text('Light').evaluate().isNotEmpty ||
+                find.text('فاتح').evaluate().isNotEmpty,
+            isTrue,
+          );
         });
 
         // ── Stage: change language ──
         await stage('change language', () async {
-          await scrollUntilVisible(tester, find.text('Language'));
-          await tapAndSettle(tester, find.text('Language'));
+          final languageTile = textAnyOf(tester, ['Language', 'اللغة']);
+          await scrollUntilVisible(tester, languageTile);
+          await tapAndSettle(tester, languageTile);
 
           await waitForWidget(tester, find.text('العربية'));
           await tapAndSettle(tester, find.text('العربية'));
@@ -43,62 +47,98 @@ void main() {
 
           expect(find.text('العربية'), findsWidgets);
 
-          final langTile = find.text('اللغة');
-          if (langTile.evaluate().isNotEmpty) {
-            await scrollUntilVisible(tester, langTile);
-            await tapAndSettle(tester, langTile);
-            await waitForWidget(tester, find.text('English'));
-            await tapAndSettle(tester, find.text('English'));
-            await pumpAndSettleWithTimeout(tester);
-          }
+          await scrollUntilVisible(tester, textAnyOf(tester, ['Language', 'اللغة']));
+          await tapAndSettle(tester, textAnyOf(tester, ['Language', 'اللغة']));
+          await waitForWidget(tester, find.text('English'));
+          await tapAndSettle(tester, find.text('English'));
+          await pumpAndSettleWithTimeout(tester);
 
-          expect(find.text('Settings'), findsWidgets);
+          await waitForAnyText(tester, ['Settings', 'الإعدادات']);
         });
 
         // ── Stage: change font size ──
         await stage('change font size', () async {
-          await scrollUntilVisible(tester, find.text('Font Size'));
-          await tapAndSettle(tester, find.text('Font Size'));
+          await scrollUntilVisible(
+            tester,
+            textAnyOf(tester, ['Font Size', 'حجم الخط']),
+          );
+          await tapAndSettle(tester, textAnyOf(tester, ['Font Size', 'حجم الخط']));
 
-          await waitForWidget(tester, find.text('Large'));
-          await tapAndSettle(tester, find.text('Large'));
+          await tapAnyText(tester, ['Large', 'كبير']);
 
-          await scrollUntilVisible(tester, find.text('Font Size'));
-          expect(find.text('Large'), findsWidgets);
+          await scrollUntilVisible(
+            tester,
+            textAnyOf(tester, ['Font Size', 'حجم الخط']),
+          );
+          expect(
+            find.text('Large').evaluate().isNotEmpty ||
+                find.text('كبير').evaluate().isNotEmpty,
+            isTrue,
+          );
 
           // Revert to Normal
-          await tapAndSettle(tester, find.text('Font Size'));
-          await waitForWidget(tester, find.text('Normal'));
-          await tapAndSettle(tester, find.text('Normal'));
+          await tapAndSettle(tester, textAnyOf(tester, ['Font Size', 'حجم الخط']));
+          await tapAnyText(tester, ['Normal', 'عادي']);
         });
 
         // ── Stage: test export data ──
         await stage('test export data', () async {
           // Data & Backup section is collapsed by default -- expand it
-          await scrollUntilVisible(tester, find.text('Data & Backup'));
-          await tapAndSettle(tester, find.text('Data & Backup'));
+          await scrollUntilVisible(
+            tester,
+            textAnyOf(tester, ['Data & Backup', 'البيانات والنسخة الاحتياطية']),
+          );
+          await tapAndSettle(
+            tester,
+            textAnyOf(tester, ['Data & Backup', 'البيانات والنسخة الاحتياطية']),
+          );
           await pumpAndSettleWithTimeout(tester);
 
-          await scrollUntilVisible(tester, find.text('Export data'));
-          expect(find.text('Export data'), findsOneWidget);
+          await scrollUntilVisible(
+            tester,
+            textAnyOf(tester, ['Export data', 'تصدير البيانات']),
+          );
+          expect(
+            find.text('Export data').evaluate().isNotEmpty ||
+                find.text('تصدير البيانات').evaluate().isNotEmpty,
+            isTrue,
+          );
 
           // Do NOT tap Export data on mobile: FilePicker.platform.saveFile()
           // opens a native Android save dialog that blocks the test.
           // Just verify the tile is present.
-          await scrollUntilVisible(tester, find.text('Import Data'));
-          expect(find.text('Import Data'), findsOneWidget);
+          await scrollUntilVisible(
+            tester,
+            textAnyOf(tester, ['Import Data', 'استيراد البيانات']),
+          );
+          expect(
+            find.text('Import Data').evaluate().isNotEmpty ||
+                find.text('استيراد البيانات').evaluate().isNotEmpty,
+            isTrue,
+          );
         });
 
         // ── Stage: test import data ──
         await stage('test import data', () async {
-          await scrollUntilVisible(tester, find.text('Import Data'));
-          await tapAndSettle(tester, find.text('Import Data'));
+          await scrollUntilVisible(
+            tester,
+            textAnyOf(tester, ['Import Data', 'استيراد البيانات']),
+          );
+          await tapAndSettle(
+            tester,
+            textAnyOf(tester, ['Import Data', 'استيراد البيانات']),
+          );
           await pumpAndSettleWithTimeout(tester);
 
-          // Confirmation dialog should appear
-          await waitForWidget(
+          // Confirmation sheet/dialog should appear.
+          await waitForCondition(
             tester,
-            find.textContaining('overwrite or duplicate'),
+            condition: () =>
+                find.byType(BottomSheet).evaluate().isNotEmpty ||
+                find.byType(Dialog).evaluate().isNotEmpty ||
+                find.byType(AlertDialog).evaluate().isNotEmpty,
+            timeout: const Duration(seconds: 10),
+            reason: 'Import confirmation sheet/dialog should appear',
           );
 
           // Dismiss the import confirmation bottom sheet by tapping the
@@ -107,10 +147,11 @@ void main() {
           await tester.tapAt(const Offset(200, 100));
           await pumpAndSettleWithTimeout(tester);
           // If the dialog is still open, try Navigator pop as fallback.
-          if (find
-              .textContaining('overwrite or duplicate')
-              .evaluate()
-              .isNotEmpty) {
+          final confirmStillOpen =
+              find.byType(BottomSheet).evaluate().isNotEmpty ||
+              find.byType(Dialog).evaluate().isNotEmpty ||
+              find.byType(AlertDialog).evaluate().isNotEmpty;
+          if (confirmStillOpen) {
             final nav = tester.state<NavigatorState>(
               find.byType(Navigator).last,
             );
@@ -119,23 +160,32 @@ void main() {
           }
 
           // Verify we're still on settings
-          expect(find.text('Settings'), findsWidgets);
+          await waitForAnyText(tester, ['Settings', 'الإعدادات']);
         });
 
         // ── Stage: toggle telemetry ──
         await stage('toggle telemetry', () async {
           // Privacy section is collapsed by default -- expand it
-          await scrollUntilVisible(tester, find.text('Privacy'));
-          await tapAndSettle(tester, find.text('Privacy'));
+          await scrollUntilVisible(
+            tester,
+            textAnyOf(tester, ['Privacy', 'الخصوصية']),
+          );
+          await tapAndSettle(tester, textAnyOf(tester, ['Privacy', 'الخصوصية']));
           await tester.pumpAndSettle();
 
           await scrollUntilVisible(
             tester,
-            find.text('Send anonymous usage data'),
+            textAnyOf(
+              tester,
+              ['Send anonymous usage data', 'إرسال بيانات استخدام مجهولة'],
+            ),
           );
 
           final telemetryTile = find.ancestor(
-            of: find.text('Send anonymous usage data'),
+            of: textAnyOf(
+              tester,
+              ['Send anonymous usage data', 'إرسال بيانات استخدام مجهولة'],
+            ),
             matching: find.byType(ListTile),
           );
           final switchWidget = find.descendant(
@@ -158,15 +208,21 @@ void main() {
 
         // ── Stage: verify About section ──
         await stage('verify about section', () async {
-          await scrollUntilVisible(tester, find.text('About'));
-          expect(find.text('About'), findsWidgets);
+          await scrollUntilVisible(tester, textAnyOf(tester, ['About', 'حول']));
+          expect(
+            find.text('About').evaluate().isNotEmpty ||
+                find.text('حول').evaluate().isNotEmpty,
+            isTrue,
+          );
 
           // Tap to expand the About section
-          await tapAndSettle(tester, find.text('About'));
+          await tapAndSettle(tester, textAnyOf(tester, ['About', 'حول']));
           await pumpAndSettleWithTimeout(tester);
 
           // Verify app version info or View logs appears
-          final viewLogs = find.text('View logs');
+          final viewLogs = find.text('View logs').evaluate().isNotEmpty
+              ? find.text('View logs')
+              : find.text('عرض السجلات');
           if (viewLogs.evaluate().isNotEmpty) {
             expect(viewLogs, findsOneWidget);
           }
@@ -177,20 +233,31 @@ void main() {
           // After the about/telemetry stages the ListView is scrolled down.
           // "Theme" is near the top and has been disposed by the lazy builder.
           // Scroll UP (positive delta) to bring it back into the viewport.
-          await scrollUntilVisible(tester, find.text('Theme'), delta: 200);
-          await tapAndSettle(tester, find.text('Theme'));
+          await scrollUntilVisible(
+            tester,
+            textAnyOf(tester, ['Theme', 'المظهر']),
+            delta: 200,
+          );
+          await tapAndSettle(tester, textAnyOf(tester, ['Theme', 'المظهر']));
 
-          await waitForWidget(tester, find.text('Dark'));
-          await tapAndSettle(tester, find.text('Dark'));
+          await tapAnyText(tester, ['Dark', 'داكن']);
 
-          await tapAndSettle(tester, find.text('Groups'));
+          await tapAnyText(tester, ['Groups', 'المجموعات']);
           await pumpAndSettleWithTimeout(tester);
 
-          await waitForWidget(tester, find.text('Settings'));
-          await tapAndSettle(tester, find.text('Settings'));
+          await waitForAnyText(tester, ['Settings', 'الإعدادات']);
+          await tapAnyText(tester, ['Settings', 'الإعدادات']);
 
-          await scrollUntilVisible(tester, find.text('Theme'), delta: 200);
-          expect(find.text('Dark'), findsWidgets);
+          await scrollUntilVisible(
+            tester,
+            textAnyOf(tester, ['Theme', 'المظهر']),
+            delta: 200,
+          );
+          expect(
+            find.text('Dark').evaluate().isNotEmpty ||
+                find.text('داكن').evaluate().isNotEmpty,
+            isTrue,
+          );
         });
       },
     );

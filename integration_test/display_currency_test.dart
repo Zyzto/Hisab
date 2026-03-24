@@ -20,11 +20,17 @@ void main() {
 
       // ── Stage: set display currency in Settings ──
       await stage('set display currency', () async {
-        await tapAndSettle(tester, find.text('Settings'));
+        await tapAnyText(tester, ['Settings', 'الإعدادات']);
         await pumpAndSettleWithTimeout(tester);
 
-        await scrollUntilVisible(tester, find.text('Display Currency'));
-        await tapAndSettle(tester, find.text('Display Currency'));
+        await scrollUntilVisible(
+          tester,
+          textAnyOf(tester, ['Display Currency', 'عملة العرض']),
+        );
+        await tapAndSettle(
+          tester,
+          textAnyOf(tester, ['Display Currency', 'عملة العرض']),
+        );
         await pumpAndSettleWithTimeout(tester);
 
         // Currency picker opens (title "Select Currency" on tablet; on mobile sheet has no title, so wait for search field)
@@ -58,22 +64,26 @@ void main() {
         await pumpAndSettleWithTimeout(tester);
 
         // Picker closes; we're back on Settings
-        await waitForWidget(tester, find.text('Settings'));
-        expect(find.text('Settings'), findsWidgets);
+        await waitForAnyText(tester, ['Settings', 'الإعدادات']);
       });
 
       // ── Stage: create group ──
       await stage('create group for display currency', () async {
         await pumpAndSettleWithTimeout(tester);
-        await scrollUntilVisible(tester, find.text('Groups'));
-        await tester.ensureVisible(find.text('Groups').first);
+        await scrollUntilVisible(
+          tester,
+          textAnyOf(tester, ['Groups', 'المجموعات']),
+        );
+        await tester.ensureVisible(textAnyOf(tester, ['Groups', 'المجموعات']).first);
         // Tap the nav bar item (InkWell containing "Groups") so we hit the tappable area, not obscured text
-        final groupsNav = find.widgetWithText(InkWell, 'Groups');
+        final groupsNav = find.widgetWithText(InkWell, 'Groups').evaluate().isNotEmpty
+            ? find.widgetWithText(InkWell, 'Groups')
+            : find.widgetWithText(InkWell, 'المجموعات');
         if (groupsNav.evaluate().isNotEmpty) {
           await tester.ensureVisible(groupsNav.first);
           await tapAndSettle(tester, groupsNav.first);
         } else {
-          await tapAndSettle(tester, find.text('Groups').first);
+          await tapAndSettle(tester, textAnyOf(tester, ['Groups', 'المجموعات']).first);
         }
         await pumpAndSettleWithTimeout(tester);
 
@@ -101,13 +111,9 @@ void main() {
         await tapAndSettle(tester, find.byKey(const Key('wizard_next_button')));
         await tester.pump(const Duration(milliseconds: 400));
 
-        await waitForWidget(tester, find.text('Add'));
-        await enterTextAndPump(tester, find.byType(TextField).last, 'Alex');
-        await tester.testTextInput.receiveAction(TextInputAction.done);
-        await tester.pumpAndSettle();
-        await enterTextAndPump(tester, find.byType(TextField).last, 'Sam');
-        await tester.testTextInput.receiveAction(TextInputAction.done);
-        await tester.pumpAndSettle();
+        await waitForAnyText(tester, ['Add', 'إضافة']);
+        await addWizardParticipant(tester, 'Alex');
+        await addWizardParticipant(tester, 'Sam');
 
         await waitForWidget(
           tester,
@@ -157,8 +163,16 @@ void main() {
 
       // ── Stage: group detail shows summary in group currency ──
       await stage('group detail shows group currency', () async {
-        expect(find.text('My Expenses'), findsWidgets);
-        expect(find.text('Total Expenses'), findsWidgets);
+        expect(
+          find.text('My Expenses').evaluate().isNotEmpty ||
+              find.text('مصاريفي').evaluate().isNotEmpty,
+          isTrue,
+        );
+        expect(
+          find.text('Total Expenses').evaluate().isNotEmpty ||
+              find.text('إجمالي المصروفات').evaluate().isNotEmpty,
+          isTrue,
+        );
         // Amounts are in group currency (SAR); we show formatted amount
         expect(find.text('Coffee'), findsWidgets);
       });
@@ -170,7 +184,7 @@ void main() {
 
         expect(find.text('Coffee'), findsWidgets);
         await tapAndSettle(tester, find.byIcon(Icons.arrow_back));
-        await waitForWidget(tester, find.text('Expenses'));
+        await waitForAnyText(tester, ['Expenses', 'المصروفات']);
       });
 
       // ── Stage: clear display currency (verifies clear button works) ──
@@ -178,24 +192,29 @@ void main() {
         // We may still be on group detail; tap back until Settings is visible in shell nav
         for (
           var i = 0;
-          i < 3 && find.text('Settings').evaluate().isEmpty;
+          i < 3 &&
+              find.text('Settings').evaluate().isEmpty &&
+              find.text('الإعدادات').evaluate().isEmpty;
           i++
         ) {
           if (find.byIcon(Icons.arrow_back).evaluate().isEmpty) break;
           await tapAndSettle(tester, find.byIcon(Icons.arrow_back).first);
           await pumpAndSettleWithTimeout(tester);
         }
-        await waitForWidget(
+        await waitForAnyText(
           tester,
-          find.text('Settings'),
+          ['Settings', 'الإعدادات'],
           timeout: const Duration(seconds: 5),
         );
-        await tapAndSettle(tester, find.text('Settings'));
+        await tapAnyText(tester, ['Settings', 'الإعدادات']);
         await pumpAndSettleWithTimeout(tester);
 
-        await scrollUntilVisible(tester, find.text('Display Currency'));
+        await scrollUntilVisible(
+          tester,
+          textAnyOf(tester, ['Display Currency', 'عملة العرض']),
+        );
         final displayCurrencyTile = find.ancestor(
-          of: find.text('Display Currency'),
+          of: textAnyOf(tester, ['Display Currency', 'عملة العرض']),
           matching: find.byType(ListTile),
         );
         final clearBtn = find.descendant(
@@ -206,7 +225,7 @@ void main() {
           await tapAndSettle(tester, clearBtn.first);
           await pumpAndSettleWithTimeout(tester);
         }
-        expect(find.text('Settings'), findsWidgets);
+        await waitForAnyText(tester, ['Settings', 'الإعدادات']);
       });
     });
   });
