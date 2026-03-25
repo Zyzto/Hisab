@@ -60,11 +60,18 @@ jobs:
         id: chrome
         uses: browser-actions/setup-chrome@v2
         with:
+          chrome-version: 'stable'
           install-chromedriver: true
+
+      - name: Link action Chrome over system Chrome
+        run: |
+          sudo ln -sf "${{ steps.chrome.outputs.chrome-path }}" /opt/google/chrome/chrome
+          sudo ln -sf "${{ steps.chrome.outputs.chrome-path }}" /usr/bin/google-chrome
+          sudo ln -sf "${{ steps.chrome.outputs.chrome-path }}" /usr/bin/google-chrome-stable
 
       - name: Start ChromeDriver
         run: |
-          chromedriver --port=4444 &
+          "${{ steps.chrome.outputs.chromedriver-path }}" --port=4444 &
           sleep 3
 
       - name: Run integration tests (web)
@@ -144,11 +151,18 @@ jobs:
         id: chrome
         uses: browser-actions/setup-chrome@v2
         with:
+          chrome-version: 'stable'
           install-chromedriver: true
+
+      - name: Link action Chrome over system Chrome
+        run: |
+          sudo ln -sf "${{ steps.chrome.outputs.chrome-path }}" /opt/google/chrome/chrome
+          sudo ln -sf "${{ steps.chrome.outputs.chrome-path }}" /usr/bin/google-chrome
+          sudo ln -sf "${{ steps.chrome.outputs.chrome-path }}" /usr/bin/google-chrome-stable
 
       - name: Start ChromeDriver
         run: |
-          chromedriver --port=4444 &
+          "${{ steps.chrome.outputs.chromedriver-path }}" --port=4444 &
           sleep 3
 
       - name: Run online integration tests (web)
