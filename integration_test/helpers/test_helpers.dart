@@ -218,6 +218,10 @@ Future<T> waitForAsyncResult<T>(
 
 /// Scroll until [finder] is visible, using [tester.ensureVisible] when the
 /// widget is already in the tree, or manual drag-scrolling otherwise.
+///
+/// Uses bounded pumps instead of bare [pumpAndSettle] (which defaults to a
+/// 10-minute timeout) so background animations (UpgradeAlert, sync indicator,
+/// CircularProgressIndicator) cannot stall the test.
 Future<void> scrollUntilVisible(
   WidgetTester tester,
   Finder finder, {
@@ -227,7 +231,7 @@ Future<void> scrollUntilVisible(
 }) async {
   if (finder.evaluate().isNotEmpty) {
     await tester.ensureVisible(finder.first);
-    await tester.pumpAndSettle();
+    await _settleWithBound(tester);
     return;
   }
   final scrollCandidates = scrollable ?? find.byType(Scrollable);
@@ -242,14 +246,29 @@ Future<void> scrollUntilVisible(
   final scrollFinder = scrollCandidates.first;
   for (var i = 0; i < maxScrolls; i++) {
     await tester.drag(scrollFinder, Offset(0, delta));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
     if (finder.evaluate().isNotEmpty) {
       await tester.ensureVisible(finder.first);
-      await tester.pumpAndSettle();
+      await _settleWithBound(tester);
       return;
     }
   }
   expect(finder, findsWidgets, reason: 'Could not scroll to $finder');
+}
+
+/// Try to pump-and-settle with a short timeout. If a continuous animation
+/// (e.g. [CircularProgressIndicator], UpgradeAlert network check) prevents
+/// settling, swallow the timeout error so the caller can continue.
+Future<void> _settleWithBound(WidgetTester tester) async {
+  try {
+    await tester.pumpAndSettle(
+      const Duration(milliseconds: 100),
+      EnginePhase.sendSemanticsUpdate,
+      const Duration(seconds: 5),
+    );
+  } on FlutterError {
+    // pumpAndSettle timed out; the UI is usable even if not fully quiescent.
+  }
 }
 
 /// Tap the expense form's submit button ("Add Expense" / "Submit") reliably.
