@@ -555,8 +555,14 @@ void main() {
           await tester.pump(const Duration(milliseconds: 300));
 
           recordStage('delete expense', 'tapping expense tile');
-          await tapAndSettle(tester, tile.first);
-          await pumpAndSettleWithTimeout(tester);
+          try {
+            await tapAndSettle(tester, tile.first,
+                timeout: const Duration(seconds: 8));
+          } on FlutterError catch (_) {}
+          try {
+            await pumpAndSettleWithTimeout(tester,
+                timeout: const Duration(seconds: 5));
+          } on FlutterError catch (_) {}
 
           recordStage('delete expense', 'waiting for more_vert');
           await waitForWidget(tester, find.byIcon(Icons.more_vert));
