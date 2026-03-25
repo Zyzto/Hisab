@@ -235,6 +235,36 @@ keyAlias=hisab-release
 keyPassword=your_key_password
 ```
 
+### Local CI (act + Podman)
+
+Run the release workflow's test jobs locally without pushing to GitHub. Uses [nektos/act](https://github.com/nektos/act) with Podman as the container runtime.
+
+#### One-time setup
+
+```bash
+# 1. Install act
+curl -sSL https://github.com/nektos/act/releases/latest/download/act_Linux_x86_64.tar.gz \
+  | tar xz -C ~/.local/bin act
+
+# 2. Enable Podman socket (Docker API compat layer)
+systemctl --user enable --now podman.socket
+```
+
+#### Run
+
+```bash
+# Run the "test" job (unit + widget + integration tests)
+bash scripts/act_test.sh
+
+# Run the online test job
+bash scripts/act_test.sh --job test-online
+
+# If actions hit permission errors, add --privileged
+bash scripts/act_test.sh --privileged
+```
+
+The first run pulls a ~12 GB Ubuntu runner image (`catthehacker/ubuntu:full-latest`); subsequent runs use the cached image. Podman support in act is unofficial but works via Docker API socket emulation.
+
 ## Known issues
 
 - **Change password modal — focus loss on text fields:** The change-password sheet (Settings → Change password) can lose focus on the current/new/confirm password fields at random when clicking (e.g. on the visibility toggles or elsewhere). In-app controls were made non-focusable (`canRequestFocus: false`) to reduce this, but the issue may still occur on some platforms or with certain focus/route updates. Workaround: tap directly on the text field again to refocus.
