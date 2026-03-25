@@ -535,32 +535,40 @@ void main() {
         }
 
         // ── Stage: delete expense ──
+        // Every pumpAndSettle in this stage is replaced with explicit pumps
+        // because background animations (UpgradeAlert, sync indicator) prevent
+        // the UI from ever "settling", causing a 10-minute hang.
         await stage('delete expense', () async {
-          // 'Updated Dinner' is the oldest expense and sits below the fold in
-          // the lazy ListView.  Scroll the *expense list* (not the TabBarView)
-          // so the item is built before we try to tap it.
+          recordStage('delete expense', 'scrolling to Updated Dinner');
           await scrollUntilVisible(
             tester,
             find.text('Updated Dinner'),
             scrollable: find.byType(ListView),
           );
-          await tapAndSettle(tester, find.text('Updated Dinner'));
-          await pumpAndSettleWithTimeout(tester);
 
+          recordStage('delete expense', 'tapping expense tile');
+          await tapAndPump(tester, find.text('Updated Dinner'));
+
+          recordStage('delete expense', 'waiting for more_vert');
           await waitForWidget(tester, find.byIcon(Icons.more_vert));
-          await tapAndSettle(tester, find.byIcon(Icons.more_vert));
+
+          recordStage('delete expense', 'opening overflow menu');
+          await tapAndPump(tester, find.byIcon(Icons.more_vert));
+
+          recordStage('delete expense', 'tapping Delete menu item');
           await tapAnyText(tester, ['Delete', 'حذف']);
 
+          recordStage('delete expense', 'waiting for confirm dialog');
           await waitForAnyText(tester, ['Delete Expense?', 'حذف المصروف؟']);
-          // In some layouts there can be multiple "Delete" labels (menu + sheet),
-          // so tap the last one which is the sheet confirm action.
+
+          recordStage('delete expense', 'confirming delete');
           final confirmButton = find.text('Delete').evaluate().isNotEmpty
               ? find.text('Delete')
               : find.text('حذف');
-          await tapAndSettle(tester, confirmButton.last);
+          await tapAndPump(tester, confirmButton.last);
 
+          recordStage('delete expense', 'waiting for list update');
           await waitForAnyText(tester, ['Expenses', 'المصروفات']);
-          // Wait for list to update (Web can be slower)
           await waitForCondition(
             tester,
             condition: () => find.text('Updated Dinner').evaluate().isEmpty,
