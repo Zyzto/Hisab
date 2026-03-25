@@ -536,8 +536,14 @@ void main() {
 
         // ── Stage: delete expense ──
         await stage('delete expense', () async {
-          await waitForWidget(tester, find.text('Updated Dinner'));
-          await scrollUntilVisible(tester, find.text('Updated Dinner'));
+          // 'Updated Dinner' is the oldest expense and sits below the fold in
+          // the lazy ListView.  Scroll the *expense list* (not the TabBarView)
+          // so the item is built before we try to tap it.
+          await scrollUntilVisible(
+            tester,
+            find.text('Updated Dinner'),
+            scrollable: find.byType(ListView),
+          );
           await tapAndSettle(tester, find.text('Updated Dinner'));
           await pumpAndSettleWithTimeout(tester);
 
