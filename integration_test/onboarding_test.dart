@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:integration_test/integration_test.dart';
 
 import 'helpers/test_bootstrap.dart';
 import 'helpers/test_helpers.dart';
 
 void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-
   group('Onboarding', () {
     testWidgets('complete onboarding flow lands on home', (tester) async {
       recordStage('onboarding: bootstrap', 'STARTED');

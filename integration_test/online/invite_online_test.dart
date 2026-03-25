@@ -2,14 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hisab/features/expenses/widgets/expense_list_tile.dart';
-import 'package:integration_test/integration_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../helpers/online_test_bootstrap.dart';
 import '../helpers/test_helpers.dart';
 
 void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   final skipInviteFlows = const bool.fromEnvironment(
     'HISAB_SKIP_INVITE_ONLINE',
     defaultValue: true,

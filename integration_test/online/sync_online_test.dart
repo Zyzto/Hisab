@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:integration_test/integration_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../helpers/online_test_bootstrap.dart';
 import '../helpers/test_helpers.dart';
 
 void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-
   group('Online sync flow', () {
     testWidgets('create group → verify in Supabase → add expense → verify → '
         'trigger sync → delete group', (tester) async {

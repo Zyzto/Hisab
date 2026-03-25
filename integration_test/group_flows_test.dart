@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:integration_test/integration_test.dart';
 
 import 'helpers/test_helpers.dart';
 
 void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-
   group('Group lifecycle', () {
     testWidgets('create (icon+color) → tabs → people → settings → currency → '
         'settlement → freeze → delete', (tester) async {
