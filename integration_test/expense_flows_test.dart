@@ -10,7 +10,7 @@ void main() {
   group('Expense lifecycle', () {
     testWidgets(
       'full form → group → tags → description → breakdown → long title → '
-      'splits → edit → chevrons → income → transfer → photos → delete',
+      'splits → edit → chevrons → delete → income → transfer → photos',
       (tester) async {
         await ensureIntegrationTestReady(tester);
 
@@ -393,6 +393,35 @@ void main() {
           await waitForWidget(tester, find.text('Expenses'));
         });
 
+        // ── Stage: delete expense ──
+        // Runs here (with only 6 expenses) so "Updated Dinner" is visible
+        // without scrolling — the chevrons stage just tapped it directly.
+        await stage('delete expense', () async {
+          await tapAndSettle(tester, find.text('Updated Dinner'));
+          await pumpAndSettleWithTimeout(tester);
+
+          await waitForWidget(tester, find.byIcon(Icons.more_vert));
+          await tapAndSettle(tester, find.byIcon(Icons.more_vert));
+
+          await tapAnyText(tester, ['Delete', 'حذف']);
+
+          await waitForAnyText(tester, ['Delete Expense?', 'حذف المصروف؟']);
+          final confirmButton = find.text('Delete').evaluate().isNotEmpty
+              ? find.text('Delete')
+              : find.text('حذف');
+          await tapAndSettle(tester, confirmButton.last);
+
+          await waitForAnyText(tester, ['Expenses', 'المصروفات']);
+          await waitForCondition(
+            tester,
+            condition: () =>
+                find.text('Updated Dinner').evaluate().isEmpty,
+            timeout: const Duration(seconds: 25),
+            reason: 'Updated Dinner should be removed after delete',
+          );
+          expect(find.text('Updated Dinner'), findsNothing);
+        });
+
         // ── Stage: add income ──
         await stage('add income', () async {
           await waitForWidget(tester, find.byIcon(Icons.add));
@@ -531,67 +560,7 @@ void main() {
           });
         }
 
-        // ── Stage: delete expense ──
-        await stage('delete expense', () async {
-          recordStage('delete expense', 'scrolling to Updated Dinner');
-          await scrollUntilVisible(
-            tester,
-            find.text('Updated Dinner'),
-            scrollable: find.byType(ListView),
-          );
-
-          // Verify the widget survived the scroll (lazy list may rebuild).
-          final tile = find.text('Updated Dinner');
-          expect(tile, findsWidgets,
-              reason: 'Updated Dinner not found after scroll');
-
-          // Center the tile in the viewport so it doesn't overlap the FAB
-          // at the bottom of the screen (the item lands near the bottom
-          // edge after ensureVisible's default alignment).
-          await Scrollable.ensureVisible(
-            tile.first.evaluate().single,
-            alignment: 0.5,
-          );
-          await tester.pump(const Duration(milliseconds: 300));
-
-          recordStage('delete expense', 'tapping expense tile');
-          try {
-            await tapAndSettle(tester, tile.first,
-                timeout: const Duration(seconds: 8));
-          } on FlutterError catch (_) {}
-          try {
-            await pumpAndSettleWithTimeout(tester,
-                timeout: const Duration(seconds: 5));
-          } on FlutterError catch (_) {}
-
-          recordStage('delete expense', 'waiting for more_vert');
-          await waitForWidget(tester, find.byIcon(Icons.more_vert));
-
-          recordStage('delete expense', 'opening overflow menu');
-          await tapAndPump(tester, find.byIcon(Icons.more_vert));
-
-          recordStage('delete expense', 'tapping Delete menu item');
-          await tapAnyPump(tester, ['Delete', 'حذف']);
-
-          recordStage('delete expense', 'waiting for confirm dialog');
-          await waitForAnyText(tester, ['Delete Expense?', 'حذف المصروف؟']);
-
-          recordStage('delete expense', 'confirming delete');
-          final confirmButton = find.text('Delete').evaluate().isNotEmpty
-              ? find.text('Delete')
-              : find.text('حذف');
-          await tapAndPump(tester, confirmButton.last);
-
-          recordStage('delete expense', 'waiting for list update');
-          await waitForAnyText(tester, ['Expenses', 'المصروفات']);
-          await waitForCondition(
-            tester,
-            condition: () => find.text('Updated Dinner').evaluate().isEmpty,
-            timeout: const Duration(seconds: 25),
-            reason: 'Updated Dinner should be removed from list after delete',
-          );
-          expect(find.text('Updated Dinner'), findsNothing);
-        });
+        // (delete expense stage moved earlier — runs right after chevrons)
       },
     );
   });
