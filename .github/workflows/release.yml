@@ -57,6 +57,7 @@ jobs:
         run: flutter test
 
       - name: Install Chrome + ChromeDriver
+        id: chrome
         uses: browser-actions/setup-chrome@v2
         with:
           install-chromedriver: true
@@ -67,6 +68,8 @@ jobs:
           sleep 3
 
       - name: Run integration tests (web)
+        env:
+          CHROME_EXECUTABLE: ${{ steps.chrome.outputs.chrome-path }}
         run: |
           flutter drive \
             --driver=test_driver/integration_test.dart \
@@ -138,6 +141,7 @@ jobs:
           echo "anon_key=$(supabase status --output json | jq -r '.ANON_KEY')" >> "$GITHUB_OUTPUT"
 
       - name: Install Chrome + ChromeDriver
+        id: chrome
         uses: browser-actions/setup-chrome@v2
         with:
           install-chromedriver: true
@@ -148,6 +152,8 @@ jobs:
           sleep 3
 
       - name: Run online integration tests (web)
+        env:
+          CHROME_EXECUTABLE: ${{ steps.chrome.outputs.chrome-path }}
         run: |
           flutter drive \
             --driver=test_driver/integration_test.dart \
