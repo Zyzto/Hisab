@@ -535,7 +535,6 @@ void main() {
         }
 
         // ── Stage: delete expense ──
-        // All pumpAndSettle avoided — background animations prevent settling.
         await stage('delete expense', () async {
           recordStage('delete expense', 'scrolling to Updated Dinner');
           await scrollUntilVisible(
@@ -549,13 +548,18 @@ void main() {
           expect(tile, findsWidgets,
               reason: 'Updated Dinner not found after scroll');
 
+          // Center the tile in the viewport so it doesn't overlap the FAB
+          // at the bottom of the screen (the item lands near the bottom
+          // edge after ensureVisible's default alignment).
+          await Scrollable.ensureVisible(
+            tile.first.evaluate().single,
+            alignment: 0.5,
+          );
+          await tester.pump(const Duration(milliseconds: 300));
+
           recordStage('delete expense', 'tapping expense tile');
-          try {
-            await tapAndSettle(tester, tile.first,
-                timeout: const Duration(seconds: 5));
-          } on FlutterError catch (_) {
-            // Background animations may prevent settling — that's OK.
-          }
+          await tapAndSettle(tester, tile.first);
+          await pumpAndSettleWithTimeout(tester);
 
           recordStage('delete expense', 'waiting for more_vert');
           await waitForWidget(tester, find.byIcon(Icons.more_vert));
