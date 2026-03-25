@@ -99,6 +99,18 @@ Future<void> tapAnyText(
   await tapAndSettle(tester, target, timeout: timeout);
 }
 
+/// Like [tapAnyText] but uses explicit pumps instead of [pumpAndSettle].
+/// Prefer this when background animations prevent the UI from settling.
+Future<void> tapAnyPump(
+  WidgetTester tester,
+  List<String> labels, {
+  Duration timeout = const Duration(seconds: 15),
+  int pumps = 20,
+}) async {
+  final target = await waitForAnyText(tester, labels, timeout: timeout);
+  await tapAndPump(tester, target, pumps: pumps);
+}
+
 /// Tap a widget and pump manually (no pumpAndSettle). Use this for buttons
 /// that trigger async operations like DB writes + navigation, where
 /// pumpAndSettle would return before the Future completes.
@@ -219,9 +231,9 @@ Future<T> waitForAsyncResult<T>(
 /// Scroll until [finder] is visible, using [tester.ensureVisible] when the
 /// widget is already in the tree, or manual drag-scrolling otherwise.
 ///
-/// Uses bounded pumps instead of bare [pumpAndSettle] (which defaults to a
-/// 10-minute timeout) so background animations (UpgradeAlert, sync indicator,
-/// CircularProgressIndicator) cannot stall the test.
+/// Avoids [pumpAndSettle] entirely — background animations (UpgradeAlert,
+/// sync indicator, loaders) prevent settling and can also cause scroll physics
+/// to drift lazy-list items back out of view during the settle window.
 Future<void> scrollUntilVisible(
   WidgetTester tester,
   Finder finder, {
@@ -231,7 +243,7 @@ Future<void> scrollUntilVisible(
 }) async {
   if (finder.evaluate().isNotEmpty) {
     await tester.ensureVisible(finder.first);
-    await _settleWithBound(tester);
+    await tester.pump(const Duration(milliseconds: 300));
     return;
   }
   final scrollCandidates = scrollable ?? find.byType(Scrollable);
@@ -249,26 +261,11 @@ Future<void> scrollUntilVisible(
     await tester.pump(const Duration(milliseconds: 300));
     if (finder.evaluate().isNotEmpty) {
       await tester.ensureVisible(finder.first);
-      await _settleWithBound(tester);
+      await tester.pump(const Duration(milliseconds: 300));
       return;
     }
   }
   expect(finder, findsWidgets, reason: 'Could not scroll to $finder');
-}
-
-/// Try to pump-and-settle with a short timeout. If a continuous animation
-/// (e.g. [CircularProgressIndicator], UpgradeAlert network check) prevents
-/// settling, swallow the timeout error so the caller can continue.
-Future<void> _settleWithBound(WidgetTester tester) async {
-  try {
-    await tester.pumpAndSettle(
-      const Duration(milliseconds: 100),
-      EnginePhase.sendSemanticsUpdate,
-      const Duration(seconds: 5),
-    );
-  } on FlutterError {
-    // pumpAndSettle timed out; the UI is usable even if not fully quiescent.
-  }
 }
 
 /// Tap the expense form's submit button ("Add Expense" / "Submit") reliably.
