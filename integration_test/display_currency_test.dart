@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:integration_test/integration_test.dart';
 
 import 'helpers/test_helpers.dart';
 
@@ -9,8 +8,6 @@ import 'helpers/test_helpers.dart';
 /// - Group detail summary and list showing amounts in group currency
 /// - Expense detail showing amount in group currency
 void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-
   group('Display currency and group currency display', () {
     testWidgets('set display currency → create group → add expense → '
         'group detail shows group currency → expense detail shows group currency', (

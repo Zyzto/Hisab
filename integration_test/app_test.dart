@@ -8,6 +8,8 @@
 // The last "STARTED" or "PASSED" stage before the failure shows where the test reached.
 // Failures inside stage() also report: FAILED at stage "stage name": <error>.
 
+import 'package:integration_test/integration_test.dart';
+
 import 'smoke_test.dart' as smoke;
 import 'onboarding_test.dart' as onboarding;
 import 'group_flows_test.dart' as group_flows;
@@ -18,6 +20,7 @@ import 'settings_test.dart' as settings;
 import 'display_currency_test.dart' as display_currency;
 
 void main() {
+  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   smoke.main();
   onboarding.main();
   group_flows.main();
