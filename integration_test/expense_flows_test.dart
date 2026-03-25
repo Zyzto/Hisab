@@ -535,9 +535,7 @@ void main() {
         }
 
         // ── Stage: delete expense ──
-        // Every pumpAndSettle in this stage is replaced with explicit pumps
-        // because background animations (UpgradeAlert, sync indicator) prevent
-        // the UI from ever "settling", causing a 10-minute hang.
+        // All pumpAndSettle avoided — background animations prevent settling.
         await stage('delete expense', () async {
           recordStage('delete expense', 'scrolling to Updated Dinner');
           await scrollUntilVisible(
@@ -546,8 +544,18 @@ void main() {
             scrollable: find.byType(ListView),
           );
 
+          // Verify the widget survived the scroll (lazy list may rebuild).
+          final tile = find.text('Updated Dinner');
+          expect(tile, findsWidgets,
+              reason: 'Updated Dinner not found after scroll');
+
           recordStage('delete expense', 'tapping expense tile');
-          await tapAndPump(tester, find.text('Updated Dinner'));
+          try {
+            await tapAndSettle(tester, tile.first,
+                timeout: const Duration(seconds: 5));
+          } on FlutterError catch (_) {
+            // Background animations may prevent settling — that's OK.
+          }
 
           recordStage('delete expense', 'waiting for more_vert');
           await waitForWidget(tester, find.byIcon(Icons.more_vert));
@@ -556,7 +564,7 @@ void main() {
           await tapAndPump(tester, find.byIcon(Icons.more_vert));
 
           recordStage('delete expense', 'tapping Delete menu item');
-          await tapAnyText(tester, ['Delete', 'حذف']);
+          await tapAnyPump(tester, ['Delete', 'حذف']);
 
           recordStage('delete expense', 'waiting for confirm dialog');
           await waitForAnyText(tester, ['Delete Expense?', 'حذف المصروف؟']);
