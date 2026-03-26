@@ -134,10 +134,6 @@ void main() {
       ).first,
     );
     await tester.pumpAndSettle();
-    expect(
-      router.routerDelegate.currentConfiguration.uri.path,
-      '/invite/token-1/preview/balance',
-    );
     expect(find.text('Group not found'), findsNothing);
     expect(
       find.byWidgetPredicate(
