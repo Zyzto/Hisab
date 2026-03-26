@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
@@ -170,23 +171,18 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
     }
   }
 
-  void _navigateToTabIfNeeded(int index) {
+  /// Update the browser URL bar to reflect the active tab without triggering
+  /// a GoRouter navigation (which would destroy and recreate this widget,
+  /// killing any in-progress PageView animation).
+  void _syncUrlToTab(int index) {
     final targetPath = _targetPathForTabIndex(index);
     final currentPath =
         GoRouter.of(context).routerDelegate.currentConfiguration.uri.path;
     if (currentPath != targetPath) {
-      context.go(targetPath);
-    }
-  }
-
-  void _syncTabFromRoute() {
-    final targetIndex = _tabIndexFromInitialTab();
-    if (_selectedTabIndex == targetIndex) return;
-    _selectedTabIndex = targetIndex;
-    _tabIndexNotifier.value = targetIndex;
-    _segmentController.value = targetIndex;
-    if (_pageController.hasClients) {
-      _pageController.jumpToPage(targetIndex);
+      SystemNavigator.routeInformationUpdated(
+        uri: Uri.parse(targetPath),
+        replace: true,
+      );
     }
   }
 
@@ -197,14 +193,6 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
     _tabIndexNotifier = ValueNotifier<int>(_selectedTabIndex);
     _pageController = PageController(initialPage: _selectedTabIndex);
     _segmentController = CustomSegmentedController<int>(value: _selectedTabIndex);
-  }
-
-  @override
-  void didUpdateWidget(covariant _GroupDetailContent oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.initialTab != widget.initialTab) {
-      setState(_syncTabFromRoute);
-    }
   }
 
   @override
@@ -549,7 +537,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
                               duration: const Duration(milliseconds: 200),
                               curve: Curves.easeInOut,
                               onValueChanged: (v) {
-                                _navigateToTabIfNeeded(v);
+                                _syncUrlToTab(v);
                                 setState(() {
                                   _selectedTabIndex = v;
                                   _programmaticTargetPage = v;
@@ -591,7 +579,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
                         setState(() => _selectedTabIndex = i);
                         _tabIndexNotifier.value = i;
                         _segmentController.value = i;
-                        _navigateToTabIfNeeded(i);
+                        _syncUrlToTab(i);
                       },
                       children: [
                         _ExpensesTab(
