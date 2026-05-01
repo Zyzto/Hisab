@@ -10,11 +10,15 @@ import '../widgets/toast.dart';
 /// If [context] and [errorToastMessage] are provided and the context is still
 /// mounted after a catch, shows an error toast with Share/Report actions.
 /// If [ref] is provided, sends anonymized error telemetry when online and telemetry is enabled.
+///
+/// [errorSummaryEnglish] is included in Share / GitHub reports (English). When
+/// null, [logMessage] is used for that section.
 Future<T?> runGuardedAsync<T>(
   Future<T> future,
   String logMessage, {
   BuildContext? context,
   String? errorToastMessage,
+  String? errorSummaryEnglish,
   WidgetRef? ref,
 }) async {
   try {
@@ -25,7 +29,7 @@ Future<T?> runGuardedAsync<T>(
     if (ref != null) {
       sendErrorTelemetryIfOnline(
         ref,
-        message: errorToastMessage ?? details,
+        message: errorSummaryEnglish ?? logMessage,
         details: details,
       );
     }
@@ -34,6 +38,7 @@ Future<T?> runGuardedAsync<T>(
         errorToastMessage,
         details: details,
         stackTrace: st,
+        summaryEnglish: errorSummaryEnglish ?? logMessage,
       );
     }
     return null;

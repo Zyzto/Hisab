@@ -49,8 +49,8 @@ The same domain entity (`Group`) and the same pages (detail, settings, expense f
 ### Create
 
 - **Home** → tap or long-press the **+** FAB → modal with **Create group** and **Create personal**.
-- **Create personal** → `GroupCreatePage(isPersonal: true)` (route `/groups/create-personal`): 3 steps (name+currency, icon+color, summary). No participants step; `repo.create(..., isPersonal: true, initialParticipants: [])`.
-- **Create group** → same page with `isPersonal: false`; 4 steps including participants.
+- **Create personal** → `GroupCreatePage(isPersonal: true)` at canonical route **`/groups/create-personal`** (3 steps: name+currency, icon+color, summary). Legacy URLs such as `/groups/create-personal/details` redirect to that path. No participants step; `repo.create(..., isPersonal: true, initialParticipants: [])`.
+- **Create group** → same widget with `isPersonal: false` at **`/groups/create`** (4 steps including participants). Legacy per-step paths under `/groups/create/...` redirect to `/groups/create`. In-wizard address-bar updates use decorative `routeInformationUpdated` so wizard state is not lost between steps.
 
 ### Detail (group detail page)
 
@@ -79,7 +79,7 @@ The same domain entity (`Group`) and the same pages (detail, settings, expense f
 | Domain | `lib/domain/group.dart` |
 | Schema | `lib/core/database/powersync_schema.dart`, `lib/core/database/sync_engine.dart` |
 | Repo | `lib/core/repository/group_repository.dart`, `lib/core/repository/powersync_repository.dart` |
-| Routes | `lib/core/navigation/route_paths.dart` (`groupCreatePersonal`), `lib/core/navigation/app_router.dart` |
+| Routes | `lib/core/navigation/route_paths.dart` (`groupCreate`, `groupCreatePersonal`, legacy step constants for redirects), `lib/core/navigation/app_router.dart` (canonical create shells + redirects) |
 | Home | `lib/features/home/pages/home_page.dart` (modal, two sections: Personal / Groups) |
 | Create | `lib/features/groups/pages/group_create_page.dart` (`isPersonal`, 3 vs 4 steps) |
 | Detail | `lib/features/groups/pages/group_detail_page.dart` (branch on `widget.group.isPersonal`; `_PersonalBudgetHeader`, single view vs tabs) |

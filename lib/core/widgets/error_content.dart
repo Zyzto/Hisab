@@ -23,6 +23,7 @@ class ErrorContentWidget extends StatelessWidget {
     this.onGoHome,
     this.details,
     this.stackTrace,
+    this.summaryEnglish,
   });
 
   /// Optional detail message (e.g. error.toString()). When null, only title is shown.
@@ -42,6 +43,9 @@ class ErrorContentWidget extends StatelessWidget {
 
   /// Optional stack trace for Report issue body.
   final StackTrace? stackTrace;
+
+  /// Optional English line for Share / GitHub (e.g. provider or API context).
+  final String? summaryEnglish;
 
   @override
   Widget build(BuildContext context) {
@@ -95,6 +99,7 @@ class ErrorContentWidget extends StatelessWidget {
                   message: displayMessage,
                   details: details,
                   stackTrace: stackTrace,
+                  summaryEnglish: summaryEnglish,
                 ),
                 icon: const Icon(Icons.share, size: 20),
                 label: Text('share'.tr()),
@@ -105,6 +110,7 @@ class ErrorContentWidget extends StatelessWidget {
                   message: displayMessage,
                   details: details,
                   stackTrace: stackTrace,
+                  summaryEnglish: summaryEnglish,
                   onCopied: () {
                     if (context.mounted) {
                       context.showSuccess('logs_copied_paste'.tr());
