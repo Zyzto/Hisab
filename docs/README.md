@@ -33,5 +33,5 @@ Quick links to setup, backend, product, and UI docs.
 
 ## Codebase and tests
 
-- [CODEBASE.md](CODEBASE.md) — Codebase overview: stack, layout, data/sync, features
+- [CODEBASE.md](CODEBASE.md) — Codebase overview: stack, layout, data/sync, features, navigation (wizards, decorative URLs, navigation trace for error reports), error reporting / Share–GitHub flow
 - [../test/README.md](../test/README.md) — How to run unit, widget, and integration tests

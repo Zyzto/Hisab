@@ -33,6 +33,18 @@ import '../../../domain/domain.dart';
 import '../utils/group_icon_utils.dart';
 
 const double _kTabFabBottomClearance = 96.0;
+
+/// Grapheme-safe cap before adding an ellipsis; pixel overflow still handled by [Text].
+const int _kGroupDetailAppBarTitleMaxGraphemes = 40;
+
+String _elideGroupNameForAppBar(String name) {
+  final trimmed = name.trim();
+  if (trimmed.isEmpty) return trimmed;
+  final ch = Characters(trimmed);
+  if (ch.length <= _kGroupDetailAppBarTitleMaxGraphemes) return trimmed;
+  return '${ch.take(_kGroupDetailAppBarTitleMaxGraphemes).string}…';
+}
+
 const double _kTabListBottomSpacing = 16.0;
 
 enum GroupDetailTab { expenses, balance, people }
@@ -225,6 +237,9 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
 
   Widget _buildAppBarTitle(BuildContext context) {
     final theme = Theme.of(context);
+    final fullName = widget.group.name;
+    final displayName = _elideGroupNameForAppBar(fullName);
+    final wasElided = displayName != fullName.trim();
     final groupColor = widget.group.color != null
         ? Color(widget.group.color!)
         : theme.colorScheme.surfaceContainerHighest;
@@ -234,7 +249,10 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
     final avatarFg = hasCustomColor
         ? ThemeConfig.foregroundOnBackground(groupColor)
         : theme.colorScheme.onSurface;
-    return Row(
+    final letter = fullName.trim().isNotEmpty
+        ? Characters(fullName.trim()).first.toUpperCase()
+        : '?';
+    final titleRow = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         CircleAvatar(
@@ -243,9 +261,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
           child: iconData != null
               ? Icon(iconData, size: 20, color: avatarFg)
               : Text(
-                  widget.group.name.isNotEmpty
-                      ? widget.group.name[0].toUpperCase()
-                      : '?',
+                  letter,
                   style: theme.textTheme.titleMedium?.copyWith(
                     color: avatarFg,
                     fontWeight: FontWeight.w600,
@@ -255,7 +271,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
         const SizedBox(width: 10),
         Flexible(
           child: Text(
-            widget.group.name,
+            displayName,
             key: const Key('group_detail_title'),
             style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
@@ -265,6 +281,12 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
           ),
         ),
       ],
+    );
+    return Semantics(
+      label: fullName,
+      child: wasElided
+          ? Tooltip(message: fullName, child: titleRow)
+          : titleRow,
     );
   }
 

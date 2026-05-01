@@ -42,12 +42,16 @@ extension ToastContext on BuildContext {
     String message, {
     String? details,
     StackTrace? stackTrace,
+    /// Short English line for GitHub / share (e.g. same as [Log.warning] text).
+    String? summaryEnglish,
     Duration? duration,
   }) {
     if (!mounted) return;
+    final uiLocaleTag = readUiLocaleTagForReport(this);
     final displayMessage = message.length > _errorToastMessageMaxLen
         ? '${message.substring(0, _errorToastMessageMaxLen)}…'
         : message;
+    final surfaceContext = this;
     toastification.showCustom(
       context: this,
       alignment: Alignment.bottomCenter,
@@ -90,32 +94,44 @@ extension ToastContext on BuildContext {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton(
-                      onPressed: () {
-                        shareErrorReport(
-                          context,
-                          message: message,
-                          details: details,
-                          stackTrace: stackTrace,
-                        );
+                      onPressed: () async {
+                        // Remove overlay before native share sheet so Android does not
+                        // keep a stale hit target over the bottom of the screen.
                         toastification.dismiss(holder);
+                        try {
+                          await shareErrorReport(
+                            surfaceContext,
+                            message: message,
+                            details: details,
+                            stackTrace: stackTrace,
+                            summaryEnglish: summaryEnglish,
+                            uiLocaleTag: uiLocaleTag,
+                          );
+                        } catch (_) {}
                       },
                       child: Text('share'.tr()),
                     ),
                     const SizedBox(width: 8),
                     FilledButton(
-                      onPressed: () {
-                        openErrorReportGitHubIssue(
-                          context,
-                          message: message,
-                          details: details,
-                          stackTrace: stackTrace,
-                          onCopied: () {
-                            if (context.mounted) {
-                              context.showSuccess('logs_copied_paste'.tr());
-                            }
-                          },
-                        );
+                      onPressed: () async {
                         toastification.dismiss(holder);
+                        try {
+                          await openErrorReportGitHubIssue(
+                            surfaceContext,
+                            message: message,
+                            details: details,
+                            stackTrace: stackTrace,
+                            summaryEnglish: summaryEnglish,
+                            uiLocaleTag: uiLocaleTag,
+                            onCopied: () {
+                              if (surfaceContext.mounted) {
+                                surfaceContext.showSuccess(
+                                  'logs_copied_paste'.tr(),
+                                );
+                              }
+                            },
+                          );
+                        } catch (_) {}
                       },
                       child: Text('report_issue'.tr()),
                     ),

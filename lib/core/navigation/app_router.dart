@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
+import 'navigation_trace.dart';
 import 'route_paths.dart';
 import '../../features/home/routes.dart';
 import '../../features/settings/routes.dart';
@@ -131,7 +132,7 @@ GoRouter router(Ref ref) {
   final refreshNotifier = ref.watch(localeRefreshProvider);
   final onboardingCompleted = ref.watch(onboardingCompletedProvider);
 
-  return GoRouter(
+  final router = GoRouter(
     refreshListenable: refreshNotifier,
     initialLocation: RoutePaths.home,
     redirect: (context, state) {
@@ -273,48 +274,45 @@ GoRouter router(Ref ref) {
         path: '/functions/v1/invite-redirect',
         builder: (context, state) => InviteRedirectProxyPage(uri: state.uri),
       ),
+      // One shell per wizard so PageView state is not disposed on step changes.
       GoRoute(
-        path: '/groups/create',
-        redirect: (context, state) => RoutePaths.groupCreateDetails,
+        path: RoutePaths.groupCreate,
+        builder: (context, state) =>
+            const GroupCreatePage(isPersonal: false),
       ),
       GoRoute(
-        path: '/groups/create-personal',
-        redirect: (context, state) => RoutePaths.groupCreatePersonalDetails,
+        path: RoutePaths.groupCreatePersonal,
+        builder: (context, state) =>
+            const GroupCreatePage(isPersonal: true),
       ),
+      // Legacy per-step URLs (bookmarks / old links) → canonical wizard routes.
       GoRoute(
         path: RoutePaths.groupCreateDetails,
-        builder: (context, state) =>
-            const GroupCreatePage(isPersonal: false, initialStep: 0),
+        redirect: (context, state) => RoutePaths.groupCreate,
       ),
       GoRoute(
         path: RoutePaths.groupCreateParticipants,
-        builder: (context, state) =>
-            const GroupCreatePage(isPersonal: false, initialStep: 1),
+        redirect: (context, state) => RoutePaths.groupCreate,
       ),
       GoRoute(
         path: RoutePaths.groupCreateStyle,
-        builder: (context, state) =>
-            const GroupCreatePage(isPersonal: false, initialStep: 2),
+        redirect: (context, state) => RoutePaths.groupCreate,
       ),
       GoRoute(
         path: RoutePaths.groupCreateReview,
-        builder: (context, state) =>
-            const GroupCreatePage(isPersonal: false, initialStep: 3),
+        redirect: (context, state) => RoutePaths.groupCreate,
       ),
       GoRoute(
         path: RoutePaths.groupCreatePersonalDetails,
-        builder: (context, state) =>
-            const GroupCreatePage(isPersonal: true, initialStep: 0),
+        redirect: (context, state) => RoutePaths.groupCreatePersonal,
       ),
       GoRoute(
         path: RoutePaths.groupCreatePersonalStyle,
-        builder: (context, state) =>
-            const GroupCreatePage(isPersonal: true, initialStep: 1),
+        redirect: (context, state) => RoutePaths.groupCreatePersonal,
       ),
       GoRoute(
         path: RoutePaths.groupCreatePersonalReview,
-        builder: (context, state) =>
-            const GroupCreatePage(isPersonal: true, initialStep: 2),
+        redirect: (context, state) => RoutePaths.groupCreatePersonal,
       ),
       GoRoute(
         path: '/groups/:id',
@@ -415,4 +413,16 @@ GoRouter router(Ref ref) {
       ),
     ],
   );
+
+  void traceListener() {
+    try {
+      NavigationTrace.instance.recordUri(
+        router.routerDelegate.currentConfiguration.uri.toString(),
+      );
+    } catch (_) {}
+  }
+
+  traceListener();
+  router.routerDelegate.addListener(traceListener);
+  return router;
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:material_symbols_icons/material_symbols_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -88,12 +89,19 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
     }
   }
 
-  void _syncRouteWithPage(int page) {
+  /// Updates the address bar to match the wizard step without [context.go],
+  /// so this [State] (PageView, timers, etc.) is not disposed mid-flow.
+  void _syncDecorativeUrlToPage(int page) {
+    final router = GoRouter.maybeOf(context);
+    if (router == null) return;
     final targetPath = _routeForPage(page);
     final currentPath =
-        GoRouter.of(context).routerDelegate.currentConfiguration.uri.path;
+        router.routerDelegate.currentConfiguration.uri.path;
     if (currentPath != targetPath) {
-      context.go(targetPath);
+      SystemNavigator.routeInformationUpdated(
+        uri: Uri.parse(targetPath),
+        replace: true,
+      );
     }
   }
 
@@ -117,6 +125,10 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
       vsync: this,
       duration: const Duration(milliseconds: 150),
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _syncDecorativeUrlToPage(_currentPage);
+    });
     _hintTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       if (mounted) {
         setState(() {
@@ -205,7 +217,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                               _permissionStatusFuture = _loadPermissionStatus();
                             }
                           });
-                          _syncRouteWithPage(i);
+                          _syncDecorativeUrlToPage(i);
                         },
                         children: [
                           const RepaintBoundary(child: OnboardingWelcomePage()),

@@ -83,7 +83,9 @@ class ContentAlignedAppBar extends StatelessWidget
                     ),
                     child: DefaultTextStyle(
                       style: titleStyle,
-                      child: FittedBox(fit: BoxFit.scaleDown, child: title),
+                      // Do not scale titles down (hurts readability on phones).
+                      // Titles get the band max width; use ellipsis / elision in the title widget.
+                      child: title,
                     ),
                   ),
                 ),

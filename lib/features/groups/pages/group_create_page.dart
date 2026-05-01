@@ -1,5 +1,6 @@
 import 'package:currency_picker/currency_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
@@ -68,9 +69,9 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
   // ── Step 4 state ──
   bool _saving = false;
 
-  String _routeForPage(int page) {
+  String _decorativePathForPage(int page) {
     if (widget.isPersonal) {
-      switch (page) {
+      switch (page.clamp(0, _pageCount - 1)) {
         case 1:
           return RoutePaths.groupCreatePersonalStyle;
         case 2:
@@ -80,7 +81,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
           return RoutePaths.groupCreatePersonalDetails;
       }
     }
-    switch (page) {
+    switch (page.clamp(0, _pageCount - 1)) {
       case 1:
         return RoutePaths.groupCreateParticipants;
       case 2:
@@ -93,12 +94,19 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
     }
   }
 
-  void _syncRouteWithPage(int page) {
-    final targetPath = _routeForPage(page);
+  /// Address bar only — canonical route stays [RoutePaths.groupCreate] /
+  /// [RoutePaths.groupCreatePersonal] so this [State] is not recreated per step.
+  void _syncDecorativeUrlToPage(int page) {
+    final router = GoRouter.maybeOf(context);
+    if (router == null) return;
+    final targetPath = _decorativePathForPage(page);
     final currentPath =
-        GoRouter.of(context).routerDelegate.currentConfiguration.uri.path;
+        router.routerDelegate.currentConfiguration.uri.path;
     if (currentPath != targetPath) {
-      context.go(targetPath);
+      SystemNavigator.routeInformationUpdated(
+        uri: Uri.parse(targetPath),
+        replace: true,
+      );
     }
   }
 
@@ -108,6 +116,10 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
     _currentPage = widget.initialStep.clamp(0, _pageCount - 1);
     _pageController = PageController(initialPage: _currentPage);
     _selectedCurrency = CurrencyHelpers.defaultCurrency();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _syncDecorativeUrlToPage(_currentPage);
+    });
   }
 
   @override
@@ -279,7 +291,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                         onPageChanged: (i) {
                           final fromPage = _currentPage;
                           setState(() => _currentPage = i);
-                          _syncRouteWithPage(i);
+                          _syncDecorativeUrlToPage(i);
                           // Clear focus after returning to step 0 so keyboard does not reopen.
                           if (i == 0 && fromPage > 0) {
                             WidgetsBinding.instance.addPostFrameCallback((_) {
