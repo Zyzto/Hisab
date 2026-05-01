@@ -92,6 +92,10 @@ jobs:
   test-online:
     name: Online Tests
     runs-on: ubuntu-latest
+    env:
+      # Isolate compose project naming from checkout path mismatches — reduces Kong/storage
+      # routing flakes during `supabase db reset` (see supabase/cli#4535).
+      COMPOSE_PROJECT_NAME: hisab
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -114,13 +118,25 @@ jobs:
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pin for reproducible CI (avoid transient regressions when `latest` moves).
+          version: 2.95.4
 
       - name: Start local Supabase
         run: supabase start
 
       - name: Reset database (migrations + seed)
-        run: supabase db reset
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            echo "supabase db reset (attempt ${attempt}/5)"
+            if supabase db reset; then
+              exit 0
+            fi
+            echo "Reset failed — cooling down before retry..."
+            sleep 25
+          done
+          echo "supabase db reset failed after retries"
+          exit 1
 
       - name: Wait for Supabase API
         run: |
