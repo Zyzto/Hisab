@@ -1397,6 +1397,78 @@ class _BreakdownBarsCard extends StatelessWidget {
     return row.label;
   }
 
+  List<PieChartSectionData> _buildPieSections(
+    BuildContext context,
+    List<AmountBreakdownItem> visibleRows,
+    int total,
+    Map<String, Color> colorByCategoryId,
+    List<Color> palette,
+  ) {
+    // fl_chart draws clockwise from top (0° = 12 o'clock).
+    // cos(angle) > 0 means the badge is in the upper half → line below text.
+    double cumulativeAngle = 0;
+    return visibleRows.asMap().entries.map((entry) {
+      final index = entry.key;
+      final row = entry.value;
+      final value = row.amountCents.abs().toDouble();
+      final sweepDeg = (value / total) * 360;
+      final midDeg = cumulativeAngle + sweepDeg / 2;
+      cumulativeAngle += sweepDeg;
+
+      final pct = (value / total) * 100;
+      final showOutsidePct = pct > 0 && pct < 8;
+      final color =
+          colorByCategoryId[row.id] ?? palette[index % palette.length];
+
+      // Badge is above center when midDeg is in [0,90) or (270,360)
+      final badgeAboveCenter = math.cos(midDeg * math.pi / 180) > 0;
+
+      final line = Container(width: 1.6, height: 12, color: color);
+      const gap = SizedBox(height: 3);
+      final label = Text(
+        '${pct.toStringAsFixed(0)}%',
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: Theme.of(context).colorScheme.onSurface,
+          fontWeight: FontWeight.w700,
+        ),
+      );
+
+      return PieChartSectionData(
+        value: value,
+        color: color,
+        radius: 42,
+        title: showOutsidePct
+            ? ''
+            : (pct >= 8 ? '${pct.toStringAsFixed(0)}%' : ''),
+        titleStyle: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
+          shadows: const [
+            Shadow(
+              color: Color(0x99000000),
+              offset: Offset(0, 1),
+              blurRadius: 2,
+            ),
+          ],
+        ),
+        badgePositionPercentageOffset: 1.22,
+        badgeWidget: showOutsidePct
+            ? GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () =>
+                    onOpenCategoryExpenses?.call(row.id, row.label),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: badgeAboveCenter
+                      ? [label, gap, line]
+                      : [line, gap, label],
+                ),
+              )
+            : null,
+      );
+    }).toList();
+  }
+
   Widget _buildPieChart(BuildContext context, List<AmountBreakdownItem> rows) {
     final palette = <Color>[
       const Color(0xFF2563EB),
@@ -1467,57 +1539,13 @@ class _BreakdownBarsCard extends StatelessWidget {
                   );
                 },
               ),
-              sections: visibleRows.asMap().entries.map((entry) {
-                final index = entry.key;
-                final row = entry.value;
-                final value = row.amountCents.abs().toDouble();
-                final pct = (value / total) * 100;
-                final showOutsidePct = pct > 0 && pct < 8;
-                return PieChartSectionData(
-                  value: value,
-                  color: colorByCategoryId[row.id] ?? palette[index % palette.length],
-                  radius: 42,
-                  title: showOutsidePct ? '' : (pct >= 8 ? '${pct.toStringAsFixed(0)}%' : ''),
-                  titleStyle: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    shadows: const [
-                      Shadow(
-                        color: Color(0x99000000),
-                        offset: Offset(0, 1),
-                        blurRadius: 2,
-                      ),
-                    ],
-                  ),
-                  badgePositionPercentageOffset: 1.22,
-                  badgeWidget: showOutsidePct
-                      ? GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () =>
-                              onOpenCategoryExpenses?.call(row.id, row.label),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 1.6,
-                                height: 12,
-                                color:
-                                    colorByCategoryId[row.id] ?? palette[index % palette.length],
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                '${pct.toStringAsFixed(0)}%',
-                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : null,
-                );
-              }).toList(),
+              sections: _buildPieSections(
+                context,
+                visibleRows,
+                total,
+                colorByCategoryId,
+                palette,
+              ),
             ),
           ),
         ),

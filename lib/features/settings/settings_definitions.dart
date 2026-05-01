@@ -365,6 +365,44 @@ final homeListShowCreatedAtSettingDef = const BoolSetting(
   order: 4,
 );
 
+/// Transaction scanner section (personal budget auto-import from notifications).
+final scannerSection = const SettingSection(
+  key: 'scanner',
+  titleKey: 'scanner_section',
+  icon: Icons.document_scanner_outlined,
+  order: 3,
+);
+
+/// Master toggle for the notification transaction scanner. Disabled by default.
+final scannerEnabledSettingDef = const BoolSetting(
+  'scanner_enabled',
+  defaultValue: false,
+  titleKey: 'scanner_enabled',
+  icon: Icons.notifications_active_outlined,
+  section: 'scanner',
+  order: 0,
+);
+
+/// When true, capture GPS location at notification time. Disabled by default.
+final scannerLocationEnabledSettingDef = const BoolSetting(
+  'scanner_location_enabled',
+  defaultValue: false,
+  titleKey: 'scanner_location_enabled',
+  icon: Icons.location_on_outlined,
+  section: 'scanner',
+  order: 1,
+);
+
+/// Show a local notification when a transaction is captured.
+final scannerNotifyOnCaptureSettingDef = const BoolSetting(
+  'scanner_notify_on_capture',
+  defaultValue: true,
+  titleKey: 'scanner_notify_on_capture',
+  icon: Icons.notification_add_outlined,
+  section: 'scanner',
+  order: 2,
+);
+
 final allSections = [
   accountSection,
   appearanceSection,
@@ -372,6 +410,7 @@ final allSections = [
   homeListSection,
   dataBackupSection,
   receiptAiSection,
+  scannerSection,
   privacySection,
   advancedSection,
   aboutSection,
@@ -465,6 +504,9 @@ final allSettings = <SettingDefinition>[
   receiptAiProviderSettingDef,
   geminiApiKeySettingDef,
   openaiApiKeySettingDef,
+  scannerEnabledSettingDef,
+  scannerLocationEnabledSettingDef,
+  scannerNotifyOnCaptureSettingDef,
   telemetryEnabledSettingDef,
   notificationsEnabledSettingDef,
   homeListDisplaySettingDef,

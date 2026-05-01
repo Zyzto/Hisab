@@ -98,6 +98,51 @@ const schema = Schema([
     Column.text('archived_at'),
   ]),
 
+  // ── Transaction scanner (local-only) ────────────────────────────────
+  Table('draft_transactions', [
+    Column.text('personal_group_id'),
+    Column.integer('amount_cents'),
+    Column.text('currency_code'),
+    Column.text('card_last_four'),
+    Column.text('merchant_name'),
+    Column.text('merchant_category'),
+    Column.text('transaction_date'),
+    Column.text('captured_at'),
+    Column.real('latitude'),
+    Column.real('longitude'),
+    Column.text('raw_notification_text'),
+    Column.text('sender_package'),
+    Column.text('sender_title'),
+    Column.text('status'),
+    Column.text('matched_pattern_id'),
+    Column.real('confidence'),
+    Column.text('created_expense_id'),
+    Column.text('created_at'),
+    Column.text('updated_at'),
+  ]),
+  Table('scanner_sender_rules', [
+    Column.text('package_name'),
+    Column.text('sender_label'),
+    Column.text('sender_number'),
+    Column.integer('enabled'),
+    Column.integer('match_count'),
+    Column.text('created_at'),
+  ]),
+  Table('scanner_patterns', [
+    Column.text('name'),
+    Column.text('sender_match'),
+    Column.text('amount_regex'),
+    Column.text('currency_regex'),
+    Column.text('card_regex'),
+    Column.text('merchant_regex'),
+    Column.text('date_regex'),
+    Column.text('date_format'),
+    Column.integer('is_built_in'),
+    Column.integer('enabled'),
+    Column.integer('success_count'),
+    Column.text('created_at'),
+  ]),
+
   // ── Offline queue ────────────────────────────────────────────────────
   // Stores writes made while in Online mode but temporarily offline.
   // Processed by DataSyncService when connectivity returns.

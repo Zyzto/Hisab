@@ -26,6 +26,9 @@ class GroupCard extends ConsumerWidget {
   /// When true, card is in selection mode and highlighted.
   final bool isSelected;
 
+  /// When > 0, show a badge count (e.g. pending scanner drafts).
+  final int badgeCount;
+
   const GroupCard({
     super.key,
     required this.group,
@@ -35,6 +38,7 @@ class GroupCard extends ConsumerWidget {
     this.onPinToggle,
     this.onLongPress,
     this.isSelected = false,
+    this.badgeCount = 0,
   });
 
   @override
@@ -196,6 +200,22 @@ class GroupCard extends ConsumerWidget {
               },
             ),
           ),
+          if (badgeCount > 0)
+            Container(
+              margin: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                badgeCount > 99 ? '99+' : '$badgeCount',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
           if (onPinToggle != null)
             IconButton(
               icon: Icon(

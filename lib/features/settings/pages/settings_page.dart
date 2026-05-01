@@ -44,6 +44,9 @@ import '../../../core/theme/flex_theme_builder.dart'
 import '../widgets/change_password_sheet.dart';
 import '../widgets/edit_profile_sheet.dart';
 import '../widgets/setting_tile_helper.dart';
+import '../../transaction_scanner/pages/scanner_hub_page.dart';
+import '../../transaction_scanner/providers/scanner_providers.dart';
+import '../../transaction_scanner/services/notification_bridge.dart';
 import '../sections/settings_functional_section.dart';
 import '../sections/settings_privacy_section.dart';
 import '../sections/settings_advanced_section.dart';
@@ -186,6 +189,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     ),
                   ),
                 ),
+                if (scannerAvailable)
+                  _buildSection(
+                    context,
+                    ref,
+                    settings,
+                    scannerSection,
+                    _buildScannerSectionTiles(context, ref, settings),
+                  ),
                 // Privacy: renamed from Logging
                 _buildSection(
                   context,
@@ -1527,6 +1538,51 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ),
       ],
     );
+  }
+
+  List<Widget> _buildScannerSectionTiles(
+    BuildContext context,
+    WidgetRef ref,
+    SettingsProviders settings,
+  ) {
+    final isEnabled = ref.watch(scannerEnabledProvider);
+    final pendingCount =
+        ref.watch(pendingDraftCountProvider).asData?.value ?? 0;
+    return [
+      SwitchSettingsTile.fromSetting(
+        setting: scannerEnabledSettingDef,
+        title: 'scanner_enabled'.tr(),
+        subtitle: 'scanner_enabled_description'.tr(),
+        value: isEnabled,
+        onChanged: (v) {
+          ref
+              .read(settings.provider(scannerEnabledSettingDef).notifier)
+              .set(v);
+          if (v) {
+            NotificationBridge.setEnabled(true);
+          } else {
+            NotificationBridge.setEnabled(false);
+          }
+          Log.info('Setting changed: ${scannerEnabledSettingDef.key}=$v');
+        },
+      ),
+      NavigationSettingsTile(
+        leading: const Icon(Icons.checklist),
+        title: Text('scanner_pending_title'.tr()),
+        subtitle: pendingCount > 0
+            ? Text(
+                'scanner_pending_count'.tr(args: [pendingCount.toString()]),
+              )
+            : Text('scanner_no_pending'.tr()),
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const ScannerHubPage(),
+            ),
+          );
+        },
+      ),
+    ];
   }
 
   static Future<void> _showApiKeyDialog({
