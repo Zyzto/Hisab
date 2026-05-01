@@ -29,6 +29,7 @@ import 'core/navigation/app_router.dart';
 import 'core/navigation/invite_link_handler.dart';
 import 'core/services/connectivity_service.dart';
 import 'core/widgets/back_button_keyboard_dismiss.dart';
+import 'features/transaction_scanner/providers/scanner_providers.dart';
 import 'core/widgets/toast.dart';
 
 class App extends ConsumerStatefulWidget {
@@ -340,6 +341,9 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
 
     // Watch DataSyncService to reactively fetch/push data
     ref.watch(dataSyncServiceProvider);
+
+    // Initialize transaction scanner controller (Android only, no-op elsewhere)
+    if (scannerAvailable) ref.watch(scannerControllerProvider);
 
     // Locale is read exclusively from EasyLocalization (context.locale) so that
     // locale: and localizationsDelegates always come from the same frame.

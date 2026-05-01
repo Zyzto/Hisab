@@ -17,6 +17,7 @@ import '../../groups/providers/groups_provider.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 import '../../settings/settings_definitions.dart';
 import '../../groups/widgets/group_card.dart';
+import '../../transaction_scanner/providers/scanner_providers.dart';
 import '../providers/home_list_provider.dart';
 import '../../../domain/domain.dart';
 
@@ -447,11 +448,16 @@ class HomePage extends ConsumerWidget {
                   final personal = ordered.where((g) => g.isPersonal).toList();
                   final shared = ordered.where((g) => !g.isPersonal).toList();
 
+                  final scannerBadge = scannerAvailable
+                      ? ref.watch(pendingDraftCountProvider).asData?.value ?? 0
+                      : 0;
+
                   Widget buildCard(Group group) {
                     return GroupCard(
                       key: ValueKey(group.id),
                       group: group,
                       isSelected: selectedIds.contains(group.id),
+                      badgeCount: group.isPersonal ? scannerBadge : 0,
                       onTap: () {
                         final cur = ref.read(selectedGroupIdsProvider);
                         if (cur.isNotEmpty) {
