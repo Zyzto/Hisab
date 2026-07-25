@@ -20,6 +20,7 @@ Quick links to setup, backend, product, and UI docs.
 - [DELETE_ACCOUNT.md](DELETE_ACCOUNT.md) — User-facing: delete local/cloud data, request account deletion
 - [PLAY_CONSOLE_DECLARATIONS.md](PLAY_CONSOLE_DECLARATIONS.md) — Play Console: privacy, ads, content ratings
 - [PERSONAL_FEATURE.md](PERSONAL_FEATURE.md) — Personal (my-expenses-only) mode: data model and flows
+- [TRANSACTION_SCANNER.md](TRANSACTION_SCANNER.md) — Android notification → draft → personal expense scanner
 
 ## Web debugging
 
@@ -33,5 +34,5 @@ Quick links to setup, backend, product, and UI docs.
 
 ## Codebase and tests
 
-- [CODEBASE.md](CODEBASE.md) — Codebase overview: stack, layout, data/sync, features, navigation (wizards, decorative URLs, navigation trace for error reports), error reporting / Share–GitHub flow
+- [CODEBASE.md](CODEBASE.md) — Codebase overview: stack, layout, data/sync, features (including Transaction Scanner), navigation (wizards, decorative URLs, navigation trace for error reports), error reporting / Share–GitHub flow
 - [../test/README.md](../test/README.md) — How to run unit, widget, and integration tests

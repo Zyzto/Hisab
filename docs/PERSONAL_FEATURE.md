@@ -140,7 +140,12 @@ Summary: Personal↔Group only toggles `is_personal` and (when going to personal
 - **Existing groups:** Unchanged; `isPersonal` defaults to `false` everywhere (schema, sync, backup parse).
 - **Local-only:** Create personal, add expense, set budget, delete, and Share as group all work without Supabase.
 
+## Transaction Scanner
+
+On **Android**, the opt-in Transaction Scanner can create expenses/income in a **personal** group from reviewed notification drafts (pending count badge on personal cards on Home). Draft tables are local-only; see [TRANSACTION_SCANNER.md](TRANSACTION_SCANNER.md).
+
 ## Related docs
 
 - [SUPABASE_SETUP.md](SUPABASE_SETUP.md) — Migration 16 (groups personal and budget)
 - [CODEBASE.md](CODEBASE.md) — Data layer, sync, feature modules
+- [TRANSACTION_SCANNER.md](TRANSACTION_SCANNER.md) — Notification → draft → personal expense (Android)

@@ -13,6 +13,7 @@ Group expense splitting and settle-up app. Built with Flutter, Riverpod, GoRoute
 - **Balance** — View who is owed / who owes; settle-up suggests minimal transfers.
 - **Record Settlement** — Tap a settlement suggestion to record the payment and zero out the debt.
 - **Settings** — Theme, language, and **Local Only** toggle.
+- **Transaction Scanner (Android)** — Opt-in: parse bank/payment notifications into draft expenses for personal budgets (on-device; user review required). See [docs/TRANSACTION_SCANNER.md](docs/TRANSACTION_SCANNER.md).
 - **Offline-first** — Works entirely offline via local SQLite. Syncs directly with Supabase when online.
 
 ## Two Modes
