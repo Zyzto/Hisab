@@ -22,7 +22,9 @@
 |---|---|
 | `lib/` | Main Flutter application code |
 | `lib/core/` | Cross-cutting: auth, constants, database, debug, navigation, receipt, repository, services, telemetry, theme, update, utils, widgets |
-| `lib/features/` | Feature modules (`home`, `groups`, `expenses`, `balance`, `settings`, `onboarding`) |
+| `lib/features/` | Feature modules (`home`, `groups`, `expenses`, `balance`, `settings`, `onboarding`, `transaction_scanner`) |
+| `android/.../TransactionNotificationListener.kt` | Android Notification Listener for Transaction Scanner (opt-in) |
+| `android/.../NotificationBridge.kt` | Method/Event channel bridge for scanner ↔ Flutter |
 | `lib/domain/` | Domain entities and value types; barrel export in `domain.dart` |
 | `assets/translations/` | Localization JSON files |
 | `web/` | PWA shell, Firebase web messaging config, redirect pages, static privacy page |
@@ -58,6 +60,7 @@
 - `lib/core/database/powersync_schema.dart` defines local schema:
   - `groups`, `group_members`, `participants`, `expenses`, `expense_tags`, `group_invites`, `invite_usages`
   - `local_archived_groups` — per-user “hide from my list” (not synced)
+  - `draft_transactions`, `scanner_sender_rules`, `scanner_patterns` — Transaction Scanner (local-only; not synced); see [TRANSACTION_SCANNER.md](TRANSACTION_SCANNER.md)
   - `pending_writes` queue for offline-online deferred writes
 - **PowerSync `id` column:** PowerSync adds an `id` column automatically to each table. Do not add `Column.text('id')` (or any custom `id` column) in the schema — it will trigger: *"id column is automatically added, custom id columns are not supported"*.
 - **Repositories** (`lib/core/repository/`): `group_repository`, `participant_repository`, `expense_repository`, `group_member_repository`, `group_invite_repository`, `tag_repository`, `powersync_repository`. Wired in `repository_providers.dart` with `effectiveLocalOnlyProvider` and connectivity; implementations in `powersync_repository.dart` and per-entity repositories.
@@ -121,6 +124,7 @@ Expense form **photos**: add up to 5 images (camera or gallery on all platforms,
 - **Group / personal create wizard:** Canonical routes are `/groups/create` and `/groups/create-personal` (each mounts one `GroupCreatePage` so `PageView` state is not disposed between steps). Legacy paths such as `/groups/create/details` **redirect** to the canonical URL (bookmarks still work; refresh on a legacy step URL restarts the wizard at step 0). In-wizard step labels in the address bar use `SystemNavigator.routeInformationUpdated` (decorative), not `context.go`, so state and animations stay intact.
 - **Onboarding wizard:** Per-step routes (`/onboarding/welcome`, …) remain for deep links and cold starts; swiping between steps updates the browser URL the same way (**decorative** `routeInformationUpdated`) so `OnboardingPage` state is not recreated by `go()` on every page.
 - **Group detail tabs:** Tab changes still use `SystemNavigator.routeInformationUpdated` in `group_detail_page.dart` (same pattern: URL reflects tab without replacing the route).
+- **Transaction Scanner (Android):** No GoRouter paths; Settings / hub use imperative `Navigator.push` (`MaterialPageRoute`). See [TRANSACTION_SCANNER.md](TRANSACTION_SCANNER.md).
 - **Modals/sheets:** `lib/core/layout/responsive_sheet.dart` — `showResponsiveSheet` (bottom sheet on narrow, centered dialog on tablet+) and `showAppDialog`; both support `centerInFullViewport` and **click-outside-to-close** (barrier dismiss on all platforms, including desktop web via an explicit barrier gesture). See [MODAL_CENTERING_AND_RESPONSIVE_SHEET.md](MODAL_CENTERING_AND_RESPONSIVE_SHEET.md).
 - **App bar title alignment:** Pages that use `ConstrainedContent` for the body use **ContentAlignedAppBar** (see Layout above) so the app bar title sits in the same horizontal band as the content (tablet/desktop with rail and max-width content).
 - Deep link handling: `lib/core/navigation/invite_link_handler.dart`
@@ -167,9 +171,11 @@ Push notifications are sent when expenses are added/edited or members join a gro
 
 **Settings:** `notifications_enabled` controls initialization and token registration; the toggle is shown only in online mode.
 
+**Transaction Scanner (separate from FCM):** On Android, an opt-in Notification Listener can parse bank/payment notifications into local drafts for personal expenses. This does **not** use FCM. See [TRANSACTION_SCANNER.md](TRANSACTION_SCANNER.md).
+
 ## Feature Modules
 
-- `features/home`: groups list (Personal and Groups sections) via **home_list_provider** (ordered list, pinned/custom order), **routes**, create FAB + modal (Create group / Create personal), manual refresh trigger
+- `features/home`: groups list (Personal and Groups sections) via **home_list_provider** (ordered list, pinned/custom order), **routes**, create FAB + modal (Create group / Create personal), manual refresh trigger; pending Transaction Scanner draft badge on personal group cards
 - `features/groups`: create/detail/settings (including personal vs group branches and convert flows), invite management, invite acceptance; group settings include permission toggles (e.g. Members can add expenses, Members can record settlements for others). **Group create** uses a single shell route per flow plus decorative step URLs (see Navigation). `invite_redirect_proxy` (and `invite_redirect_proxy_web`, `invite_redirect_proxy_stub`, `invite_redirect_proxy_page`) for web/invite redirect; **create_invite_sheet** (invite creation UI)
 - `features/expenses`: create/edit/detail expenses (**expense_detail_shell**), split logic UI, image input hooks; **expense_navigation_direction** (provider), **expense_form_constants**, **category_icons**
 - `features/balance`: settlement list and record settlement flow. By default only the group owner or the debtor (participant who owes) can record a settlement; group setting **Members can record settlements for others** (Group.allowMemberSettleForOthers) allows any member to record. Balance list (`balance_list.dart`) uses `myMemberInGroupProvider` and `myRoleInGroupProvider` to enable or disable the record button per row.
@@ -179,10 +185,12 @@ Push notifications are sent when expenses are added/edited or members join a gro
   - local-only toggle + migration
   - import/export backup JSON (**backup_helper**: `parseBackupJson`, etc.)
   - telemetry + notifications toggles
+  - **Transaction Scanner** section (Android only): `scanner_enabled` + Pending Transactions → scanner hub
   - logs viewer/clear/report flow
   - feedback capture (**feedback_upload**, feedback_clipboard with io/stub)
   - About: version row tappable to check for updates manually; About me shows developer info from GitHub (avatar, name, bio, profile link)
 - `features/onboarding`: multi-step onboarding (welcome, preferences, permissions, connect) with mode selection and auth gate for online mode; URL sync for steps is decorative (see Navigation) so wizard state is preserved while swiping
+- `features/transaction_scanner`: Android notification → draft → personal expense pipeline (setup, hub, drafts, sender rules, patterns, parser, native bridge). See [TRANSACTION_SCANNER.md](TRANSACTION_SCANNER.md).
 
 ## Settings Framework
 
@@ -194,6 +202,7 @@ Major persisted keys include:
 - mode/lifecycle: `local_only`, `onboarding_completed`, pending OAuth flags, pending invite token
 - privacy: `telemetry_enabled`, `notifications_enabled`
 - receipt AI: OCR/AI flags, provider, and API keys
+- transaction scanner (Android): `scanner_enabled` (UI), plus `scanner_location_enabled` / `scanner_notify_on_capture` (defined; not yet wired in Settings UI)
 
 ## Web and PWA
 
