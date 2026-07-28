@@ -15,6 +15,7 @@ This note explains why Flutter web can feel much slower on iOS Safari than Andro
   - `--dart-define=ENABLE_WEB_SEMANTICS=true`
 - Production web builds default to:
   - `--dart-define=ENABLE_WEB_SEMANTICS=false`
+- Web SQLite change detection uses a **1.5s poll** (not native `watch`) because PowerSync’s web update stream can throw `LegacyJavaScriptObject`/`UpdateNotification`. Polls are **fingerprint-gated** so unchanged data does not rebuild Riverpod widgets every tick (important for Safari scroll FPS).
 
 This keeps iOS Safari responsive for most users while still allowing accessibility-targeted builds.
 

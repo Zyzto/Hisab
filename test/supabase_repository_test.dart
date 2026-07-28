@@ -76,10 +76,11 @@ void main() {
       if (!_powerSyncAvailable || db == null) return;
       final mockClient = MockSupabaseClient();
       final mockBuilder = MockSupabaseQueryBuilder();
-      when(() => mockClient.from(any())).thenReturn(mockBuilder);
+      // Query builders implement Future; mocktail rejects thenReturn(Future).
+      when(() => mockClient.from(any())).thenAnswer((_) => mockBuilder);
       when(
         () => mockBuilder.insert(any()),
-      ).thenThrow(Exception('supabase_insert_called'));
+      ).thenAnswer((_) => throw Exception('supabase_insert_called'));
 
       final repo = PowerSyncGroupRepository(
         db!,

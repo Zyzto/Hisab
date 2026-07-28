@@ -10,10 +10,25 @@ import '../../../domain/domain.dart';
 import '../../balance/providers/balance_provider.dart';
 import '../../expenses/pages/expense_detail_shell.dart';
 import '../../expenses/widgets/expense_detail_body.dart';
+import '../../settings/providers/settings_framework_providers.dart';
+import '../../settings/settings_definitions.dart';
 import '../providers/group_member_provider.dart';
 import '../providers/groups_provider.dart';
 import '../providers/invite_preview_provider.dart';
 import 'group_detail_page.dart';
+
+void _dismissInvitePreview(WidgetRef ref, BuildContext context) {
+  final settings = ref.read(hisabSettingsProvidersProvider);
+  if (settings != null) {
+    ref
+        .read(settings.provider(pendingInviteTokenSettingDef).notifier)
+        .set('');
+    ref
+        .read(settings.provider(pendingInviteAutoJoinSettingDef).notifier)
+        .set(false);
+  }
+  context.go(RoutePaths.home);
+}
 
 class InviteGroupPreviewPage extends ConsumerWidget {
   const InviteGroupPreviewPage({
@@ -42,7 +57,7 @@ class InviteGroupPreviewPage extends ConsumerWidget {
                   ),
                   const SizedBox(height: 24),
                   TextButton.icon(
-                    onPressed: () => context.go(RoutePaths.home),
+                    onPressed: () => _dismissInvitePreview(ref, context),
                     icon: const Icon(Icons.home_outlined, size: 20),
                     label: Text('go_home'.tr()),
                   ),
@@ -70,7 +85,7 @@ class InviteGroupPreviewPage extends ConsumerWidget {
               const CircularProgressIndicator(),
               const SizedBox(height: 24),
               TextButton.icon(
-                onPressed: () => context.go(RoutePaths.home),
+                onPressed: () => _dismissInvitePreview(ref, context),
                 icon: const Icon(Icons.home_outlined, size: 20),
                 label: Text('go_home'.tr()),
               ),
@@ -85,7 +100,7 @@ class InviteGroupPreviewPage extends ConsumerWidget {
             details: e.toString(),
             stackTrace: st,
             onRetry: () => ref.invalidate(invitePreviewDataProvider(token)),
-            onGoHome: () => context.go(RoutePaths.home),
+            onGoHome: () => _dismissInvitePreview(ref, context),
           ),
         ),
       ),
@@ -120,7 +135,7 @@ class InvitePreviewExpenseDetailPage extends ConsumerWidget {
                   ),
                   const SizedBox(height: 24),
                   TextButton.icon(
-                    onPressed: () => context.go(RoutePaths.home),
+                    onPressed: () => _dismissInvitePreview(ref, context),
                     icon: const Icon(Icons.home_outlined, size: 20),
                     label: Text('go_home'.tr()),
                   ),
@@ -143,7 +158,7 @@ class InvitePreviewExpenseDetailPage extends ConsumerWidget {
                   ),
                   const SizedBox(height: 24),
                   TextButton.icon(
-                    onPressed: () => context.go(RoutePaths.home),
+                    onPressed: () => _dismissInvitePreview(ref, context),
                     icon: const Icon(Icons.home_outlined, size: 20),
                     label: Text('go_home'.tr()),
                   ),
@@ -157,7 +172,7 @@ class InvitePreviewExpenseDetailPage extends ConsumerWidget {
             ..._buildPreviewOverrides(preview),
             futureExpenseProvider(
               expenseId,
-            ).overrideWith((ref) async => previewExpense),
+            ).overrideWith((ref) => Stream.value(previewExpense)),
           ],
           child: ExpenseDetailShell(
             groupId: groupId,
@@ -176,7 +191,7 @@ class InvitePreviewExpenseDetailPage extends ConsumerWidget {
               const CircularProgressIndicator(),
               const SizedBox(height: 24),
               TextButton.icon(
-                onPressed: () => context.go(RoutePaths.home),
+                onPressed: () => _dismissInvitePreview(ref, context),
                 icon: const Icon(Icons.home_outlined, size: 20),
                 label: Text('go_home'.tr()),
               ),
@@ -191,7 +206,7 @@ class InvitePreviewExpenseDetailPage extends ConsumerWidget {
             details: e.toString(),
             stackTrace: st,
             onRetry: () => ref.invalidate(invitePreviewDataProvider(token)),
-            onGoHome: () => context.go(RoutePaths.home),
+            onGoHome: () => _dismissInvitePreview(ref, context),
           ),
         ),
       ),
@@ -240,7 +255,9 @@ Iterable<dynamic> _buildPreviewOverrides(InvitePreviewData preview) {
   });
 
   return [
-    futureGroupProvider(groupId).overrideWith((ref) async => preview.group),
+    futureGroupProvider(
+      groupId,
+    ).overrideWith((ref) => Stream.value(preview.group)),
     participantsByGroupProvider(
       groupId,
     ).overrideWith((ref) => Stream.value(preview.participants)),
@@ -263,8 +280,12 @@ Iterable<dynamic> _buildPreviewOverrides(InvitePreviewData preview) {
     tagsByGroupProvider(
       groupId,
     ).overrideWith((ref) => Stream.value(const <ExpenseTag>[])),
-    myRoleInGroupProvider(groupId).overrideWith((ref) async => null),
-    myMemberInGroupProvider(groupId).overrideWith((ref) async => null),
+    myRoleInGroupProvider(groupId).overrideWith(
+      (ref) => Stream<GroupRole?>.value(null),
+    ),
+    myMemberInGroupProvider(groupId).overrideWith(
+      (ref) => Stream<GroupMember?>.value(null),
+    ),
     membersByGroupProvider(groupId).overrideWith((ref) => Stream.value(members)),
   ];
 }

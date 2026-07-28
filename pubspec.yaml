@@ -1,7 +1,7 @@
 name: hisab
 description: "Group expense splitting and settle-up app."
 publish_to: 'none'
-version: 0.5.30+52
+version: 0.6.0+53
 
 environment:
   sdk: ^3.10.0
@@ -27,6 +27,7 @@ dependencies:
 
   # Backend & database
   supabase_flutter: ^2.8.4
+  # Stay on 1.x until sync/schema tests and app paths are migrated for PowerSync 2.
   powersync: ^1.18.0
   path_provider: ^2.1.2
   path: ^1.9.0
@@ -51,7 +52,7 @@ dependencies:
   image_picker: ^1.0.7
   image_picker_android: ^0.8.13
   image_picker_platform_interface: ^2.9.0
-  google_mlkit_text_recognition: ^0.15.1
+  google_mlkit_text_recognition: ^0.16.0
   flutter_image_compress: ^2.3.0
 
   # Receipt AI (LangChain.dart – Gemini + OpenAI vision)
@@ -69,13 +70,13 @@ dependencies:
   flutter_settings_framework:
     git:
       url: https://github.com/Zyzto/edadat.git
-      ref: main
+      ref: b1d07e0e47c241b1ff1d3db0fa6d73bb166c10c7
 
   # About (version, licenses)
-  package_info_plus: ^9.0.0
+  package_info_plus: ^9.0.1
 
   # App update (version check + Android in-app update)
-  upgrader: ^12.5.0
+  upgrader: ^13.6.0
   in_app_update: ^4.2.5
   version: ^3.0.2
 
@@ -96,7 +97,7 @@ dependencies:
   # Push notifications
   firebase_core: ^4.6.0
   firebase_messaging: ^16.1.3
-  flutter_local_notifications: ^21.0.0
+  flutter_local_notifications: ^22.2.0
   pwa_install: ^0.0.6
 
   # Permissions
@@ -105,7 +106,7 @@ dependencies:
   # Interactive feedback with annotated screenshots
   feedback: ^3.2.0
   clipboard: ^3.0.14
-  share_plus: ^12.0.1
+  share_plus: ^12.0.2
   web: ^1.1.0
 
 dev_dependencies:
@@ -123,6 +124,10 @@ dev_dependencies:
   build_runner: ^2.13.1
   riverpod_generator: ^4.0.3
   flutter_launcher_icons: ^0.14.4
+
+# langchain_google 0.7.x still expects ApiException.code; googleai_dart 3.6 renamed it.
+dependency_overrides:
+  googleai_dart: 3.0.0
 
 flutter_launcher_icons:
   android: true

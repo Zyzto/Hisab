@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:easy_localization/easy_localization.dart';
+
 import 'http_fetch_helper.dart';
 
 /// Result of fetching Firebase status (from incidents.json).
@@ -53,7 +55,9 @@ Future<FirebaseStatusResult> fetchFirebaseStatus() async {
 
   try {
     final list = jsonDecode(result.body!);
-    if (list is! List) return FirebaseStatusFailure('Invalid response');
+    if (list is! List) {
+      return FirebaseStatusFailure('status_invalid_response'.tr());
+    }
 
     final now = DateTime.now().toUtc();
     final cutoff = now.subtract(const Duration(hours: _recentHours));
@@ -72,7 +76,7 @@ Future<FirebaseStatusResult> fetchFirebaseStatus() async {
       final desc =
           e['external_desc'] as String? ??
           e['service_name'] as String? ??
-          'Incident';
+          'status_incident'.tr();
       final mostRecent = e['most_recent_update'] as Map<String, dynamic>?;
       final status = mostRecent?['status'] as String? ?? '';
       final active = status != 'AVAILABLE';

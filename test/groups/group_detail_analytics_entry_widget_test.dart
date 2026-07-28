@@ -9,6 +9,7 @@ import 'package:hisab/features/groups/pages/group_analytics_page.dart';
 import 'package:hisab/features/groups/pages/group_detail_page.dart';
 import 'package:hisab/features/groups/providers/group_member_provider.dart';
 import 'package:hisab/features/groups/providers/groups_provider.dart';
+import 'package:hisab/features/groups/widgets/group_section_header.dart';
 import 'package:hisab/features/settings/providers/settings_framework_providers.dart';
 
 import '../widget_test_helpers.dart';
@@ -100,7 +101,8 @@ void main() {
     tester,
   ) async {
     const groupId = 'g2';
-    final now = DateTime(2026, 3, 20);
+    // Analytics range filter uses wall-clock "now", not fixture timestamps.
+    final now = DateTime.now();
     final group = Group(
       id: groupId,
       name: 'Trip',
@@ -126,6 +128,7 @@ void main() {
         updatedAt: now,
       ),
     ];
+    // Keep dates inside the default 90-day analytics window.
     final expenses = [
       Expense(
         id: 'e1',
@@ -134,7 +137,7 @@ void main() {
         amountCents: 1400,
         currencyCode: 'USD',
         title: 'Coffee',
-        date: DateTime(2026, 3, 18),
+        date: now.subtract(const Duration(days: 3)),
         splitType: SplitType.equal,
         splitShares: const {},
         createdAt: now,
@@ -148,7 +151,7 @@ void main() {
         amountCents: 900,
         currencyCode: 'USD',
         title: 'Taxi',
-        date: DateTime(2026, 3, 19),
+        date: now.subtract(const Duration(days: 2)),
         splitType: SplitType.equal,
         splitShares: const {},
         createdAt: now,
@@ -218,7 +221,7 @@ void main() {
     tester,
   ) async {
     const groupId = 'g3';
-    final now = DateTime(2026, 3, 20);
+    final now = DateTime.now();
     final group = Group(
       id: groupId,
       name: 'Trip',
@@ -252,7 +255,7 @@ void main() {
         amountCents: 2200,
         currencyCode: 'USD',
         title: 'Groceries',
-        date: DateTime(2026, 3, 18),
+        date: now.subtract(const Duration(days: 3)),
         splitType: SplitType.equal,
         splitShares: const {},
         createdAt: now,
@@ -266,7 +269,7 @@ void main() {
         amountCents: 900,
         currencyCode: 'USD',
         title: 'Taxi',
-        date: DateTime(2026, 3, 19),
+        date: now.subtract(const Duration(days: 2)),
         splitType: SplitType.equal,
         splitShares: const {},
         createdAt: now,
@@ -323,6 +326,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(GroupAnalyticsPage), findsOneWidget);
-    expect(find.byType(Card), findsWidgets);
+    expect(find.byType(GroupSectionHeader), findsWidgets);
   });
 }

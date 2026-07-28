@@ -2,7 +2,8 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_logging_service/flutter_logging_service.dart';
+
+import 'apply_setting.dart';
 
 /// Builds a [SwitchSettingsTile] for a [BoolSetting] with the standard
 /// watch/read pattern. Use this to reduce repetition when the only behavior
@@ -30,8 +31,8 @@ Widget buildBoolSettingTile(
     onChanged:
         onChanged ??
         (v) {
-          ref.read(settings.provider(settingDef).notifier).set(v);
-          Log.info('Setting changed: ${settingDef.key}=$v');
+          // Fire-and-forget is fine: SettingNotifier updates state immediately.
+          applySetting(ref, settings, settingDef, v);
         },
     enabled: enabled,
   );

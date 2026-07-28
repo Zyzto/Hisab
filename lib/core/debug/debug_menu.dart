@@ -62,7 +62,7 @@ class DebugMenuFab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return FloatingActionButton.small(
       heroTag: 'debugMenuFab',
-      tooltip: 'Debug menu',
+      tooltip: 'debug_menu_title'.tr(),
       backgroundColor: Theme.of(
         context,
       ).colorScheme.errorContainer.withValues(alpha: 0.9),
@@ -77,7 +77,7 @@ class DebugMenuFab extends ConsumerWidget {
           onBeforeOpen?.call();
           showResponsiveSheet<void>(
             context: navContext,
-            title: 'Debug',
+            title: 'debug_menu_title'.tr(),
             isScrollControlled: true,
             child: EasyLocalization(
               supportedLocales: const [Locale('en'), Locale('ar')],
@@ -194,7 +194,7 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Debug Menu',
+                  'debug_menu_title'.tr(),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: colorScheme.error,
                     fontWeight: FontWeight.bold,
@@ -265,7 +265,7 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
             // Sync status override (for testing chip/banner)
             const SizedBox(height: 8),
             Text(
-              'Sync status (override)',
+              'debug_sync_status_override'.tr(),
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),

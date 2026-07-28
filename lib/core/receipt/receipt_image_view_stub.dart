@@ -46,29 +46,36 @@ Widget buildExpenseImageView(
   BuildContext context,
   String? imagePath, {
   double? maxHeight,
+  double? width,
   BoxFit fit = BoxFit.cover,
+  EdgeInsetsGeometry padding = const EdgeInsets.only(top: 8),
+  BorderRadius? borderRadius,
 }) {
   if (imagePath == null || imagePath.isEmpty) return const SizedBox.shrink();
   final theme = Theme.of(context);
   final colorScheme = theme.colorScheme;
+  final radius = borderRadius ?? BorderRadius.circular(12);
   if (isImageUrl(imagePath)) {
     final effectiveMaxHeight = maxHeight ?? 200;
     return Padding(
-      padding: const EdgeInsets.only(top: 8),
+      padding: padding,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: radius,
         child: SizedBox(
+          width: width,
           height: effectiveMaxHeight,
           child: Image.network(
             imagePath,
             fit: fit,
+            width: width,
+            height: effectiveMaxHeight,
             loadingBuilder: (context, child, loadingProgress) {
               if (loadingProgress == null) return child;
               return _buildImageLoadingSkeleton(context);
             },
             errorBuilder: (_, _, _) => Material(
               color: colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: radius,
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(
@@ -94,31 +101,45 @@ Widget buildExpenseImageView(
       ),
     );
   }
+  final effectiveMaxHeight = maxHeight ?? 200;
+  final compact = width != null && width < 140;
   return Padding(
-    padding: const EdgeInsets.only(top: 8),
-    child: Material(
-      color: colorScheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Icon(
-              Icons.image_outlined,
-              size: 40,
-              color: colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'image_attached'.tr(),
-                style: theme.textTheme.bodyMedium?.copyWith(
+    padding: padding,
+    child: SizedBox(
+      width: width,
+      height: effectiveMaxHeight,
+      child: Material(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: radius,
+        child: compact
+            ? Center(
+                child: Icon(
+                  Icons.image_outlined,
+                  size: 28,
                   color: colorScheme.onSurfaceVariant,
                 ),
+              )
+            : Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.image_outlined,
+                      size: 40,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 12),
+                    Flexible(
+                      child: Text(
+                        'image_attached'.tr(),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
       ),
     ),
   );

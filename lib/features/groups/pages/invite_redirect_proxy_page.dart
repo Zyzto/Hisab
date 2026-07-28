@@ -82,7 +82,7 @@ class _InviteRedirectProxyPageState extends State<InviteRedirectProxyPage> {
             const CircularProgressIndicator(),
             const SizedBox(height: 16),
             Text(
-              'Redirecting...',
+              'redirecting'.tr(),
               style: Theme.of(context).textTheme.bodyLarge,
             ),
           ],

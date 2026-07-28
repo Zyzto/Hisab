@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:easy_localization/easy_localization.dart';
+import '../../../core/theme/accent_style.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/widgets/group_section_header.dart';
+import '../../../core/widgets/participant_avatar.dart';
 import '../../../domain/domain.dart';
 import '../constants/expense_form_constants.dart';
 
-const double _kSplitRadius = 4;
+const double _kSplitRadius = 14;
 
 InputDecoration _splitInputDecoration(ThemeData theme) {
   return InputDecoration(
@@ -86,63 +89,53 @@ class ExpenseSplitSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsetsDirectional.only(start: 4, bottom: 8),
-          child: Row(
-            children: [
-              Text(
-                'split'.tr(),
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.onSurface,
-                ),
-              ),
-              const Spacer(),
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: onSplitTypeTap,
-                  borderRadius: BorderRadius.circular(20),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 8,
-                      horizontal: 12,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          splitType == SplitType.equal
-                              ? 'equal'.tr()
-                              : splitType == SplitType.parts
-                              ? 'parts'.tr()
-                              : 'amounts'.tr(),
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.primary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.arrow_drop_down,
-                          size: 20,
+          padding: const EdgeInsetsDirectional.only(start: 2, bottom: 10),
+          child: GroupSectionHeader(
+            label: 'split'.tr(),
+            trailing: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onSplitTypeTap,
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 12,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        splitType == SplitType.equal
+                            ? 'equal'.tr()
+                            : splitType == SplitType.parts
+                            ? 'parts'.tr()
+                            : 'amounts'.tr(),
+                        style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w500,
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.arrow_drop_down,
+                        size: 20,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ],
+            ),
           ),
         ),
-        Material(
-          color: theme.colorScheme.surfaceContainerHighest.withValues(
-            alpha: 0.5,
+        Container(
+          decoration: AccentSurfaces.flatPanel(
+            theme.colorScheme,
+            radius: _kSplitRadius,
           ),
-          borderRadius: BorderRadius.circular(_kSplitRadius),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(_kSplitRadius),
-            child: Column(
+          clipBehavior: Clip.antiAlias,
+          child: Column(
               children: List.generate(participants.length, (i) {
                   final p = participants[i];
                   final cents = i < sharesCents.length ? sharesCents[i] : 0;
@@ -416,6 +409,18 @@ class ExpenseSplitSection extends StatelessWidget {
                               MaterialTapTargetSize.shrinkWrap,
                         ),
                         const SizedBox(width: 8),
+                        ParticipantAvatar(
+                          name: p.name,
+                          avatarId: p.avatarId,
+                          radius: 16,
+                          backgroundColor: included
+                              ? null
+                              : theme.colorScheme.surfaceContainerHighest,
+                          foregroundColor: included
+                              ? null
+                              : theme.colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: InkWell(
                             borderRadius: BorderRadius.circular(_kSplitRadius),
@@ -443,7 +448,6 @@ class ExpenseSplitSection extends StatelessWidget {
                     ),
                   );
                 }),
-            ),
           ),
         ),
         if (splitType == SplitType.amounts && includedList.isNotEmpty) ...[

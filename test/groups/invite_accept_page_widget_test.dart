@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:hisab/core/auth/auth_service.dart';
 import 'package:hisab/core/auth/auth_user_profile.dart';
@@ -13,6 +14,7 @@ import 'package:hisab/core/repository/repository_providers.dart';
 import 'package:hisab/domain/domain.dart';
 import 'package:hisab/features/groups/pages/invite_accept_page.dart';
 import 'package:hisab/features/settings/providers/settings_framework_providers.dart';
+import 'package:hisab/features/settings/settings_definitions.dart';
 
 import '../widget_test_helpers.dart';
 
@@ -56,7 +58,11 @@ class _FakeGroupInviteRepository implements IGroupInviteRepository {
       (invite: invite, group: group);
 
   @override
-  Future<String> accept(String token, {String? newParticipantName}) async {
+  Future<String> accept(
+    String token, {
+    String? newParticipantName,
+    String? participantId,
+  }) async {
     acceptCalls += 1;
     if (acceptErrorMessage != null) {
       throw acceptErrorMessage!;
@@ -86,6 +92,7 @@ class _FakeGroupInviteRepository implements IGroupInviteRepository {
 void main() {
   setUpAll(() {
     EasyLocalization.logger.enableBuildModes = [];
+    SharedPreferences.setMockInitialValues({});
   });
 
   GroupInvite makeInvite() => GroupInvite(
@@ -385,4 +392,296 @@ void main() {
 
     expect(find.text('SETTINGS_PAGE'), findsOneWidget);
   }, skip: !kIsWeb);
+
+  testWidgets(
+    'authenticated view+join auto-accepts when pending_invite_auto_join is set',
+    (tester) async {
+      final settings = await initializeHisabSettings();
+      expect(settings, isNotNull);
+      settings!.controller.set(pendingInviteTokenSettingDef, 'token-1');
+      settings.controller.set(pendingInviteAutoJoinSettingDef, true);
+
+      final repo = _FakeGroupInviteRepository(
+        acceptErrorMessage: 'Already a member of this group',
+        invite: makeInvite().copyWith(
+          accessMode: InviteAccessMode.readonlyJoin,
+        ),
+        group: makeGroup(),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            hisabSettingsProvidersProvider.overrideWithValue(settings),
+            effectiveLocalOnlyProvider.overrideWith((ref) => false),
+            isAuthenticatedProvider.overrideWith((ref) => true),
+            authServiceProvider.overrideWith((ref) => _FakeAuthService()),
+            groupInviteRepositoryProvider.overrideWithValue(repo),
+          ],
+          child: EasyLocalization(
+            path: 'assets/translations',
+            supportedLocales: testSupportedLocales,
+            fallbackLocale: const Locale('en'),
+            startLocale: const Locale('en'),
+            child: const MaterialApp(
+              home: InviteAcceptPage(token: 'token-1'),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(repo.acceptCalls, greaterThanOrEqualTo(1));
+      expect(find.textContaining('already'), findsOneWidget);
+      // Leftover pending would bounce /groups → /invite after Open Group.
+      expect(
+        settings.controller.get(pendingInviteTokenSettingDef),
+        isEmpty,
+      );
+      expect(
+        settings.controller.get(pendingInviteAutoJoinSettingDef),
+        isFalse,
+      );
+    },
+  );
+
+  testWidgets(
+    'authenticated standard invite auto-accepts when auto-join flag set',
+    (tester) async {
+      final settings = await initializeHisabSettings();
+      expect(settings, isNotNull);
+      settings!.controller.set(pendingInviteAutoJoinSettingDef, true);
+
+      final repo = _FakeGroupInviteRepository(
+        // Stay on page after accept attempt (nav needs sync/DB mocks).
+        acceptErrorMessage: 'Already a member of this group',
+        invite: makeInvite(),
+        group: makeGroup(),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            hisabSettingsProvidersProvider.overrideWithValue(settings),
+            effectiveLocalOnlyProvider.overrideWith((ref) => false),
+            isAuthenticatedProvider.overrideWith((ref) => true),
+            authServiceProvider.overrideWith((ref) => _FakeAuthService()),
+            groupInviteRepositoryProvider.overrideWithValue(repo),
+          ],
+          child: EasyLocalization(
+            path: 'assets/translations',
+            supportedLocales: testSupportedLocales,
+            fallbackLocale: const Locale('en'),
+            startLocale: const Locale('en'),
+            child: const MaterialApp(
+              home: InviteAcceptPage(token: 'token-1'),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(repo.acceptCalls, 1);
+    },
+  );
+
+  testWidgets(
+    'authenticated does not auto-accept when auto-join flag is off',
+    (tester) async {
+      final settings = await initializeHisabSettings();
+      expect(settings, isNotNull);
+      settings!.controller.set(pendingInviteAutoJoinSettingDef, false);
+
+      final repo = _FakeGroupInviteRepository(
+        invite: makeInvite().copyWith(
+          accessMode: InviteAccessMode.readonlyJoin,
+        ),
+        group: makeGroup(),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            hisabSettingsProvidersProvider.overrideWithValue(settings),
+            effectiveLocalOnlyProvider.overrideWith((ref) => false),
+            isAuthenticatedProvider.overrideWith((ref) => true),
+            authServiceProvider.overrideWith((ref) => _FakeAuthService()),
+            groupInviteRepositoryProvider.overrideWithValue(repo),
+          ],
+          child: EasyLocalization(
+            path: 'assets/translations',
+            supportedLocales: testSupportedLocales,
+            fallbackLocale: const Locale('en'),
+            startLocale: const Locale('en'),
+            child: const MaterialApp(
+              home: InviteAcceptPage(token: 'token-1'),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(repo.acceptCalls, 0);
+    },
+  );
+
+  testWidgets(
+    'readonly_only never auto-accepts even with auto-join flag',
+    (tester) async {
+      final settings = await initializeHisabSettings();
+      expect(settings, isNotNull);
+      settings!.controller.set(pendingInviteAutoJoinSettingDef, true);
+
+      final repo = _FakeGroupInviteRepository(
+        invite: makeInvite().copyWith(
+          accessMode: InviteAccessMode.readonlyOnly,
+        ),
+        group: makeGroup(),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            hisabSettingsProvidersProvider.overrideWithValue(settings),
+            effectiveLocalOnlyProvider.overrideWith((ref) => false),
+            isAuthenticatedProvider.overrideWith((ref) => true),
+            authServiceProvider.overrideWith((ref) => _FakeAuthService()),
+            groupInviteRepositoryProvider.overrideWithValue(repo),
+          ],
+          child: EasyLocalization(
+            path: 'assets/translations',
+            supportedLocales: testSupportedLocales,
+            fallbackLocale: const Locale('en'),
+            startLocale: const Locale('en'),
+            child: const MaterialApp(
+              home: InviteAcceptPage(token: 'token-1'),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(repo.acceptCalls, 0);
+    },
+  );
+
+  testWidgets(
+    'local-only authenticated does not auto-accept with auto-join flag',
+    (tester) async {
+      final settings = await initializeHisabSettings();
+      expect(settings, isNotNull);
+      settings!.controller.set(pendingInviteAutoJoinSettingDef, true);
+
+      final repo = _FakeGroupInviteRepository(
+        invite: makeInvite().copyWith(
+          accessMode: InviteAccessMode.readonlyJoin,
+        ),
+        group: makeGroup(),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            hisabSettingsProvidersProvider.overrideWithValue(settings),
+            effectiveLocalOnlyProvider.overrideWith((ref) => true),
+            isAuthenticatedProvider.overrideWith((ref) => true),
+            authServiceProvider.overrideWith((ref) => _FakeAuthService()),
+            groupInviteRepositoryProvider.overrideWithValue(repo),
+          ],
+          child: EasyLocalization(
+            path: 'assets/translations',
+            supportedLocales: testSupportedLocales,
+            fallbackLocale: const Locale('en'),
+            startLocale: const Locale('en'),
+            child: const MaterialApp(
+              home: InviteAcceptPage(token: 'token-1'),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(repo.acceptCalls, 0);
+    },
+  );
+
+  testWidgets(
+    'auto-join accepts at most once even if widget rebuilds',
+    (tester) async {
+      final settings = await initializeHisabSettings();
+      expect(settings, isNotNull);
+      settings!.controller.set(pendingInviteAutoJoinSettingDef, true);
+
+      final repo = _FakeGroupInviteRepository(
+        acceptErrorMessage: 'Already a member of this group',
+        invite: makeInvite(),
+        group: makeGroup(),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            hisabSettingsProvidersProvider.overrideWithValue(settings),
+            effectiveLocalOnlyProvider.overrideWith((ref) => false),
+            isAuthenticatedProvider.overrideWith((ref) => true),
+            authServiceProvider.overrideWith((ref) => _FakeAuthService()),
+            groupInviteRepositoryProvider.overrideWithValue(repo),
+          ],
+          child: EasyLocalization(
+            path: 'assets/translations',
+            supportedLocales: testSupportedLocales,
+            fallbackLocale: const Locale('en'),
+            startLocale: const Locale('en'),
+            child: const MaterialApp(
+              home: InviteAcceptPage(token: 'token-1'),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      // Re-enable flag and force another frame (simulates setting flicker).
+      settings.controller.set(pendingInviteAutoJoinSettingDef, true);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(repo.acceptCalls, 1);
+    },
+  );
+
+  testWidgets('accept error for expired invite surfaces message', (tester) async {
+    final settings = await initializeHisabSettings();
+    expect(settings, isNotNull);
+    settings!.controller.set(pendingInviteAutoJoinSettingDef, true);
+
+    final repo = _FakeGroupInviteRepository(
+      acceptErrorMessage: 'This invite has expired',
+      invite: makeInvite(),
+      group: makeGroup(),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          hisabSettingsProvidersProvider.overrideWithValue(settings),
+          effectiveLocalOnlyProvider.overrideWith((ref) => false),
+          isAuthenticatedProvider.overrideWith((ref) => true),
+          authServiceProvider.overrideWith((ref) => _FakeAuthService()),
+          groupInviteRepositoryProvider.overrideWithValue(repo),
+        ],
+        child: EasyLocalization(
+          path: 'assets/translations',
+          supportedLocales: testSupportedLocales,
+          fallbackLocale: const Locale('en'),
+          startLocale: const Locale('en'),
+          child: const MaterialApp(
+            home: InviteAcceptPage(token: 'token-1'),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repo.acceptCalls, 1);
+    expect(find.textContaining('expired'), findsOneWidget);
+  });
 }

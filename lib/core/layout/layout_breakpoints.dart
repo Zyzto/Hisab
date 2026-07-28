@@ -55,6 +55,11 @@ class LayoutBreakpoints {
   /// [ConstrainedContent]. Use the same [contentAreaWidth] for the app bar
   /// (e.g. from LayoutBuilder around the scaffold) so the title sits in the
   /// same horizontal band as the body. On narrow screens returns (0, contentAreaWidth).
+  ///
+  /// [leftOffset] is a **physical** left inset within the content area (rail
+  /// sibling), chosen so the band is centered in the full viewport. Callers
+  /// must apply it with physical-left layout (e.g. [Positioned.left] or a Row
+  /// forced to [TextDirection.ltr]), not a direction-flipping Row.
   static (double leftOffset, double contentMaxWidth) contentBandMetrics(
     BuildContext context,
     double contentAreaWidth,
@@ -67,10 +72,15 @@ class LayoutBreakpoints {
     final effectiveRailWidth = (viewportWidth - contentAreaWidth) > 5
         ? (viewportWidth - contentAreaWidth)
         : 0.0;
-    var leftOffset = (viewportWidth / 2 - maxW / 2 - effectiveRailWidth).clamp(
-      0.0,
-      double.infinity,
-    );
+    // Scaffold Row puts the rail at start: left in LTR, right in RTL.
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
+    final contentAreaLeftInViewport = isRtl ? 0.0 : effectiveRailWidth;
+    final desiredBandLeftInViewport = (viewportWidth - maxW) / 2;
+    var leftOffset =
+        (desiredBandLeftInViewport - contentAreaLeftInViewport).clamp(
+          0.0,
+          double.infinity,
+        );
     if (leftOffset > contentAreaWidth) leftOffset = 0.0;
     final bandWidth = (contentAreaWidth - leftOffset).clamp(0.0, maxW);
     return (leftOffset, bandWidth);

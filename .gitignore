@@ -16,7 +16,7 @@ migrate_working_dir/
 /supabase/.migrations/
 /supabase/.migrations/**
 
-# IDEs
+# IDEs / local agent state
 *.iml
 *.ipr
 *.iws
@@ -31,7 +31,6 @@ pubspec_overrides.yaml
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
-# Linter / analyzer cache
 .dart_tool/analyzer/
 .dart_tool/lint/
 .flutter-plugins
@@ -53,33 +52,45 @@ android/app/google-services.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+**/*.keystore
+**/*.jks
 
-# iOS (Firebase config)
+# iOS Firebase config
 ios/Runner/GoogleService-Info.plist
+**/GoogleService-Info.plist
 
 # Firebase Hosting cache
 .firebase/
 
-# Secrets (copy from *_example files)
+# ── Secrets / local defines (never commit) ──────────────────────────────────
 lib/core/constants/app_secrets.dart
 dart_defines_online.json
+dart_defines_local.json
 
-# Firebase / Google credentials (sensitive)
+# Local secrets folder (keep README + .gitkeep only)
+secrets/**
+!secrets/.gitkeep
+!secrets/README.md
+**/fcm-service-account*.json
 **/serviceAccount*.json
 **/*-firebase-adminsdk-*.json
 **/service-account*.json
 **/credentials*.json
 **/client_secret*.json
+**/signing_keys.json
 firebase-debug.log
 firebase-debug.*.log
 *.pem
 *.p12
 *.key
 
-# Environment
+# Environment files (keep *.example)
 .env
 .env.*
+!**/.env.example
 !.env.example
+supabase/.env
+functions/.env
 
 # Python (uv / venv)
 .venv/

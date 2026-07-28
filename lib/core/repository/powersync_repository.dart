@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:powersync/powersync.dart';
@@ -25,13 +26,105 @@ const archiveAutoFreezeSnapshotMarker = _archiveAutoFreezeMarker;
 /// On web, PowerSync/sqlite3_web can emit raw JS objects (LegacyJavaScriptObject)
 /// in update streams instead of Dart UpdateNotification, causing type errors.
 /// Use polling instead of watch() to avoid the broken stream.
-const _webPollPeriod = Duration(milliseconds: 800);
+///
+/// Period is intentionally >1s: iOS Safari + Flutter web janks when many
+/// StreamProviders rebuild every tick. Fingerprints skip unchanged yields.
+const _webPollPeriod = Duration(milliseconds: 1500);
 
-Stream<T> _pollStream<T>(Future<T> Function() fetch) async* {
-  yield await fetch();
+Stream<T> _pollStream<T>(
+  Future<T> Function() fetch, {
+  Object? Function(T value)? fingerprint,
+}) async* {
+  var prev = await fetch();
+  yield prev;
+  var prevFp = fingerprint?.call(prev);
   await for (final _ in Stream.periodic(_webPollPeriod)) {
-    yield await fetch();
+    final next = await fetch();
+    if (fingerprint != null) {
+      final fp = fingerprint(next);
+      if (fp == prevFp) continue;
+      prevFp = fp;
+    } else if (next == prev) {
+      continue;
+    }
+    prev = next;
+    yield next;
   }
+}
+
+Object? _groupFp(Group? g) {
+  if (g == null) return null;
+  return Object.hash(
+    g.id,
+    g.name,
+    g.currencyCode,
+    g.updatedAt.millisecondsSinceEpoch,
+    g.settlementMethod,
+    g.treasurerParticipantId,
+    g.settlementFreezeAt?.millisecondsSinceEpoch,
+    g.settlementSnapshotJson,
+    g.ownerId,
+    g.allowMemberAddExpense,
+    g.allowMemberChangeSettings,
+    g.allowExpenseAsOtherParticipant,
+    g.allowMemberSettleForOthers,
+    g.icon,
+    g.color,
+    g.archivedAt?.millisecondsSinceEpoch,
+    g.isPersonal,
+    g.budgetAmountCents,
+  );
+}
+
+Object? _expenseFp(Expense? e) {
+  if (e == null) return null;
+  return Object.hash(
+    e.id,
+    e.groupId,
+    e.amountCents,
+    e.currencyCode,
+    e.title,
+    e.date.millisecondsSinceEpoch,
+    e.updatedAt.millisecondsSinceEpoch,
+    e.payerParticipantId,
+    e.splitType,
+    e.tag,
+    e.imagePath,
+    e.exchangeRate,
+  );
+}
+
+Object? _memberFp(GroupMember? m) {
+  if (m == null) return null;
+  return Object.hash(m.id, m.groupId, m.userId, m.role, m.participantId);
+}
+
+Object _groupsListFp(List<Group> list) =>
+    Object.hashAll(list.map(_groupFp));
+
+Object _expensesListFp(List<Expense> list) =>
+    Object.hashAll(list.map(_expenseFp));
+
+Object _membersListFp(List<GroupMember> list) =>
+    Object.hashAll(list.map(_memberFp));
+
+Object? _participantFp(Participant p) => Object.hash(
+  p.id,
+  p.groupId,
+  p.name,
+  p.order,
+  p.userId,
+  p.avatarId,
+  p.leftAt?.millisecondsSinceEpoch,
+  p.updatedAt.millisecondsSinceEpoch,
+);
+
+Object _participantsListFp(List<Participant> list) =>
+    Object.hashAll(list.map(_participantFp));
+
+Object _stringSetFp(Set<String> set) {
+  final sorted = set.toList()..sort();
+  return Object.hashAll(sorted);
 }
 
 // =============================================================================
@@ -362,12 +455,15 @@ class PowerSyncGroupRepository implements IGroupRepository {
   @override
   Stream<List<Group>> watchAll() {
     if (kIsWeb) {
-      return _pollStream(() async {
-        final rows = await _db.getAll(
-          'SELECT * FROM groups WHERE $_activeGroupsWhere ORDER BY updated_at DESC',
-        );
-        return rows.map(_groupFromRow).toList();
-      });
+      return _pollStream(
+        () async {
+          final rows = await _db.getAll(
+            'SELECT * FROM groups WHERE $_activeGroupsWhere ORDER BY updated_at DESC',
+          );
+          return rows.map(_groupFromRow).toList();
+        },
+        fingerprint: _groupsListFp,
+      );
     }
     return _db
         .watch(
@@ -379,12 +475,15 @@ class PowerSyncGroupRepository implements IGroupRepository {
   @override
   Stream<List<Group>> watchArchived() {
     if (kIsWeb) {
-      return _pollStream(() async {
-        final rows = await _db.getAll(
-          'SELECT * FROM groups WHERE $_archivedGroupsWhere ORDER BY updated_at DESC',
-        );
-        return rows.map(_groupFromRow).toList();
-      });
+      return _pollStream(
+        () async {
+          final rows = await _db.getAll(
+            'SELECT * FROM groups WHERE $_archivedGroupsWhere ORDER BY updated_at DESC',
+          );
+          return rows.map(_groupFromRow).toList();
+        },
+        fingerprint: _groupsListFp,
+      );
     }
     return _db
         .watch(
@@ -401,6 +500,16 @@ class PowerSyncGroupRepository implements IGroupRepository {
   }
 
   @override
+  Stream<Group?> watchById(String id) {
+    if (kIsWeb) {
+      return _pollStream(() => getById(id), fingerprint: _groupFp);
+    }
+    return _db
+        .watch('SELECT * FROM groups WHERE id = ?', parameters: [id])
+        .map((rows) => rows.isEmpty ? null : _groupFromRow(rows.first));
+  }
+
+  @override
   Future<String> create(
     String name,
     String currencyCode, {
@@ -410,6 +519,15 @@ class PowerSyncGroupRepository implements IGroupRepository {
     bool isPersonal = false,
     int? budgetAmountCents,
   }) async {
+    final trimmedName = name.trim();
+    if (trimmedName.isEmpty || trimmedName.length > 200) {
+      throw ArgumentError(
+        'Group name must be 1–200 characters (got ${trimmedName.length})',
+      );
+    }
+    if (currencyCode.trim().length != 3) {
+      throw ArgumentError('currency_code must be 3 characters');
+    }
     final id = _uuid.v4();
     final now = _nowIso();
     String? ownerId;
@@ -422,13 +540,13 @@ class PowerSyncGroupRepository implements IGroupRepository {
           user.userMetadata?['display_name'] as String? ??
           user.userMetadata?['full_name'] as String? ??
           user.email ??
-          'Owner';
+          'default_owner_name'.tr();
       ownerAvatarId = user.userMetadata?['avatar_id'] as String?;
     }
 
     final groupData = <String, dynamic>{
       'id': id,
-      'name': name,
+      'name': trimmedName,
       'currency_code': currencyCode,
       'owner_id': ownerId,
       'icon': icon,
@@ -445,6 +563,11 @@ class PowerSyncGroupRepository implements IGroupRepository {
     for (int i = 0; i < initialParticipants.length; i++) {
       final pName = initialParticipants[i].trim();
       if (pName.isEmpty) continue;
+      if (pName.length > 100) {
+        throw ArgumentError(
+          'Participant name must be at most 100 characters',
+        );
+      }
       additionalParticipantIds.add((
         id: _uuid.v4(),
         name: pName,
@@ -455,7 +578,15 @@ class PowerSyncGroupRepository implements IGroupRepository {
     // Auto-create a participant for the owner
     final participantId = _uuid.v4();
     final ownerMemberId = ownerId != null ? _uuid.v4() : null;
-    final participantName = ownerDisplayName ?? 'Owner';
+    // participants.name CHECK is 1–100; clamp auth display names so group
+    // create cannot fail after the groups row is already inserted.
+    final fallbackOwnerName = 'default_owner_name'.tr();
+    final rawOwnerName = (ownerDisplayName ?? fallbackOwnerName).trim();
+    final participantName = rawOwnerName.isEmpty
+        ? fallbackOwnerName
+        : (rawOwnerName.length > 100
+              ? rawOwnerName.substring(0, 100)
+              : rawOwnerName);
 
     if (!_isLocalOnly && _isOnline && _client != null) {
       // Online: write to Supabase first
@@ -605,11 +736,20 @@ class PowerSyncGroupRepository implements IGroupRepository {
 
   @override
   Future<void> update(Group group) async {
+    final trimmedName = group.name.trim();
+    if (trimmedName.isEmpty || trimmedName.length > 200) {
+      throw ArgumentError(
+        'Group name must be 1–200 characters (got ${trimmedName.length})',
+      );
+    }
+    if (group.currencyCode.trim().length != 3) {
+      throw ArgumentError('currency_code must be 3 characters');
+    }
     final now = _nowIso();
     final data = <String, dynamic>{
       'id': group.id,
-      'name': group.name,
-      'currency_code': group.currencyCode,
+      'name': trimmedName,
+      'currency_code': group.currencyCode.trim().toUpperCase(),
       'settlement_method': group.settlementMethod.name,
       'treasurer_participant_id': group.treasurerParticipantId,
       'settlement_freeze_at': group.settlementFreezeAt
@@ -630,15 +770,12 @@ class PowerSyncGroupRepository implements IGroupRepository {
     };
 
     if (!_isLocalOnly && _isOnline && _client != null) {
-      // Omit columns that may not exist so group settings update succeeds without Migrations 12/16/20.
-      // Omit id from PATCH body to avoid primary-key update restrictions.
-      // See SUPABASE_SETUP.md: apply Migrations 12, 16, 20 to add these columns and get full sync.
+      // Omit id (PK) and archived_at (archive/unarchive use dedicated methods).
+      // Personal/budget/settle/permission columns are part of the groups schema
+      // (migrations 12/16/19/20260728120000) and must sync or local edits revert on fetch.
       final supabaseData = Map<String, dynamic>.from(data)
         ..remove('archived_at')
-        ..remove('id')
-        ..remove('is_personal')
-        ..remove('budget_amount_cents')
-        ..remove('allow_member_settle_for_others');
+        ..remove('id');
       await _client.from('groups').update(supabaseData).eq('id', group.id);
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,
@@ -662,8 +799,8 @@ class PowerSyncGroupRepository implements IGroupRepository {
         allow_member_settle_for_others = ?, icon = ?, color = ?, archived_at = ?, is_personal = ?, budget_amount_cents = ?, updated_at = ?
       WHERE id = ?''',
       [
-        group.name,
-        group.currencyCode,
+        trimmedName,
+        data['currency_code'],
         group.settlementMethod.name,
         group.treasurerParticipantId,
         group.settlementFreezeAt?.toUtc().toIso8601String(),
@@ -806,13 +943,16 @@ class PowerSyncGroupRepository implements IGroupRepository {
   Stream<Set<String>> watchLocallyArchivedGroupIds() {
     const q = 'SELECT group_id FROM local_archived_groups';
     if (kIsWeb) {
-      return _pollStream(() async {
-        final rows = await _db.getAll(q);
-        return rows
-            .map((r) => r['group_id'] as String?)
-            .whereType<String>()
-            .toSet();
-      });
+      return _pollStream(
+        () async {
+          final rows = await _db.getAll(q);
+          return rows
+              .map((r) => r['group_id'] as String?)
+              .whereType<String>()
+              .toSet();
+        },
+        fingerprint: _stringSetFp,
+      );
     }
     return _db
         .watch(q)
@@ -834,10 +974,13 @@ class PowerSyncGroupRepository implements IGroupRepository {
   @override
   Stream<List<Group>> watchLocallyArchivedGroups() {
     if (kIsWeb) {
-      return _pollStream(() async {
-        final rows = await _db.getAll(_locallyArchivedGroupsQuery);
-        return rows.map(_groupFromRow).toList();
-      });
+      return _pollStream(
+        () async {
+          final rows = await _db.getAll(_locallyArchivedGroupsQuery);
+          return rows.map(_groupFromRow).toList();
+        },
+        fingerprint: _groupsListFp,
+      );
     }
     return _db
         .watch(_locallyArchivedGroupsQuery)
@@ -973,7 +1116,10 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
   @override
   Stream<List<Participant>> watchByGroupId(String groupId) {
     if (kIsWeb) {
-      return _pollStream(() => getByGroupId(groupId));
+      return _pollStream(
+        () => getByGroupId(groupId),
+        fingerprint: _participantsListFp,
+      );
     }
     return _db
         .watch(
@@ -1000,12 +1146,18 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
     String? userId,
     String? avatarId,
   }) async {
+    final trimmedName = name.trim();
+    if (trimmedName.isEmpty || trimmedName.length > 100) {
+      throw ArgumentError(
+        'Participant name must be 1–100 characters (got ${trimmedName.length})',
+      );
+    }
     final id = _uuid.v4();
     final now = _nowIso();
     final data = <String, dynamic>{
       'id': id,
       'group_id': groupId,
-      'name': name,
+      'name': trimmedName,
       'sort_order': order,
       'user_id': userId,
       'avatar_id': avatarId,
@@ -1030,13 +1182,19 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
 
     await _db.execute(
       'INSERT INTO participants (id, group_id, name, sort_order, user_id, avatar_id, left_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, groupId, name, order, userId, avatarId, null, now, now],
+      [id, groupId, trimmedName, order, userId, avatarId, null, now, now],
     );
     return id;
   }
 
   @override
   Future<void> update(Participant participant) async {
+    final trimmedName = participant.name.trim();
+    if (trimmedName.isEmpty || trimmedName.length > 100) {
+      throw ArgumentError(
+        'Participant name must be 1–100 characters (got ${trimmedName.length})',
+      );
+    }
     final now = _nowIso();
 
     final leftAtIso = participant.leftAt?.toUtc().toIso8601String();
@@ -1044,7 +1202,7 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
       await _client
           .from('participants')
           .update({
-            'name': participant.name,
+            'name': trimmedName,
             'sort_order': participant.order,
             'avatar_id': participant.avatarId,
             'left_at': leftAtIso,
@@ -1061,7 +1219,7 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
         operation: 'update',
         rowId: participant.id,
         data: {
-          'name': participant.name,
+          'name': trimmedName,
           'sort_order': participant.order,
           'avatar_id': participant.avatarId,
           'left_at': leftAtIso,
@@ -1073,7 +1231,7 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
     await _db.execute(
       'UPDATE participants SET name = ?, sort_order = ?, avatar_id = ?, left_at = ?, updated_at = ? WHERE id = ?',
       [
-        participant.name,
+        trimmedName,
         participant.order,
         participant.avatarId,
         leftAtIso,
@@ -1116,8 +1274,14 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
     String newName, {
     String? avatarId,
   }) async {
+    final trimmedName = newName.trim();
+    if (trimmedName.isEmpty || trimmedName.length > 100) {
+      throw ArgumentError(
+        'Participant name must be 1–100 characters (got ${trimmedName.length})',
+      );
+    }
     final now = _nowIso();
-    final updates = <String, dynamic>{'name': newName, 'updated_at': now};
+    final updates = <String, dynamic>{'name': trimmedName, 'updated_at': now};
     if (avatarId != null) updates['avatar_id'] = avatarId;
 
     if (!_isLocalOnly && _isOnline && _client != null) {
@@ -1146,12 +1310,12 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
     if (avatarId != null) {
       await _db.execute(
         'UPDATE participants SET name = ?, avatar_id = ?, updated_at = ? WHERE user_id = ?',
-        [newName, avatarId, now, userId],
+        [trimmedName, avatarId, now, userId],
       );
     } else {
       await _db.execute(
         'UPDATE participants SET name = ?, updated_at = ? WHERE user_id = ?',
-        [newName, now, userId],
+        [trimmedName, now, userId],
       );
     }
   }
@@ -1217,7 +1381,10 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
   @override
   Stream<List<Expense>> watchByGroupId(String groupId) {
     if (kIsWeb) {
-      return _pollStream(() => getByGroupId(groupId));
+      return _pollStream(
+        () => getByGroupId(groupId),
+        fingerprint: _expensesListFp,
+      );
     }
     return _db
         .watch(
@@ -1235,7 +1402,29 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
   }
 
   @override
+  Stream<Expense?> watchById(String id) {
+    if (kIsWeb) {
+      return _pollStream(() => getById(id), fingerprint: _expenseFp);
+    }
+    return _db
+        .watch('SELECT * FROM expenses WHERE id = ?', parameters: [id])
+        .map((rows) => rows.isEmpty ? null : _expenseFromRow(rows.first));
+  }
+
+  @override
   Future<String> create(Expense expense) async {
+    final title = expense.title.trim();
+    if (title.isEmpty || title.length > 500) {
+      throw ArgumentError(
+        'Expense title must be 1–500 characters (got ${title.length})',
+      );
+    }
+    if (expense.amountCents <= 0) {
+      throw ArgumentError('Expense amount_cents must be positive');
+    }
+    if (expense.currencyCode.trim().length != 3) {
+      throw ArgumentError('currency_code must be 3 characters');
+    }
     final id = _uuid.v4();
     final now = _nowIso();
     final splitSharesJson = jsonEncode(expense.splitShares);
@@ -1257,10 +1446,10 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
       'group_id': expense.groupId,
       'payer_participant_id': expense.payerParticipantId,
       'amount_cents': expense.amountCents,
-      'currency_code': expense.currencyCode,
+      'currency_code': expense.currencyCode.trim().toUpperCase(),
       'exchange_rate': expense.exchangeRate,
       'base_amount_cents': expense.baseAmountCents,
-      'title': expense.title,
+      'title': title,
       'description': expense.description,
       'date': expense.date.toUtc().toIso8601String(),
       'split_type': expense.splitType.name,
@@ -1302,10 +1491,10 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
         expense.groupId,
         expense.payerParticipantId,
         expense.amountCents,
-        expense.currencyCode,
+        data['currency_code'],
         expense.exchangeRate,
         expense.baseAmountCents,
-        expense.title,
+        title,
         expense.description,
         expense.date.toUtc().toIso8601String(),
         expense.splitType.name,
@@ -1325,6 +1514,18 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
 
   @override
   Future<void> update(Expense expense) async {
+    final title = expense.title.trim();
+    if (title.isEmpty || title.length > 500) {
+      throw ArgumentError(
+        'Expense title must be 1–500 characters (got ${title.length})',
+      );
+    }
+    if (expense.amountCents <= 0) {
+      throw ArgumentError('Expense amount_cents must be positive');
+    }
+    if (expense.currencyCode.trim().length != 3) {
+      throw ArgumentError('currency_code must be 3 characters');
+    }
     final now = _nowIso();
     final splitSharesJson = jsonEncode(expense.splitShares);
     final lineItemsJson = expense.lineItems != null
@@ -1339,14 +1540,15 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
     final imagePathsJson = imagePaths != null
         ? jsonEncode(imagePaths)
         : null;
+    final currencyCode = expense.currencyCode.trim().toUpperCase();
 
     if (!_isLocalOnly && _isOnline && _client != null) {
       await _client
           .from('expenses')
           .update({
-            'title': expense.title,
+            'title': title,
             'amount_cents': expense.amountCents,
-            'currency_code': expense.currencyCode,
+            'currency_code': currencyCode,
             'exchange_rate': expense.exchangeRate,
             'base_amount_cents': expense.baseAmountCents,
             'payer_participant_id': expense.payerParticipantId,
@@ -1373,9 +1575,9 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
         operation: 'update',
         rowId: expense.id,
         data: {
-          'title': expense.title,
+          'title': title,
           'amount_cents': expense.amountCents,
-          'currency_code': expense.currencyCode,
+          'currency_code': currencyCode,
           'exchange_rate': expense.exchangeRate,
           'base_amount_cents': expense.baseAmountCents,
           'payer_participant_id': expense.payerParticipantId,
@@ -1404,9 +1606,9 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
         line_items_json = ?, image_path = ?, image_paths = ?, updated_at = ?
       WHERE id = ?''',
       [
-        expense.title,
+        title,
         expense.amountCents,
-        expense.currencyCode,
+        currencyCode,
         expense.exchangeRate,
         expense.baseAmountCents,
         expense.payerParticipantId,
@@ -1484,7 +1686,12 @@ class PowerSyncTagRepository implements ITagRepository {
   @override
   Stream<List<ExpenseTag>> watchByGroupId(String groupId) {
     if (kIsWeb) {
-      return _pollStream(() => getByGroupId(groupId));
+      return _pollStream(
+        () => getByGroupId(groupId),
+        fingerprint: (list) => Object.hashAll(
+          list.map((t) => Object.hash(t.id, t.groupId, t.label)),
+        ),
+      );
     }
     return _db
         .watch(
@@ -1505,13 +1712,25 @@ class PowerSyncTagRepository implements ITagRepository {
 
   @override
   Future<String> create(String groupId, String label, String iconName) async {
+    final trimmedLabel = label.trim();
+    final trimmedIcon = iconName.trim();
+    if (trimmedLabel.isEmpty || trimmedLabel.length > 100) {
+      throw ArgumentError(
+        'Tag label must be 1–100 characters (got ${trimmedLabel.length})',
+      );
+    }
+    if (trimmedIcon.isEmpty || trimmedIcon.length > 80) {
+      throw ArgumentError(
+        'Tag icon_name must be 1–80 characters (got ${trimmedIcon.length})',
+      );
+    }
     final id = _uuid.v4();
     final now = _nowIso();
     final data = <String, dynamic>{
       'id': id,
       'group_id': groupId,
-      'label': label,
-      'icon_name': iconName,
+      'label': trimmedLabel,
+      'icon_name': trimmedIcon,
       'created_at': now,
       'updated_at': now,
     };
@@ -1533,21 +1752,33 @@ class PowerSyncTagRepository implements ITagRepository {
 
     await _db.execute(
       'INSERT INTO expense_tags (id, group_id, label, icon_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [id, groupId, label, iconName, now, now],
+      [id, groupId, trimmedLabel, trimmedIcon, now, now],
     );
     return id;
   }
 
   @override
   Future<void> update(ExpenseTag tag) async {
+    final trimmedLabel = tag.label.trim();
+    final trimmedIcon = tag.iconName.trim();
+    if (trimmedLabel.isEmpty || trimmedLabel.length > 100) {
+      throw ArgumentError(
+        'Tag label must be 1–100 characters (got ${trimmedLabel.length})',
+      );
+    }
+    if (trimmedIcon.isEmpty || trimmedIcon.length > 80) {
+      throw ArgumentError(
+        'Tag icon_name must be 1–80 characters (got ${trimmedIcon.length})',
+      );
+    }
     final now = _nowIso();
 
     if (!_isLocalOnly && _isOnline && _client != null) {
       await _client
           .from('expense_tags')
           .update({
-            'label': tag.label,
-            'icon_name': tag.iconName,
+            'label': trimmedLabel,
+            'icon_name': trimmedIcon,
             'updated_at': now,
           })
           .eq('id', tag.id);
@@ -1561,8 +1792,8 @@ class PowerSyncTagRepository implements ITagRepository {
         operation: 'update',
         rowId: tag.id,
         data: {
-          'label': tag.label,
-          'icon_name': tag.iconName,
+          'label': trimmedLabel,
+          'icon_name': trimmedIcon,
           'updated_at': now,
         },
       );
@@ -1570,7 +1801,7 @@ class PowerSyncTagRepository implements ITagRepository {
 
     await _db.execute(
       'UPDATE expense_tags SET label = ?, icon_name = ?, updated_at = ? WHERE id = ?',
-      [tag.label, tag.iconName, now, tag.id],
+      [trimmedLabel, trimmedIcon, now, tag.id],
     );
   }
 
@@ -1633,6 +1864,23 @@ class PowerSyncGroupMemberRepository implements IGroupMemberRepository {
   }
 
   @override
+  Stream<GroupMember?> watchMyMember(String groupId) {
+    if (kIsWeb) {
+      return _pollStream(() => getMyMember(groupId), fingerprint: _memberFp);
+    }
+    final userId = _currentUserId;
+    if (userId == null) {
+      return Stream<GroupMember?>.value(null);
+    }
+    return _db
+        .watch(
+          'SELECT * FROM group_members WHERE group_id = ? AND user_id = ?',
+          parameters: [groupId, userId],
+        )
+        .map((rows) => rows.isEmpty ? null : _memberFromRow(rows.first));
+  }
+
+  @override
   Future<List<GroupMember>> listByGroup(String groupId) async {
     final rows = await _db.getAll(
       'SELECT * FROM group_members WHERE group_id = ? ORDER BY joined_at ASC',
@@ -1644,7 +1892,10 @@ class PowerSyncGroupMemberRepository implements IGroupMemberRepository {
   @override
   Stream<List<GroupMember>> watchByGroup(String groupId) {
     if (kIsWeb) {
-      return _pollStream(() => listByGroup(groupId));
+      return _pollStream(
+        () => listByGroup(groupId),
+        fingerprint: _membersListFp,
+      );
     }
     return _db
         .watch(
@@ -1852,7 +2103,11 @@ class PowerSyncGroupInviteRepository implements IGroupInviteRepository {
   }
 
   @override
-  Future<String> accept(String token, {String? newParticipantName}) async {
+  Future<String> accept(
+    String token, {
+    String? newParticipantName,
+    String? participantId,
+  }) async {
     final client = supabaseClient;
     if (client == null) {
       throw UnsupportedError('accept requires online mode');
@@ -1861,7 +2116,7 @@ class PowerSyncGroupInviteRepository implements IGroupInviteRepository {
       'accept_invite',
       params: {
         'p_token': token,
-        'p_participant_id': null,
+        'p_participant_id': participantId,
         'p_new_participant_name': newParticipantName,
       },
     );

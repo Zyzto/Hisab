@@ -180,6 +180,10 @@ class FakeGroupRepository implements IGroupRepository {
   Future<Group?> getById(String id) async => id == group.id ? group : null;
 
   @override
+  Stream<Group?> watchById(String id) =>
+      Stream.value(id == group.id ? group : null);
+
+  @override
   Future<List<Group>> getAll() async => [group];
 
   @override
@@ -303,6 +307,9 @@ class FakeExpenseRepository implements IExpenseRepository {
   Future<Expense?> getById(String id) async => null;
 
   @override
+  Stream<Expense?> watchById(String id) => Stream.value(null);
+
+  @override
   Future<String> create(Expense expense) async => 'e1';
 
   @override
@@ -331,6 +338,10 @@ class FakeExpenseRepositoryWithGetById implements IExpenseRepository {
   @override
   Future<Expense?> getById(String id) async =>
       id == expense.id ? expense : null;
+
+  @override
+  Stream<Expense?> watchById(String id) =>
+      Stream.value(id == expense.id ? expense : null);
 
   @override
   Future<String> create(Expense expense) async => 'e1';

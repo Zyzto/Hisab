@@ -2,9 +2,12 @@
 
 <!-- markdownlint-disable MD031 MD032 MD034 MD060 -->
 
-Hisab uses **Supabase** for authentication, database, and edge functions. Local data is stored in **SQLite** (via the PowerSync package) for offline use. All configuration is provided at build time via `--dart-define` — no secrets are committed to the repository.
+Hisab is **offline-first**: SQLite (PowerSync package) always runs on device. **Supabase** is optional — Auth, Postgres, RPCs, and Edge Functions when you pass build-time defines.
 
-For the full backend setup guide (creating the Supabase project, applying migrations, deploying edge functions), see [SUPABASE_SETUP.md](SUPABASE_SETUP.md).
+All secrets and project URLs come from `--dart-define` or gitignored define files. Nothing sensitive belongs in the repo — see [SECURITY.md](../SECURITY.md).
+
+- Hosted backend setup → [SUPABASE_SETUP.md](SUPABASE_SETUP.md)
+- Local Podman stack → [LOCAL_TEST_ENV.md](LOCAL_TEST_ENV.md)
 
 ---
 
@@ -29,6 +32,15 @@ flutter run \
 ```
 
 `SITE_URL` is used as the redirect URL in magic links and sign-up confirmation emails. If unset, Supabase uses the project **Site URL** from the dashboard (often localhost in dev). Add the same URL to **Supabase Dashboard → Authentication → URL Configuration → Redirect URLs**.
+
+### Local Supabase (Docker / Podman)
+
+```bash
+./scripts/local_test_env.sh up
+flutter run --dart-define-from-file=dart_defines_local.json --web-port=8080
+```
+
+See [LOCAL_TEST_ENV.md](LOCAL_TEST_ENV.md). Prefer VS Code launches **Hisab (Local Online)** / **Hisab (Chrome Local Online)**. Use `dart_defines_online.json` only for a hosted (non-local) project.
 
 ### Running without Supabase (offline only)
 

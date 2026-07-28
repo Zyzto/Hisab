@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../../core/utils/form_validators.dart';
 import '../../../domain/domain.dart';
+import '../category_icons.dart';
 import '../constants/expense_form_constants.dart';
 
 /// Title input with category tag button and optional add-photos button.
@@ -67,6 +68,7 @@ class ExpenseTitleSection extends StatelessWidget {
               horizontal: 16,
               vertical: 14,
             ),
+            counterText: '',
             suffixIcon: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -74,7 +76,11 @@ class ExpenseTitleSection extends StatelessWidget {
                   icon: Icon(
                     tagIcon,
                     color: selectedTag != null
-                        ? theme.colorScheme.primary
+                        ? chromeForExpenseTag(
+                            selectedTag,
+                            brightness: theme.brightness,
+                            surface: theme.colorScheme.surface,
+                          ).onSurface
                         : theme.colorScheme.onSurfaceVariant,
                   ),
                   onPressed: onTagPicker,
@@ -92,7 +98,8 @@ class ExpenseTitleSection extends StatelessWidget {
               ],
             ),
           ),
-          validator: validator ?? FormValidators.required,
+          maxLength: FormValidators.expenseTitleMax,
+          validator: validator ?? FormValidators.expenseTitle,
         ),
       ],
     );

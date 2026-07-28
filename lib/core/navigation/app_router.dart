@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
+import 'invite_nav_redirect.dart';
 import 'navigation_trace.dart';
 import 'route_paths.dart';
 import '../../features/home/routes.dart';
@@ -142,29 +143,45 @@ GoRouter router(Ref ref) {
       final onPrivacyPolicy = state.matchedLocation == RoutePaths.privacyPolicy;
       final settings = ref.read(hisabSettingsProvidersProvider);
       if (settings != null) {
+        // Pending invite first — must beat last-route restore (camera kill),
+        // otherwise Join→auth can land on a stale group detail instead of invite.
+        final pendingToken = ref.read(
+          settings.provider(pendingInviteTokenSettingDef),
+        );
+        final pendingTarget = pendingInviteRedirectTarget(
+          pendingToken: pendingToken,
+          currentPath: state.uri.path,
+          onOnboarding: onOnboarding,
+          onPrivacyPolicy: onPrivacyPolicy,
+        );
+        if (pendingTarget != null) {
+          ref
+              .read(settings.provider(pendingInviteTokenSettingDef).notifier)
+              .set('');
+          // Drop stale restore so it cannot override invite on the next refresh.
+          final lastPath = ref.read(settings.provider(lastRoutePathSettingDef));
+          if (lastPath.isNotEmpty) {
+            ref
+                .read(settings.provider(lastRoutePathSettingDef).notifier)
+                .set('');
+          }
+          Log.info(
+            'Setting changed: ${pendingInviteTokenSettingDef.key}=(cleared for redirect)',
+          );
+          return pendingTarget;
+        }
         // Restore route after process kill (e.g. returning from camera)
         final lastPath = ref.read(settings.provider(lastRoutePathSettingDef));
-        if (lastPath.isNotEmpty &&
-            lastPath != RoutePaths.home &&
-            onboardingCompleted) {
+        if (shouldRestoreLastRoute(
+          lastPath: lastPath,
+          pendingToken: pendingToken,
+          onboardingCompleted: onboardingCompleted,
+        )) {
           ref.read(settings.provider(lastRoutePathSettingDef).notifier).set('');
           Log.info(
             'Setting changed: ${lastRoutePathSettingDef.key}=(cleared for redirect)',
           );
           return lastPath;
-        }
-        // Pending invite from deep link: send to invite page and clear
-        final pendingToken = ref.read(
-          settings.provider(pendingInviteTokenSettingDef),
-        );
-        if (pendingToken.isNotEmpty) {
-          ref
-              .read(settings.provider(pendingInviteTokenSettingDef).notifier)
-              .set('');
-          Log.info(
-            'Setting changed: ${pendingInviteTokenSettingDef.key}=(cleared for redirect)',
-          );
-          return RoutePaths.inviteAccept(pendingToken);
         }
       }
       if (!onboardingCompleted && !onOnboarding && !onPrivacyPolicy) {
@@ -173,7 +190,32 @@ GoRouter router(Ref ref) {
         return RoutePaths.onboarding;
       }
       if (onboardingCompleted && onOnboarding) {
-        return RoutePaths.home;
+        final settingsForInvite = ref.read(hisabSettingsProvidersProvider);
+        final pending = settingsForInvite == null
+            ? ''
+            : ref.read(
+                settingsForInvite.provider(pendingInviteTokenSettingDef),
+              );
+        final afterOnboarding = afterOnboardingRedirectTarget(
+          onboardingCompleted: onboardingCompleted,
+          onOnboarding: onOnboarding,
+          pendingToken: pending,
+        );
+        if (afterOnboarding != null &&
+            afterOnboarding.startsWith('/invite/') &&
+            settingsForInvite != null) {
+          ref
+              .read(
+                settingsForInvite
+                    .provider(pendingInviteTokenSettingDef)
+                    .notifier,
+              )
+              .set('');
+          Log.info(
+            'Setting changed: ${pendingInviteTokenSettingDef.key}=(cleared after onboarding)',
+          );
+        }
+        return afterOnboarding;
       }
       return null;
     },

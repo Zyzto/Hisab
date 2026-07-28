@@ -49,6 +49,55 @@ void main() {
     expect(calls, contains('get_invite_by_token'));
   });
 
+  test('maps participant avatar_id from preview RPC', () async {
+    final container = ProviderContainer(
+      overrides: [
+        invitePreviewRpcProvider.overrideWithValue((rpcName, params) async {
+          if (rpcName == 'get_invite_preview_group') {
+            return [
+              {
+                'invite_id': 'invite-1',
+                'group_id': 'group-1',
+                'invite_access_mode': 'readonly_join',
+                'group_name': 'Trip',
+                'group_currency_code': 'USD',
+                'group_created_at': '2026-01-01T00:00:00Z',
+                'group_updated_at': '2026-01-01T00:00:00Z',
+              },
+            ];
+          }
+          if (rpcName == 'get_invite_preview_participants') {
+            return [
+              {
+                'id': 'p1',
+                'group_id': 'group-1',
+                'name': 'Alice',
+                'sort_order': 0,
+                'user_id': 'u1',
+                'avatar_id': 'smile',
+                'left_at': null,
+                'created_at': '2026-01-01T00:00:00Z',
+                'updated_at': '2026-01-01T00:00:00Z',
+                'member_role': 'owner',
+              },
+            ];
+          }
+          if (rpcName == 'get_invite_preview_expenses') {
+            return <Map<String, dynamic>>[];
+          }
+          throw UnimplementedError(rpcName);
+        }),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final data = await container.read(invitePreviewDataProvider('t-avatar').future);
+    expect(data, isNotNull);
+    expect(data!.participants, hasLength(1));
+    expect(data.participants.first.avatarId, 'smile');
+    expect(data.participants.first.userId, 'u1');
+  });
+
   test('fallback keeps standard invite hidden from preview', () async {
     final container = ProviderContainer(
       overrides: [

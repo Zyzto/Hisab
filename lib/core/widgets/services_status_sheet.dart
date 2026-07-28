@@ -6,9 +6,11 @@ import 'package:url_launcher/url_launcher.dart';
 import '../layout/layout_breakpoints.dart';
 import '../layout/responsive_sheet.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
+import '../constants/supabase_config.dart';
 import '../services/connectivity_service.dart';
 import '../services/firebase_status_client.dart';
 import '../services/status_page_client.dart';
+import '../services/supabase_project_health_client.dart';
 
 const _supabaseStatusUrl = 'https://status.supabase.com';
 const _firebaseStatusUrl = 'https://status.firebase.google.com';
@@ -42,12 +44,14 @@ class _ServicesStatusSheet extends ConsumerStatefulWidget {
 class _ServicesStatusSheetState extends ConsumerState<_ServicesStatusSheet> {
   Future<StatusPageResult>? _supabaseFuture;
   Future<FirebaseStatusResult>? _firebaseFuture;
+  Future<SupabaseProjectHealthResult>? _projectHealthFuture;
 
   @override
   void initState() {
     super.initState();
     _supabaseFuture = fetchSupabaseStatus();
     _firebaseFuture = fetchFirebaseStatus();
+    _projectHealthFuture = fetchSupabaseProjectHealth();
   }
 
   @override
@@ -101,6 +105,15 @@ class _ServicesStatusSheetState extends ConsumerState<_ServicesStatusSheet> {
                   );
                 },
               ),
+              if (supabaseConfigAvailable) ...[
+                const SizedBox(height: 12),
+                FutureBuilder<SupabaseProjectHealthResult>(
+                  future: _projectHealthFuture,
+                  builder: (context, snapshot) {
+                    return _ProjectHealthRow(result: snapshot.data);
+                  },
+                ),
+              ],
               const SizedBox(height: 12),
               FutureBuilder<FirebaseStatusResult>(
                 future: _firebaseFuture,
@@ -490,6 +503,106 @@ class _FirebaseServiceRow extends StatelessWidget {
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
+  }
+}
+
+/// Row for this app's cloud data availability (user-facing; no admin links).
+class _ProjectHealthRow extends StatelessWidget {
+  const _ProjectHealthRow({required this.result});
+
+  final SupabaseProjectHealthResult? result;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    late final String statusText;
+    late final Color statusColor;
+    String? hint;
+
+    if (result == null) {
+      statusText = 'services_status_loading'.tr();
+      statusColor = cs.onSurfaceVariant;
+    } else if (result is SupabaseProjectHealthPaused) {
+      statusText = 'services_status_project_paused'.tr();
+      statusColor = cs.error;
+      hint = 'services_status_project_paused_hint'.tr();
+    } else if (result is SupabaseProjectHealthActive) {
+      statusText = 'services_status_project_active'.tr();
+      statusColor = cs.primary;
+    } else {
+      // Unreachable or not configured — same user-facing "unavailable".
+      statusText = 'services_status_project_unreachable'.tr();
+      statusColor = cs.error;
+      hint = 'services_status_project_unreachable_hint'.tr();
+    }
+
+    return Material(
+      color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: statusColor,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: statusColor.withValues(alpha: 0.4),
+                        blurRadius: 4,
+                        spreadRadius: 0,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'service_supabase_project'.tr(),
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        statusText,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: statusColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (hint != null) ...[
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.only(left: 24),
+                child: Text(
+                  hint,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }
 

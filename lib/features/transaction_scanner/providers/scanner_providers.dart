@@ -126,7 +126,7 @@ class ScannerController {
       final builtIns = <ScannerPattern>[
         ScannerPattern(
           id: 'builtin_bank_en_1',
-          name: 'Bank SMS (EN)',
+          name: 'scanner_pattern_bank_en',
           senderMatch: '*',
           amountRegex: r'(?:SAR|USD|EUR|GBP|AED)\s*(\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?)',
           currencyRegex: r'\b(SAR|USD|EUR|GBP|AED|KWD|BHD|OMR|QAR|EGP)\b',
@@ -137,7 +137,7 @@ class ScannerController {
         ),
         ScannerPattern(
           id: 'builtin_bank_ar_1',
-          name: 'Bank SMS (AR)',
+          name: 'scanner_pattern_bank_ar',
           senderMatch: '*',
           amountRegex: r'(\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?)\s*(?:\u0631\.\u0633|\u0631\u064A\u0627\u0644|\u062F\.\u0625|\u062F\u0631\u0647\u0645)',
           currencyRegex: r'(\u0631\.\u0633|\u0631\u064A\u0627\u0644|\u062F\.\u0625|\u062F\u0631\u0647\u0645|\u062F\.\u0643|\u062F\.\u0628|\u0631\.\u0639|\u0631\.\u0642|\u062C\.\u0645)',
@@ -148,7 +148,7 @@ class ScannerController {
         ),
         ScannerPattern(
           id: 'builtin_amount_generic',
-          name: 'Generic Amount',
+          name: 'scanner_pattern_generic_amount',
           senderMatch: '*',
           amountRegex: r'(\d{1,3}(?:,\d{3})*\.\d{2})',
           isBuiltIn: true,

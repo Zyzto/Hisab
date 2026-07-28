@@ -141,7 +141,7 @@ final languageSettingDef = const EnumSetting(
   defaultValue: 'en',
   titleKey: 'language',
   options: ['en', 'ar'],
-  optionLabels: {'en': 'English', 'ar': 'العربية'},
+  optionLabels: {'en': 'language_name_en', 'ar': 'language_name_ar'},
   icon: Icons.language,
   section: 'appearance',
   order: 3,
@@ -204,6 +204,17 @@ final pendingInviteTokenSettingDef = const StringSetting(
   icon: Icons.link,
   section: 'appearance',
   order: -4, // Internal, not shown in settings UI
+);
+
+/// When true, after login/register the invite page should auto-accept and open the group
+/// (view+join flow). Cleared after accept attempt.
+final pendingInviteAutoJoinSettingDef = const BoolSetting(
+  'pending_invite_auto_join',
+  defaultValue: false,
+  titleKey: 'pending_invite_auto_join',
+  icon: Icons.group_add,
+  section: 'appearance',
+  order: -5, // Internal, not shown in settings UI
 );
 
 /// Last route path when app went to background; used to restore after process kill (e.g. returning from camera).
@@ -449,6 +460,16 @@ final use24HourFormatSettingDef = const BoolSetting(
   order: 7,
 );
 
+/// When true, tone down decorative accent fills in cards/headers.
+final subtleAccentsSettingDef = const BoolSetting(
+  'subtle_accents',
+  defaultValue: false,
+  titleKey: 'subtle_accents',
+  icon: Icons.tonality,
+  section: 'appearance',
+  order: 8,
+);
+
 /// When true, expense form shows full options (Expense / Income / Transfer pill).
 /// When false (default), only expense addition is shown; pill is hidden.
 final expenseFormFullFeaturesSettingDef = const BoolSetting(
@@ -485,6 +506,7 @@ final allSettings = <SettingDefinition>[
   onboardingOnlinePendingSettingDef,
   settingsOnlinePendingSettingDef,
   pendingInviteTokenSettingDef,
+  pendingInviteAutoJoinSettingDef,
   lastRoutePathSettingDef,
   themeModeSettingDef,
   themeSchemeSettingDef,
@@ -494,6 +516,7 @@ final allSettings = <SettingDefinition>[
   favoriteCurrenciesSettingDef,
   displayCurrencySettingDef,
   use24HourFormatSettingDef,
+  subtleAccentsSettingDef,
   expenseFormFullFeaturesSettingDef,
   expenseFormExpandDescriptionSettingDef,
   expenseFormExpandBillBreakdownSettingDef,

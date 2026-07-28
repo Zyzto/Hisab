@@ -1,8 +1,10 @@
-# Hisab Codebase Overview
+# Codebase overview
 
 <!-- markdownlint-disable MD060 -->
 
-`Hisab` is a Flutter app for group expense splitting and settlement. It is offline-first: local SQLite (via the PowerSync package) is always initialized, and Supabase is optional for online auth/sync/invites/notifications.
+Hisab is a Flutter app for group expense splitting and settlement. Local SQLite (PowerSync package) always starts; Supabase is optional for auth, sync, invites, and push.
+
+Product and install overview: [../README.md](../README.md). Doc index: [README.md](README.md).
 
 ## Stack
 
@@ -23,8 +25,6 @@
 | `lib/` | Main Flutter application code |
 | `lib/core/` | Cross-cutting: auth, constants, database, debug, navigation, receipt, repository, services, telemetry, theme, update, utils, widgets |
 | `lib/features/` | Feature modules (`home`, `groups`, `expenses`, `balance`, `settings`, `onboarding`, `transaction_scanner`) |
-| `android/.../TransactionNotificationListener.kt` | Android Notification Listener for Transaction Scanner (opt-in) |
-| `android/.../NotificationBridge.kt` | Method/Event channel bridge for scanner ↔ Flutter |
 | `lib/domain/` | Domain entities and value types; barrel export in `domain.dart` |
 | `assets/translations/` | Localization JSON files |
 | `web/` | PWA shell, Firebase web messaging config, redirect pages, static privacy page |
@@ -34,8 +34,8 @@
 | `supabase/functions/send-notification/` | Edge Function: FCM push (expenses, member_joined; excludes joinee) |
 | `supabase/functions/telemetry/` | Edge Function: anonymous telemetry ingest |
 | `docs/` | Setup and architecture documentation; see [docs/README.md](README.md) for an index |
-| `test/` | Tests mirroring `lib/` layout; see [test/README.md](test/README.md) |
-| `integration_test/` | Full-app integration tests (local-only + online); see [test/README.md](test/README.md) |
+| `test/` | Tests mirroring `lib/` layout; see [test/README.md](../test/README.md) |
+| `integration_test/` | Full-app integration tests (local-only + online); see [test/README.md](../test/README.md) |
 | `supabase/` | Local Supabase config, migrations, seed data for online integration tests |
 | `scripts/` | Helper scripts (`run_online_tests.sh` for online tests) |
 | `.github/workflows/release.yml` | CI/CD for Android builds/releases + web deploy + online integration tests |
@@ -124,7 +124,6 @@ Expense form **photos**: add up to 5 images (camera or gallery on all platforms,
 - **Group / personal create wizard:** Canonical routes are `/groups/create` and `/groups/create-personal` (each mounts one `GroupCreatePage` so `PageView` state is not disposed between steps). Legacy paths such as `/groups/create/details` **redirect** to the canonical URL (bookmarks still work; refresh on a legacy step URL restarts the wizard at step 0). In-wizard step labels in the address bar use `SystemNavigator.routeInformationUpdated` (decorative), not `context.go`, so state and animations stay intact.
 - **Onboarding wizard:** Per-step routes (`/onboarding/welcome`, …) remain for deep links and cold starts; swiping between steps updates the browser URL the same way (**decorative** `routeInformationUpdated`) so `OnboardingPage` state is not recreated by `go()` on every page.
 - **Group detail tabs:** Tab changes still use `SystemNavigator.routeInformationUpdated` in `group_detail_page.dart` (same pattern: URL reflects tab without replacing the route).
-- **Transaction Scanner (Android):** No GoRouter paths; Settings / hub use imperative `Navigator.push` (`MaterialPageRoute`). See [TRANSACTION_SCANNER.md](TRANSACTION_SCANNER.md).
 - **Modals/sheets:** `lib/core/layout/responsive_sheet.dart` — `showResponsiveSheet` (bottom sheet on narrow, centered dialog on tablet+) and `showAppDialog`; both support `centerInFullViewport` and **click-outside-to-close** (barrier dismiss on all platforms, including desktop web via an explicit barrier gesture). See [MODAL_CENTERING_AND_RESPONSIVE_SHEET.md](MODAL_CENTERING_AND_RESPONSIVE_SHEET.md).
 - **App bar title alignment:** Pages that use `ConstrainedContent` for the body use **ContentAlignedAppBar** (see Layout above) so the app bar title sits in the same horizontal band as the content (tablet/desktop with rail and max-width content).
 - Deep link handling: `lib/core/navigation/invite_link_handler.dart`
@@ -139,6 +138,8 @@ Expense form **photos**: add up to 5 images (camera or gallery on all platforms,
 - `App` (`lib/app.dart`) intentionally reads locale from `context.locale` only.
 - Router refreshes on locale changes via `localeRefreshNotifier`.
 - Supported locales: English (`en`), Arabic (`ar`).
+- Strings live in `assets/translations/en.json` and `ar.json` (same key set). Production UI uses `.tr()`; keep both locale files in lockstep when adding keys.
+- Special cases (FCM background isolate English fallbacks, debug menu, bug-report English markdown, stored default participant names): see [I18N.md](I18N.md).
 
 ## Authentication
 
@@ -165,17 +166,17 @@ Push notifications are sent when expenses are added/edited or members join a gro
 - Handles token refresh, foreground display (mobile: local notifications), and tap → navigate to group detail using `message.data['group_id']`.
 - Expects incoming messages to have `notification` (title, body) and `data.group_id` (string).
 
-**Backend:** Database trigger `notify_on_expense_change` (and `notify_on_member_join`) calls `notify_group_activity()`, which POSTs to the `send-notification` Edge Function with `group_id`, `actor_user_id`, `action`, and optional expense fields. **Personal groups** (groups with `is_personal = true`; see [PERSONAL_FEATURE.md](docs/PERSONAL_FEATURE.md)) do not trigger push notifications—the trigger function skips the HTTP call for them. The Edge Function (`supabase/functions/send-notification/index.ts`) loads other group members’ tokens and `locale` from `device_tokens` and sends FCM v1 messages (one per token). For **expense_created** and **expense_updated**, the actor is the user who created or last updated the expense; the Edge Function excludes that actor so only **other** group members receive the push. For `member_joined`, the actor is the new member; the Edge Function excludes the actor so the joinee does not receive a push notification. Notification title and body are localized per device using the stored `locale` (en/ar; fallback en).
+**Backend:** Database trigger `notify_on_expense_change` (and `notify_on_member_join`) calls `notify_group_activity()`, which POSTs to the `send-notification` Edge Function with `group_id`, `actor_user_id`, `action`, and optional expense fields. **Personal groups** (groups with `is_personal = true`; see [PERSONAL_FEATURE.md](PERSONAL_FEATURE.md)) do not trigger push notifications—the trigger function skips the HTTP call for them. The Edge Function (`supabase/functions/send-notification/index.ts`) loads other group members’ tokens and `locale` from `device_tokens` and sends FCM v1 messages (one per token). For **expense_created** and **expense_updated**, the actor is the user who created or last updated the expense; the Edge Function excludes that actor so only **other** group members receive the push. For `member_joined`, the actor is the new member; the Edge Function excludes the actor so the joinee does not receive a push notification. Notification title and body are localized per device using the stored `locale` (en/ar; fallback en).
 
 **Web:** `web/index.html` initializes Firebase web SDK; `web/firebase-messaging-sw.js` handles background push and clicks. Web token registration requires `FCM_VAPID_KEY` at build time.
 
 **Settings:** `notifications_enabled` controls initialization and token registration; the toggle is shown only in online mode.
 
-**Transaction Scanner (separate from FCM):** On Android, an opt-in Notification Listener can parse bank/payment notifications into local drafts for personal expenses. This does **not** use FCM. See [TRANSACTION_SCANNER.md](TRANSACTION_SCANNER.md).
+**Transaction Scanner:** Separate from FCM — Android Notification Listener → local drafts → personal expenses. See [TRANSACTION_SCANNER.md](TRANSACTION_SCANNER.md).
 
 ## Feature Modules
 
-- `features/home`: groups list (Personal and Groups sections) via **home_list_provider** (ordered list, pinned/custom order), **routes**, create FAB + modal (Create group / Create personal), manual refresh trigger; pending Transaction Scanner draft badge on personal group cards
+- `features/home`: groups list (Personal and Groups sections) via **home_list_provider** (ordered list, pinned/custom order), **routes**, create FAB + modal (Create group / Create personal), manual refresh trigger
 - `features/groups`: create/detail/settings (including personal vs group branches and convert flows), invite management, invite acceptance; group settings include permission toggles (e.g. Members can add expenses, Members can record settlements for others). **Group create** uses a single shell route per flow plus decorative step URLs (see Navigation). `invite_redirect_proxy` (and `invite_redirect_proxy_web`, `invite_redirect_proxy_stub`, `invite_redirect_proxy_page`) for web/invite redirect; **create_invite_sheet** (invite creation UI)
 - `features/expenses`: create/edit/detail expenses (**expense_detail_shell**), split logic UI, image input hooks; **expense_navigation_direction** (provider), **expense_form_constants**, **category_icons**
 - `features/balance`: settlement list and record settlement flow. By default only the group owner or the debtor (participant who owes) can record a settlement; group setting **Members can record settlements for others** (Group.allowMemberSettleForOthers) allows any member to record. Balance list (`balance_list.dart`) uses `myMemberInGroupProvider` and `myRoleInGroupProvider` to enable or disable the record button per row.
@@ -185,12 +186,11 @@ Push notifications are sent when expenses are added/edited or members join a gro
   - local-only toggle + migration
   - import/export backup JSON (**backup_helper**: `parseBackupJson`, etc.)
   - telemetry + notifications toggles
-  - **Transaction Scanner** section (Android only): `scanner_enabled` + Pending Transactions → scanner hub
   - logs viewer/clear/report flow
   - feedback capture (**feedback_upload**, feedback_clipboard with io/stub)
   - About: version row tappable to check for updates manually; About me shows developer info from GitHub (avatar, name, bio, profile link)
 - `features/onboarding`: multi-step onboarding (welcome, preferences, permissions, connect) with mode selection and auth gate for online mode; URL sync for steps is decorative (see Navigation) so wizard state is preserved while swiping
-- `features/transaction_scanner`: Android notification → draft → personal expense pipeline (setup, hub, drafts, sender rules, patterns, parser, native bridge). See [TRANSACTION_SCANNER.md](TRANSACTION_SCANNER.md).
+- `features/transaction_scanner`: Android notification → draft → personal expense (Settings hub; local-only tables). See [TRANSACTION_SCANNER.md](TRANSACTION_SCANNER.md).
 
 ## Settings Framework
 
@@ -202,7 +202,6 @@ Major persisted keys include:
 - mode/lifecycle: `local_only`, `onboarding_completed`, pending OAuth flags, pending invite token
 - privacy: `telemetry_enabled`, `notifications_enabled`
 - receipt AI: OCR/AI flags, provider, and API keys
-- transaction scanner (Android): `scanner_enabled` (UI), plus `scanner_location_enabled` / `scanner_notify_on_capture` (defined; not yet wired in Settings UI)
 
 ## Web and PWA
 
@@ -401,11 +400,11 @@ The `test-online` job requires no additional secrets — it uses the local Supab
 - **Run all tests:** `flutter test`
 - **Coverage:**
   - **Unit:** domain, settle-up, sync error classification, backup parse, translations.
-  - **Widget:** Public custom widgets under `test/` mirroring `lib/`: `test/core/` (async_value_builder, back_button_keyboard_dismiss, connection_banner, currency_picker_list, expandable_section, floating_nav_bar, invite_link_handler, pwa_install_banner, sync_status_chip), `test/groups/` (group_card, create_invite_sheet), `test/expenses/` (expense_list_tile, expense_title_section, expense_amount_section, expense_split_section, expense_bill_breakdown_section, expense_detail_body, expense_detail_body_header), `test/settings/` (logs_viewer_dialog, privacy_policy_page), `test/pages/` (main_scaffold, home_page, archived_groups_page), `test/balance/` (balance_list: settlement permission — owner vs member/debtor), `test/onboarding/` (onboarding_page), plus error_content and app. Widget tests use EasyLocalization + MaterialApp; Riverpod widgets use ProviderScope with overrides when needed. See [test/widget_test_helpers.dart](test/widget_test_helpers.dart) and [test/README.md](test/README.md).
-  - **Locale:** Key widgets are tested in both English and Arabic via `test/widget_test_helpers.dart`: `pumpApp(tester, child: ..., locale: Locale('ar'))` and `testSupportedLocales`. Edge cases (empty/zero/long content, optional params) are covered where relevant.
-  - **Integration-style:** Local PowerSync DB, sync engine with fake backend. See [test/README.md](test/README.md) for PowerSync native binary requirements and coverage (`flutter test --coverage`).
-  - **Integration (local-only):** Full-app flows in `integration_test/` — smoke, onboarding, group, personal, expense (tags, photos, currencies, bill breakdown), balance (settlements, freeze), settings. Run with `flutter drive` on web or `flutter test integration_test/ -d <device>`. See [test/README.md](test/README.md).
-  - **Integration (online):** Full end-to-end tests against a **local Supabase instance** (Docker) — auth (sign-in/out), data sync (create group/expense → verify in Supabase DB), and multi-user invite flow. Run with `./scripts/run_online_tests.sh` or manually via `supabase start` + `flutter drive`. See [test/README.md](test/README.md) for full setup.
+  - **Widget:** Public custom widgets under `test/` mirroring `lib/`: `test/core/` (async_value_builder, back_button_keyboard_dismiss, connection_banner, currency_picker_list, expandable_section, floating_nav_bar, invite_link_handler, pwa_install_banner, sync_status_chip), `test/groups/` (group_card, create_invite_sheet), `test/expenses/` (expense_list_tile, expense_title_section, expense_amount_section, expense_split_section, expense_bill_breakdown_section, expense_detail_body, expense_detail_body_header), `test/settings/` (logs_viewer_dialog, privacy_policy_page), `test/pages/` (main_scaffold, home_page, archived_groups_page), `test/balance/` (balance_list: settlement permission — owner vs member/debtor), `test/onboarding/` (onboarding_page), plus error_content and app. Widget tests use EasyLocalization + MaterialApp; Riverpod widgets use ProviderScope with overrides when needed. See [test/widget_test_helpers.dart](../test/widget_test_helpers.dart) and [test/README.md](../test/README.md).
+  - **Locale:** Key widgets are tested in both English and Arabic via `test/widget_test_helpers.dart`: `pumpApp(tester, child: ..., locale: Locale('ar'))` and `testSupportedLocales`. Edge cases (empty/zero/long content, optional params) are covered where relevant. Translation file parity: `test/translations_test.dart` (see [I18N.md](I18N.md)).
+  - **Integration-style:** Local PowerSync DB, sync engine with fake backend. See [test/README.md](../test/README.md) for PowerSync native binary requirements and coverage (`flutter test --coverage`).
+  - **Integration (local-only):** Full-app flows in `integration_test/` — smoke, onboarding, group, personal, expense (tags, photos, currencies, bill breakdown), balance (settlements, freeze), settings. Run with `flutter drive` on web or `flutter test integration_test/ -d <device>`. See [test/README.md](../test/README.md).
+  - **Integration (online):** Full end-to-end tests against a **local Supabase instance** (Docker) — auth (sign-in/out), data sync (create group/expense → verify in Supabase DB), and multi-user invite flow. Run with `./scripts/run_online_tests.sh` or manually via `supabase start` + `flutter drive`. See [test/README.md](../test/README.md) for full setup.
 - **Widget test helper:** `test/widget_test_helpers.dart` provides `pumpApp(tester, child, locale?, pumpAndSettle?)` to wrap the widget in EasyLocalization + MaterialApp; use for presentational widgets. For widgets that depend on Riverpod, build ProviderScope + EasyLocalization + MaterialApp inline with overrides (see e.g. `test/balance/balance_list_widget_test.dart`).
 - **Generated code:** Run `dart run build_runner build` (or `watch`) to regenerate `.g.dart` files before running tests or when changing providers/settings.
 
@@ -439,8 +438,10 @@ The following improvements are reflected in the codebase and docs:
 - **App bar title aligned with content:** All pages with a constrained body use **ContentAlignedAppBar** so the app bar title sits in the same horizontal band as the body (same `contentBandMetrics` as `ConstrainedContent`). The title is absolutely positioned in the app bar so it is not affected by leading/actions; titles are not shrunk with `FittedBox` (use ellipsis / elision in the title widget). Wrap the scaffold in `LayoutBuilder` and pass `layoutConstraints.maxWidth` as `contentAreaWidth`. See `lib/core/layout/content_aligned_app_bar.dart` and the “Layout (core/layout)” section above.
 
 - **Settlement permission:** By default only the group owner or the debtor (participant who owes) can record a settlement. Group setting **Members can record settlements for others** (`Group.allowMemberSettleForOthers`, default false) allows any member to record. Schema: `groups.allow_member_settle_for_others`; sync, repository, backup, and Migration 19 in `docs/SUPABASE_SETUP.md`; local Supabase migration `20250101000019_groups_allow_member_settle_for_others.sql`. Balance list and group settings UI enforce the rule. See `lib/features/balance/widgets/balance_list.dart`, `lib/features/groups/pages/group_settings_page.dart`, `lib/domain/group.dart`.
-- **Online integration tests:** Full end-to-end tests against a local Supabase Docker instance — auth, sync, and invite flows. Local Supabase setup (config, migrations, seed) lives in `supabase/`. Run with `./scripts/run_online_tests.sh`. CI runs them in the `test-online` GitHub Actions job. See [test/README.md](test/README.md) for full setup, prerequisites, and troubleshooting.
+- **Online integration tests:** Full end-to-end tests against a local Supabase Docker instance — auth, sync, and invite flows. Local Supabase setup (config, migrations, seed) lives in `supabase/`. Run with `./scripts/run_online_tests.sh`. CI runs them in the `test-online` GitHub Actions job. See [test/README.md](../test/README.md) for full setup, prerequisites, and troubleshooting.
 - **Invite RPC null-expiry fix:** `accept_invite` treats `expires_at IS NULL` as valid (never-expiring invites) and pre-filters inactive/maxed invites. Apply migration `20260306120000_fix_accept_invite_null_expiry_validation.sql` in local/dev environments so invite acceptance matches production behavior.
+- **Duplicate participant guard:** Memberships stay unique via `group_members(group_id, user_id)`. Active linked participants are also unique via partial index `idx_participants_active_user_per_group` (`user_id IS NOT NULL AND left_at IS NULL`). `accept_invite` reuses by `user_id`, race-safely claims a unique unlinked placeholder (name/profile/first-token/email/local-part, min length 2), and maps membership races to “Already a member”; `merge_participant_with_member` unlinks the old row before claiming. Migration: `20260728130000_prevent_duplicate_active_participants.sql`.
+- **i18n hardcode pass:** User-facing strings (scanner, notifications channel/fallbacks, language/theme labels, exchange-rate label, receipt/status defaults, relative times, feedback issue title, etc.) go through translation keys in both `en.json` and `ar.json`. Built-in scanner pattern names are stored as keys and shown via `scannerPatternDisplayName`. Conventions and intentional exceptions: [I18N.md](I18N.md).
 
 ## Related Docs
 
@@ -449,6 +450,8 @@ The following improvements are reflected in the codebase and docs:
 - `docs/SUPABASE_BACKUP.md` - how to backup Supabase database (dashboard, pg_dump, script)
 - `docs/EDGE_FUNCTIONS.md` - Supabase Edge Functions list and deploy commands (invite-redirect, og-invite-image, send-notification, telemetry)
 - `docs/PERSONAL_FEATURE.md` - personal (my-expenses-only) mode: data model, flows, code locations, backup, i18n
+- `docs/TRANSACTION_SCANNER.md` - Android notification → draft → personal expense scanner
+- `docs/I18N.md` - localization conventions, key groups, en/ar parity, notification/scanner special cases
 - `docs/CONFIGURATION.md` - runtime configuration quick reference
 - `docs/RELEASE_SETUP.md` and `docs/PLAY_CONSOLE_DECLARATIONS.md` - release/distribution notes
 - `docs/DELETE_ACCOUNT.md` - user-facing guide for deleting data and requesting account deletion

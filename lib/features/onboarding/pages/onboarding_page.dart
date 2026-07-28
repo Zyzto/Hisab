@@ -47,9 +47,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
   late final AnimationController _languagePulseController;
 
   static const List<Locale> _supportedLocales = [Locale('en'), Locale('ar')];
-  static const List<String> _hintLanguageInLocales = [
-    'You can change language from here',
-    'تقدر تغيّر اللغة من هنا',
+  static const List<String> _hintLanguageKeys = [
+    'onboarding_language_hint_en',
+    'onboarding_language_hint_ar',
   ];
   static const List<String> _themeDemoOrder = [
     'light',
@@ -133,7 +133,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
       if (mounted) {
         setState(() {
           _hintLocaleIndex =
-              (_hintLocaleIndex + 1) % _hintLanguageInLocales.length;
+              (_hintLocaleIndex + 1) % _hintLanguageKeys.length;
         });
       }
     });
@@ -177,10 +177,10 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
   static String _localeDisplayName(Locale locale) {
     switch (locale.languageCode) {
       case 'ar':
-        return 'العربية';
+        return 'language_name_ar'.tr();
       case 'en':
       default:
-        return 'English';
+        return 'language_name_en'.tr();
     }
   }
 
@@ -668,7 +668,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
             AnimatedSwitcher(
               duration: ThemeConfig.animationMedium,
               child: Text(
-                _hintLanguageInLocales[_hintLocaleIndex],
+                _hintLanguageKeys[_hintLocaleIndex].tr(),
                 key: ValueKey<int>(_hintLocaleIndex),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: colorScheme.onSurfaceVariant,
@@ -736,6 +736,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
         ref
             .read(settings.provider(pendingInviteTokenSettingDef).notifier)
             .set('');
+        // Keep pending_invite_auto_join so InviteAcceptPage joins then opens group.
         Log.info(
           'Setting changed: ${pendingInviteTokenSettingDef.key}=(cleared)',
         );

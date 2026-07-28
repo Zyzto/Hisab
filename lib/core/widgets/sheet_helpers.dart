@@ -119,6 +119,7 @@ Future<String?> showTextInputSheet(
   String? hint,
   String initialValue = '',
   int maxLines = 1,
+  int? maxLength,
   bool obscureText = false,
   bool centerInFullViewport = true,
 }) {
@@ -142,8 +143,10 @@ Future<String?> showTextInputSheet(
             decoration: InputDecoration(
               hintText: hint,
               border: const OutlineInputBorder(),
+              counterText: maxLength != null ? '' : null,
             ),
             maxLines: maxLines,
+            maxLength: maxLength,
             autofocus: true,
           ),
         ),

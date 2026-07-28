@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +13,7 @@ import '../../../core/auth/sign_in_sheet.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/constrained_content.dart';
+import '../../../core/navigation/invite_nav_redirect.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/utils/error_report_helper.dart';
 import '../../../core/widgets/error_content.dart';
@@ -75,6 +78,8 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
   bool _didAttemptWebPreviewRedirect = false;
   bool _didAttemptPreviewRedirectForNotOnboarded = false;
   bool _didAttemptOnboardingRedirectForNotOnboarded = false;
+  bool _didAttemptAutoJoin = false;
+  bool _didScheduleUnauthResume = false;
 
   bool _shouldAutoRedirectToPreview(InviteAccessMode? mode) =>
       mode == InviteAccessMode.readonlyOnly;
@@ -160,7 +165,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                 title: Text('invite'.tr()),
                 leading: IconButton(
                   icon: const Icon(Icons.close),
-                  onPressed: () => context.go(RoutePaths.home),
+                  onPressed: () => _dismissInvite(context),
                 ),
               ),
               body: Center(
@@ -179,7 +184,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                     ),
                     const SizedBox(height: 24),
                     FilledButton(
-                      onPressed: () => context.go(RoutePaths.home),
+                      onPressed: () => _dismissInvite(context),
                       child: Text('go_home'.tr()),
                     ),
                   ],
@@ -198,7 +203,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
               title: Text('invite'.tr()),
               leading: IconButton(
                 icon: const Icon(Icons.close),
-                onPressed: () => context.go(RoutePaths.home),
+                onPressed: () => _dismissInvite(context),
               ),
             ),
             body: previewAsync.when(
@@ -225,7 +230,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                       onPrimary: () =>
                           context.go(RoutePaths.invitePreview(widget.token)),
                       primaryLabelKey: 'invite_preview_open_group',
-                      onGoHome: () => context.go(RoutePaths.home),
+                      onGoHome: () => _dismissInvite(context),
                     );
                   }
                   if (preview.invite.accessMode == InviteAccessMode.readonlyJoin ||
@@ -256,7 +261,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                       context.go(RoutePaths.onboarding);
                     },
                     primaryLabelKey: 'onboarding_next',
-                    onGoHome: () => context.go(RoutePaths.home),
+                    onGoHome: () => _dismissInvite(context),
                   );
                 }
                 return Center(
@@ -272,7 +277,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                       ),
                       const SizedBox(height: 16),
                       TextButton.icon(
-                        onPressed: () => context.go(RoutePaths.home),
+                        onPressed: () => _dismissInvite(context),
                         icon: const Icon(Icons.home_outlined, size: 20),
                         label: Text('go_home'.tr()),
                       ),
@@ -287,7 +292,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                     const CircularProgressIndicator(),
                     const SizedBox(height: 24),
                     TextButton.icon(
-                      onPressed: () => context.go(RoutePaths.home),
+                      onPressed: () => _dismissInvite(context),
                       icon: const Icon(Icons.home_outlined, size: 20),
                       label: Text('go_home'.tr()),
                     ),
@@ -312,7 +317,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                     stackTrace: st,
                     onRetry: () =>
                         ref.invalidate(invitePreviewDataProvider(widget.token)),
-                    onGoHome: () => context.go(RoutePaths.home),
+                    onGoHome: () => _dismissInvite(context),
                   ),
                 );
               },
@@ -332,7 +337,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
               title: Text('invite'.tr()),
               leading: IconButton(
                 icon: const Icon(Icons.close),
-                onPressed: () => context.go(RoutePaths.home),
+                onPressed: () => _dismissInvite(context),
               ),
             ),
             body: (!supabaseConfigAvailable || !hasNetwork)
@@ -413,7 +418,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                           stackTrace: st,
                           onRetry: () =>
                               ref.invalidate(inviteByTokenProvider(widget.token)),
-                          onGoHome: () => context.go(RoutePaths.home),
+                          onGoHome: () => _dismissInvite(context),
                         ),
                       );
                     },
@@ -433,7 +438,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
               title: Text('invite'.tr()),
               leading: IconButton(
                 icon: const Icon(Icons.close),
-                onPressed: () => context.go(RoutePaths.home),
+                onPressed: () => _dismissInvite(context),
               ),
             ),
             body: inviteAsync.when(
@@ -455,7 +460,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                         ),
                         const SizedBox(height: 24),
                         TextButton.icon(
-                          onPressed: () => context.go(RoutePaths.home),
+                          onPressed: () => _dismissInvite(context),
                           icon: const Icon(Icons.home_outlined, size: 20),
                           label: Text('go_home'.tr()),
                         ),
@@ -522,7 +527,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                     inviteStack: st,
                     onRetry: () =>
                         ref.invalidate(inviteByTokenProvider(widget.token)),
-                    onGoHome: () => context.go(RoutePaths.home),
+                    onGoHome: () => _dismissInvite(context),
                   );
                 }
                 sendErrorTelemetryIfOnline(
@@ -537,7 +542,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                     stackTrace: st,
                     onRetry: () =>
                         ref.invalidate(inviteByTokenProvider(widget.token)),
-                    onGoHome: () => context.go(RoutePaths.home),
+                    onGoHome: () => _dismissInvite(context),
                   ),
                 );
               },
@@ -555,7 +560,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
             title: Text('invite'.tr()),
             leading: IconButton(
               icon: const Icon(Icons.close),
-              onPressed: () => context.go(RoutePaths.home),
+              onPressed: () => _dismissInvite(context),
             ),
           ),
           body: ConstrainedContent(
@@ -578,7 +583,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                         ),
                         const SizedBox(height: 24),
                         TextButton.icon(
-                          onPressed: () => context.go(RoutePaths.home),
+                          onPressed: () => _dismissInvite(context),
                           icon: const Icon(Icons.home_outlined, size: 20),
                           label: Text('go_home'.tr()),
                         ),
@@ -597,7 +602,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                     inviteStack: st,
                     onRetry: () =>
                         ref.invalidate(inviteByTokenProvider(widget.token)),
-                    onGoHome: () => context.go(RoutePaths.home),
+                    onGoHome: () => _dismissInvite(context),
                   );
                 }
                 sendErrorTelemetryIfOnline(
@@ -612,7 +617,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                     stackTrace: st,
                     onRetry: () =>
                         ref.invalidate(inviteByTokenProvider(widget.token)),
-                    onGoHome: () => context.go(RoutePaths.home),
+                    onGoHome: () => _dismissInvite(context),
                   ),
                 );
               },
@@ -638,6 +643,60 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
     final showJoinRequiresOnlineCta = isReadonlyJoin && localOnly;
     final showJoinOnboardingCta =
         isReadonlyJoin && !isAuthenticated && !localOnly;
+
+    // Resume view+join after login/register without an extra Accept tap.
+    final settings = ref.read(hisabSettingsProvidersProvider);
+    final autoJoinFlag = settings != null &&
+        ref.read(settings.provider(pendingInviteAutoJoinSettingDef));
+    if (shouldAutoJoinInvite(
+      autoJoinFlag: autoJoinFlag,
+      isAuthenticated: isAuthenticated,
+      localOnly: localOnly,
+      canAcceptInvite: canAcceptInvite,
+      alreadyAttempted: _didAttemptAutoJoin || _accepting,
+    )) {
+      _maybeAutoJoin(context, invite, group);
+    } else {
+      final resume = unauthenticatedAutoJoinResume(
+        autoJoinFlag: autoJoinFlag,
+        isAuthenticated: isAuthenticated,
+        localOnly: localOnly,
+        canAcceptInvite: canAcceptInvite,
+        onboardingCompleted: ref.read(onboardingCompletedProvider),
+        alreadyAttempted: _didAttemptAutoJoin || _didScheduleUnauthResume,
+      );
+      if (resume != InviteUnauthResumeAction.none) {
+        _didScheduleUnauthResume = true;
+        // Mark attempted only when we actually open sign-in/onboarding.
+        // If auth lands before the frame callback, fall through to auto-join.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || _didAttemptAutoJoin || _accepting) return;
+          final settingsNow = ref.read(hisabSettingsProvidersProvider);
+          final autoJoinNow = settingsNow != null &&
+              ref.read(settingsNow.provider(pendingInviteAutoJoinSettingDef));
+          final action = unauthenticatedAutoJoinResume(
+            autoJoinFlag: autoJoinNow,
+            isAuthenticated: ref.read(isAuthenticatedProvider),
+            localOnly: ref.read(effectiveLocalOnlyProvider),
+            canAcceptInvite: canAcceptInvite,
+            onboardingCompleted: ref.read(onboardingCompletedProvider),
+            alreadyAttempted: false,
+          );
+          switch (action) {
+            case InviteUnauthResumeAction.signIn:
+              _didAttemptAutoJoin = true;
+              unawaited(_signInThenAcceptIfPossible(context));
+            case InviteUnauthResumeAction.onboarding:
+              _didAttemptAutoJoin = true;
+              _persistPendingInviteToken(autoJoin: true);
+              context.go(RoutePaths.onboarding);
+            case InviteUnauthResumeAction.none:
+              // Auth may have completed between build and frame.
+              _maybeAutoJoin(context, invite, group);
+          }
+        });
+      }
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -699,8 +758,10 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
           const SizedBox(height: 32),
           if (_alreadyMemberGroupId != null)
             FilledButton(
-              onPressed: () =>
-                  context.go(RoutePaths.groupDetail(_alreadyMemberGroupId!)),
+              onPressed: () {
+                _clearPendingInviteState();
+                context.go(RoutePaths.groupDetail(_alreadyMemberGroupId!));
+              },
               child: Text('open_group'.tr()),
             )
           else
@@ -748,40 +809,142 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
     );
   }
 
-  void _persistPendingInviteToken() {
+  void _persistPendingInviteToken({bool autoJoin = false}) {
     final settings = ref.read(hisabSettingsProvidersProvider);
     if (settings == null) return;
     ref.read(settings.provider(pendingInviteTokenSettingDef).notifier).set(
       widget.token,
     );
+    if (autoJoin) {
+      ref
+          .read(settings.provider(pendingInviteAutoJoinSettingDef).notifier)
+          .set(true);
+    }
+  }
+
+  void _clearAutoJoinFlag() {
+    final settings = ref.read(hisabSettingsProvidersProvider);
+    if (settings == null) return;
+    ref
+        .read(settings.provider(pendingInviteAutoJoinSettingDef).notifier)
+        .set(false);
+  }
+
+  /// Clear token + auto-join before leaving /invite/* for a group.
+  /// Otherwise the router still sees pendingInvite and redirects back to invite.
+  void _clearPendingInviteState() {
+    final settings = ref.read(hisabSettingsProvidersProvider);
+    if (settings == null) return;
+    final token = ref.read(settings.provider(pendingInviteTokenSettingDef));
+    if (token.isNotEmpty) {
+      ref
+          .read(settings.provider(pendingInviteTokenSettingDef).notifier)
+          .set('');
+    }
+    _clearAutoJoinFlag();
+  }
+
+  void _dismissInvite(BuildContext context) {
+    _clearPendingInviteState();
+    context.go(RoutePaths.home);
+  }
+
+  bool _consumeAutoJoinFlag() {
+    final settings = ref.read(hisabSettingsProvidersProvider);
+    if (settings == null) return false;
+    final enabled = ref.read(
+      settings.provider(pendingInviteAutoJoinSettingDef),
+    );
+    if (enabled) {
+      ref
+          .read(settings.provider(pendingInviteAutoJoinSettingDef).notifier)
+          .set(false);
+    }
+    return enabled;
+  }
+
+  /// View+join: after login/register, accept once and open the group.
+  void _maybeAutoJoin(BuildContext context, GroupInvite invite, Group group) {
+    if (_didAttemptAutoJoin || _accepting) return;
+    if (invite.accessMode == InviteAccessMode.readonlyOnly) return;
+    if (!ref.read(isAuthenticatedProvider)) return;
+    if (ref.read(effectiveLocalOnlyProvider)) return;
+    if (!_consumeAutoJoinFlag()) return;
+    _didAttemptAutoJoin = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _accept(context, group);
+    });
   }
 
   void _goToOnboardingForInvite(BuildContext context) {
-    _persistPendingInviteToken();
-    context.go(RoutePaths.onboarding);
-  }
-
-  void _goToOnlineRequiredForInvite(BuildContext context) {
-    _persistPendingInviteToken();
-    final isAuthenticated = ref.read(isAuthenticatedProvider);
-    if (isAuthenticated) {
-      context.go(RoutePaths.settings);
+    _persistPendingInviteToken(autoJoin: true);
+    final onboardingCompleted = ref.read(onboardingCompletedProvider);
+    if (onboardingCompleted) {
+      // Returning user: sign in here — router would bounce /onboarding → home.
+      unawaited(_signInThenAcceptIfPossible(context));
       return;
     }
     context.go(RoutePaths.onboarding);
   }
 
-  Future<void> _openSignInForWebInvite(BuildContext context) async {
+  void _goToOnlineRequiredForInvite(BuildContext context) {
+    _persistPendingInviteToken(autoJoin: true);
+    final isAuthenticated = ref.read(isAuthenticatedProvider);
+    if (isAuthenticated) {
+      context.go(RoutePaths.settings);
+      return;
+    }
+    final onboardingCompleted = ref.read(onboardingCompletedProvider);
+    if (onboardingCompleted) {
+      unawaited(_signInThenAcceptIfPossible(context));
+      return;
+    }
+    context.go(RoutePaths.onboarding);
+  }
+
+  Future<void> _signInThenAcceptIfPossible(BuildContext context) async {
     final result = await showSignInSheet(context, ref);
     switch (result) {
       case SignInResult.success:
         await ref.read(dataSyncServiceProvider.notifier).syncNow();
-        // Page will rebuild; invite content or accept button will show
+        if (!context.mounted) return;
+        final data = await ref.read(
+          inviteByTokenProvider(widget.token).future,
+        );
+        if (data != null && context.mounted) {
+          await _accept(context, data.group);
+        }
         break;
       case SignInResult.pendingRedirect:
-        _persistPendingInviteToken();
+        _persistPendingInviteToken(autoJoin: true);
         break;
       case SignInResult.cancelled:
+        _clearAutoJoinFlag();
+        if (context.mounted) context.showToast('sign_in_required'.tr());
+        break;
+    }
+  }
+
+  Future<void> _openSignInForWebInvite(BuildContext context) async {
+    _persistPendingInviteToken(autoJoin: true);
+    final result = await showSignInSheet(context, ref);
+    switch (result) {
+      case SignInResult.success:
+        await ref.read(dataSyncServiceProvider.notifier).syncNow();
+        if (!context.mounted) return;
+        final data = await ref.read(
+          inviteByTokenProvider(widget.token).future,
+        );
+        if (data != null && context.mounted) {
+          await _accept(context, data.group);
+        }
+        break;
+      case SignInResult.pendingRedirect:
+        _persistPendingInviteToken(autoJoin: true);
+        break;
+      case SignInResult.cancelled:
+        _clearAutoJoinFlag();
         if (context.mounted) context.showToast('sign_in_required'.tr());
         break;
     }
@@ -795,9 +958,10 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
           await ref.read(dataSyncServiceProvider.notifier).syncNow();
           break;
         case SignInResult.pendingRedirect:
-          _persistPendingInviteToken();
+          _persistPendingInviteToken(autoJoin: true);
           return;
         case SignInResult.cancelled:
+          _clearAutoJoinFlag();
           if (context.mounted) context.showToast('sign_in_required'.tr());
           return;
       }
@@ -814,7 +978,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
       final name = profile?.name?.trim();
       final displayName = (name != null && name.isNotEmpty)
           ? name
-          : (ref.read(currentUserProvider)?.email ?? 'Member');
+          : (ref.read(currentUserProvider)?.email ?? 'group_member'.tr());
       final repo = ref.read(groupInviteRepositoryProvider);
       final groupId = await repo.accept(
         widget.token,
@@ -844,6 +1008,8 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
       Log.info('Sync after invite complete, navigating to group $groupId');
       ref.invalidate(groupsProvider);
       ref.invalidate(futureGroupProvider(groupId));
+      // Must clear before go() — leftover pending token redirects /groups → /invite.
+      _clearPendingInviteState();
       if (context.mounted) {
         context.go(RoutePaths.groupDetail(groupId));
       }
@@ -860,8 +1026,11 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
           if (errorKind == _InviteAcceptErrorKind.alreadyMember) {
             _error = 'invite_already_member'.tr();
             _alreadyMemberGroupId = group.id;
+            // Join is done — drop pending so Open Group / leave can't bounce.
+            _clearPendingInviteState();
           } else if (errorKind == _InviteAcceptErrorKind.invalidOrExpired) {
             _error = 'invite_expired'.tr();
+            _clearPendingInviteState();
           } else {
             _error = errorKind == _InviteAcceptErrorKind.unauthenticated
                 ? 'sign_in_required'.tr()
@@ -904,12 +1073,17 @@ class _InvitePreviewFallbackOnErrorState
     extends ConsumerState<_InvitePreviewFallbackOnError> {
   bool _didRedirect = false;
 
-  void _persistPendingInviteToken() {
+  void _persistPendingInviteToken({bool autoJoin = false}) {
     final settings = ref.read(hisabSettingsProvidersProvider);
     if (settings == null) return;
     ref.read(settings.provider(pendingInviteTokenSettingDef).notifier).set(
       widget.token,
     );
+    if (autoJoin) {
+      ref
+          .read(settings.provider(pendingInviteAutoJoinSettingDef).notifier)
+          .set(true);
+    }
   }
 
   @override
@@ -955,8 +1129,14 @@ class _InvitePreviewFallbackOnErrorState
                     const SizedBox(height: 12),
                     FilledButton(
                       onPressed: () {
-                        _persistPendingInviteToken();
-                        context.go(RoutePaths.onboarding);
+                        _persistPendingInviteToken(autoJoin: true);
+                        final onboarded = ref.read(onboardingCompletedProvider);
+                        if (onboarded) {
+                          // Stay on invite accept; parent page handles sign-in.
+                          context.go(RoutePaths.inviteAccept(widget.token));
+                        } else {
+                          context.go(RoutePaths.onboarding);
+                        }
                       },
                       child: Text('invite_preview_join_cta'.tr()),
                     ),

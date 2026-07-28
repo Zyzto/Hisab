@@ -11,6 +11,7 @@ import '../providers/group_member_provider.dart';
 import '../providers/group_invite_provider.dart';
 import '../widgets/create_invite_sheet.dart';
 import '../widgets/group_color_picker.dart';
+import '../widgets/group_section_header.dart';
 import '../utils/group_icon_utils.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
@@ -21,10 +22,12 @@ import '../../../core/navigation/route_paths.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/services/settle_up_service.dart';
 import '../../../core/telemetry/telemetry_service.dart';
+import '../../../core/theme/accent_style.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/currency_helpers.dart';
 import '../../../core/utils/error_report_helper.dart';
+import '../../../core/utils/form_validators.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/toast.dart';
@@ -377,110 +380,115 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
         : colorScheme.onPrimary;
     final iconData = groupIconFromKey(group.icon);
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(ThemeConfig.radiusXL),
-        side: BorderSide(color: colorScheme.outline.withValues(alpha: 0.2)),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: ThemeConfig.spacingM,
+        vertical: ThemeConfig.spacingM,
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: ThemeConfig.spacingM,
-          vertical: ThemeConfig.spacingM,
-        ),
-        child: Row(
-          children: [
-            // Avatar – tap to change icon/color
-            GestureDetector(
-              onTap: canEditSettings
-                  ? () => _showIconColorPicker(context, group)
-                  : null,
-              child: Stack(
-                alignment: AlignmentDirectional.bottomEnd,
-                children: [
-                  CircleAvatar(
-                    radius: 30,
-                    backgroundColor: avatarColor,
-                    child: iconData != null
-                        ? Icon(iconData, size: 30, color: avatarFg)
-                        : Text(
-                            group.name.isNotEmpty
-                                ? group.name[0].toUpperCase()
-                                : '?',
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              color: avatarFg,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                  ),
-                  if (canEditSettings)
-                    Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(
-                        color: colorScheme.surface,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: colorScheme.outline.withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: Icon(
-                        Icons.edit,
-                        size: 12,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(width: ThemeConfig.spacingM),
-            // Name + date
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Name – tap to edit
-                  GestureDetector(
-                    onTap: canEditSettings
-                        ? () => _showEditNameDialog(context, group)
-                        : null,
-                    child: Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            group.name,
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                            overflow: TextOverflow.ellipsis,
+      decoration: AccentSurfaces.panel(
+        colorScheme,
+        subtle: context.subtleAccents,
+        accentContainer: group.color != null
+            ? Color(group.color!).withValues(alpha: 0.35)
+            : colorScheme.primaryContainer,
+        accentBorder: group.color != null
+            ? Color(group.color!)
+            : colorScheme.primary,
+        radius: ThemeConfig.radiusXL,
+      ),
+      child: Row(
+        children: [
+          // Avatar – tap to change icon/color
+          GestureDetector(
+            onTap: canEditSettings
+                ? () => _showIconColorPicker(context, group)
+                : null,
+            child: Stack(
+              alignment: AlignmentDirectional.bottomEnd,
+              children: [
+                CircleAvatar(
+                  radius: 30,
+                  backgroundColor: avatarColor,
+                  child: iconData != null
+                      ? Icon(iconData, size: 30, color: avatarFg)
+                      : Text(
+                          group.name.isNotEmpty
+                              ? group.name[0].toUpperCase()
+                              : '?',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            color: avatarFg,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(width: ThemeConfig.spacingXS),
-                        if (canEditSettings)
-                          Icon(
-                            Icons.edit_outlined,
-                            size: 16,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                      ],
+                ),
+                if (canEditSettings)
+                  Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surface,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: colorScheme.outline.withValues(alpha: 0.3),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: ThemeConfig.spacingXS),
-                  // Created date
-                  Text(
-                    'created_on'.tr(
-                      namedArgs: {
-                        'date': DateFormat.yMMMd().format(group.createdAt),
-                      },
-                    ),
-                    style: theme.textTheme.bodySmall?.copyWith(
+                    child: Icon(
+                      Icons.edit,
+                      size: 12,
                       color: colorScheme.onSurfaceVariant,
                     ),
                   ),
-                ],
-              ),
+              ],
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: ThemeConfig.spacingM),
+          // Name + date
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Name – tap to edit
+                GestureDetector(
+                  onTap: canEditSettings
+                      ? () => _showEditNameDialog(context, group)
+                      : null,
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          group.name,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: ThemeConfig.spacingXS),
+                      if (canEditSettings)
+                        Icon(
+                          Icons.edit_outlined,
+                          size: 16,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: ThemeConfig.spacingXS),
+                // Created date
+                Text(
+                  'created_on'.tr(
+                    namedArgs: {
+                      'date': DateFormat.yMMMd().format(group.createdAt),
+                    },
+                  ),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -496,26 +504,15 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     Color? titleColor,
     Widget? trailing,
   }) {
-    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                title,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: titleColor,
-                ),
-              ),
-            ),
-            ?trailing,
-          ],
+        GroupSectionHeader(
+          label: title,
+          trailing: trailing,
+          barColor: titleColor,
+          labelColor: titleColor,
         ),
-        const SizedBox(height: ThemeConfig.spacingS),
-        const Divider(height: 1),
         const SizedBox(height: ThemeConfig.spacingM),
         ...children,
       ],
@@ -1361,6 +1358,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
       title: (isPersonal ? 'edit_list_name' : 'edit_group_name').tr(),
       hint: (isPersonal ? 'list_name' : 'group_name').tr(),
       initialValue: group.name,
+      maxLength: FormValidators.groupNameMax,
       centerInFullViewport: true,
     );
 
@@ -1368,6 +1366,16 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
       if (newName != null && newName.isEmpty && context.mounted) {
         context.showToast(
           (group.isPersonal ? 'list_name_empty' : 'group_name_empty').tr(),
+        );
+      }
+      return;
+    }
+    if (FormValidators.groupName(newName) != null) {
+      if (context.mounted) {
+        context.showToast(
+          'field_too_long'.tr(
+            namedArgs: {'max': '${FormValidators.groupNameMax}'},
+          ),
         );
       }
       return;

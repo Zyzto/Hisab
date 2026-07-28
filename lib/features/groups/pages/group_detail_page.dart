@@ -12,23 +12,27 @@ import '../../../core/layout/responsive_sheet.dart';
 import '../providers/groups_provider.dart';
 import '../providers/group_member_provider.dart';
 import '../widgets/create_invite_sheet.dart';
+import '../widgets/group_section_header.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/theme/accent_style.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/error_report_helper.dart';
 import '../../../core/utils/expense_totals.dart';
+import '../../../core/utils/form_validators.dart';
 import '../../../core/widgets/amount_with_secondary_display.dart';
 import '../../../core/widgets/async_value_builder.dart';
 import '../../../core/widgets/error_content.dart';
+import '../../../core/widgets/participant_avatar.dart';
 import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/toast.dart';
 import '../../expenses/widgets/expense_list_tile.dart';
 import '../../expenses/category_icons.dart';
 import '../../balance/widgets/balance_list.dart';
 import '../../settings/providers/settings_framework_providers.dart';
-import '../../../core/auth/predefined_avatars.dart';
+import '../../settings/settings_definitions.dart';
 import '../../../domain/domain.dart';
 import '../utils/group_icon_utils.dart';
 
@@ -389,7 +393,26 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
                 ),
                 const SizedBox(width: 10),
                 FilledButton(
-                  onPressed: () => context.push(RoutePaths.inviteAccept(token)),
+                  onPressed: () {
+                    final settings = ref.read(hisabSettingsProvidersProvider);
+                    if (settings != null) {
+                      ref
+                          .read(
+                            settings
+                                .provider(pendingInviteTokenSettingDef)
+                                .notifier,
+                          )
+                          .set(token);
+                      ref
+                          .read(
+                            settings
+                                .provider(pendingInviteAutoJoinSettingDef)
+                                .notifier,
+                          )
+                          .set(true);
+                    }
+                    context.push(RoutePaths.inviteAccept(token));
+                  },
                   child: Text('invite_preview_join_cta'.tr()),
                 ),
               ],
@@ -416,6 +439,27 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
             leading: IconButton(
               icon: const Icon(Icons.arrow_back),
               onPressed: () {
+                // Preview Join may have set pending invite; clear on dismiss so
+                // home is not redirected straight back to /invite.
+                if (widget.readOnlyPreview) {
+                  final settings = ref.read(hisabSettingsProvidersProvider);
+                  if (settings != null) {
+                    ref
+                        .read(
+                          settings
+                              .provider(pendingInviteTokenSettingDef)
+                              .notifier,
+                        )
+                        .set('');
+                    ref
+                        .read(
+                          settings
+                              .provider(pendingInviteAutoJoinSettingDef)
+                              .notifier,
+                        )
+                        .set(false);
+                  }
+                }
                 if (context.canPop()) {
                   context.pop();
                 } else {
@@ -455,10 +499,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
               children: [
                 if (widget.group.isArchived) _buildArchivedBanner(context),
                 if (widget.group.isPersonal) ...[
-                  _PersonalBudgetHeader(
-                    group: widget.group,
-                    onRefresh: _onRefresh,
-                  ),
+                  _PersonalBudgetHeader(group: widget.group),
                   Expanded(
                     child: _ExpensesTab(
                       groupId: widget.group.id,
@@ -649,10 +690,9 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
 
 /// Budget summary for personal groups: My budget + total spent; theme-aware color when near/over budget.
 class _PersonalBudgetHeader extends ConsumerWidget {
-  const _PersonalBudgetHeader({required this.group, required this.onRefresh});
+  const _PersonalBudgetHeader({required this.group});
 
   final Group group;
-  final Future<void> Function() onRefresh;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -678,66 +718,107 @@ class _PersonalBudgetHeader extends ConsumerWidget {
             ? colorScheme.error
             : (nearBudget ? colorScheme.tertiary : null);
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
-              side: BorderSide(
-                color:
-                    attentionColor ??
-                    colorScheme.outline.withValues(alpha: 0.2),
-              ),
+        final progress = hasBudget
+            ? (totalSpentCents / budgetCents).clamp(0.0, 1.2)
+            : 0.0;
+        final barColor = attentionColor ?? colorScheme.primary;
+
+        final subtle = context.subtleAccents;
+        final BoxDecoration panelDecoration;
+        if (subtle) {
+          panelDecoration = AccentSurfaces.panel(
+            colorScheme,
+            subtle: true,
+            radius: ThemeConfig.radiusL,
+          );
+        } else if (attentionColor != null) {
+          panelDecoration = BoxDecoration(
+            borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                attentionColor.withValues(alpha: 0.9),
+                colorScheme.surfaceContainerLow,
+              ],
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'my_budget'.tr(),
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
+            border: Border.all(
+              color: attentionColor.withValues(alpha: 0.45),
+            ),
+          );
+        } else {
+          panelDecoration = AccentSurfaces.panel(
+            colorScheme,
+            subtle: false,
+            radius: ThemeConfig.radiusL,
+          );
+        }
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+            decoration: panelDecoration,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'my_budget'.tr(),
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  hasBudget
+                      ? CurrencyFormatter.formatCentsAsWholeUnits(
+                          budgetCents,
+                          currencyCode,
+                        )
+                      : '—',
+                  key: const Key('personal_budget_amount'),
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.3,
+                    color: attentionColor ?? colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Text(
+                      '${'my_expenses'.tr()}: ',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    AmountWithSecondaryDisplay(
+                      amountCents: totalSpentCents,
+                      groupCurrencyCode: currencyCode,
+                      primaryStyle: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: attentionColor ?? colorScheme.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+                if (hasBudget) ...[
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                      value: progress > 1 ? 1 : progress,
+                      minHeight: 7,
+                      backgroundColor: colorScheme.surface.withValues(
+                        alpha: 0.7,
+                      ),
+                      color: barColor,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          hasBudget
-                              ? CurrencyFormatter.formatCentsAsWholeUnits(
-                                  budgetCents,
-                                  currencyCode,
-                                )
-                              : '—',
-                          key: const Key('personal_budget_amount'),
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: attentionColor ?? colorScheme.onSurface,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        '${'my_expenses'.tr()}: ',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      AmountWithSecondaryDisplay(
-                        amountCents: totalSpentCents,
-                        groupCurrencyCode: currencyCode,
-                        primaryStyle: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: attentionColor ?? colorScheme.onSurface,
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
-              ),
+              ],
             ),
           ),
         );
@@ -808,10 +889,52 @@ class _ExpensesTab extends ConsumerWidget {
         return expensesAsync.when(
           data: (expenses) {
             if (expenses.isEmpty) {
-              return Center(
-                child: Text(
-                  'add_expense'.tr(),
-                  style: Theme.of(context).textTheme.bodyLarge,
+              final theme = Theme.of(context);
+              return RefreshIndicator(
+                onRefresh: onRefresh,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.only(
+                    bottom:
+                        _kTabFabBottomClearance +
+                        _kTabListBottomSpacing +
+                        MediaQuery.of(context).padding.bottom,
+                  ),
+                  children: [
+                    SizedBox(height: MediaQuery.of(context).size.height * 0.18),
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 72,
+                              height: 72,
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primaryContainer
+                                    .withValues(alpha: 0.55),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.receipt_long_rounded,
+                                size: 34,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'add_expense'.tr(),
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               );
             }
@@ -916,12 +1039,9 @@ class _ExpensesTab extends ConsumerWidget {
                       );
                     case _ExpenseListDateHeaderItem():
                       return Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
-                        child: Text(
-                          dateFormat.format(item.date),
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
+                        padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
+                        child: GroupSectionHeader(
+                          label: dateFormat.format(item.date),
                         ),
                       );
                     case _ExpenseListExpenseItem():
@@ -1051,10 +1171,51 @@ class _PeopleTab extends ConsumerWidget {
                 .toList();
 
             if (activeParticipants.isEmpty && pastParticipants.isEmpty) {
-              return Center(
-                child: Text(
-                  'add_participants_first'.tr(),
-                  style: theme.textTheme.bodyLarge,
+              return RefreshIndicator(
+                onRefresh: onRefresh,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.only(
+                    bottom:
+                        _kTabFabBottomClearance +
+                        _kTabListBottomSpacing +
+                        MediaQuery.of(context).padding.bottom,
+                  ),
+                  children: [
+                    SizedBox(height: MediaQuery.of(context).size.height * 0.18),
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 72,
+                              height: 72,
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primaryContainer
+                                    .withValues(alpha: 0.55),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.group_add_rounded,
+                                size: 34,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'add_participants_first'.tr(),
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               );
             }
@@ -1065,7 +1226,7 @@ class _PeopleTab extends ConsumerWidget {
                 key: const PageStorageKey<String>('group_detail_members'),
                 padding: EdgeInsets.fromLTRB(
                   16,
-                  8,
+                  12,
                   16,
                   8 +
                       _kTabFabBottomClearance +
@@ -1078,121 +1239,51 @@ class _PeopleTab extends ConsumerWidget {
                     final hasUserId = p.userId != null;
                     final isActive = linkedMember != null;
                     final isLeft = hasUserId && !isActive;
+                    final roleLabel = isActive
+                        ? _roleLabel(linkedMember.role)
+                        : isLeft
+                        ? 'left'.tr()
+                        : null;
 
-                    final emoji = avatarEmoji(p.avatarId);
-
-                    return ListTile(
-                      key: ValueKey(p.id),
-                      leading: CircleAvatar(
-                        backgroundColor: isLeft
-                            ? theme.colorScheme.surfaceContainerHighest
-                            : null,
-                        child: emoji != null
-                            ? Text(
-                                emoji,
-                                style: TextStyle(
-                                  fontSize: 22,
-                                  color: isLeft
-                                      ? theme.colorScheme.onSurfaceVariant
-                                      : null,
-                                ),
-                              )
-                            : Text(
-                                p.name.isNotEmpty
-                                    ? p.name[0].toUpperCase()
-                                    : '?',
-                                style: isLeft
-                                    ? TextStyle(
-                                        color:
-                                            theme.colorScheme.onSurfaceVariant,
-                                      )
-                                    : null,
-                              ),
-                      ),
-                      title: Text(
-                        p.name,
-                        style: isLeft
-                            ? TextStyle(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              )
-                            : null,
-                      ),
-                      subtitle: isActive
-                          ? Text(_roleLabel(linkedMember.role))
-                          : isLeft
-                          ? Text(
-                              'left'.tr(),
-                              style: TextStyle(
-                                color: theme.colorScheme.onSurfaceVariant,
-                                fontStyle: FontStyle.italic,
-                              ),
-                            )
-                          : null,
-                      trailing: _buildTrailing(
-                        context,
-                        ref,
-                        groupId,
-                        p,
-                        linkedMember,
-                        isActive,
-                        isLeft,
-                        isOwnerOrAdmin,
-                        myRole,
-                        localOnly,
-                        members,
-                        participants,
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _PeoplePersonCard(
+                        key: ValueKey(p.id),
+                        name: p.name,
+                        avatarId: p.avatarId,
+                        subtitle: roleLabel,
+                        muted: isLeft,
+                        trailing: _buildTrailing(
+                          context,
+                          ref,
+                          groupId,
+                          p,
+                          linkedMember,
+                          isActive,
+                          isLeft,
+                          isOwnerOrAdmin,
+                          myRole,
+                          localOnly,
+                          members,
+                          participants,
+                        ),
                       ),
                     );
                   }),
                   if (pastParticipants.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 16, bottom: 8),
-                      child: Text(
-                        'past_members'.tr(),
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
+                    const SizedBox(height: 12),
+                    GroupSectionHeader(label: 'past_members'.tr()),
+                    const SizedBox(height: 10),
                     ...pastParticipants.map((p) {
-                      final emoji = avatarEmoji(p.avatarId);
-                      return ListTile(
-                        key: ValueKey('past_${p.id}'),
-                        leading: CircleAvatar(
-                          backgroundColor:
-                              theme.colorScheme.surfaceContainerHighest,
-                          child: emoji != null
-                              ? Text(
-                                  emoji,
-                                  style: TextStyle(
-                                    fontSize: 22,
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                )
-                              : Text(
-                                  p.name.isNotEmpty
-                                      ? p.name[0].toUpperCase()
-                                      : '?',
-                                  style: TextStyle(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _PeoplePersonCard(
+                          key: ValueKey('past_${p.id}'),
+                          name: p.name,
+                          avatarId: p.avatarId,
+                          subtitle: 'left'.tr(),
+                          muted: true,
                         ),
-                        title: Text(
-                          p.name,
-                          style: TextStyle(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        subtitle: Text(
-                          'left'.tr(),
-                          style: TextStyle(
-                            color: theme.colorScheme.onSurfaceVariant,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                        trailing: null,
                       );
                     }),
                   ],
@@ -1500,9 +1591,12 @@ class _PeopleTab extends ConsumerWidget {
       title: 'participant_name'.tr(),
       hint: 'participant_name'.tr(),
       initialValue: participant.name,
+      maxLength: FormValidators.participantNameMax,
       centerInFullViewport: true,
     );
-    if (newName != null && newName.isNotEmpty && context.mounted) {
+    if (newName != null &&
+        FormValidators.participantName(newName) == null &&
+        context.mounted) {
       await ref
           .read(participantRepositoryProvider)
           .update(participant.copyWith(name: newName));
@@ -1652,6 +1746,11 @@ class _PeopleTab extends ConsumerWidget {
                     }
                     final label = linked?.name ?? 'group_member'.tr();
                     return ListTile(
+                      leading: ParticipantAvatar(
+                        name: label,
+                        avatarId: linked?.avatarId,
+                        radius: 18,
+                      ),
                       title: Text(label),
                       subtitle: Text(_roleLabel(m.role)),
                       onTap: () => Navigator.pop(ctx, m),
@@ -1842,6 +1941,98 @@ sealed class _ExpenseListItem {
   const _ExpenseListItem();
 }
 
+/// Person row for the People tab — matches expense-detail person cards.
+class _PeoplePersonCard extends StatelessWidget {
+  final String name;
+  final String? avatarId;
+  final String? subtitle;
+  final bool muted;
+  final Widget? trailing;
+
+  const _PeoplePersonCard({
+    super.key,
+    required this.name,
+    this.avatarId,
+    this.subtitle,
+    this.muted = false,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final mutedColor = colorScheme.onSurfaceVariant;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+      decoration: BoxDecoration(
+        color: muted
+            ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.55)
+            : colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.45),
+        ),
+      ),
+      child: Row(
+        children: [
+          ParticipantAvatar(
+            name: name,
+            avatarId: avatarId,
+            backgroundColor: muted
+                ? colorScheme.surfaceContainerHighest
+                : colorScheme.secondaryContainer.withValues(alpha: 0.7),
+            foregroundColor: muted
+                ? mutedColor
+                : colorScheme.onSecondaryContainer,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: muted ? mutedColor : null,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (subtitle != null && subtitle!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest.withValues(
+                        alpha: 0.8,
+                      ),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      subtitle!,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: mutedColor,
+                        fontWeight: FontWeight.w600,
+                        fontStyle: muted ? FontStyle.italic : FontStyle.normal,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          ?trailing,
+        ],
+      ),
+    );
+  }
+}
+
 class _ExpenseListSummaryItem extends _ExpenseListItem {
   final int myExpensesCents;
   final int totalCents;
@@ -1879,29 +2070,34 @@ class _ExpenseSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+    final colorScheme = theme.colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      decoration: AccentSurfaces.panel(
+        colorScheme,
+        subtle: context.subtleAccents,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
             ),
-            const SizedBox(height: 4),
-            valueWidget ??
-                Text(
-                  value,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+          ),
+          const SizedBox(height: 6),
+          valueWidget ??
+              Text(
+                value,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
-          ],
-        ),
+              ),
+        ],
       ),
     );
   }
@@ -1971,9 +2167,12 @@ Future<void> _showAddParticipant(
     context,
     title: 'add_participant'.tr(),
     hint: 'participant_name'.tr(),
+    maxLength: FormValidators.participantNameMax,
     centerInFullViewport: true,
   );
-  if (name != null && name.isNotEmpty && context.mounted) {
+  if (name != null &&
+      FormValidators.participantName(name) == null &&
+      context.mounted) {
     // Defer create to the next frame so the sheet overlay is fully disposed
     // before any provider/stream updates. Otherwise Flutter can hit
     // _dependents.isEmpty when the Directionality is deactivated while the

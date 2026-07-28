@@ -27,16 +27,20 @@ import '../../../core/layout/constrained_content.dart';
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/theme/accent_style.dart';
 import '../../../core/utils/currency_helpers.dart';
 import '../../../core/utils/error_report_helper.dart';
+import '../../../core/utils/form_validators.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/expandable_section.dart';
+import '../../../core/widgets/participant_avatar.dart';
 import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../features/settings/providers/settings_framework_providers.dart';
 import '../../balance/providers/balance_provider.dart';
 import '../../groups/providers/group_member_provider.dart';
 import '../../groups/providers/groups_provider.dart';
+import '../category_icons.dart';
 import '../constants/expense_form_constants.dart';
 import '../widgets/expense_amount_section.dart';
 import '../widgets/expense_bill_breakdown_section.dart';
@@ -257,6 +261,15 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   }
 
   bool get _isDifferentCurrency => _currencyCode != _groupCurrencyCode;
+
+  Widget _formPanel(BuildContext context, {required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: AccentSurfaces.flatPanel(Theme.of(context).colorScheme),
+      child: child,
+    );
+  }
 
   void _defocusFormInputs() {
     FocusManager.instance.primaryFocus?.unfocus();
@@ -489,6 +502,13 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     var didPop = false;
     try {
       final title = isTransfer ? 'transfer'.tr() : _titleController.text.trim();
+      if (!isTransfer && FormValidators.expenseTitle(title) != null) {
+        if (mounted) {
+          setState(() => _saving = false);
+          _formKey.currentState?.validate();
+        }
+        return;
+      }
       final desc = _descriptionController.text.trim();
 
       // Compute base amount in group currency when currencies differ
@@ -1320,14 +1340,18 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                               const SizedBox(height: 24),
                             ],
                             if (!isTransfer) ...[
-                              ExpenseTitleSection(
-                                controller: _titleController,
-                                selectedTag: _selectedTag,
-                                customTags: customTags,
-                                onTagPicker: () => _showTagPicker(customTags),
-                                onPickImage: _expenseImages.isEmpty
-                                    ? _addPhoto
-                                    : null,
+                              _formPanel(
+                                context,
+                                child: ExpenseTitleSection(
+                                  controller: _titleController,
+                                  selectedTag: _selectedTag,
+                                  customTags: customTags,
+                                  onTagPicker: () =>
+                                      _showTagPicker(customTags),
+                                  onPickImage: _expenseImages.isEmpty
+                                      ? _addPhoto
+                                      : null,
+                                ),
                               ),
                               if (_expenseImages.isNotEmpty)
                                 _buildPhotosSection(context),
@@ -1354,38 +1378,50 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                               ),
                               const SizedBox(height: 20),
                             ],
-                            ExpenseAmountSection(
-                              controller: _amountController,
-                              currencyCode: _currencyCode,
-                              onCurrencyTap: _openExpenseCurrencyPicker,
-                              groupCurrencyCode: _groupCurrencyCode,
-                              exchangeRateController:
-                                  _exchangeRateController,
-                              baseAmountController: _baseAmountController,
-                              fetchingRate: _fetchingRate,
-                              onExchangeRateChanged: _onExchangeRateChanged,
-                              onBaseAmountChanged: _onBaseAmountChanged,
+                            _formPanel(
+                              context,
+                              child: ExpenseAmountSection(
+                                controller: _amountController,
+                                currencyCode: _currencyCode,
+                                onCurrencyTap: _openExpenseCurrencyPicker,
+                                groupCurrencyCode: _groupCurrencyCode,
+                                exchangeRateController:
+                                    _exchangeRateController,
+                                baseAmountController: _baseAmountController,
+                                fetchingRate: _fetchingRate,
+                                onExchangeRateChanged: _onExchangeRateChanged,
+                                onBaseAmountChanged: _onBaseAmountChanged,
+                              ),
                             ),
                             const SizedBox(height: 20),
                             if (isTransfer) ...[
-                              _buildTransferFromToRow(
+                              _formPanel(
                                 context,
-                                participants,
-                                effectivePayerId,
-                                toId,
-                                payerReadOnly: restrictPayerToSelf,
+                                child: _buildTransferFromToRow(
+                                  context,
+                                  participants,
+                                  effectivePayerId,
+                                  toId,
+                                  payerReadOnly: restrictPayerToSelf,
+                                ),
                               ),
                               const SizedBox(height: 20),
-                              _buildWhenSection(context),
+                              _formPanel(
+                                context,
+                                child: _buildWhenSection(context),
+                              ),
                             ] else
-                              group.isPersonal
-                                  ? _buildWhenSection(context)
-                                  : _buildPaidByAndWhenRow(
-                                      context,
-                                      participants,
-                                      effectivePayerId,
-                                      payerReadOnly: restrictPayerToSelf,
-                                    ),
+                              _formPanel(
+                                context,
+                                child: group.isPersonal
+                                    ? _buildWhenSection(context)
+                                    : _buildPaidByAndWhenRow(
+                                        context,
+                                        participants,
+                                        effectivePayerId,
+                                        payerReadOnly: restrictPayerToSelf,
+                                      ),
+                              ),
                             if (!isTransfer) ...[
                               const SizedBox(height: 20),
                               ExpandableSection(
@@ -1768,6 +1804,11 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                     children: [
                       ...presetExpenseTags.map((preset) {
                         final selected = _selectedTag == preset.id;
+                        final chrome = chromeForExpenseTag(
+                          preset.id,
+                          brightness: theme.brightness,
+                          surface: theme.colorScheme.surface,
+                        );
                         return InkWell(
                           onTap: () {
                             setState(() => _selectedTag = preset.id);
@@ -1781,9 +1822,14 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                             ),
                             decoration: BoxDecoration(
                               color: selected
-                                  ? theme.colorScheme.primaryContainer
+                                  ? chrome.container
                                   : theme.colorScheme.surfaceContainerHighest,
                               borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: chrome.accent.withValues(
+                                  alpha: selected ? 0.0 : 0.35,
+                                ),
+                              ),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -1792,16 +1838,17 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                   preset.icon,
                                   size: 20,
                                   color: selected
-                                      ? theme.colorScheme.onPrimaryContainer
-                                      : theme.colorScheme.onSurfaceVariant,
+                                      ? chrome.onContainer
+                                      : chrome.onSurface,
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
                                   'category_${preset.id}'.tr(),
                                   style: theme.textTheme.labelLarge?.copyWith(
                                     color: selected
-                                        ? theme.colorScheme.onPrimaryContainer
+                                        ? chrome.onContainer
                                         : theme.colorScheme.onSurface,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ],
@@ -1814,6 +1861,11 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                         final iconData =
                             selectableExpenseIcons[tag.iconName] ??
                             Icons.label_outlined;
+                        final chrome = chromeForExpenseTag(
+                          tag.id,
+                          brightness: theme.brightness,
+                          surface: theme.colorScheme.surface,
+                        );
                         return InkWell(
                           onTap: () {
                             setState(() => _selectedTag = tag.id);
@@ -1827,9 +1879,14 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                             ),
                             decoration: BoxDecoration(
                               color: selected
-                                  ? theme.colorScheme.primaryContainer
+                                  ? chrome.container
                                   : theme.colorScheme.surfaceContainerHighest,
                               borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: chrome.accent.withValues(
+                                  alpha: selected ? 0.0 : 0.35,
+                                ),
+                              ),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -1838,16 +1895,17 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                   iconData,
                                   size: 20,
                                   color: selected
-                                      ? theme.colorScheme.onPrimaryContainer
-                                      : theme.colorScheme.onSurfaceVariant,
+                                      ? chrome.onContainer
+                                      : chrome.onSurface,
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
                                   tag.label,
                                   style: theme.textTheme.labelLarge?.copyWith(
                                     color: selected
-                                        ? theme.colorScheme.onPrimaryContainer
+                                        ? chrome.onContainer
                                         : theme.colorScheme.onSurface,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ],
@@ -2279,16 +2337,28 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
               payerReadOnly
                   ? Container(
                       height: 52,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
                         color: theme.colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       alignment: AlignmentDirectional.centerStart,
-                      child: Text(
-                        payerName,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyLarge,
+                      child: Row(
+                        children: [
+                          ParticipantAvatar(
+                            name: payerName,
+                            avatarId: payer.avatarId,
+                            radius: 16,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              payerName,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyLarge,
+                            ),
+                          ),
+                        ],
                       ),
                     )
                   : InkWell(
@@ -2296,7 +2366,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
                         height: 52,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
                         decoration: BoxDecoration(
                           color: theme.colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(12),
@@ -2304,6 +2374,12 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                         alignment: AlignmentDirectional.centerStart,
                         child: Row(
                           children: [
+                            ParticipantAvatar(
+                              name: payerName,
+                              avatarId: payer.avatarId,
+                              radius: 16,
+                            ),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: Text(
                                 payerName,
@@ -2363,16 +2439,28 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
               payerReadOnly
                   ? Container(
                       height: 52,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
                         color: theme.colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       alignment: AlignmentDirectional.centerStart,
-                      child: Text(
-                        payer.name,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyLarge,
+                      child: Row(
+                        children: [
+                          ParticipantAvatar(
+                            name: payer.name,
+                            avatarId: payer.avatarId,
+                            radius: 16,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              payer.name,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyLarge,
+                            ),
+                          ),
+                        ],
                       ),
                     )
                   : InkWell(
@@ -2380,7 +2468,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
                         height: 52,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
                         decoration: BoxDecoration(
                           color: theme.colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(12),
@@ -2388,6 +2476,12 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                         alignment: AlignmentDirectional.centerStart,
                         child: Row(
                           children: [
+                            ParticipantAvatar(
+                              name: payer.name,
+                              avatarId: payer.avatarId,
+                              radius: 16,
+                            ),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: Text(
                                 payer.name,
@@ -2450,6 +2544,11 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                   ),
                                 ...others.map(
                                   (p) => ListTile(
+                                    leading: ParticipantAvatar(
+                                      name: p.name,
+                                      avatarId: p.avatarId,
+                                      radius: 18,
+                                    ),
                                     title: Text(p.name),
                                     onTap: () => Navigator.of(ctx).pop(p.id),
                                   ),
@@ -2466,7 +2565,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
                   height: 52,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(12),
@@ -2474,6 +2573,12 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                   alignment: AlignmentDirectional.centerStart,
                   child: Row(
                     children: [
+                      ParticipantAvatar(
+                        name: toParticipant.name,
+                        avatarId: toParticipant.avatarId,
+                        radius: 16,
+                      ),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           toParticipant.name,
@@ -2596,6 +2701,11 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                     ),
                   ...participants.map(
                     (p) => ListTile(
+                      leading: ParticipantAvatar(
+                        name: p.name,
+                        avatarId: p.avatarId,
+                        radius: 18,
+                      ),
                       title: Text(p.name),
                       onTap: () => Navigator.of(ctx).pop(p.id),
                     ),
@@ -2725,7 +2835,9 @@ class _CreateTagSheetContentState extends State<_CreateTagSheetContent> {
             decoration: InputDecoration(
               labelText: 'tag_name'.tr(),
               border: const OutlineInputBorder(),
+              counterText: '',
             ),
+            maxLength: FormValidators.expenseTagLabelMax,
             autofocus: true,
             textCapitalization: TextCapitalization.sentences,
           ),
@@ -2770,7 +2882,7 @@ class _CreateTagSheetContentState extends State<_CreateTagSheetContent> {
         FilledButton(
           onPressed: () async {
             final label = _nameController.text.trim();
-            if (label.isEmpty) return;
+            if (FormValidators.expenseTagLabel(label) != null) return;
             final id = await widget.ref
                 .read(tagRepositoryProvider)
                 .create(widget.groupId, label, _selectedIconName);

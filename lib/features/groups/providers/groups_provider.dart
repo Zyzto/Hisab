@@ -59,9 +59,11 @@ Stream<Set<String>> locallyArchivedGroupIds(Ref ref) {
   return ref.watch(groupRepositoryProvider).watchLocallyArchivedGroupIds();
 }
 
+/// Kept name `futureGroup` for call-site stability; backed by a live stream
+/// so group detail/settings/balance refresh after remote sync.
 @riverpod
-Future<Group?> futureGroup(Ref ref, String groupId) async {
-  return ref.read(groupRepositoryProvider).getById(groupId);
+Stream<Group?> futureGroup(Ref ref, String groupId) {
+  return ref.watch(groupRepositoryProvider).watchById(groupId);
 }
 
 @riverpod
@@ -70,8 +72,8 @@ Stream<List<Expense>> expensesByGroup(Ref ref, String groupId) {
 }
 
 @riverpod
-Future<Expense?> futureExpense(Ref ref, String expenseId) async {
-  return ref.read(expenseRepositoryProvider).getById(expenseId);
+Stream<Expense?> futureExpense(Ref ref, String expenseId) {
+  return ref.watch(expenseRepositoryProvider).watchById(expenseId);
 }
 
 @riverpod

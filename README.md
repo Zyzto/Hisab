@@ -1,82 +1,92 @@
 # Hisab
 
-<!-- markdownlint-disable MD060 -->
+<!-- markdownlint-disable MD033 MD060 -->
 
-![Hisab logo](assets/Hisab.png)
+<p align="center">
+  <img src="assets/Hisab.png" alt="Hisab" width="120" />
+</p>
 
-Group expense splitting and settle-up app. Built with Flutter, Riverpod, GoRouter, and Supabase.
+<p align="center">
+  <strong>Split expenses. Settle cleanly. Work offline.</strong>
+</p>
 
-## Features
+<p align="center">
+  Shared trips, household costs, and personal budgets — with balances that stay clear<br/>
+  when everyone chips in. Flutter · offline-first · optional Supabase sync.
+</p>
 
-- **Groups** — Create groups (trips/events) with participants.
-- **Expenses** — Log multi-currency expenses with payer and split type (Equal, Parts, Amounts).
-- **Balance** — View who is owed / who owes; settle-up suggests minimal transfers.
-- **Record Settlement** — Tap a settlement suggestion to record the payment and zero out the debt.
-- **Settings** — Theme, language, and **Local Only** toggle.
-- **Transaction Scanner (Android)** — Opt-in: parse bank/payment notifications into draft expenses for personal budgets (on-device; user review required). See [docs/TRANSACTION_SCANNER.md](docs/TRANSACTION_SCANNER.md).
-- **Offline-first** — Works entirely offline via local SQLite. Syncs directly with Supabase when online.
+<p align="center">
+  <a href="https://hisab.shenepoy.com"><strong>Open the web app</strong></a>
+  ·
+  <a href="https://github.com/Zyzto/Hisab/releases/latest">Latest release</a>
+  ·
+  <a href="docs/README.md">Documentation</a>
+</p>
 
-## Two Modes
+---
 
-| Mode | What works | Data location |
-|------|-----------|---------------|
-| **Local-Only** (default) | **Everything** — full CRUD, settlement, no restrictions | Local SQLite only |
-| **Online** (with Supabase) | **Everything** + invites, members, cross-device sync | Supabase + local SQLite cache |
+## What you get
 
-When in Online mode and temporarily offline, you can still add expenses (queued for later sync). Other features like invites and member management require connectivity.
+| | |
+|---|---|
+| **Groups & people** | Trips, events, or household lists — with participants linked to real accounts when online. |
+| **Expenses** | Multi-currency amounts, categories, receipts, equal / parts / amounts splits, transfers. |
+| **Balance & settle-up** | Who owes whom, minimal settlement suggestions, record payments in one tap. |
+| **Personal lists** | Solo budgets and spending (no split UI); optional Android notification scanner drafts. |
+| **Offline-first** | Full local SQLite. Sync, invites, and members when you connect Supabase. |
+| **Locales** | English and Arabic (RTL), themes, and subtle accent controls. |
+
+**Modes**
+
+| Mode | Data | Extra |
+|------|------|--------|
+| **Local-only** (default) | Device SQLite | Everything except sign-in & cross-device sync |
+| **Online** | Supabase + local cache | Invites, members, push, multi-device |
+
+Temporarily offline in online mode: expense writes queue and sync later. Invites and member admin need a connection.
+
+---
 
 ## Screenshots
 
-![Screenshot 2](screenshots/2.png)
-![Demo GIF](screenshots/6.gif)
-![Screenshot 3](screenshots/3.png)
-![Screenshot 4](screenshots/4.png)
-![Screenshot 5](screenshots/5.png)
-![Screenshot 7](screenshots/7.png)
-![Screenshot 8](screenshots/8.png)
+<p align="center">
+  <img src="screenshots/2.png" alt="Groups" width="180" />
+  <img src="screenshots/3.png" alt="Expenses" width="180" />
+  <img src="screenshots/4.png" alt="Balance" width="180" />
+  <img src="screenshots/5.png" alt="People" width="180" />
+</p>
+
+<p align="center">
+  <img src="screenshots/6.gif" alt="Hisab demo" width="360" />
+</p>
+
+<p align="center">
+  <img src="screenshots/7.png" alt="Settings" width="180" />
+  <img src="screenshots/8.png" alt="Detail" width="180" />
+</p>
+
+---
 
 ## Install
 
-### 🌐 Web / PWA
+### Web / PWA
 
-The app is deployed as a **Progressive Web App (PWA)** and is hosted on Firebase Hosting. New versions are deployed via the [Release workflow](.github/workflows/release.yml) (on version tags `v*` or manual run). It works locally and offline.
-
-### Visit the Web App
-
-[👉 Open Hisab Web App](https://hisab.shenepoy.com)
-
-- **Install:** Add to Home Screen via Chrome, Edge, or Safari.
-- **Offline:** Works perfectly without an internet connection.
+Live at **[hisab.shenepoy.com](https://hisab.shenepoy.com)** (Firebase Hosting).  
+Add to Home Screen in Chrome, Edge, or Safari — works offline after install.
 
 ### Android
 
-#### Option 1: Obtainium (Recommended) - Automatic Updates
+| Option | |
+|--------|--|
+| **Obtainium** (recommended) | [Add Hisab](https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/Zyzto/Hisab) — tracks [GitHub Releases](https://github.com/Zyzto/Hisab/releases) |
+| **APK** | Download `app-release.apk` from [latest release](https://github.com/Zyzto/Hisab/releases/latest) |
+| **Play Store** | [Listing](https://play.google.com/store/apps/details?id=com.shenepoy.hisab) (WIP / when published) |
 
-[![Get it on Obtainium](https://raw.githubusercontent.com/ImranR98/Obtainium/refs/heads/main/assets/graphics/badge_obtainium.png)](https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/Zyzto/Hisab)
+---
 
-- **Manual Setup**: Install [Obtainium](https://github.com/ImranR98/Obtainium) from [F-Droid](https://f-droid.org/packages/com.imranr98.obtainium/) or [GitHub Releases](https://github.com/ImranR98/Obtainium/releases), then:
-  - Open Obtainium and tap the "+" button
-  - Select "GitHub Releases" as the source
-  - Enter repository: `Zyzto/Hisab`
-- Obtainium will automatically track new releases and notify you of updates
+## Develop
 
-#### Option 2: Google Play Store (WIP)
-
-- Available on [Google Play Store](https://play.google.com/store/apps/details?id=com.shenepoy.hisab) (when published)
-- Automatic updates through Play Store
-
-#### Option 3: Direct Install (APK)
-
-- Download the APK (e.g. `app-release.apk`) from [GitHub Releases](https://github.com/Zyzto/Hisab/releases/latest)
-- Enable "Install from unknown sources" in your Android settings
-- Tap the downloaded APK file to install
-
-## Requirements
-
-- Flutter SDK ^3.10.0
-- Dart ^3.10.0
-
-## Run
+**Requirements:** Flutter / Dart `^3.10`
 
 ```bash
 flutter pub get
@@ -84,196 +94,93 @@ dart run build_runner build --delete-conflicting-outputs
 flutter run
 ```
 
-Without `--dart-define` parameters the app runs in **local-only mode** (no sign-in, no sync).
+No `--dart-define` → **local-only** mode.
 
-### Online mode
+**Online (hosted Supabase):**
 
 ```bash
 flutter run \
-  --dart-define=SUPABASE_URL=https://xxxxx.supabase.co \
-  --dart-define=SUPABASE_ANON_KEY=eyJhbGci...
+  --dart-define=SUPABASE_URL=https://YOUR_PROJECT.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=YOUR_ANON_KEY
 ```
 
-For web: ensure `web/sqlite3.wasm` is present (it is generated locally and typically not committed). Generate it with:
+Or use define files (gitignored): copy `dart_defines_online.example.json` / `dart_defines_local.example.json`, then launch with `--dart-define-from-file=...` (see `.vscode/launch.json`).
+
+**Web:** generate WASM once if needed:
 
 ```bash
 dart run powersync:setup_web
 ```
 
-## Architecture
+**Fuller local stack** (Supabase + Edge Functions on LAN):
 
-- **State** — Riverpod 3 with `riverpod_annotation` codegen.
-- **Navigation** — GoRouter with ShellRoute and bottom nav.
-- **Data** — Repository pattern: `IGroupRepository`, `IParticipantRepository`, `IExpenseRepository`.
-  - Local SQLite (via PowerSync package) is the single local database engine.
-  - When online, writes go to Supabase first, then update local cache.
-  - Reads always come from local SQLite for speed and reactivity.
-  - Complex operations (invite accept, ownership transfer, etc.) use Supabase RPC functions.
-- **Sync** — `DataSyncService` handles: full fetch from Supabase, push pending offline writes, periodic refresh.
-- **Auth** — Supabase Auth (email/password, magic link, Google OAuth, GitHub OAuth).
-- **Domain** — `lib/domain/`: Group, Participant, Expense (amounts in cents), SplitType, SettlementTransaction, and related types (e.g. GroupMember, GroupInvite, SettlementMethod, SettlementSnapshot).
+```bash
+./scripts/local_test_env.sh up
+```
 
-## Supabase (optional)
+Details: [docs/LOCAL_TEST_ENV.md](docs/LOCAL_TEST_ENV.md) · [docs/CONFIGURATION.md](docs/CONFIGURATION.md) · [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md)
 
-For **online mode**, set up Supabase. See **[SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md)** for the full step-by-step guide covering:
+### Quick fixes
 
-- Creating the Supabase project and applying database migrations
-- Configuring authentication providers (email, Google, GitHub)
-- Deploying Edge Functions (the repo includes `invite-redirect`; `telemetry` and `send-notification` are documented in setup docs and can be deployed from those definitions)
-- Configuring `--dart-define` parameters
+| Issue | Fix |
+|-------|-----|
+| Stays local-only | Pass both `SUPABASE_URL` and `SUPABASE_ANON_KEY` |
+| SQLite crash on web | `dart run powersync:setup_web` |
+| OAuth redirect fails | Align Supabase Auth redirect URLs with your app / `SITE_URL` |
+| Migration errors | Stable network; migrations are idempotent — see Supabase setup docs |
 
-If no `--dart-define` values are provided, the app runs in **local-only mode** — all features work except sign-in and cross-device sync.
+---
 
-### Common issues
+## Architecture (short)
 
-| Issue | Quick fix |
-|-------|-----------|
-| **App shows local-only mode** | Ensure both `--dart-define` params are set |
-| **SQLite web crash** | Run `dart run powersync:setup_web` to download WASM |
-| **OAuth redirect fails** | Check Supabase Auth redirect URLs match your app |
-| **Migration fails** | Ensure stable internet; migration is idempotent |
+- **UI / state** — Flutter, Riverpod 3 (codegen), GoRouter  
+- **Local DB** — SQLite via PowerSync package (always on)  
+- **Cloud** — Optional Supabase (Auth, Postgres, RPCs, Edge Functions)  
+- **Sync** — Online writes to Supabase then cache; reads from SQLite; pending queue when offline  
+- **Domain** — Groups, participants, expenses (cents), balances, settlements, invites  
 
-Full configuration reference: [CONFIGURATION.md](docs/CONFIGURATION.md).
+Deeper map: [docs/CODEBASE.md](docs/CODEBASE.md)
 
-### Keeping secrets out of git
+---
 
-All secrets are provided at build time via `--dart-define` — nothing is committed to the repository. The only gitignored file for local secrets is `lib/core/constants/app_secrets.dart` (copy from `app_secrets_example.dart`); it holds the report-issue URL. All Supabase and Firebase values are provided via `--dart-define` only.
+## Docs
 
-See [SECURITY.md](SECURITY.md) for the full commit policy (safe-to-commit vs never-commit) for this public repository.
+| Guide | |
+|-------|--|
+| [Documentation index](docs/README.md) | All topics |
+| [Configuration](docs/CONFIGURATION.md) | `--dart-define`, online vs local |
+| [Supabase setup](docs/SUPABASE_SETUP.md) | Project, migrations, auth, Edge Functions |
+| [Local test env](docs/LOCAL_TEST_ENV.md) | Podman / CLI stack for device + Edge tests |
+| [Security](SECURITY.md) | Public-repo secret policy (what never to commit) |
+| [GitHub Actions secrets](docs/GITHUB_ACTIONS_SECRETS.md) | CI/CD secret names and sources |
+| [Tests](test/README.md) | Unit, widget, integration, online |
+
+---
 
 ## Testing
 
 ```bash
-# Unit + widget tests
 flutter test
 
-# Local-only integration tests (web — requires ChromeDriver on port 4444)
-flutter drive --driver=test_driver/integration_test.dart \
-  --target=integration_test/app_test.dart -d web-server --release
+# Local stack + Edge smoke
+./scripts/local_test_env.sh up
+./scripts/local_test_env.sh test-edge
 
-# Online integration tests (requires Docker + Supabase CLI)
+# Online integration (Docker/Podman + Supabase CLI)
 ./scripts/run_online_tests.sh
 ```
 
-Online integration tests run against a **local Supabase instance** (Docker). They cover auth (sign-in/out), data sync (create group/expense → verify in Supabase DB), and multi-user invite flows. See [test/README.md](test/README.md) for full setup and troubleshooting.
+CI builds Android, deploys web, and runs tests on tags `v*` / manual dispatch (`.github/workflows/release.yml`). Secrets live in GitHub Actions — see [docs/GITHUB_ACTIONS_SECRETS.md](docs/GITHUB_ACTIONS_SECRETS.md), not in this repo.
 
-## CI/CD (GitHub Actions)
+---
 
-The project includes a release workflow (`.github/workflows/release.yml`) that builds Android APK/AAB, deploys to Google Play, and deploys the web app to Firebase Hosting. It triggers on version tags (`v*`) or manual dispatch. It also runs local-only and online integration tests (the latter using a Docker-based Supabase instance).
+## Contributing & secrets
 
-### Required GitHub Secrets
+This repository is **public**. Never commit real keys, service-account JSON, or filled define/env files. Use `*_example` templates and [SECURITY.md](SECURITY.md).
 
-Go to **repo Settings** → **Secrets and variables** → **Actions** and add each secret.
-
-#### Supabase
-
-| Secret | How to get it |
-|--------|--------------|
-| `SUPABASE_URL` | Supabase Dashboard → **Settings** → **API** → Project URL |
-| `SUPABASE_ANON_KEY` | Supabase Dashboard → **Settings** → **API** → `anon` `public` key |
-| `SITE_URL` | Your web app URL, e.g. `https://hisab.shenepoy.com` |
-
-#### Firebase Hosting
-
-| Secret | How to get it |
-|--------|--------------|
-| `FIREBASE_SERVICE_ACCOUNT` | Firebase Console → **Project Settings** → **Service accounts** → **Generate new private key** → paste the entire JSON |
-
-#### Firebase / FCM (web push, optional for Android)
-
-| Secret | How to get it |
-|--------|--------------|
-| `FCM_VAPID_KEY` | Firebase Console → **Project Settings** → **Cloud Messaging** → **Web Push certificates** → generate or copy the key pair's public key (required for web push token) |
-
-#### Android Signing
-
-Generate a keystore (one-time setup):
-
-```bash
-keytool -genkey -v \
-  -keystore ~/hisab-release.jks \
-  -keyalg RSA -keysize 2048 \
-  -validity 10000 \
-  -alias hisab-release
-```
-
-You will be prompted for a **store password** and a **key password** (press Enter at the key password prompt to reuse the store password).
-
-Then base64-encode it:
-
-```bash
-base64 -w 0 ~/hisab-release.jks
-```
-
-Copy the keystore into the project for local signed builds (already gitignored):
-
-```bash
-cp ~/hisab-release.jks android/app/release-keystore.jks
-```
-
-| Secret | Value |
-|--------|-------|
-| `KEYSTORE_BASE64` | Output of `base64 -w 0 ~/hisab-release.jks` (entire string, no newlines) |
-| `KEYSTORE_PASSWORD` | The store password you chose during `keytool` |
-| `KEY_ALIAS` | `hisab-release` |
-| `KEY_PASSWORD` | The key password (same as store password if you pressed Enter) |
-| `GOOGLE_SERVICES_JSON` | Base64-encoded `android/app/google-services.json` (Firebase Console → **Project settings** → your Android app → download `google-services.json`, then `base64 -w 0 android/app/google-services.json`) |
-
-#### Google Play (optional)
-
-| Secret | How to get it |
-|--------|--------------|
-| `PLAY_STORE_SERVICE_ACCOUNT_JSON` | Google Play Console → **Setup** → **API access** → create/link a service account → download JSON key |
-
-### Local key.properties (for local release builds)
-
-Create `android/key.properties` (gitignored):
-
-```properties
-storeFile=/absolute/path/to/android/app/release-keystore.jks
-storePassword=your_store_password
-keyAlias=hisab-release
-keyPassword=your_key_password
-```
-
-### Local CI (act + Podman)
-
-Run the release workflow's test jobs locally without pushing to GitHub. Uses [nektos/act](https://github.com/nektos/act) with Podman as the container runtime.
-
-#### One-time setup
-
-```bash
-# 1. Install act
-curl -sSL https://github.com/nektos/act/releases/latest/download/act_Linux_x86_64.tar.gz \
-  | tar xz -C ~/.local/bin act
-
-# 2. Enable Podman socket (Docker API compat layer)
-systemctl --user enable --now podman.socket
-```
-
-#### Run
-
-```bash
-# Run the "test" job (unit + widget + integration tests)
-bash scripts/act_test.sh
-
-# Run the online test job
-bash scripts/act_test.sh --job test-online
-
-# If actions hit permission errors, add --privileged
-bash scripts/act_test.sh --privileged
-```
-
-The first run pulls a ~12 GB Ubuntu runner image (`catthehacker/ubuntu:full-latest`); subsequent runs use the cached image. Podman support in act is unofficial but works via Docker API socket emulation.
-
-## Known issues
-
-- **Change password modal — focus loss on text fields:** The change-password sheet (Settings → Change password) can lose focus on the current/new/confirm password fields at random when clicking (e.g. on the visibility toggles or elsewhere). In-app controls were made non-focusable (`canRequestFocus: false`) to reduce this, but the issue may still occur on some platforms or with certain focus/route updates. Workaround: tap directly on the text field again to refocus.
+---
 
 ## License
 
-This project is licensed under **Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)**.
-
-- You may **share** and **adapt** the material with **attribution**, for **non-commercial** use only, and you must **share adaptations** under the same license.
-- Full legal text: [LICENSE](LICENSE) in this repo, or [legalcode](https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode) on the CC site.
-- Human-readable summary: [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).
+[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) — share and adapt with attribution, **non-commercial** only, same license for derivatives.  
+Full text: [LICENSE](LICENSE).

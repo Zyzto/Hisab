@@ -1,6 +1,7 @@
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:powersync/powersync.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 
 /// Result of a Local -> Online migration attempt.
 enum MigrationResult { success, noData, failed }
@@ -9,6 +10,8 @@ enum MigrationResult { success, noData, failed }
 class MigrationService {
   final PowerSyncDatabase _db;
   final SupabaseClient _client;
+
+  static const _uuid = Uuid();
 
   MigrationService(this._db, this._client);
 
@@ -54,8 +57,9 @@ class MigrationService {
 
       // Push groups with owner_id = current user
       for (final g in groups) {
+        final groupId = g['id'] as String;
         await _client.from('groups').upsert({
-          'id': g['id'],
+          'id': groupId,
           'name': g['name'],
           'currency_code': g['currency_code'],
           'owner_id': userId,
@@ -73,20 +77,34 @@ class MigrationService {
           'icon': g['icon'],
           'color': g['color'],
           'archived_at': g['archived_at'],
+          'is_personal': (g['is_personal'] as num?)?.toInt() == 1,
+          'budget_amount_cents': g['budget_amount_cents'],
           'created_at': g['created_at'],
           'updated_at': g['updated_at'],
         });
 
-        // Create owner membership for each group
-        // Use a deterministic ID based on group + user to avoid duplicates
-        final memberId = '${g['id']}_$userId'.hashCode
-            .toRadixString(16)
-            .padLeft(32, '0');
+        // Deterministic UUID so re-runs upsert the same membership row.
+        final memberId = _uuid.v5(
+          Namespace.url.value,
+          'hisab-member:$groupId:$userId',
+        );
+        String? ownerParticipantId;
+        for (final p in participants) {
+          if (p['group_id'] != groupId) continue;
+          if (p['user_id'] == userId ||
+              (p['user_id'] == null &&
+                  (p['sort_order'] as num?)?.toInt() == 0)) {
+            ownerParticipantId = p['id'] as String?;
+            break;
+          }
+        }
+
         await _client.from('group_members').upsert({
           'id': memberId,
-          'group_id': g['id'],
+          'group_id': groupId,
           'user_id': userId,
           'role': 'owner',
+          'participant_id': ownerParticipantId,
           'joined_at': g['created_at'],
         }, onConflict: 'group_id,user_id');
 
@@ -96,7 +114,7 @@ class MigrationService {
         // Also update local DB with owner_id
         await _db.execute('UPDATE groups SET owner_id = ? WHERE id = ?', [
           userId,
-          g['id'],
+          groupId,
         ]);
       }
 
@@ -107,6 +125,9 @@ class MigrationService {
           'group_id': p['group_id'],
           'name': p['name'],
           'sort_order': p['sort_order'],
+          'user_id': p['user_id'],
+          'avatar_id': p['avatar_id'],
+          'left_at': p['left_at'],
           'created_at': p['created_at'],
           'updated_at': p['updated_at'],
         });
@@ -122,6 +143,8 @@ class MigrationService {
           'payer_participant_id': e['payer_participant_id'],
           'amount_cents': e['amount_cents'],
           'currency_code': e['currency_code'],
+          'exchange_rate': e['exchange_rate'],
+          'base_amount_cents': e['base_amount_cents'],
           'title': e['title'],
           'description': e['description'],
           'date': e['date'],
@@ -162,7 +185,7 @@ class MigrationService {
     }
   }
 
-  /// Check if there is local data that would need migration.
+  /// Whether the local DB has any groups worth migrating.
   Future<bool> hasLocalData() async {
     final rows = await _db.getAll('SELECT COUNT(*) as cnt FROM groups');
     final count = (rows.first['cnt'] as num?)?.toInt() ?? 0;

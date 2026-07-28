@@ -43,6 +43,7 @@ import '../../../core/theme/flex_theme_builder.dart'
     show flexSchemeOptionIds, primaryColorForSchemeId;
 import '../widgets/change_password_sheet.dart';
 import '../widgets/edit_profile_sheet.dart';
+import '../widgets/apply_setting.dart';
 import '../widgets/setting_tile_helper.dart';
 import '../../transaction_scanner/pages/scanner_hub_page.dart';
 import '../../transaction_scanner/providers/scanner_providers.dart';
@@ -52,7 +53,7 @@ import '../sections/settings_privacy_section.dart';
 import '../sections/settings_advanced_section.dart';
 import '../sections/settings_data_backup_section.dart';
 import '../sections/settings_receipt_ai_section.dart';
-import '../../../core/auth/predefined_avatars.dart';
+import '../../../core/widgets/participant_avatar.dart';
 import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/sync_status_icon.dart';
 import '../../../core/widgets/toast.dart';
@@ -73,10 +74,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   static String _localeDisplayName(Locale locale) {
     switch (locale.languageCode) {
       case 'ar':
-        return 'العربية';
+        return 'language_name_ar'.tr();
       case 'en':
       default:
-        return 'English';
+        return 'language_name_en'.tr();
     }
   }
 
@@ -98,10 +99,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           return Scaffold(
             appBar: ContentAlignedAppBar(
               contentAreaWidth: layoutConstraints.maxWidth,
-              leading: const Padding(
-                padding: EdgeInsets.only(left: 8),
-                child: SyncStatusChip(),
-              ),
+              leading: const SyncStatusChip(),
               title: Text('settings'.tr()),
             ),
             body: Center(child: Text('settings_unavailable'.tr())),
@@ -115,10 +113,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         return Scaffold(
           appBar: ContentAlignedAppBar(
             contentAreaWidth: layoutConstraints.maxWidth,
-            leading: const Padding(
-              padding: EdgeInsets.only(left: 8),
-              child: SyncStatusChip(),
-            ),
+            leading: const SyncStatusChip(),
             title: Text('settings'.tr()),
           ),
           body: ConstrainedContent(
@@ -140,6 +135,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     use24HourFormatSettingDef,
                     titleKey: 'use_24_hour_format',
                     subtitleKey: 'use_24_hour_format_description',
+                  ),
+                  buildBoolSettingTile(
+                    ref,
+                    settings,
+                    subtleAccentsSettingDef,
+                    titleKey: 'subtle_accents',
+                    subtitleKey: 'subtle_accents_description',
                   ),
                 ]),
                 // Functional: behavior toggles (expense form mode, etc.)
@@ -329,28 +331,25 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ];
         }
 
-        final initials = _getInitials(profile.name, profile.email);
         final provider = _getProviderLabel(user);
-        final emoji = avatarEmoji(profile.avatarId);
+        final displayName = profile.name ?? profile.email ?? profile.sub;
+        final initials = _getInitials(profile.name, profile.email);
 
         return [
           // User info card (tappable to edit profile)
           ListTile(
-            leading: CircleAvatar(
+            leading: ParticipantAvatar(
+              name: displayName,
+              avatarId: profile.avatarId,
+              initials: initials,
               backgroundColor: colorScheme.primaryContainer,
               foregroundColor: colorScheme.onPrimaryContainer,
-              child: emoji != null
-                  ? Text(emoji, style: const TextStyle(fontSize: 24))
-                  : Text(
-                      initials,
-                      style: textTheme.titleSmall?.copyWith(
-                        color: colorScheme.onPrimaryContainer,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+              textStyle: textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
             title: Text(
-              profile.name ?? profile.email ?? profile.sub,
+              displayName,
               style: textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w600,
               ),
@@ -976,10 +975,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         );
         if (chosen != null && context.mounted) {
           final langCode = chosen.languageCode;
-          await ref
-              .read(settings.provider(languageSettingDef).notifier)
-              .set(langCode);
-          Log.info('Setting changed: ${languageSettingDef.key}=$langCode');
+          await applySetting(ref, settings, languageSettingDef, langCode);
           // _LocaleSync will call setLocale when it sees provider != context.locale
         }
       },
@@ -1036,8 +1032,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
         );
         if (chosen != null && context.mounted) {
-          ref.read(settings.provider(themeModeSettingDef).notifier).set(chosen);
-          Log.info('Setting changed: ${themeModeSettingDef.key}=$chosen');
+          await applySetting(ref, settings, themeModeSettingDef, chosen);
         }
       },
     );
@@ -1141,13 +1136,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
         );
         if (chosenScheme != null && context.mounted) {
-          ref
-              .read(settings.provider(themeSchemeSettingDef).notifier)
-              .set(chosenScheme);
-          Log.info(
-            'Setting changed: ${themeSchemeSettingDef.key}=$chosenScheme',
+          await applySetting(
+            ref,
+            settings,
+            themeSchemeSettingDef,
+            chosenScheme,
           );
-          if (chosenScheme == 'custom') {
+          if (chosenScheme == 'custom' && context.mounted) {
             final chosenColor = await showResponsiveSheet<int>(
               context: context,
               title: 'select_theme_color'.tr(),
@@ -1214,14 +1209,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                               final colorChanged =
                                   picked.toARGB32() != themeColorValue;
                               if (colorChanged) {
-                                ref
-                                    .read(
-                                        settings
-                                            .provider(themeColorSettingDef)
-                                            .notifier)
-                                    .set(picked.toARGB32());
-                                Log.info(
-                                  'Setting changed: ${themeColorSettingDef.key}=${picked.toARGB32()}',
+                                applySetting(
+                                  ref,
+                                  settings,
+                                  themeColorSettingDef,
+                                  picked.toARGB32(),
                                 );
                                 if (ctx.mounted) {
                                   Navigator.of(ctx).pop();
@@ -1239,11 +1231,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
             );
             if (chosenColor != null && context.mounted) {
-              ref
-                  .read(settings.provider(themeColorSettingDef).notifier)
-                  .set(chosenColor);
-              Log.info(
-                'Setting changed: ${themeColorSettingDef.key}=$chosenColor',
+              await applySetting(
+                ref,
+                settings,
+                themeColorSettingDef,
+                chosenColor,
               );
             }
           }
@@ -1302,10 +1294,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
         );
         if (chosen != null && context.mounted) {
-          ref
-              .read(settings.provider(fontSizeScaleSettingDef).notifier)
-              .set(chosen);
-          Log.info('Setting changed: ${fontSizeScaleSettingDef.key}=$chosen');
+          await applySetting(ref, settings, fontSizeScaleSettingDef, chosen);
         }
       },
     );
@@ -1341,14 +1330,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               icon: const Icon(Icons.restore),
               tooltip: 'reset_to_default'.tr(),
               onPressed: () {
-                ref
-                    .read(
-                      settings.provider(favoriteCurrenciesSettingDef).notifier,
-                    )
-                    .set('');
-                Log.info(
-                  'Setting changed: ${favoriteCurrenciesSettingDef.key}=(reset)',
-                );
+                applySetting(ref, settings, favoriteCurrenciesSettingDef, '');
               },
             )
           : null,
@@ -1397,12 +1379,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               icon: const Icon(Icons.clear),
               tooltip: 'display_currency_none'.tr(),
               onPressed: () {
-                ref
-                    .read(settings.provider(displayCurrencySettingDef).notifier)
-                    .set('');
-                Log.info(
-                  'Setting changed: ${displayCurrencySettingDef.key}=(none)',
-                );
+                applySetting(ref, settings, displayCurrencySettingDef, '');
               },
             ),
         ],
@@ -1425,11 +1402,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       centerInFullViewport: true,
       favorite: favorites,
       onSelect: (currency) {
-        ref
-            .read(settings.provider(displayCurrencySettingDef).notifier)
-            .set(currency.code);
-        Log.info(
-          'Setting changed: ${displayCurrencySettingDef.key}=${currency.code}',
+        applySetting(
+          ref,
+          settings,
+          displayCurrencySettingDef,
+          currency.code,
         );
       },
     );
@@ -1454,11 +1431,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         initial: current,
         onSave: (updated) {
           final encoded = CurrencyHelpers.encodeFavorites(updated);
-          ref
-              .read(settings.provider(favoriteCurrenciesSettingDef).notifier)
-              .set(encoded);
-          Log.info(
-            'Setting changed: ${favoriteCurrenciesSettingDef.key}=${updated.length} items',
+          applySetting(
+            ref,
+            settings,
+            favoriteCurrenciesSettingDef,
+            encoded,
           );
         },
       ),
@@ -1555,15 +1532,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         subtitle: 'scanner_enabled_description'.tr(),
         value: isEnabled,
         onChanged: (v) {
-          ref
-              .read(settings.provider(scannerEnabledSettingDef).notifier)
-              .set(v);
-          if (v) {
-            NotificationBridge.setEnabled(true);
-          } else {
-            NotificationBridge.setEnabled(false);
-          }
-          Log.info('Setting changed: ${scannerEnabledSettingDef.key}=$v');
+          applySetting(ref, settings, scannerEnabledSettingDef, v);
+          NotificationBridge.setEnabled(v);
         },
       ),
       NavigationSettingsTile(

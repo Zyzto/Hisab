@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hisab/domain/domain.dart';
 import 'package:hisab/features/expenses/widgets/expense_detail_body.dart';
 
@@ -29,50 +30,58 @@ void main() {
     );
   });
 
-  testWidgets('ExpenseDetailBodyHeader shows icon and date', (tester) async {
-    await tester.pumpWidget(
-      EasyLocalization(
+  Widget wrap(Widget child) {
+    return ProviderScope(
+      child: EasyLocalization(
         path: 'assets/translations',
         supportedLocales: const [Locale('en')],
         fallbackLocale: const Locale('en'),
         startLocale: const Locale('en'),
-        child: MaterialApp(
-          home: Scaffold(
-            body: ExpenseDetailBodyHeader(
-              expense: testExpense,
-              use24HourFormat: false,
-            ),
-          ),
-        ),
+        child: MaterialApp(home: Scaffold(body: child)),
       ),
     );
-    await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.credit_card), findsOneWidget);
-    expect(find.textContaining('2025'), findsOneWidget);
-  });
+  }
 
-  testWidgets('ExpenseDetailBodyHeader shows date text', (tester) async {
+  testWidgets('ExpenseDetailBodyHeader shows amount and date', (tester) async {
     await tester.pumpWidget(
-      EasyLocalization(
-        path: 'assets/translations',
-        supportedLocales: const [Locale('en')],
-        fallbackLocale: const Locale('en'),
-        startLocale: const Locale('en'),
-        child: MaterialApp(
-          home: Scaffold(
-            body: ExpenseDetailBodyHeader(
-              expense: testExpense,
-              use24HourFormat: false,
-            ),
-          ),
+      wrap(
+        ExpenseDetailBodyHeader(
+          expense: testExpense,
+          use24HourFormat: false,
+          amountCents: 5000,
+          displayCurrencyCode: 'USD',
         ),
       ),
     );
     await tester.pumpAndSettle();
     expect(find.textContaining('2025'), findsOneWidget);
+    expect(find.textContaining('50'), findsWidgets);
   });
 
-  testWidgets('ExpenseDetailBodyHeader income shows trending icon', (
+  testWidgets('ExpenseDetailBodyHeader shows category chip when tagged', (
+    tester,
+  ) async {
+    final tagged = testExpense.copyWith(tag: 'coffee');
+    await tester.pumpWidget(
+      wrap(
+        ExpenseDetailBodyHeader(
+          expense: tagged,
+          amountCents: 5000,
+          displayCurrencyCode: 'USD',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    // One chip icon only (big duplicate icon removed).
+    expect(find.byIcon(Icons.coffee), findsOneWidget);
+    expect(
+      find.textContaining('Coffee').evaluate().isNotEmpty ||
+          find.text('category_coffee').evaluate().isNotEmpty,
+      isTrue,
+    );
+  });
+
+  testWidgets('ExpenseDetailBodyHeader income shows income chip', (
     tester,
   ) async {
     final income = Expense(
@@ -90,17 +99,19 @@ void main() {
       transactionType: TransactionType.income,
     );
     await tester.pumpWidget(
-      EasyLocalization(
-        path: 'assets/translations',
-        supportedLocales: const [Locale('en')],
-        fallbackLocale: const Locale('en'),
-        startLocale: const Locale('en'),
-        child: MaterialApp(
-          home: Scaffold(body: ExpenseDetailBodyHeader(expense: income)),
+      wrap(
+        ExpenseDetailBodyHeader(
+          expense: income,
+          amountCents: 10000,
+          displayCurrencyCode: 'USD',
         ),
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.trending_up), findsOneWidget);
+    expect(
+      find.text('Income').evaluate().isNotEmpty ||
+          find.text('income').evaluate().isNotEmpty,
+      isTrue,
+    );
   });
 }

@@ -9,80 +9,6 @@ part of 'group_member_provider.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
-@ProviderFor(myRoleInGroup)
-final myRoleInGroupProvider = MyRoleInGroupFamily._();
-
-final class MyRoleInGroupProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<GroupRole?>,
-          GroupRole?,
-          FutureOr<GroupRole?>
-        >
-    with $FutureModifier<GroupRole?>, $FutureProvider<GroupRole?> {
-  MyRoleInGroupProvider._({
-    required MyRoleInGroupFamily super.from,
-    required String super.argument,
-  }) : super(
-         retry: null,
-         name: r'myRoleInGroupProvider',
-         isAutoDispose: true,
-         dependencies: null,
-         $allTransitiveDependencies: null,
-       );
-
-  @override
-  String debugGetCreateSourceHash() => _$myRoleInGroupHash();
-
-  @override
-  String toString() {
-    return r'myRoleInGroupProvider'
-        ''
-        '($argument)';
-  }
-
-  @$internal
-  @override
-  $FutureProviderElement<GroupRole?> $createElement($ProviderPointer pointer) =>
-      $FutureProviderElement(pointer);
-
-  @override
-  FutureOr<GroupRole?> create(Ref ref) {
-    final argument = this.argument as String;
-    return myRoleInGroup(ref, argument);
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return other is MyRoleInGroupProvider && other.argument == argument;
-  }
-
-  @override
-  int get hashCode {
-    return argument.hashCode;
-  }
-}
-
-String _$myRoleInGroupHash() => r'fb1c5e51464868f2f70009a89546d44b60b04633';
-
-final class MyRoleInGroupFamily extends $Family
-    with $FunctionalFamilyOverride<FutureOr<GroupRole?>, String> {
-  MyRoleInGroupFamily._()
-    : super(
-        retry: null,
-        name: r'myRoleInGroupProvider',
-        dependencies: null,
-        $allTransitiveDependencies: null,
-        isAutoDispose: true,
-      );
-
-  MyRoleInGroupProvider call(String groupId) =>
-      MyRoleInGroupProvider._(argument: groupId, from: this);
-
-  @override
-  String toString() => r'myRoleInGroupProvider';
-}
-
 @ProviderFor(myMemberInGroup)
 final myMemberInGroupProvider = MyMemberInGroupFamily._();
 
@@ -91,9 +17,9 @@ final class MyMemberInGroupProvider
         $FunctionalProvider<
           AsyncValue<GroupMember?>,
           GroupMember?,
-          FutureOr<GroupMember?>
+          Stream<GroupMember?>
         >
-    with $FutureModifier<GroupMember?>, $FutureProvider<GroupMember?> {
+    with $FutureModifier<GroupMember?>, $StreamProvider<GroupMember?> {
   MyMemberInGroupProvider._({
     required MyMemberInGroupFamily super.from,
     required String super.argument,
@@ -117,12 +43,12 @@ final class MyMemberInGroupProvider
 
   @$internal
   @override
-  $FutureProviderElement<GroupMember?> $createElement(
+  $StreamProviderElement<GroupMember?> $createElement(
     $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
+  ) => $StreamProviderElement(pointer);
 
   @override
-  FutureOr<GroupMember?> create(Ref ref) {
+  Stream<GroupMember?> create(Ref ref) {
     final argument = this.argument as String;
     return myMemberInGroup(ref, argument);
   }
@@ -138,10 +64,10 @@ final class MyMemberInGroupProvider
   }
 }
 
-String _$myMemberInGroupHash() => r'a39d25c54f3218ad3865e33fe178cc7f9262eb65';
+String _$myMemberInGroupHash() => r'537094b4d8eadf5a6551995e1049828619fa3134';
 
 final class MyMemberInGroupFamily extends $Family
-    with $FunctionalFamilyOverride<FutureOr<GroupMember?>, String> {
+    with $FunctionalFamilyOverride<Stream<GroupMember?>, String> {
   MyMemberInGroupFamily._()
     : super(
         retry: null,
@@ -156,6 +82,80 @@ final class MyMemberInGroupFamily extends $Family
 
   @override
   String toString() => r'myMemberInGroupProvider';
+}
+
+@ProviderFor(myRoleInGroup)
+final myRoleInGroupProvider = MyRoleInGroupFamily._();
+
+final class MyRoleInGroupProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<GroupRole?>,
+          GroupRole?,
+          Stream<GroupRole?>
+        >
+    with $FutureModifier<GroupRole?>, $StreamProvider<GroupRole?> {
+  MyRoleInGroupProvider._({
+    required MyRoleInGroupFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'myRoleInGroupProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$myRoleInGroupHash();
+
+  @override
+  String toString() {
+    return r'myRoleInGroupProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $StreamProviderElement<GroupRole?> $createElement($ProviderPointer pointer) =>
+      $StreamProviderElement(pointer);
+
+  @override
+  Stream<GroupRole?> create(Ref ref) {
+    final argument = this.argument as String;
+    return myRoleInGroup(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is MyRoleInGroupProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$myRoleInGroupHash() => r'9abfa4e248389ced029bb623a87ef63eb5532e17';
+
+final class MyRoleInGroupFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<GroupRole?>, String> {
+  MyRoleInGroupFamily._()
+    : super(
+        retry: null,
+        name: r'myRoleInGroupProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  MyRoleInGroupProvider call(String groupId) =>
+      MyRoleInGroupProvider._(argument: groupId, from: this);
+
+  @override
+  String toString() => r'myRoleInGroupProvider';
 }
 
 @ProviderFor(membersByGroup)

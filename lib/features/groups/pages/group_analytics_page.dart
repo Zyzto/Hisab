@@ -11,9 +11,11 @@ import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/theme/accent_style.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/widgets/error_content.dart';
 import '../providers/group_analytics_provider.dart';
+import '../widgets/group_section_header.dart';
 
 class _ModalSelectOption<T> {
   const _ModalSelectOption({required this.value, required this.label});
@@ -182,26 +184,26 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
         _buildFilters(context, data),
         const SizedBox(height: 12),
         if (!hasData)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.insights_outlined,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'analytics_empty'.tr(),
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: AccentSurfaces.flatPanel(theme.colorScheme),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.insights_outlined,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'analytics_empty'.tr(),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           )
         else ...[
@@ -309,20 +311,16 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
       ).toLowerCase().compareTo(_translateCategoryLike(b.label).toLowerCase()),
     );
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'analytics_filters'.tr(),
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+      decoration: AccentSurfaces.flatPanel(Theme.of(context).colorScheme),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GroupSectionHeader(label: 'analytics_filters'.tr()),
+          const SizedBox(height: 10),
+          Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
@@ -409,7 +407,6 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
               ),
           ],
         ),
-      ),
     );
   }
 
@@ -534,31 +531,34 @@ class _KpiCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              label,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: AccentSurfaces.panel(
+        theme.colorScheme,
+        subtle: context.subtleAccents,
+        radius: 14,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -592,75 +592,73 @@ class _TrendChartCard extends StatelessWidget {
     final theme = Theme.of(context);
     final activeMode = _resolveMode(mode);
     final availableModes = _availableModes;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(title, style: theme.textTheme.titleSmall),
-                ),
-                InkWell(
-                  borderRadius: BorderRadius.circular(8),
-                  onTap: () async {
-                    final selected =
-                        await _showModalSelectSheet<AnalyticsTrendChartMode>(
-                      context: context,
-                      title: 'analytics_chart_mode_menu'.tr(),
-                      selectedValue: activeMode,
-                      options: availableModes
-                          .map(
-                            (mode) => _ModalSelectOption<AnalyticsTrendChartMode>(
-                              value: mode,
-                              label: mode.labelKey.tr(),
-                            ),
-                          )
-                          .toList(),
-                    );
-                    if (selected != null) onModeChanged(selected);
-                  },
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          activeMode.labelKey.tr(),
-                          maxLines: 1,
-                          overflow: TextOverflow.fade,
-                          softWrap: false,
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            color: theme.colorScheme.primary,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: AccentSurfaces.flatPanel(theme.colorScheme),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: GroupSectionHeader(label: title)),
+              InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () async {
+                  final selected =
+                      await _showModalSelectSheet<AnalyticsTrendChartMode>(
+                    context: context,
+                    title: 'analytics_chart_mode_menu'.tr(),
+                    selectedValue: activeMode,
+                    options: availableModes
+                        .map(
+                          (mode) => _ModalSelectOption<AnalyticsTrendChartMode>(
+                            value: mode,
+                            label: mode.labelKey.tr(),
                           ),
+                        )
+                        .toList(),
+                  );
+                  if (selected != null) onModeChanged(selected);
+                },
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        activeMode.labelKey.tr(),
+                        maxLines: 1,
+                        overflow: TextOverflow.fade,
+                        softWrap: false,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: theme.colorScheme.primary,
                         ),
                       ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.keyboard_arrow_down, size: 18),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.keyboard_arrow_down, size: 18),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
               ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
-            const SizedBox(height: 2),
-            Text(
-              _modeHint(activeMode).tr(),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            _modeHint(activeMode).tr(),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
-            const SizedBox(height: 12),
-            _buildChartContent(context, theme, activeMode),
-          ],
-        ),
+          ),
+          const SizedBox(height: 12),
+          _buildChartContent(context, theme, activeMode),
+        ],
       ),
     );
   }
@@ -1273,19 +1271,18 @@ class _BreakdownBarsCard extends StatelessWidget {
         ? 1
         : rows.map((r) => r.amountCents.abs()).reduce(math.max).clamp(1, 1 << 30);
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(title, style: theme.textTheme.titleSmall),
-                ),
-                if (allowPieMode && onModeChanged != null)
-                  InkWell(
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: AccentSurfaces.flatPanel(theme.colorScheme),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: GroupSectionHeader(label: title)),
+              if (allowPieMode && onModeChanged != null)
+                InkWell(
                     borderRadius: BorderRadius.circular(8),
                     onTap: () async {
                       final selected =
@@ -1385,7 +1382,6 @@ class _BreakdownBarsCard extends StatelessWidget {
               }),
           ],
         ),
-      ),
     );
   }
 

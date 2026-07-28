@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/theme/accent_style.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/theme/theme_providers.dart';
 import '../../../domain/domain.dart';
@@ -59,43 +60,55 @@ class GroupCard extends ConsumerWidget {
       groupName: group.name,
     );
 
+    final colorScheme = theme.colorScheme;
+    final subtle = context.subtleAccents;
+    final borderColor = isSelected
+        ? colorScheme.primary
+        : isPinned
+        ? colorScheme.primary.withValues(alpha: subtle ? 0.28 : 0.45)
+        : colorScheme.outlineVariant.withValues(alpha: 0.45);
+    final fillColor = isSelected
+        ? colorScheme.primaryContainer.withValues(alpha: 0.4)
+        : isPinned && !subtle
+        ? colorScheme.primaryContainer.withValues(alpha: 0.18)
+        : colorScheme.surfaceContainerLow;
+
     return Semantics(
       label: group.name,
       hint: (group.isPersonal ? 'open_list' : 'open_group').tr(),
       button: true,
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
-        child: Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          color: isSelected
-              ? theme.colorScheme.primaryContainer.withValues(alpha: 0.4)
-              : null,
-          shape: RoundedRectangleBorder(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+          child: Material(
+            color: fillColor,
             borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
-            side: isSelected
-                ? BorderSide(color: theme.colorScheme.primary, width: 2)
-                : isPinned
-                ? BorderSide(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.5),
-                    width: 1,
-                  )
-                : BorderSide(color: theme.colorScheme.outlineVariant, width: 1),
-          ),
-          child: InkWell(
-            onTap: () {
-              HapticFeedback.lightImpact();
-              onTap?.call();
-            },
-            onLongPress: onLongPress != null
-                ? () {
-                    HapticFeedback.mediumImpact();
-                    onLongPress!();
-                  }
-                : null,
-            borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
-            child: _buildListContent(
-              theme: theme,
-              leadingWidget: leadingWidget,
+            child: InkWell(
+              onTap: () {
+                HapticFeedback.lightImpact();
+                onTap?.call();
+              },
+              onLongPress: onLongPress != null
+                  ? () {
+                      HapticFeedback.mediumImpact();
+                      onLongPress!();
+                    }
+                  : null,
+              borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
+                  border: Border.all(
+                    color: borderColor,
+                    width: isSelected ? 2 : 1,
+                  ),
+                ),
+                child: _buildListContent(
+                  theme: theme,
+                  leadingWidget: leadingWidget,
+                ),
+              ),
             ),
           ),
         ),
@@ -108,7 +121,7 @@ class GroupCard extends ConsumerWidget {
     required Widget leadingWidget,
   }) {
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       child: Row(
         children: [
           if (createdDateLabel != null) ...[

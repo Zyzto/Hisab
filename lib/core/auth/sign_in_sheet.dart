@@ -304,7 +304,7 @@ class _SignInSheetState extends State<_SignInSheet> {
           e.message.toLowerCase().contains('rate limit')) {
         return 'auth_rate_limit'.tr();
       }
-      return e.message;
+      return 'auth_generic_error'.tr();
     }
     final msg = e.toString();
     if (msg.contains('Invalid login credentials')) {

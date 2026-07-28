@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../domain/scanner_pattern.dart';
 import '../providers/scanner_providers.dart';
+import '../utils/scanner_pattern_labels.dart';
 
 const _uuid = Uuid();
 
@@ -23,7 +24,11 @@ class ScannerPatternsPage extends ConsumerWidget {
       body: ConstrainedContent(
         child: patternsAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('Error: $e')),
+          error: (e, _) => Center(
+            child: Text(
+              'error_with_details'.tr(namedArgs: {'details': '$e'}),
+            ),
+          ),
           data: (patterns) => patterns.isEmpty
               ? _buildEmptyState(context)
               : _buildList(context, ref, patterns),
@@ -121,7 +126,7 @@ class _PatternTile extends ConsumerWidget {
               : theme.colorScheme.onPrimaryContainer,
         ),
       ),
-      title: Text(pattern.name),
+      title: Text(scannerPatternDisplayName(pattern.name)),
       subtitle: Text(
         '${pattern.senderMatch}  •  ${pattern.successCount} ${'scanner_matches'.tr()}',
         style: theme.textTheme.bodySmall?.copyWith(
@@ -161,7 +166,7 @@ class _PatternTile extends ConsumerWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('scanner_delete_pattern'.tr()),
-        content: Text(pattern.name),
+        content: Text(scannerPatternDisplayName(pattern.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -353,7 +358,7 @@ class _PatternEditorPageState extends ConsumerState<_PatternEditorPage> {
   void _runTest() {
     final text = _testCtrl.text.trim();
     if (text.isEmpty || _amountCtrl.text.trim().isEmpty) {
-      setState(() => _testResult = 'Provide text and amount regex');
+      setState(() => _testResult = 'scanner_test_need_text_and_amount'.tr());
       return;
     }
 
@@ -362,32 +367,57 @@ class _PatternEditorPageState extends ConsumerState<_PatternEditorPage> {
       final result = _tryMatch(text, pattern);
       setState(() => _testResult = result);
     } catch (e) {
-      setState(() => _testResult = 'Regex error: $e');
+      setState(
+        () => _testResult = 'scanner_test_regex_error'.tr(
+          namedArgs: {'details': '$e'},
+        ),
+      );
     }
   }
 
   String _tryMatch(String text, ScannerPattern pattern) {
+    final notFound = 'scanner_test_not_found'.tr();
     final buf = StringBuffer();
     final amountMatch = RegExp(pattern.amountRegex).firstMatch(text);
     buf.writeln(
-      'Amount: ${amountMatch?.group(1) ?? amountMatch?.group(0) ?? "NOT FOUND"}',
+      'scanner_test_amount'.tr(
+        namedArgs: {
+          'value': amountMatch?.group(1) ?? amountMatch?.group(0) ?? notFound,
+        },
+      ),
     );
 
     if (pattern.currencyRegex != null && pattern.currencyRegex!.isNotEmpty) {
       final m = RegExp(pattern.currencyRegex!).firstMatch(text);
-      buf.writeln('Currency: ${m?.group(1) ?? "NOT FOUND"}');
+      buf.writeln(
+        'scanner_test_currency'.tr(
+          namedArgs: {'value': m?.group(1) ?? notFound},
+        ),
+      );
     }
     if (pattern.cardRegex != null && pattern.cardRegex!.isNotEmpty) {
       final m = RegExp(pattern.cardRegex!).firstMatch(text);
-      buf.writeln('Card: ${m?.group(1) ?? "NOT FOUND"}');
+      buf.writeln(
+        'scanner_test_card'.tr(
+          namedArgs: {'value': m?.group(1) ?? notFound},
+        ),
+      );
     }
     if (pattern.merchantRegex != null && pattern.merchantRegex!.isNotEmpty) {
       final m = RegExp(pattern.merchantRegex!).firstMatch(text);
-      buf.writeln('Merchant: ${m?.group(1) ?? "NOT FOUND"}');
+      buf.writeln(
+        'scanner_test_merchant'.tr(
+          namedArgs: {'value': m?.group(1) ?? notFound},
+        ),
+      );
     }
     if (pattern.dateRegex != null && pattern.dateRegex!.isNotEmpty) {
       final m = RegExp(pattern.dateRegex!).firstMatch(text);
-      buf.writeln('Date: ${m?.group(0) ?? "NOT FOUND"}');
+      buf.writeln(
+        'scanner_test_date'.tr(
+          namedArgs: {'value': m?.group(0) ?? notFound},
+        ),
+      );
     }
     return buf.toString().trim();
   }

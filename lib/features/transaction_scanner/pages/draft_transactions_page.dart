@@ -29,7 +29,11 @@ class DraftTransactionsPage extends ConsumerWidget {
       body: ConstrainedContent(
         child: draftsAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('Error: $e')),
+          error: (e, _) => Center(
+            child: Text(
+              'error_with_details'.tr(namedArgs: {'details': '$e'}),
+            ),
+          ),
           data: (drafts) => drafts.isEmpty
               ? _buildEmptyState(context)
               : _buildList(context, ref, drafts),
@@ -234,9 +238,17 @@ class _DraftCard extends ConsumerWidget {
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final diff = now.difference(date);
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    if (diff.inMinutes < 60) {
+      return 'time_minutes_ago'.tr(
+        namedArgs: {'count': '${diff.inMinutes}'},
+      );
+    }
+    if (diff.inHours < 24) {
+      return 'time_hours_ago'.tr(namedArgs: {'count': '${diff.inHours}'});
+    }
+    if (diff.inDays < 7) {
+      return 'time_days_ago'.tr(namedArgs: {'count': '${diff.inDays}'});
+    }
     return '${date.month}/${date.day}';
   }
 }
