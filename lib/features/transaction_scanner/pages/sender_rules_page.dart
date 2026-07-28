@@ -23,7 +23,11 @@ class SenderRulesPage extends ConsumerWidget {
       body: ConstrainedContent(
         child: rulesAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('Error: $e')),
+          error: (e, _) => Center(
+            child: Text(
+              'error_with_details'.tr(namedArgs: {'details': '$e'}),
+            ),
+          ),
           data: (rules) => rules.isEmpty
               ? _buildEmptyState(context)
               : _buildList(context, ref, rules),
@@ -99,7 +103,7 @@ class SenderRulesPage extends ConsumerWidget {
               controller: packageController,
               decoration: InputDecoration(
                 labelText: 'scanner_package_name'.tr(),
-                hintText: 'com.example.bank',
+                hintText: 'scanner_hint_package_example'.tr(),
               ),
             ),
             const SizedBox(height: 12),
@@ -107,7 +111,7 @@ class SenderRulesPage extends ConsumerWidget {
               controller: labelController,
               decoration: InputDecoration(
                 labelText: 'scanner_sender_label'.tr(),
-                hintText: 'My Bank',
+                hintText: 'scanner_hint_sender_label'.tr(),
               ),
             ),
           ],

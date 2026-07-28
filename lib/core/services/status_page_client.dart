@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:easy_localization/easy_localization.dart';
+
 import 'http_fetch_helper.dart';
 
 /// Result of fetching a Statuspage.io summary.
@@ -60,11 +62,14 @@ Future<StatusPageResult> fetchSupabaseStatus() async {
 
   try {
     final json = jsonDecode(result.body!) as Map<String, dynamic>?;
-    if (json == null) return StatusPageFailure('Invalid response');
+    if (json == null) {
+      return StatusPageFailure('status_invalid_response'.tr());
+    }
 
     final statusObj = json['status'] as Map<String, dynamic>?;
     final indicator = statusObj?['indicator'] as String? ?? 'none';
-    final description = statusObj?['description'] as String? ?? 'Unknown';
+    final description =
+        statusObj?['description'] as String? ?? 'status_unknown'.tr();
 
     final incidentsList = json['incidents'] as List<dynamic>? ?? [];
     final incidents = <StatusPageIncident>[];

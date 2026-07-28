@@ -3,6 +3,9 @@ import '../../domain/domain.dart';
 abstract class IGroupMemberRepository {
   Future<GroupRole?> getMyRole(String groupId);
   Future<GroupMember?> getMyMember(String groupId);
+
+  /// Live updates for the signed-in user's membership in [groupId].
+  Stream<GroupMember?> watchMyMember(String groupId);
   Future<List<GroupMember>> listByGroup(String groupId);
   Stream<List<GroupMember>> watchByGroup(String groupId);
   Future<void> kickMember(String groupId, String memberId);

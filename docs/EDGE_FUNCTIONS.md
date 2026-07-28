@@ -1,8 +1,10 @@
-# Supabase Edge Functions
+# Edge Functions
 
 <!-- markdownlint-disable MD060 -->
 
-The **source of truth** for Edge Function code is this repo. Deploy with the Supabase CLI to keep the project in sync.
+Function source lives in this repo under `supabase/functions/`. Deploy with the Supabase CLI so hosted projects stay in sync with git.
+
+Local smoke tests: [LOCAL_TEST_ENV.md](LOCAL_TEST_ENV.md).
 
 ## Functions in this repo
 
@@ -12,6 +14,17 @@ The **source of truth** for Edge Function code is this repo. Deploy with the Sup
 | **og-invite-image** | `supabase/functions/og-invite-image/` | GET `?token=...` → returns a 1200×630 PNG with themed QR code (encoding the invite URL), “Hisab” branding, and logo. Used as `og:image` / `twitter:image` for invite link previews (WhatsApp, Telegram, etc.). Uses `SITE_URL`. Deploy with `--no-verify-jwt`. |
 | **send-notification** | `supabase/functions/send-notification/index.ts` | Called by DB trigger `notify_group_activity()` (expenses + member_joined). Sends FCM push to other group members only; for `member_joined` the actor (new member) is never sent a notification. Requires secrets: `FCM_PROJECT_ID`, `FCM_SERVICE_ACCOUNT_KEY`. |
 | **telemetry** | `supabase/functions/telemetry/index.ts` | POST body `{ event, timestamp?, data? }`; inserts into `public.telemetry`. Used for optional anonymous usage analytics when enabled in app settings. |
+
+## Local testing
+
+Use the fuller local stack (Supabase + Edge Functions gateway + optional Firebase Functions emulator):
+
+```bash
+./scripts/local_test_env.sh up
+./scripts/local_test_env.sh test-edge
+```
+
+See [LOCAL_TEST_ENV.md](LOCAL_TEST_ENV.md). Locally, `send-notification` returns `{ dry_run: true }` when FCM secrets are not set (no real push). `SITE_URL` defaults to `http://localhost:8080` via `[edge_runtime.secrets]` in `supabase/config.toml`.
 
 ## Deploy
 

@@ -9,6 +9,7 @@ import '../../../core/utils/error_report_helper.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../groups/providers/groups_provider.dart';
 import '../../groups/widgets/group_card.dart';
+import '../../groups/widgets/group_section_header.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../domain/domain.dart';
 
@@ -38,23 +39,33 @@ class ArchivedGroupsPage extends ConsumerWidget {
                   final hasAny =
                       archived.isNotEmpty || locallyArchived.isNotEmpty;
                   if (!hasAny) {
+                    final theme = Theme.of(context);
                     return Center(
                       child: Padding(
-                        padding: const EdgeInsets.all(24.0),
+                        padding: const EdgeInsets.all(32.0),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
-                              Icons.archive_outlined,
-                              size: 64,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
+                            Container(
+                              width: 72,
+                              height: 72,
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primaryContainer
+                                    .withValues(alpha: 0.55),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.archive_outlined,
+                                size: 34,
+                                color: theme.colorScheme.primary,
+                              ),
                             ),
                             const SizedBox(height: 16),
                             Text(
                               'no_archived_items'.tr(),
-                              style: Theme.of(context).textTheme.titleMedium,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                               textAlign: TextAlign.center,
                             ),
                           ],
@@ -67,15 +78,9 @@ class ArchivedGroupsPage extends ConsumerWidget {
                     children: [
                       if (archived.isNotEmpty) ...[
                         Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                          child: Text(
-                            'archived_groups'.tr(),
-                            style: Theme.of(context).textTheme.titleSmall
-                                ?.copyWith(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
-                                ),
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                          child: GroupSectionHeader(
+                            label: 'archived_groups'.tr(),
                           ),
                         ),
                         ...archived.map(
@@ -90,15 +95,9 @@ class ArchivedGroupsPage extends ConsumerWidget {
                       ],
                       if (locallyArchived.isNotEmpty) ...[
                         Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                          child: Text(
-                            'hidden_by_me'.tr(),
-                            style: Theme.of(context).textTheme.titleSmall
-                                ?.copyWith(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
-                                ),
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                          child: GroupSectionHeader(
+                            label: 'hidden_by_me'.tr(),
                           ),
                         ),
                         ...locallyArchived.map(

@@ -1,44 +1,58 @@
-# Security and Secret Management
+# Security and secrets
 
-This repository is public. Follow these rules for all contributions.
+This repository is **public**. Treat every commit as visible to the world.
 
-## Safe to Commit
+## Safe to commit
 
-- `supabase/config.toml` (with `env(...)` placeholders only)
+- `supabase/config.toml` with `env(...)` placeholders only
 - `supabase/migrations/*.sql`
-- `supabase/seed.sql` with local test-only data (fake users)
-- `supabase/functions/**` source code
-- Documentation and scripts that reference secret names (not secret values)
+- `supabase/seed.sql` with **fake** local test users only
+- `supabase/functions/**` source (no embedded keys)
+- Docs and scripts that name secrets — never their values
+- `*_example.json` / `*.env.example` templates
 
-## Never Commit
+## Never commit
 
-- Supabase `service_role` key
-- Supabase JWT signing keys / `signing_keys.json`
-- Environment-specific `anon` keys (even though they are public/client keys) unless intentionally documented for a public demo
-- Firebase service account JSON private keys
-- OAuth client secrets (Google, GitHub, Apple, etc.)
-- SMTP/API tokens and any `.env*` files with real values
-- Real user data exports or production database dumps
+- Supabase `service_role` key or JWT signing material (`signing_keys.json`)
+- Filled `anon` keys / project URLs in tracked files (use local define files)
+- Firebase service-account JSON (private keys)
+- OAuth client secrets, SMTP/API tokens, real `.env*` values
+- Production dumps or real user exports
 
-## Where Secrets Should Live
+**Gitignored paths — do not `git add -f`:**
 
-- Local development: environment variables or untracked local files.
-- CI/CD: GitHub Actions Secrets (or your platform secret manager).
-- Supabase Edge Functions: `supabase secrets set ...`.
-- Supabase local config: use `env(NAME)` placeholders in `supabase/config.toml`.
+| Path | Why |
+|------|-----|
+| `dart_defines_local.json` / `dart_defines_online.json` | Project URLs + keys |
+| `lib/core/constants/app_secrets.dart` | App secrets |
+| `secrets/**` (except `README.md` / `.gitkeep`) | FCM SA JSON, etc. |
+| `supabase/.env` / `functions/.env` | Local Edge / redirect env |
+| `android/app/google-services.json` | Firebase Android |
+| `ios/Runner/GoogleService-Info.plist` | Firebase iOS |
+| `**/fcm-service-account*.json` | Firebase Admin private key |
 
-## Public Repo Notes
+Copy from `*_example` templates and [secrets/README.md](secrets/README.md).
 
-- Keep local integration test users in `supabase/seed.sql` non-production only.
-- Never reuse seeded test credentials in any live environment.
-- If a secret is committed accidentally, rotate it immediately and remove it from git history.
+## Where secrets live
 
-## Config-as-Code Guard
+| Context | Store in |
+|---------|----------|
+| Local dev | Env vars or untracked files (table above) |
+| CI/CD | [GitHub Actions secrets](docs/GITHUB_ACTIONS_SECRETS.md) |
+| Edge (hosted) | `supabase secrets set ...` |
+| Local config.toml | `env(NAME)` placeholders only |
+| Local FCM for Edge | `secrets/fcm-service-account.test.json` → `./scripts/local_test_env.sh reload-secrets` |
 
-Run this before PRs:
+## If something leaks
+
+Rotate the credential immediately and remove it from git history. Seeded test users in `supabase/seed.sql` must never be reused in production.
+
+## Config-as-code check
+
+Before opening a PR that touches Supabase config:
 
 ```bash
 bash ./scripts/verify_supabase_config_as_code.sh
 ```
 
-This verifies required Supabase config files are present and tracked.
+Confirms required Supabase config files are present and tracked.

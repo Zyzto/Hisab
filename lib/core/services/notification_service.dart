@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -71,7 +72,10 @@ Future<void> _showDataOnlyNotificationInBackground(
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
         >();
-    await androidPlugin?.createNotificationChannel(_androidChannel);
+    // Background isolate: EasyLocalization may be unavailable — English fallbacks
+    // match en.json for notification_group_activity / notification_tap_to_open.
+    final channel = _androidChannelFallback;
+    await androidPlugin?.createNotificationChannel(channel);
 
     final title = message.data['title'] as String? ?? 'Group activity';
     final body = message.data['body'] as String? ?? 'Tap to open';
@@ -84,9 +88,9 @@ Future<void> _showDataOnlyNotificationInBackground(
       body: body,
       notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
-          _androidChannel.id,
-          _androidChannel.name,
-          channelDescription: _androidChannel.description,
+          channel.id,
+          channel.name,
+          channelDescription: channel.description,
           importance: Importance.high,
           priority: Priority.high,
           icon: '@mipmap/ic_launcher',
@@ -110,12 +114,23 @@ Future<void> _showDataOnlyNotificationInBackground(
 // ─────────────────────────────────────────────────────────────────────────────
 // Android notification channel for foreground notifications
 // ─────────────────────────────────────────────────────────────────────────────
-const _androidChannel = AndroidNotificationChannel(
-  'group_activity',
+const _androidChannelId = 'group_activity';
+
+/// English fallbacks for the background isolate (no EasyLocalization).
+const _androidChannelFallback = AndroidNotificationChannel(
+  _androidChannelId,
   'Group Activity',
   description: 'Notifications for group expense and membership changes',
   importance: Importance.high,
 );
+
+AndroidNotificationChannel _localizedAndroidChannel() =>
+    AndroidNotificationChannel(
+      _androidChannelId,
+      'notification_channel_group_activity'.tr(),
+      description: 'notification_channel_group_activity_desc'.tr(),
+      importance: Importance.high,
+    );
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NotificationService — Riverpod provider
@@ -299,12 +314,12 @@ class NotificationService extends _$NotificationService {
       onDidReceiveNotificationResponse: _onLocalNotificationTap,
     );
 
-    // Create the Android notification channel
+    // Create the Android notification channel (localized when UI locale is ready)
     final androidPlugin = _localNotifications
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
         >();
-    await androidPlugin?.createNotificationChannel(_androidChannel);
+    await androidPlugin?.createNotificationChannel(_localizedAndroidChannel());
   }
 
   Future<void> _registerToken() async {
@@ -383,16 +398,17 @@ class NotificationService extends _$NotificationService {
     }
 
     // Show a local notification on mobile
+    final channel = _localizedAndroidChannel();
     final notificationId = _notificationIdForMessage(message);
     _localNotifications.show(
       id: notificationId,
-      title: notification.title,
-      body: notification.body,
+      title: notification.title ?? 'notification_group_activity'.tr(),
+      body: notification.body ?? 'notification_tap_to_open'.tr(),
       notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
-          _androidChannel.id,
-          _androidChannel.name,
-          channelDescription: _androidChannel.description,
+          channel.id,
+          channel.name,
+          channelDescription: channel.description,
           importance: Importance.high,
           priority: Priority.high,
           icon: '@mipmap/ic_launcher',

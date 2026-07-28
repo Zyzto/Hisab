@@ -10,6 +10,9 @@ import '../../../core/auth/predefined_avatars.dart';
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/repository/repository_providers.dart';
+import '../../../core/utils/form_validators.dart';
+import '../../groups/providers/groups_provider.dart';
+import '../providers/settings_framework_providers.dart';
 
 /// Bottom sheet to edit display name and avatar. Updates Supabase user_metadata.
 Future<void> showEditProfileSheet(
@@ -56,39 +59,69 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
     super.dispose();
   }
 
+  /// Repository requires a non-empty name; keep avatar sync working without one.
+  String _nameForParticipantSync(String typedName) {
+    if (typedName.isNotEmpty) return typedName;
+    final existing = (widget.profile.name ?? '').trim();
+    if (existing.isNotEmpty) return existing;
+    final email = (widget.profile.email ?? '').trim();
+    if (email.isNotEmpty) {
+      final local = email.split('@').first.trim();
+      if (local.isNotEmpty) return local;
+    }
+    final sub = widget.profile.sub.trim();
+    if (sub.isNotEmpty) return sub;
+    return 'User';
+  }
+
   Future<void> _save() async {
+    final newName = _nameController.text.trim();
+    // Empty clears display name in auth; non-empty must fit participants.name.
+    if (newName.isNotEmpty &&
+        FormValidators.participantName(newName) != null) {
+      setState(() => _error = 'field_too_long'.tr(
+            namedArgs: {'max': '${FormValidators.participantNameMax}'},
+          ));
+      return;
+    }
     setState(() {
       _error = null;
       _saving = true;
     });
     try {
       final authService = ref.read(authServiceProvider);
-      final newName = _nameController.text.trim();
       await authService.updateProfile(
         name: newName.isEmpty ? null : newName,
         avatarId: _selectedAvatarId,
       );
-      // Sync participant names and avatars across all groups
-      if (newName.isNotEmpty) {
-        final userId = authService.currentUser?.id;
-        if (userId != null) {
-          try {
-            await ref
-                .read(participantRepositoryProvider)
-                .updateProfileByUserId(
-                  userId,
-                  newName,
-                  avatarId: _selectedAvatarId,
-                );
-          } catch (e, st) {
-            Log.warning(
-              'Failed to sync participant profile',
-              error: e,
-              stackTrace: st,
-            );
-          }
+      // Sync participant names/avatars across groups. Name is required by the
+      // repository; fall back so avatar-only edits still propagate.
+      final nameForParticipants = _nameForParticipantSync(newName);
+      final userId = authService.currentUser?.id;
+      if (userId != null) {
+        try {
+          await ref
+              .read(participantRepositoryProvider)
+              .updateProfileByUserId(
+                userId,
+                nameForParticipants,
+                avatarId: _selectedAvatarId,
+              );
+        } catch (e, st) {
+          Log.warning(
+            'Failed to sync participant profile',
+            error: e,
+            stackTrace: st,
+          );
         }
       }
+      // Ensure settings UI refreshes even if auth stream is slow/missed.
+      ref.invalidate(authUserProfileProvider);
+      ref.invalidate(currentUserProvider);
+      // Refresh participant streams so group People / Balance / expense detail
+      // pick up the new avatar without waiting for the next poll tick.
+      ref.invalidate(participantsByGroupProvider);
+      ref.invalidate(activeParticipantsByGroupProvider);
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
@@ -162,7 +195,9 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                 hintText: 'auth_name_hint'.tr(),
                 prefixIcon: const Icon(Icons.badge_outlined),
                 border: const OutlineInputBorder(),
+                counterText: '',
               ),
+              maxLength: FormValidators.participantNameMax,
               textInputAction: TextInputAction.done,
               enabled: !_saving,
             ),

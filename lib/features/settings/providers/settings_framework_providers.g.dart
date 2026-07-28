@@ -725,6 +725,47 @@ final class Use24HourFormatProvider
 
 String _$use24HourFormatHash() => r'1d0dedb6f9ad10dcdc5dc1a32ba5dbb2a294bab8';
 
+@ProviderFor(subtleAccents)
+final subtleAccentsProvider = SubtleAccentsProvider._();
+
+final class SubtleAccentsProvider
+    extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  SubtleAccentsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'subtleAccentsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$subtleAccentsHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return subtleAccents(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$subtleAccentsHash() => r'9c4f2e1a0b7d6c5e8f3a2b1c0d9e8f7a6b5c4d3e';
+
 @ProviderFor(authUserProfile)
 final authUserProfileProvider = AuthUserProfileProvider._();
 

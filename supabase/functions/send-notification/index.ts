@@ -85,7 +85,7 @@ async function getFcmAccessToken(serviceAccountKey: string): Promise<string> {
 }
 
 /** Result of sending one FCM message. */
-type SendResult = { ok: true } | { ok: false; error: string; stale?: boolean };
+type SendResult = { ok: true } | { ok: false, error: string, stale?: boolean };
 
 /** Send one FCM v1 message to a single token. */
 async function sendFcmMessage(
@@ -148,16 +148,6 @@ async function handleNotificationRequest(req: Request): Promise<Response> {
     });
   }
 
-  const projectId = Deno.env.get("FCM_PROJECT_ID");
-  const serviceAccountKey = Deno.env.get("FCM_SERVICE_ACCOUNT_KEY");
-  if (!projectId || !serviceAccountKey) {
-    console.error("send-notification: FCM_PROJECT_ID or FCM_SERVICE_ACCOUNT_KEY not set");
-    return new Response(JSON.stringify({ error: "Server configuration error" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
   let payload: TriggerPayload;
   try {
     payload = (await req.json()) as TriggerPayload;
@@ -174,6 +164,29 @@ async function handleNotificationRequest(req: Request): Promise<Response> {
       headers: { "Content-Type": "application/json" },
     });
   }
+
+  const fcmProjectId = Deno.env.get("FCM_PROJECT_ID");
+  const fcmServiceAccountKey = Deno.env.get("FCM_SERVICE_ACCOUNT_KEY");
+  const dryRun =
+    Deno.env.get("DRY_RUN") === "true" || !fcmProjectId || !fcmServiceAccountKey;
+  if (dryRun) {
+    // Local / CI without FCM secrets: validate auth + payload, skip FCM.
+    console.log("send-notification: dry_run (FCM secrets missing or DRY_RUN=true)", {
+      action: payload.action,
+      group_id: payload.group_id,
+    });
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        dry_run: true,
+        sent: 0,
+        message: "dry_run: FCM not configured",
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  }
+  const projectId = fcmProjectId;
+  const serviceAccountKey = fcmServiceAccountKey;
 
   // Normalize actor so joinee is never sent member_joined (handles UUID/casing from trigger).
   const actorNorm = String(payload?.actor_user_id ?? "").trim().toLowerCase();

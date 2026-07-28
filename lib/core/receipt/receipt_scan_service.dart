@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -68,7 +69,7 @@ class ReceiptScanFallback extends ReceiptScanResult {
 
 /// Short error message for user-facing display.
 String shortReceiptErrorMessage(Object? e) {
-  if (e == null) return 'Unknown error';
+  if (e == null) return 'unknown_error'.tr();
   final s = e.toString().replaceFirst(RegExp(r'^Exception:?\s*'), '').trim();
   final firstLine = s.split(RegExp(r'[\n\r]')).first.trim();
   return firstLine.length > 120
@@ -130,7 +131,9 @@ Future<ReceiptScanResult?> processReceiptFile(
       final parsed = parseReceiptJson(responseText, fallbackDate);
       if (parsed != null) {
         final result = ReceiptScanParsed(
-          vendor: parsed.vendor.isNotEmpty ? parsed.vendor : 'Receipt',
+          vendor: parsed.vendor.isNotEmpty
+              ? parsed.vendor
+              : 'receipt_fallback_vendor'.tr(),
           date: parsed.date,
           total: parsed.total,
         );

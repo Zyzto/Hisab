@@ -35,6 +35,7 @@ This guide walks you through setting up the Supabase backend for Hisab from scra
    - [Migration 19: Groups allow_member_settle_for_others](#migration-19-groups-allow_member_settle_for_others)
    - [Migration 20: Fix accept_invite null-expiry validation](#migration-20-fix-accept_invite-null-expiry-validation)
    - [Post–Migration 20: Invite access mode and read-only preview](#postmigration-20-invite-access-mode-and-read-only-preview)
+   - [Migration 21: allow_expense_as_other, groups RLS, delete_my_data, feedback storage](#migration-21-allow_expense_as_other-groups-rls-delete_my_data-feedback-storage)
 4. [Configure Authentication](#4-configure-authentication)
 5. [Deploy Edge Functions](#5-deploy-edge-functions)
    - [Push notifications: end-to-end flow and verification](#push-notifications-end-to-end-flow-and-verification)
@@ -98,26 +99,32 @@ supabase status         # API URL and anon key for --dart-define / .env
 
 The Supabase CLI talks to the Docker API. With **Podman**, point `DOCKER_HOST` at Podman’s socket so `supabase start` uses your containers.
 
-**Linux (rootless, common setup)**
+**Linux (rootful — recommended on NixOS)**
 
-1. Enable the user socket (once): `systemctl --user enable --now podman.socket`
-2. From a new shell, either export the socket or use the repo helper:
+Kong under rootless Podman often dies with `can't create /home/kong/kong.yml: Permission denied`. Prefer the system socket:
+
+```bash
+sudo systemctl enable --now podman.socket
+export DOCKER_HOST=unix:///run/podman/podman.sock
+# user must be in the podman group (socket mode 660, root:podman)
+cd /path/to/Hisab
+supabase start -x logflare,vector   # or: ./scripts/local_test_env.sh up
+curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:54321/auth/v1/health
+```
+
+Full LAN + FCM test flow: [LOCAL_TEST_ENV.md](LOCAL_TEST_ENV.md).
+
+**Linux (rootless)**
+
+1. Enable the user socket: `systemctl --user enable --now podman.socket`
+2. Export and start (CLI ≥ 2.13.6; may still fail Kong on some hosts):
 
 ```bash
 export DOCKER_HOST=unix://${XDG_RUNTIME_DIR}/podman/podman.sock
-cd /path/to/Hisab
-npx supabase start
-```
-
-Or run any subcommand via:
-
-```bash
 ./scripts/supabase_with_podman.sh start
-./scripts/supabase_with_podman.sh db reset
-./scripts/supabase_with_podman.sh status
 ```
 
-The script sets `DOCKER_HOST` when it finds `${XDG_RUNTIME_DIR}/podman/podman.sock` or `/run/user/$(id -u)/podman/podman.sock`.
+Helpers also accept `/run/podman/podman.sock` when present (`local_test_env.sh` prefers it).
 
 **macOS**
 
@@ -1789,6 +1796,17 @@ This migration preserves participant reuse (`left_at` restoration), invite usage
 -- supabase/migrations/20260306120000_fix_accept_invite_null_expiry_validation.sql
 ```
 
+### Migration 21: allow_expense_as_other, groups RLS, delete_my_data, feedback storage
+
+Closes client/schema drift that broke online group settings sync and Delete cloud data:
+
+| File | Purpose |
+|------|---------|
+| `20260728120000_fix_groups_columns_rls_delete_my_data.sql` | Adds `groups.allow_expense_as_other_participant`; groups UPDATE RLS allows members when `allow_member_change_settings`; participants UPDATE allows own `user_id` row; creates `get_delete_my_data_preview` / `delete_my_data` |
+| `20260728120100_feedback_screenshots_storage.sql` | Storage RLS for `feedback-screenshots` bucket (declared in `supabase/config.toml`) |
+
+Apply with `supabase db push` / `db reset` (local) or paste SQL via SQL Editor / MCP on hosted projects. After this, the Flutter client sends personal/budget/settle/permission fields on online `groups.update` (no longer stripped).
+
 ### Post–Migration 20: Invite access mode and read-only preview
 
 **Cloud vs repo:** Hosted Supabase should expose the same **schema and RPC behavior** as this repository. The ordered source of truth is every file under [`supabase/migrations/`](../supabase/migrations/) (lexicographic order matches apply order). Dashboard **migration version strings** may differ from these filenames (e.g. applied via SQL Editor or squashed under another timestamp); use live checks below—not only the migration list—to detect drift.
@@ -2181,7 +2199,7 @@ After completing all steps:
    - `handle_updated_at`, `get_user_role`, `is_group_member`, `get_my_participant_id`
    - `get_invite_by_token`, `accept_invite`, `create_invite`, `revoke_invite`, `toggle_invite_active`
    - `transfer_ownership`, `leave_group`, `kick_member`, `update_member_role`, `assign_participant`, `merge_participant_with_member`
-  - `get_delete_my_data_preview`, `delete_my_data` (for Settings > Delete cloud data; see migration `20250101000007_schema_additions.sql` for related sync/schema additions and migration `20250101000017_anonymize_on_delete.sql` for account-delete anonymization behavior.)
+  - `get_delete_my_data_preview`, `delete_my_data` (Settings → Delete cloud data; migration `20260728120000_fix_groups_columns_rls_delete_my_data.sql`. Account-delete display-name anonymization: `20250101000017_anonymize_on_delete.sql`.)
 
 4. **Edge Functions**: Go to **Edge Functions** and verify `invite-redirect`, `telemetry`, and `send-notification` are deployed and active (for push notifications, also set `FCM_PROJECT_ID` and `FCM_SERVICE_ACCOUNT_KEY` secrets; see Section 5).
 
@@ -2195,7 +2213,7 @@ The following matches the live schema when Migrations 1–8 (or equivalent) are 
 
 | Table | Key columns (public schema) |
 |-------|-----------------------------|
-| **groups** | id, name, currency_code, owner_id, settlement_method, treasurer_participant_id, settlement_freeze_at, settlement_snapshot_json, allow_member_add_expense, allow_member_add_participant, allow_member_change_settings, require_participant_assignment, allow_expense_as_other_participant, allow_member_settle_for_others, icon, color, created_at, updated_at |
+| **groups** | id, name, currency_code, owner_id, settlement_method, treasurer_participant_id, settlement_freeze_at, settlement_snapshot_json, allow_member_add_expense, allow_member_add_participant, allow_member_change_settings, require_participant_assignment, allow_expense_as_other_participant, allow_member_settle_for_others, icon, color, archived_at, is_personal, budget_amount_cents, created_at, updated_at |
 | **participants** | id, group_id, name, sort_order, user_id, avatar_id, left_at, created_at, updated_at |
 | **group_members** | id, group_id, user_id, role, participant_id, joined_at |
 | **expenses** | id, group_id, payer_participant_id, amount_cents, currency_code, exchange_rate, base_amount_cents, title, description, date, split_type, split_shares_json, type, to_participant_id, tag, line_items_json, image_path, image_paths, created_at, updated_at |
@@ -2302,7 +2320,7 @@ The "Current schema reference" table above can be re-verified with `list_tables`
 
 ### Group settings change fails (PGRST204 or "column ... does not exist")
 
-- **Cause:** PostgREST’s schema cache is missing columns added in later migrations. The app **omits** `archived_at`, `is_personal`, `budget_amount_cents`, and `allow_member_settle_for_others` from the generic group update so that name, icon, color, settlement method, and permission changes succeed even when Migrations 12, 16, or 20 are not applied. If you still see PGRST204, the failure may be for another column (e.g. `icon`/`color` from Migration 7).
+- **Cause:** PostgREST’s schema cache is missing columns added in later migrations. Apply migrations through Migration 21 (`allow_expense_as_other_participant`, personal/budget/settle columns, etc.) and reload the schema cache. The app sends those fields on online `groups.update` (only `id` and `archived_at` are omitted from the generic update; archive uses dedicated methods). If you still see PGRST204, the failure may be for another column (e.g. `icon`/`color` from Migration 7).
 - **Fix:** Apply the missing migrations in the Supabase **SQL Editor** so the `groups` table has all columns:
 
   **Migration 12 (archive):**

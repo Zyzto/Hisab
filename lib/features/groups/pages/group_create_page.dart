@@ -15,6 +15,8 @@ import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/currency_helpers.dart';
 import '../../../core/utils/form_validators.dart';
 import '../../../core/utils/run_guarded_async.dart';
+import '../../../core/theme/accent_style.dart';
+import '../../../core/widgets/participant_avatar.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 import '../utils/group_icon_utils.dart';
 import '../widgets/group_color_picker.dart';
@@ -185,7 +187,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
 
   void _addParticipant() {
     final name = _participantController.text.trim();
-    if (name.isEmpty) return;
+    if (FormValidators.participantName(name) != null) return;
     setState(() {
       _participants.add(name);
       _participantController.clear();
@@ -212,9 +214,18 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
 
   Future<void> _createGroup() async {
     if (_saving) return;
+    final name = _nameController.text.trim();
+    if (FormValidators.groupName(name) != null) {
+      // Jump back to name step if somehow invalid on create.
+      if (_currentPage != 0) {
+        _pageController.jumpToPage(0);
+        setState(() => _currentPage = 0);
+      }
+      _nameFormKey.currentState?.validate();
+      return;
+    }
     setState(() => _saving = true);
     try {
-      final name = _nameController.text.trim();
       final currencyCode = _selectedCurrency.code;
       final repo = ref.read(groupRepositoryProvider);
       final budgetAmountCents = widget.isPersonal
@@ -483,8 +494,10 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                 hintText: 'wizard_name_hint'.tr(),
                 border: const OutlineInputBorder(),
                 prefixIcon: const Icon(Icons.group_outlined),
+                counterText: '',
               ),
-              validator: FormValidators.required,
+              validator: FormValidators.groupName,
+              maxLength: FormValidators.groupNameMax,
               textInputAction: TextInputAction.next,
               onChanged: (_) => setState(() {}),
             ),
@@ -604,57 +617,68 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
         const SizedBox(height: ThemeConfig.spacingL),
 
         // Owner card (non-removable)
-        Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
-            side: BorderSide(color: colorScheme.primary.withValues(alpha: 0.3)),
-          ),
-          color: colorScheme.primaryContainer.withValues(alpha: 0.2),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: colorScheme.primary,
-              child: Icon(Icons.person, color: colorScheme.onPrimary),
-            ),
-            title: Text(
-              'wizard_you'.tr(),
-              style: theme.textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.w600,
+        Builder(
+          builder: (context) {
+            final profile = ref.watch(authUserProfileProvider).value;
+            final profileName = profile?.name?.trim();
+            final displayName = (profileName != null && profileName.isNotEmpty)
+                ? profileName
+                : 'wizard_you'.tr();
+            return Container(
+              decoration: BoxDecoration(
+                color: AccentSurfaces.emphasizedFill(
+                  colorScheme,
+                  subtle: context.subtleAccents,
+                ),
+                borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
+                border: Border.all(
+                  color: AccentSurfaces.emphasizedBorder(
+                    colorScheme,
+                    subtle: context.subtleAccents,
+                  ),
+                ),
               ),
-            ),
-            subtitle: Text('wizard_owner'.tr()),
-          ),
+              child: ListTile(
+                leading: ParticipantAvatar(
+                  name: displayName,
+                  avatarId: profile?.avatarId,
+                  backgroundColor: colorScheme.primary.withValues(alpha: 0.16),
+                  foregroundColor: colorScheme.primary,
+                ),
+                title: Text(
+                  'wizard_you'.tr(),
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: Text('wizard_owner'.tr()),
+              ),
+            );
+          },
         ),
         const SizedBox(height: ThemeConfig.spacingS),
 
         // Added participants
         ...List.generate(_participants.length, (i) {
-          return Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
-              side: BorderSide(
-                color: colorScheme.outline.withValues(alpha: 0.2),
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Container(
+              decoration: AccentSurfaces.flatPanel(
+                colorScheme,
+                radius: ThemeConfig.radiusL,
               ),
-            ),
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: colorScheme.surfaceContainerHighest,
-                child: Text(
-                  _participants[i].isNotEmpty
-                      ? _participants[i][0].toUpperCase()
-                      : '?',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: colorScheme.onSurface,
-                  ),
+              child: ListTile(
+                leading: ParticipantAvatar(
+                  name: _participants[i],
+                  backgroundColor: colorScheme.surfaceContainerHighest,
+                  foregroundColor: colorScheme.onSurface,
                 ),
-              ),
-              title: Text(_participants[i]),
-              trailing: IconButton(
-                icon: Icon(Icons.close, color: colorScheme.error),
-                onPressed: () => _removeParticipant(i),
-                tooltip: 'remove'.tr(),
+                title: Text(_participants[i]),
+                trailing: IconButton(
+                  icon: Icon(Icons.close, color: colorScheme.error),
+                  onPressed: () => _removeParticipant(i),
+                  tooltip: 'remove'.tr(),
+                ),
               ),
             ),
           );
@@ -673,7 +697,9 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                   hintText: 'wizard_participant_hint'.tr(),
                   border: const OutlineInputBorder(),
                   prefixIcon: const Icon(Icons.person_add_outlined),
+                  counterText: '',
                 ),
+                maxLength: FormValidators.participantNameMax,
                 textInputAction: TextInputAction.done,
                 onSubmitted: (_) => _addParticipant(),
               ),
@@ -844,52 +870,53 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
         const SizedBox(height: ThemeConfig.spacingL),
 
         // Summary card
-        Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(ThemeConfig.radiusXL),
-            side: BorderSide(color: colorScheme.outline.withValues(alpha: 0.2)),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(ThemeConfig.spacingL),
+          decoration: AccentSurfaces.panel(
+            colorScheme,
+            subtle: context.subtleAccents,
+            accentContainer: _selectedColor.withValues(alpha: 0.35),
+            accentBorder: _selectedColor,
+            radius: ThemeConfig.radiusXL,
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(ThemeConfig.spacingL),
-            child: Column(
-              children: [
-                // Group avatar
-                Builder(
-                  builder: (_) {
-                    final fgOnColor = ThemeConfig.foregroundOnBackground(
-                      _selectedColor,
-                    );
-                    return CircleAvatar(
-                      radius: 36,
-                      backgroundColor: _selectedColor,
-                      child:
-                          iconDef != null && iconDef.key != groupIconLetterKey
-                          ? Icon(iconDef.icon, size: 36, color: fgOnColor)
-                          : Text(
-                              _nameController.text.trim().isNotEmpty
-                                  ? _nameController.text.trim()[0].toUpperCase()
-                                  : '?',
-                              style: theme.textTheme.headlineMedium?.copyWith(
-                                color: fgOnColor,
-                                fontWeight: FontWeight.bold,
-                              ),
+          child: Column(
+            children: [
+              // Group avatar
+              Builder(
+                builder: (_) {
+                  final fgOnColor = ThemeConfig.foregroundOnBackground(
+                    _selectedColor,
+                  );
+                  return CircleAvatar(
+                    radius: 36,
+                    backgroundColor: _selectedColor,
+                    child: iconDef != null && iconDef.key != groupIconLetterKey
+                        ? Icon(iconDef.icon, size: 36, color: fgOnColor)
+                        : Text(
+                            _nameController.text.trim().isNotEmpty
+                                ? _nameController.text.trim()[0].toUpperCase()
+                                : '?',
+                            style: theme.textTheme.headlineMedium?.copyWith(
+                              color: fgOnColor,
+                              fontWeight: FontWeight.bold,
                             ),
-                    );
-                  },
+                          ),
+                  );
+                },
+              ),
+              const SizedBox(height: ThemeConfig.spacingM),
+              // Group name
+              Text(
+                _nameController.text.trim(),
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(height: ThemeConfig.spacingM),
-                // Group name
-                Text(
-                  _nameController.text.trim(),
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: ThemeConfig.spacingL),
-                const Divider(),
-                const SizedBox(height: ThemeConfig.spacingS),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: ThemeConfig.spacingL),
+              const Divider(),
+              const SizedBox(height: ThemeConfig.spacingS),
 
                 // Currency row
                 _SummaryRow(
@@ -980,7 +1007,6 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                 ),
               ],
             ),
-          ),
         ),
       ],
     );

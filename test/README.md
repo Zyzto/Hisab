@@ -1,6 +1,18 @@
-# Hisab tests
+# Tests
 
 <!-- markdownlint-disable MD031 MD032 MD036 MD040 MD060 -->
+
+How to run unit, widget, integration, and online tests for Hisab. Product overview: [../README.md](../README.md). Doc index: [../docs/README.md](../docs/README.md).
+
+## Local stack (Supabase + Edge)
+
+```bash
+./scripts/local_test_env.sh up          # start, db reset, write dart_defines_local.json
+./scripts/local_test_env.sh test-edge   # HTTP smoke: telemetry, invite-redirect, og, send-notification dry-run
+./scripts/local_test_env.sh down
+```
+
+Details: [docs/LOCAL_TEST_ENV.md](../docs/LOCAL_TEST_ENV.md). VS Code: **Hisab (Local Online)** / **Hisab (Chrome Local Online)**.
 
 ## Running tests
 
@@ -205,7 +217,7 @@ Online integration tests run the app against a **local Supabase instance** via t
 
 | Requirement | Check |
 |---|---|
-| Docker or Podman | `docker info` **or** `podman info`; for rootless Podman set `DOCKER_HOST` to the user socket (see [SUPABASE_SETUP.md](../docs/SUPABASE_SETUP.md#local-supabase-with-podman)) |
+| Docker or Podman | `docker info` **or** `podman info`; on NixOS prefer **rootful** Podman (`DOCKER_HOST=unix:///run/podman/podman.sock`, see [LOCAL_TEST_ENV.md](../docs/LOCAL_TEST_ENV.md)) |
 | Supabase CLI | `supabase --version` (install: `npm i -g supabase` or [docs](https://supabase.com/docs/guides/cli/getting-started)) |
 | Chrome + ChromeDriver (web) | Same as local integration tests (version-matched); only needed for web |
 
@@ -317,6 +329,7 @@ This check fails if required files are missing/untracked or if migration filenam
 | **Auth** | `integration_test/online/auth_online_test.dart` | Sign in User A → verify session → navigate to Settings → sign out → re-sign-in → sign in User B |
 | **Sync** | `integration_test/online/sync_online_test.dart` | Create group via UI → verify in Supabase DB → add expense → verify synced → delete group → verify removed |
 | **Invite** | `integration_test/online/invite_online_test.dart` | User A creates group + invite token → User B accepts (group_id assertion) → verify membership + `invite_usages` row → User A verifies member list |
+| **Edge smoke** | `test/edge/edge_functions_smoke_test.dart` | HTTP against local Edge Functions (telemetry, invite-redirect, og-invite-image, send-notification dry-run). Run via `./scripts/local_test_env.sh test-edge` |
 
 ### CI (GitHub Actions)
 
@@ -335,7 +348,7 @@ No additional GitHub secrets are needed — the local Supabase instance generate
 
 | Issue | Fix |
 |---|---|
-| `supabase start` hangs | Ensure the container engine is running (`docker info` or `podman info`). For Podman: `systemctl --user enable --now podman.socket` and set `DOCKER_HOST`. First run pulls ~2 GB of images. |
+| `supabase start` hangs / Kong permission denied | Prefer rootful: `sudo systemctl enable --now podman.socket` and `DOCKER_HOST=unix:///run/podman/podman.sock`. See [LOCAL_TEST_ENV.md](../docs/LOCAL_TEST_ENV.md). First run pulls ~2 GB of images. |
 | `ERROR: Could not get SUPABASE_URL` | Supabase didn't start. Check `docker ps` / `podman ps` and `supabase status`. |
 | Auth sign-in fails in test | Run `supabase db reset` to re-seed test users. |
 | `pg_net` extension error | Expected — migration 6 (notification triggers) is skipped locally. |

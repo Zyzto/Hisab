@@ -11,6 +11,8 @@
 /// ```
 library;
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 const supabaseUrl = String.fromEnvironment('SUPABASE_URL', defaultValue: '');
@@ -18,6 +20,22 @@ const supabaseAnonKey = String.fromEnvironment(
   'SUPABASE_ANON_KEY',
   defaultValue: '',
 );
+
+/// Supabase URL rewritten for the current device when needed.
+///
+/// Android emulators cannot reach the host via `127.0.0.1` / `localhost`;
+/// those hosts are mapped to `10.0.2.2`. Prefer a LAN IP in
+/// `dart_defines_local.json` for physical devices (see `local_test_env.sh`).
+String get effectiveSupabaseUrl {
+  final uri = Uri.tryParse(supabaseUrl);
+  if (uri == null) return supabaseUrl;
+  if (!kIsWeb &&
+      defaultTargetPlatform == TargetPlatform.android &&
+      (uri.host == '127.0.0.1' || uri.host == 'localhost')) {
+    return uri.replace(host: '10.0.2.2').toString();
+  }
+  return supabaseUrl;
+}
 
 /// Whether Supabase is configured and online mode can be used.
 bool get supabaseConfigAvailable =>

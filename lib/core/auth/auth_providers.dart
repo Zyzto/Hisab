@@ -15,13 +15,17 @@ AuthService authService(Ref ref) => AuthService();
 /// Emits a new value whenever auth state changes. We use [int] (not [AuthState])
 /// so Riverpod never stores Supabase's JS-backed types, avoiding web-only
 /// dart_rti / NoSuchMethodError when the stream updates.
+///
+/// Values must be unique per event: Riverpod skips rebuilds when
+/// `AsyncData(n) == AsyncData(n)`, so a constant `0` would hide profile updates.
 @riverpod
 Stream<int> authStateChanges(Ref ref) {
   if (!supabaseConfigAvailable) return const Stream.empty();
+  var tick = 0;
   return ref
       .watch(authServiceProvider)
       .onAuthStateChange
-      .map((_) => 0)
+      .map((_) => ++tick)
       .handleError((Object e, StackTrace st) {
         Log.warning('authStateChanges stream error', error: e, stackTrace: st);
       });

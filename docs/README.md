@@ -1,38 +1,73 @@
-# Hisab documentation index
+# Documentation
 
-Quick links to setup, backend, product, and UI docs.
+Guides for running, shipping, and extending **Hisab**. Start with the root [README](../README.md) for product overview and a short develop path; use this index when you need depth.
 
-## Setup and configuration
+---
 
-- [CONFIGURATION.md](CONFIGURATION.md) — Build-time config (`--dart-define`), running with/without Supabase
-- [SUPABASE_SETUP.md](SUPABASE_SETUP.md) — Full Supabase backend: project, migrations, auth, Edge Functions
-- [RELEASE_SETUP.md](RELEASE_SETUP.md) — One-time release setup (keystore, Play, Firebase Hosting, GitHub secrets)
-- [GITHUB_ACTIONS_SECRETS.md](GITHUB_ACTIONS_SECRETS.md) — Secret names and where to get them
-- [../SECURITY.md](../SECURITY.md) — Public repo secret policy (safe to commit vs never commit)
+## Start here
+
+| Doc | Use when you need to… |
+|-----|------------------------|
+| [CONFIGURATION.md](CONFIGURATION.md) | Pass `--dart-define` / define files; online vs local-only |
+| [LOCAL_TEST_ENV.md](LOCAL_TEST_ENV.md) | Run Supabase + Edge Functions on LAN (Podman) for device tests |
+| [SUPABASE_SETUP.md](SUPABASE_SETUP.md) | Create a hosted project, migrations, Auth, Edge deploy |
+| [CODEBASE.md](CODEBASE.md) | Map features, sync, navigation, and where code lives |
+| [../SECURITY.md](../SECURITY.md) | Know what never lands in a public commit |
+
+---
+
+## Setup and release
+
+| Doc | Topic |
+|-----|--------|
+| [RELEASE_SETUP.md](RELEASE_SETUP.md) | Keystore, Play, Firebase Hosting, one-time release checklist |
+| [GITHUB_ACTIONS_SECRETS.md](GITHUB_ACTIONS_SECRETS.md) | CI secret names and where each value comes from |
+| [SUPABASE_BACKUP.md](SUPABASE_BACKUP.md) | Database backup and restore |
+
+---
 
 ## Backend
 
-- [EDGE_FUNCTIONS.md](EDGE_FUNCTIONS.md) — Edge Functions list and deploy commands
-- [SUPABASE_BACKUP.md](SUPABASE_BACKUP.md) — Database backup and restore
+| Doc | Topic |
+|-----|--------|
+| [EDGE_FUNCTIONS.md](EDGE_FUNCTIONS.md) | Functions list, local smoke, deploy commands |
 
-## Product and legal
+---
 
-- [DELETE_ACCOUNT.md](DELETE_ACCOUNT.md) — User-facing: delete local/cloud data, request account deletion
-- [PLAY_CONSOLE_DECLARATIONS.md](PLAY_CONSOLE_DECLARATIONS.md) — Play Console: privacy, ads, content ratings
-- [PERSONAL_FEATURE.md](PERSONAL_FEATURE.md) — Personal (my-expenses-only) mode: data model and flows
-- [TRANSACTION_SCANNER.md](TRANSACTION_SCANNER.md) — Android notification → draft → personal expense scanner
+## Product
 
-## Web debugging
+| Doc | Topic |
+|-----|--------|
+| [PERSONAL_FEATURE.md](PERSONAL_FEATURE.md) | Personal (solo) lists — data model and flows |
+| [TRANSACTION_SCANNER.md](TRANSACTION_SCANNER.md) | Android notification → draft → personal expense |
+| [I18N.md](I18N.md) | `en` / `ar` keys, conventions, scanner strings |
+| [DELETE_ACCOUNT.md](DELETE_ACCOUNT.md) | Delete local/cloud data; account deletion request |
+| [PLAY_CONSOLE_DECLARATIONS.md](PLAY_CONSOLE_DECLARATIONS.md) | Play Console privacy, ads, content ratings |
 
-- [WEB_DEBUGGING.md](WEB_DEBUGGING.md) — Dart Debug Chrome extension for meaningful console messages and DevTools when running the web app locally
-- [WEB_IOS_SAFARI_PERFORMANCE.md](WEB_IOS_SAFARI_PERFORMANCE.md) — iOS Safari Flutter web performance diagnosis, semantics tradeoff, renderer rollout, and verification checklist
+---
 
-## UI and layout
+## Web and UI
 
-- [ADAPTIVE_RESPONSIVE_PLAN.md](ADAPTIVE_RESPONSIVE_PLAN.md) — Plan for adaptive/responsive UI (breakpoints, SafeArea, large screens)
-- [MODAL_CENTERING_AND_RESPONSIVE_SHEET.md](MODAL_CENTERING_AND_RESPONSIVE_SHEET.md) — Modal centering on web, click-outside-to-close, implementation details
+| Doc | Topic |
+|-----|--------|
+| [WEB_DEBUGGING.md](WEB_DEBUGGING.md) | Meaningful Chrome console / DevTools for Flutter web |
+| [WEB_IOS_SAFARI_PERFORMANCE.md](WEB_IOS_SAFARI_PERFORMANCE.md) | iOS Safari performance, semantics, renderer checklist |
+| [ADAPTIVE_RESPONSIVE_PLAN.md](ADAPTIVE_RESPONSIVE_PLAN.md) | Breakpoints, SafeArea, large-screen direction |
+| [MODAL_CENTERING_AND_RESPONSIVE_SHEET.md](MODAL_CENTERING_AND_RESPONSIVE_SHEET.md) | Modal centering, dismiss-outside, sheet behavior |
 
-## Codebase and tests
+---
 
-- [CODEBASE.md](CODEBASE.md) — Codebase overview: stack, layout, data/sync, features (including Transaction Scanner), navigation (wizards, decorative URLs, navigation trace for error reports), error reporting / Share–GitHub flow
-- [../test/README.md](../test/README.md) — How to run unit, widget, and integration tests
+## Tests
+
+| Doc | Topic |
+|-----|--------|
+| [../test/README.md](../test/README.md) | Unit, widget, integration, online, and Edge smoke |
+
+---
+
+## Suggested reading order
+
+1. **Contributor, no cloud** — [CONFIGURATION.md](CONFIGURATION.md) (local-only), then [CODEBASE.md](CODEBASE.md).
+2. **Device + local backend** — [LOCAL_TEST_ENV.md](LOCAL_TEST_ENV.md), then [EDGE_FUNCTIONS.md](EDGE_FUNCTIONS.md).
+3. **Hosted online** — [SUPABASE_SETUP.md](SUPABASE_SETUP.md), then [CONFIGURATION.md](CONFIGURATION.md) for defines.
+4. **Ship a release** — [RELEASE_SETUP.md](RELEASE_SETUP.md) + [GITHUB_ACTIONS_SECRETS.md](GITHUB_ACTIONS_SECRETS.md); keep [SECURITY.md](../SECURITY.md) open while adding secrets.

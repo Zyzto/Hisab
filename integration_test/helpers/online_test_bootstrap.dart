@@ -120,7 +120,7 @@ Future<bool> runOnlineTestApp({
     final effectiveSupabaseUrl = _effectiveSupabaseUrlForDevice(supabaseUrl);
     await Supabase.initialize(
       url: effectiveSupabaseUrl,
-      anonKey: supabaseAnonKey,
+      publishableKey: supabaseAnonKey,
     );
   } catch (e) {
     // Already initialized (e.g. re-run in same process) – ignore

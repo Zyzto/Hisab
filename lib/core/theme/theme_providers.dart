@@ -1,7 +1,9 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/legacy.dart' show StateProvider;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'accent_style.dart';
 import 'experiment_styles.dart';
 import 'flex_theme_builder.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
@@ -11,19 +13,21 @@ part 'theme_providers.g.dart';
 /// Experiment: cycle through 6 app styles (Default + 5 Material 3). In memory only.
 final experimentStyleIndexProvider = StateProvider<int>((ref) => 0);
 
-const _experimentStyleNames = [
-  'Default',
-  'Finance Professional',
-  'Playful Bubble',
-  'Elevated Surface',
-  'Tech Utility',
-  'Editorial List',
+const _experimentStyleKeys = [
+  'theme_style_default',
+  'theme_style_finance_professional',
+  'theme_style_playful_bubble',
+  'theme_style_elevated_surface',
+  'theme_style_tech_utility',
+  'theme_style_editorial_list',
 ];
 
-/// Returns the display name for the experiment style at [index]. Used in AppBar subtitle and toast.
+/// Returns the localized display name for the experiment style at [index].
 String experimentStyleNameAt(int index) {
-  if (index < 0 || index >= _experimentStyleNames.length) return 'Default';
-  return _experimentStyleNames[index];
+  if (index < 0 || index >= _experimentStyleKeys.length) {
+    return 'theme_style_default'.tr();
+  }
+  return _experimentStyleKeys[index].tr();
 }
 
 /// Holds both light and dark themes. Built once per theme-setting change.
@@ -34,7 +38,8 @@ class AppThemes {
   const AppThemes({required this.light, required this.dark});
 }
 
-/// Theme data provider. Rebuilds when themeMode, themeScheme, themeColor, fontSizeScale, or experiment style index change.
+/// Theme data provider. Rebuilds when themeMode, themeScheme, themeColor,
+/// fontSizeScale, subtleAccents, or experiment style index change.
 @riverpod
 AppThemes appThemes(Ref ref) {
   final experimentIndex = ref.watch(experimentStyleIndexProvider);
@@ -42,21 +47,28 @@ AppThemes appThemes(Ref ref) {
   final themeSchemeValue = ref.watch(themeSchemeProvider);
   final themeColorValue = ref.watch(themeColorProvider);
   final fontSizeScaleValue = ref.watch(fontSizeScaleProvider);
+  final subtleAccentsValue = ref.watch(subtleAccentsProvider);
 
   // Index 0 = Default: use FlexColorScheme-based theme from settings.
   if (experimentIndex == 0) {
-    final lightTheme = FlexThemeBuilder.light(
-      themeScheme: themeSchemeValue,
-      themeColorValue: themeColorValue,
-      fontSizeScale: fontSizeScaleValue,
-      alwaysShowScrollbars: kIsWeb,
+    final lightTheme = withAccentStyle(
+      FlexThemeBuilder.light(
+        themeScheme: themeSchemeValue,
+        themeColorValue: themeColorValue,
+        fontSizeScale: fontSizeScaleValue,
+        alwaysShowScrollbars: kIsWeb,
+      ),
+      subtleAccents: subtleAccentsValue,
     );
-    final darkTheme = FlexThemeBuilder.dark(
-      themeScheme: themeSchemeValue,
-      themeColorValue: themeColorValue,
-      fontSizeScale: fontSizeScaleValue,
-      alwaysShowScrollbars: kIsWeb,
-      amoled: themeModeValue == 'amoled',
+    final darkTheme = withAccentStyle(
+      FlexThemeBuilder.dark(
+        themeScheme: themeSchemeValue,
+        themeColorValue: themeColorValue,
+        fontSizeScale: fontSizeScaleValue,
+        alwaysShowScrollbars: kIsWeb,
+        amoled: themeModeValue == 'amoled',
+      ),
+      subtleAccents: subtleAccentsValue,
     );
     return AppThemes(light: lightTheme, dark: darkTheme);
   }
@@ -67,7 +79,10 @@ AppThemes appThemes(Ref ref) {
     themeMode: themeModeValue,
     fontSizeScale: fontSizeScaleValue,
   );
-  return AppThemes(light: result.light, dark: result.dark);
+  return AppThemes(
+    light: withAccentStyle(result.light, subtleAccents: subtleAccentsValue),
+    dark: withAccentStyle(result.dark, subtleAccents: subtleAccentsValue),
+  );
 }
 
 /// ThemeMode for MaterialApp. Separate so locale changes don't trigger theme rebuild.

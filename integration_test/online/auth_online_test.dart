@@ -83,6 +83,9 @@ void main() {
         expect(client.auth.currentUser, isNotNull);
         expect(client.auth.currentUser!.email, equals(testUserAEmail));
       });
+
+      // Leave a clean session for the next testWidgets boot (web release flake).
+      await signOutCurrentUser();
     });
 
     testWidgets('sign-in with User B works', (tester) async {

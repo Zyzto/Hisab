@@ -30,13 +30,11 @@ Future<void> handleFeedback(
   } else if (feedback.screenshot.isNotEmpty) {
     buffer.writeln();
     buffer.writeln();
-    buffer.writeln(
-      '(Screenshot was captured; please attach it manually if needed.)',
-    );
+    buffer.writeln('feedback_screenshot_manual_note'.tr());
   }
 
   final body = buffer.toString();
-  const title = 'Feedback';
+  final title = 'feedback_issue_title'.tr();
 
   final screenshotBytes = feedback.screenshot.isNotEmpty
       ? feedback.screenshot

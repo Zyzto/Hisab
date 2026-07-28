@@ -17,6 +17,7 @@ import '../../groups/providers/groups_provider.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 import '../../settings/settings_definitions.dart';
 import '../../groups/widgets/group_card.dart';
+import '../../groups/widgets/group_section_header.dart';
 import '../../transaction_scanner/providers/scanner_providers.dart';
 import '../providers/home_list_provider.dart';
 import '../../../domain/domain.dart';
@@ -320,10 +321,7 @@ class HomePage extends ConsumerWidget {
                       onPressed: clearSelection,
                       tooltip: 'cancel'.tr(),
                     )
-                  : const Padding(
-                      padding: EdgeInsets.only(left: 8),
-                      child: SyncStatusChip(),
-                    ),
+                  : const SyncStatusChip(),
               title: inSelectionMode
                   ? Text(
                       selectedGroups.length == 1
@@ -402,24 +400,38 @@ class HomePage extends ConsumerWidget {
                                 ),
                                 child: Center(
                                   child: Padding(
-                                    padding: const EdgeInsets.all(24.0),
+                                    padding: const EdgeInsets.all(32.0),
                                     child: Column(
                                       mainAxisAlignment:
                                           MainAxisAlignment.center,
                                       children: [
-                                        Icon(
-                                          Icons.group_outlined,
-                                          size: 64,
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.onSurfaceVariant,
+                                        Container(
+                                          width: 72,
+                                          height: 72,
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .primaryContainer
+                                                .withValues(alpha: 0.55),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Icon(
+                                            Icons.group_outlined,
+                                            size: 34,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.primary,
+                                          ),
                                         ),
                                         const SizedBox(height: 16),
                                         Text(
                                           'no_groups'.tr(),
-                                          style: Theme.of(
-                                            context,
-                                          ).textTheme.titleMedium,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleMedium
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w600,
+                                              ),
                                           textAlign: TextAlign.center,
                                         ),
                                         const SizedBox(height: 8),
@@ -554,19 +566,9 @@ class HomePage extends ConsumerWidget {
                         children: [
                           if (personal.isNotEmpty) ...[
                             Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                              child: Text(
-                                'personal'.tr(),
-                                style: Theme.of(context).textTheme.titleSmall
-                                    ?.copyWith(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant,
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                              child: GroupSectionHeader(
+                                label: 'personal'.tr(),
                               ),
                             ),
                             if (sortCustom && inSelectionMode)
@@ -596,20 +598,8 @@ class HomePage extends ConsumerWidget {
                             const SizedBox(height: 16),
                           ],
                           Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            child: Text(
-                              'groups'.tr(),
-                              style: Theme.of(context).textTheme.titleSmall
-                                  ?.copyWith(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurfaceVariant,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                            ),
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                            child: GroupSectionHeader(label: 'groups'.tr()),
                           ),
                           if (shared.isEmpty)
                             Padding(

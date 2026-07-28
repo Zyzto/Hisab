@@ -27,7 +27,8 @@ CREATE POLICY "group_members_insert" ON public.group_members
     public.get_user_role(group_id) IN ('owner', 'admin')
     OR (
       user_id = (SELECT auth.uid())
-      AND role = 'owner'
+      -- Qualify column: bare `role` is the SQL session role ('authenticated').
+      AND group_members.role = 'owner'
       AND public.is_group_owner(group_id)
     )
   );

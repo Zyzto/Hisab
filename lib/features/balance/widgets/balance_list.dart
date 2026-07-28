@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
+import '../../../core/theme/accent_style.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/error_report_helper.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/widgets/amount_with_secondary_display.dart';
 import '../../../core/widgets/error_content.dart';
+import '../../../core/widgets/participant_avatar.dart';
 import '../../../domain/domain.dart';
 import '../../groups/providers/group_member_provider.dart';
+import '../../groups/widgets/group_section_header.dart';
 import '../providers/balance_provider.dart';
 import 'record_settlement_sheet.dart';
 
@@ -66,7 +69,7 @@ class BalanceList extends ConsumerWidget {
         }
 
         final nameOf = {for (final p in participants) p.id: p.name};
-        final theme = Theme.of(context);
+        final avatarOf = {for (final p in participants) p.id: p.avatarId};
 
         // Flatten for ListView.builder: compute item count and build by index.
         // Keep frozen-state context visible in read-only preview too.
@@ -74,114 +77,62 @@ class BalanceList extends ConsumerWidget {
         var itemCount = (hasFrozen ? 1 : 0) + 4 + visibleBalances.length;
         itemCount += settlements.isEmpty ? 1 : settlements.length;
 
+        final bottomInset = MediaQuery.paddingOf(context).bottom;
         final listView = ListView.builder(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + bottomInset),
           itemCount: itemCount,
           itemBuilder: (context, index) {
             var i = index;
             if (hasFrozen) {
               if (i == 0) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Card(
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.pause_circle,
-                              color: theme.colorScheme.primary,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'settlement_frozen'.tr(),
-                                    style: theme.textTheme.titleSmall?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  Text(
-                                    'settlement_frozen_hint'.tr(),
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: theme.colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: readOnlyMode
-                                  ? null
-                                  : () => context.push(
-                                      RoutePaths.groupSettings(groupId),
-                                    ),
-                              child: Text('unfreeze_settlement'.tr()),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: _FrozenBanner(
+                    readOnlyMode: readOnlyMode,
+                    onUnfreeze: () =>
+                        context.push(RoutePaths.groupSettings(groupId)),
+                  ),
                 );
               }
               i -= 1;
             }
             if (i == 0) {
-              return Text('balance'.tr(), style: theme.textTheme.titleMedium);
+              return GroupSectionHeader(label: 'balance'.tr());
             }
             i--;
             if (i == 0) {
-              return const SizedBox(height: 8);
+              return const SizedBox(height: 10);
             }
             i--;
             if (i < visibleBalances.length) {
               final b = visibleBalances[i];
               final name = nameOf[b.participantId] ?? b.participantId;
-              final isPositive = b.balanceCents >= 0;
-              final color = isPositive
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.error;
-              final amountStyle =
-                  theme.textTheme.bodyLarge?.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.w600,
-                  ) ??
-                  TextStyle(color: color, fontWeight: FontWeight.w600);
-              return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  title: Text(name),
-                  trailing: AmountWithSecondaryDisplay(
-                    amountCents: b.balanceCents.abs(),
-                    groupCurrencyCode: group.currencyCode,
-                    primaryStyle: amountStyle,
-                    isNegative: !isPositive,
-                  ),
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _BalancePersonCard(
+                  name: name,
+                  avatarId: avatarOf[b.participantId],
+                  balanceCents: b.balanceCents,
+                  currencyCode: group.currencyCode,
                 ),
               );
             }
             i -= visibleBalances.length;
             if (i == 0) {
-              return Text('settle_up'.tr(), style: theme.textTheme.titleMedium);
+              return Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: GroupSectionHeader(label: 'settle_up'.tr()),
+              );
             }
             i--;
             if (i == 0) {
-              return const SizedBox(height: 8);
+              return const SizedBox(height: 10);
             }
             i--;
             if (settlements.isEmpty) {
-              return Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Text(
-                  'all_settled'.tr(),
-                  style: theme.textTheme.bodyMedium,
-                ),
+              return _SettledHintCard(
+                message: 'all_settled'.tr(),
+                icon: Icons.check_circle_outline_rounded,
               );
             }
             final s = settlements[i];
@@ -190,88 +141,23 @@ class BalanceList extends ConsumerWidget {
             final settlementTitle =
                 '${bidiIsolate(from)} \u200E\u2192\u200E ${bidiIsolate(to)}';
             final canRecord = canRecordSettlement(s);
-            return Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                title: Text(
-                  settlementTitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _SettlementCard(
+                title: settlementTitle,
+                settlement: s,
+                canRecord: canRecord,
+                readOnlyMode: readOnlyMode,
+                hasFrozen: hasFrozen,
+                onRecord: () => showRecordSettlementSheet(
+                  context,
+                  ref,
+                  groupId: groupId,
+                  currencyCode: group.currencyCode,
+                  settlement: s,
+                  fromName: from,
+                  toName: to,
                 ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    AmountWithSecondaryDisplay(
-                      amountCents: s.amountCents,
-                      groupCurrencyCode: s.currencyCode,
-                      primaryStyle: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                      secondaryStyle: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                      secondaryOnSameRow: true,
-                    ),
-                    if (s.items != null && s.items!.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      ...s.items!.map(
-                        (subItem) => Padding(
-                          padding: const EdgeInsets.only(left: 8),
-                          child: Text(
-                            '${subItem.title}: ${CurrencyFormatter.formatCents(subItem.amountCents, s.currencyCode)}',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                trailing: !readOnlyMode
-                    ? Semantics(
-                        label: canRecord
-                            ? 'record_settlement'.tr()
-                            : 'record_settlement_restricted'.tr(),
-                        button: true,
-                        child: IconButton(
-                          icon: Icon(
-                            Icons.payments_outlined,
-                            color: canRecord
-                                ? theme.colorScheme.primary
-                                : theme.colorScheme.onSurfaceVariant,
-                          ),
-                          tooltip: canRecord
-                              ? 'record_settlement'.tr()
-                              : 'record_settlement_restricted'.tr(),
-                          onPressed: canRecord
-                              ? () => showRecordSettlementSheet(
-                                  context,
-                                  ref,
-                                  groupId: groupId,
-                                  currencyCode: group.currencyCode,
-                                  settlement: s,
-                                  fromName: from,
-                                  toName: to,
-                                )
-                              : null,
-                        ),
-                      )
-                    : null,
-                onTap: hasFrozen || readOnlyMode
-                    ? null
-                    : canRecord
-                    ? () => showRecordSettlementSheet(
-                        context,
-                        ref,
-                        groupId: groupId,
-                        currencyCode: group.currencyCode,
-                        settlement: s,
-                        fromName: from,
-                        toName: to,
-                      )
-                    : null,
               ),
             );
           },
@@ -297,6 +183,312 @@ class BalanceList extends ConsumerWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _FrozenBanner extends StatelessWidget {
+  final bool readOnlyMode;
+  final VoidCallback onUnfreeze;
+
+  const _FrozenBanner({
+    required this.readOnlyMode,
+    required this.onUnfreeze,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
+      decoration: AccentSurfaces.panel(
+        colorScheme,
+        subtle: context.subtleAccents,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.14),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.pause_circle_filled_rounded,
+                  color: colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'settlement_frozen'.tr(),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'settlement_frozen_hint'.tr(),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: TextButton(
+              onPressed: readOnlyMode ? null : onUnfreeze,
+              child: Text('unfreeze_settlement'.tr()),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SettledHintCard extends StatelessWidget {
+  final String message;
+  final IconData icon;
+
+  const _SettledHintCard({
+    required this.message,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.45),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: colorScheme.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BalancePersonCard extends StatelessWidget {
+  final String name;
+  final String? avatarId;
+  final int balanceCents;
+  final String currencyCode;
+
+  const _BalancePersonCard({
+    required this.name,
+    this.avatarId,
+    required this.balanceCents,
+    required this.currencyCode,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isPositive = balanceCents >= 0;
+    final color = isPositive ? colorScheme.primary : colorScheme.error;
+    final amountStyle =
+        theme.textTheme.titleMedium?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w700,
+        ) ??
+        TextStyle(color: color, fontWeight: FontWeight.w700);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.45),
+        ),
+      ),
+      child: Row(
+        children: [
+          ParticipantAvatar(
+            name: name,
+            avatarId: avatarId,
+            backgroundColor: color.withValues(alpha: 0.14),
+            foregroundColor: color,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              name,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          AmountWithSecondaryDisplay(
+            amountCents: balanceCents.abs(),
+            groupCurrencyCode: currencyCode,
+            primaryStyle: amountStyle,
+            isNegative: !isPositive,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SettlementCard extends StatelessWidget {
+  final String title;
+  final SettlementTransaction settlement;
+  final bool canRecord;
+  final bool readOnlyMode;
+  final bool hasFrozen;
+  final VoidCallback onRecord;
+
+  const _SettlementCard({
+    required this.title,
+    required this.settlement,
+    required this.canRecord,
+    required this.readOnlyMode,
+    required this.hasFrozen,
+    required this.onRecord,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final s = settlement;
+
+    return Material(
+      color: colorScheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: hasFrozen || readOnlyMode
+            ? null
+            : canRecord
+            ? onRecord
+            : null,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.45),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.swap_horiz_rounded,
+                  color: colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    AmountWithSecondaryDisplay(
+                      amountCents: s.amountCents,
+                      groupCurrencyCode: s.currencyCode,
+                      primaryStyle: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.onSurface,
+                      ),
+                      secondaryStyle: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      secondaryOnSameRow: true,
+                    ),
+                    if (s.items != null && s.items!.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      ...s.items!.map(
+                        (subItem) => Padding(
+                          padding: const EdgeInsets.only(bottom: 2),
+                          child: Text(
+                            '${subItem.title}: ${CurrencyFormatter.formatCents(subItem.amountCents, s.currencyCode)}',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (!readOnlyMode)
+                Semantics(
+                  label: canRecord
+                      ? 'record_settlement'.tr()
+                      : 'record_settlement_restricted'.tr(),
+                  button: true,
+                  child: IconButton(
+                    icon: Icon(
+                      Icons.payments_outlined,
+                      color: canRecord
+                          ? colorScheme.primary
+                          : colorScheme.onSurfaceVariant,
+                    ),
+                    tooltip: canRecord
+                        ? 'record_settlement'.tr()
+                        : 'record_settlement_restricted'.tr(),
+                    onPressed: canRecord ? onRecord : null,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

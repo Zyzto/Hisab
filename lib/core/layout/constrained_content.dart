@@ -21,7 +21,11 @@ class ConstrainedContent extends StatelessWidget {
           context,
           contentAreaWidth,
         );
+        // Force LTR so [leftOffset] stays a physical-left inset and matches
+        // [ContentAlignedAppBar] (which uses Positioned.left). A plain Row
+        // would flip in RTL and shift the body away from the title.
         return Row(
+          textDirection: TextDirection.ltr,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(width: leftOffset),

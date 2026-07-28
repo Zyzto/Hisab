@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../theme/accent_style.dart';
+import 'group_section_header.dart';
+
 /// A tappable section header that expands/collapses to show [child].
 /// Used to indicate "there's something here" for optional or secondary content.
 class ExpandableSection extends StatefulWidget {
@@ -41,62 +44,67 @@ class _ExpandableSectionState extends State<ExpandableSection> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final summary = widget.trailingSummary;
     final semanticsLabel = summary != null && summary.isNotEmpty
         ? '${widget.title}, $summary'
         : widget.title;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Semantics(
-          label: semanticsLabel,
-          button: true,
-          expanded: _expanded,
-          child: InkWell(
-            onTap: () => setState(() => _expanded = !_expanded),
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Text(
-                          widget.title,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: theme.colorScheme.onSurface,
+    return Container(
+      width: double.infinity,
+      decoration: AccentSurfaces.flatPanel(colorScheme),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Semantics(
+            label: semanticsLabel,
+            button: true,
+            expanded: _expanded,
+            child: InkWell(
+              onTap: () => setState(() => _expanded = !_expanded),
+              borderRadius: BorderRadius.circular(14),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 14,
+                ),
+                child: GroupSectionHeader(
+                  label: widget.title,
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (summary != null && summary.isNotEmpty) ...[
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 160),
+                          child: Text(
+                            summary,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if (summary != null && summary.isNotEmpty) ...[
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Text(
-                              summary,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
+                        const SizedBox(width: 8),
                       ],
-                    ),
+                      Icon(
+                        _expanded ? Icons.expand_less : Icons.expand_more,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ],
                   ),
-                  Icon(
-                    _expanded ? Icons.expand_less : Icons.expand_more,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
-        if (_expanded) ...[const SizedBox(height: 12), widget.child],
-      ],
+          if (_expanded) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              child: widget.child,
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

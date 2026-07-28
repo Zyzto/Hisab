@@ -1,9 +1,11 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:path/path.dart' as p;
 import 'package:powersync/powersync.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:io';
 
 import 'package:hisab/core/database/powersync_schema.dart' as ps;
 import 'package:hisab/core/repository/powersync_repository.dart';
@@ -12,6 +14,20 @@ import 'package:hisab/domain/domain.dart';
 class MockSupabaseClient extends Mock implements SupabaseClient {}
 
 class MockGoTrueClient extends Mock implements GoTrueClient {}
+
+/// Awaitable stub for [SupabaseClient.rpc], which returns a filter builder.
+class _FakeRpcBuilder extends Fake implements PostgrestFilterBuilder<dynamic> {
+  _FakeRpcBuilder(this.value);
+
+  final dynamic value;
+
+  @override
+  Future<R> then<R>(
+    FutureOr<R> Function(dynamic value) onValue, {
+    Function? onError,
+  }) =>
+      Future<R>.sync(() => onValue(value));
+}
 
 void main() {
   bool powerSyncAvailable = false;
@@ -66,7 +82,7 @@ void main() {
       final repo = PowerSyncGroupInviteRepository(db!, supabaseClient: client);
       when(
         () => client.rpc('get_invite_by_token', params: any(named: 'params')),
-      ).thenReturn(Future.value([]) as dynamic);
+      ).thenAnswer((_) => _FakeRpcBuilder(<dynamic>[]));
 
       final result = await repo.getByToken('abc');
       expect(result, isNull);
@@ -80,11 +96,10 @@ void main() {
       when(() => auth.currentUser).thenReturn(null);
       when(
         () => client.rpc('create_invite', params: any(named: 'params')),
-      ).thenReturn(
-        Future.value([
-              {'id': 'invite-id', 'token': 'invite-token'},
-            ])
-            as dynamic,
+      ).thenAnswer(
+        (_) => _FakeRpcBuilder([
+          {'id': 'invite-id', 'token': 'invite-token'},
+        ]),
       );
 
       final result = await repo.createInvite(
@@ -123,11 +138,10 @@ void main() {
         when(() => auth.currentUser).thenReturn(null);
         when(
           () => client.rpc('create_invite', params: any(named: 'params')),
-        ).thenReturn(
-          Future.value([
-                {'id': 'invite-id-2', 'token': 'invite-token-2'},
-              ])
-              as dynamic,
+        ).thenAnswer(
+          (_) => _FakeRpcBuilder([
+            {'id': 'invite-id-2', 'token': 'invite-token-2'},
+          ]),
         );
 
         await repo.createInvite('group-2', expiresIn: null);
@@ -139,7 +153,7 @@ void main() {
         final captured = verification.captured.single as Map<String, dynamic>;
         expect(captured['p_group_id'], 'group-2');
         expect(captured['p_expires_in'], isNull);
-      expect(captured['p_access_mode'], 'standard');
+        expect(captured['p_access_mode'], 'standard');
       },
     );
 
@@ -148,31 +162,33 @@ void main() {
       final repo = PowerSyncGroupInviteRepository(db!, supabaseClient: client);
       when(
         () => client.rpc('get_invite_by_token', params: any(named: 'params')),
-      ).thenReturn(
-        Future.value([
-              {
-                'invite_id': 'invite-1',
-                'group_id': 'group-1',
-                'token': 'tok-1',
-                'invitee_email': null,
-                'role': 'member',
-                'created_at': '2026-01-01T00:00:00Z',
-                'expires_at': '2026-12-31T00:00:00Z',
-                'access_mode': 'readonly_only',
-                'group_name': 'Test Group',
-                'group_currency_code': 'USD',
-                'group_created_at': '2026-01-01T00:00:00Z',
-                'group_updated_at': '2026-01-02T00:00:00Z',
-              },
-            ])
-            as dynamic,
+      ).thenAnswer(
+        (_) => _FakeRpcBuilder([
+          {
+            'invite_id': 'invite-1',
+            'group_id': 'group-1',
+            'token': 'tok-1',
+            'invitee_email': null,
+            'role': 'member',
+            'created_at': '2026-01-01T00:00:00Z',
+            'expires_at': '2026-12-31T00:00:00Z',
+            'access_mode': 'readonly_only',
+            'group_name': 'Test Group',
+            'group_currency_code': 'USD',
+            'group_created_at': '2026-01-01T00:00:00Z',
+            'group_updated_at': '2026-01-02T00:00:00Z',
+          },
+        ]),
       );
 
       final result = await repo.getByToken('tok-1');
       expect(result, isNotNull);
       expect(result!.invite.accessMode, InviteAccessMode.readonlyOnly);
       expect(result.group.name, 'Test Group');
-      expect(result.group.updatedAt.toUtc(), DateTime.parse('2026-01-02T00:00:00Z'));
+      expect(
+        result.group.updatedAt.toUtc(),
+        DateTime.parse('2026-01-02T00:00:00Z'),
+      );
     });
 
     test('getByToken defaults missing access_mode to standard', () async {
@@ -180,23 +196,22 @@ void main() {
       final repo = PowerSyncGroupInviteRepository(db!, supabaseClient: client);
       when(
         () => client.rpc('get_invite_by_token', params: any(named: 'params')),
-      ).thenReturn(
-        Future.value([
-              {
-                'invite_id': 'invite-2',
-                'group_id': 'group-1',
-                'token': 'tok-2',
-                'invitee_email': null,
-                'role': 'member',
-                'created_at': '2026-01-01T00:00:00Z',
-                'expires_at': null,
-                'group_name': 'Test Group',
-                'group_currency_code': 'USD',
-                'group_created_at': '2026-01-01T00:00:00Z',
-                'group_updated_at': '2026-01-01T00:00:00Z',
-              },
-            ])
-            as dynamic,
+      ).thenAnswer(
+        (_) => _FakeRpcBuilder([
+          {
+            'invite_id': 'invite-2',
+            'group_id': 'group-1',
+            'token': 'tok-2',
+            'invitee_email': null,
+            'role': 'member',
+            'created_at': '2026-01-01T00:00:00Z',
+            'expires_at': null,
+            'group_name': 'Test Group',
+            'group_currency_code': 'USD',
+            'group_created_at': '2026-01-01T00:00:00Z',
+            'group_updated_at': '2026-01-01T00:00:00Z',
+          },
+        ]),
       );
 
       final result = await repo.getByToken('tok-2');
@@ -209,7 +224,7 @@ void main() {
       final repo = PowerSyncGroupInviteRepository(db!, supabaseClient: client);
       when(
         () => client.rpc('accept_invite', params: any(named: 'params')),
-      ).thenReturn(Future.value('group-xyz') as dynamic);
+      ).thenAnswer((_) => _FakeRpcBuilder('group-xyz'));
 
       final result = await repo.accept('tok-123', newParticipantName: 'User B');
 
@@ -222,6 +237,30 @@ void main() {
       expect(captured['p_token'], 'tok-123');
       expect(captured['p_participant_id'], isNull);
       expect(captured['p_new_participant_name'], 'User B');
+    });
+
+    test('accept forwards optional participantId for claim', () async {
+      if (!powerSyncAvailable || db == null) return;
+      final repo = PowerSyncGroupInviteRepository(db!, supabaseClient: client);
+      when(
+        () => client.rpc('accept_invite', params: any(named: 'params')),
+      ).thenAnswer((_) => _FakeRpcBuilder('group-claim'));
+
+      final result = await repo.accept(
+        'tok-claim',
+        newParticipantName: 'Alice',
+        participantId: 'participant-1',
+      );
+
+      expect(result, 'group-claim');
+      final verification = verify(
+        () => client.rpc('accept_invite', params: captureAny(named: 'params')),
+      );
+      verification.called(1);
+      final captured = verification.captured.single as Map<String, dynamic>;
+      expect(captured['p_token'], 'tok-claim');
+      expect(captured['p_participant_id'], 'participant-1');
+      expect(captured['p_new_participant_name'], 'Alice');
     });
   });
 }

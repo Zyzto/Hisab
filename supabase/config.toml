@@ -117,13 +117,21 @@ public = true
 file_size_limit = "50MiB"
 allowed_mime_types = ["image/png", "image/jpeg", "image/webp"]
 
+# In-app feedback screenshots (GitHub issue body); path prefix feedback/
+[storage.buckets.feedback-screenshots]
+public = true
+file_size_limit = "5MiB"
+allowed_mime_types = ["image/png"]
+
 [auth]
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
 site_url = "http://localhost:8080"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["http://localhost:8080"]
+# local_test_env.sh up appends the detected LAN SITE_URL for device testing.
+# local_test_env.sh up appends http://<LAN_IP>:8080 for device testing (do not commit that IP).
+additional_redirect_urls = ["http://localhost:8080", "http://127.0.0.1:8080", "http://10.0.0.122:8080", "io.supabase.hisab://callback"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # Path to JWT signing key. DO NOT commit your signing keys file to git.
@@ -300,18 +308,25 @@ enabled = false
 [edge_runtime]
 enabled = true
 # Configure one of the supported request policies: `oneshot`, `per_worker`.
-# Use `oneshot` for hot reload, or `per_worker` for load testing.
-policy = "oneshot"
+# `oneshot` cold-boots every request — og-invite-image (React/og_edge from esm.sh)
+# often times out with BOOT_ERROR / 503 under Podman. Prefer `per_worker` locally.
+policy = "per_worker"
 # Port to attach the Chrome inspector for debugging edge functions.
 inspector_port = 8083
 # The Deno major version to use.
 deno_version = 1
 
-# [edge_runtime.secrets]
-# secret_key = "env(SECRET_VALUE)"
+# Local Edge secrets — values come from supabase/.env (written by local_test_env.sh).
+# Production secrets are set via `supabase secrets set` / the dashboard.
+[edge_runtime.secrets]
+SITE_URL = "env(SITE_URL)"
+FCM_PROJECT_ID = "env(FCM_PROJECT_ID)"
+FCM_SERVICE_ACCOUNT_KEY = "env(FCM_SERVICE_ACCOUNT_KEY)"
 
 [analytics]
-enabled = true
+# Disabled for rootless Podman: analytics uses the syslog log driver, which
+# often breaks Kong/health checks (see supabase/cli#2348). Enable only with Docker.
+enabled = false
 port = 54327
 # Configure one of the supported backends: `postgres`, `bigquery`.
 backend = "postgres"

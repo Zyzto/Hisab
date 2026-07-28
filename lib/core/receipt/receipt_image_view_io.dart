@@ -5,9 +5,10 @@ import 'package:flutter/material.dart';
 
 import '../layout/responsive_sheet.dart';
 import 'receipt_image_cache.dart';
+import 'receipt_image_view_url.dart';
 import 'receipt_utils.dart';
 
-/// Shows an attached image full-screen (dialog). Tap or back to close.
+/// Shows an attached image full-screen (dialog). Tap outside image or back to close.
 void showExpenseImageFullScreen(BuildContext context, String imagePath) {
   if (isImageUrl(imagePath)) {
     showAppDialog<void>(
@@ -15,21 +16,10 @@ void showExpenseImageFullScreen(BuildContext context, String imagePath) {
       barrierColor: Theme.of(context).colorScheme.scrim,
       barrierDismissible: true,
       centerInFullViewport: true,
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: EdgeInsets.zero,
-        child: InteractiveViewer(
-          minScale: 0.5,
-          maxScale: 4,
-          child: GestureDetector(
-            onTap: () => Navigator.of(ctx).pop(),
-            child: Center(
-              child: _ReceiptCachedOrNetworkImage(
-                imageUrl: imagePath,
-                fit: BoxFit.contain,
-              ),
-            ),
-          ),
+      builder: (ctx) => FullscreenImageDialog(
+        image: _ReceiptCachedOrNetworkImage(
+          imageUrl: imagePath,
+          fit: BoxFit.contain,
         ),
       ),
     );
@@ -42,22 +32,11 @@ void showExpenseImageFullScreen(BuildContext context, String imagePath) {
     barrierColor: Theme.of(context).colorScheme.scrim,
     barrierDismissible: true,
     centerInFullViewport: true,
-    builder: (ctx) => Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: EdgeInsets.zero,
-      child: InteractiveViewer(
-        minScale: 0.5,
-        maxScale: 4,
-        child: GestureDetector(
-          onTap: () => Navigator.of(ctx).pop(),
-          child: Center(
-            child: Image.file(
-              file,
-              fit: BoxFit.contain,
-              errorBuilder: (_, _, _) => const SizedBox.shrink(),
-            ),
-          ),
-        ),
+    builder: (ctx) => FullscreenImageDialog(
+      image: Image.file(
+        file,
+        fit: BoxFit.contain,
+        errorBuilder: (_, _, _) => const SizedBox.shrink(),
       ),
     ),
   );
@@ -68,18 +47,23 @@ Widget buildExpenseImageView(
   BuildContext context,
   String? imagePath, {
   double? maxHeight,
+  double? width,
   BoxFit fit = BoxFit.cover,
+  EdgeInsetsGeometry padding = const EdgeInsets.only(top: 8),
+  BorderRadius? borderRadius,
 }) {
   if (imagePath == null || imagePath.isEmpty) return const SizedBox.shrink();
   final effectiveMaxHeight = maxHeight ?? 200;
+  final radius = borderRadius ?? BorderRadius.circular(12);
   final unavailablePlaceholder = _buildUnavailablePlaceholder(context);
 
   if (isImageUrl(imagePath)) {
     return Padding(
-      padding: const EdgeInsets.only(top: 8),
+      padding: padding,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: radius,
         child: SizedBox(
+          width: width,
           height: effectiveMaxHeight,
           child: _ReceiptCachedOrNetworkImage(
             imageUrl: imagePath,
@@ -94,20 +78,36 @@ Widget buildExpenseImageView(
   final file = File(imagePath);
   if (!file.existsSync()) {
     return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: _buildUnavailablePlaceholder(context),
+      padding: padding,
+      child: SizedBox(
+        width: width,
+        height: effectiveMaxHeight,
+        child: ClipRRect(
+          borderRadius: radius,
+          child: _buildUnavailablePlaceholder(
+            context,
+            compact: width != null && width < 140,
+          ),
+        ),
+      ),
     );
   }
   return Padding(
-    padding: const EdgeInsets.only(top: 8),
+    padding: padding,
     child: ClipRRect(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: radius,
       child: SizedBox(
+        width: width,
         height: effectiveMaxHeight,
         child: Image.file(
           file,
           fit: fit,
-          errorBuilder: (_, _, _) => unavailablePlaceholder,
+          width: width,
+          height: effectiveMaxHeight,
+          errorBuilder: (_, _, _) => _buildUnavailablePlaceholder(
+            context,
+            compact: width != null && width < 140,
+          ),
         ),
       ),
     ),
@@ -182,9 +182,24 @@ class _ReceiptCachedOrNetworkImageState extends State<_ReceiptCachedOrNetworkIma
   }
 }
 
-Widget _buildUnavailablePlaceholder(BuildContext context) {
+Widget _buildUnavailablePlaceholder(
+  BuildContext context, {
+  bool compact = false,
+}) {
   final theme = Theme.of(context);
   final colorScheme = theme.colorScheme;
+  if (compact) {
+    return ColoredBox(
+      color: colorScheme.surfaceContainerHighest,
+      child: Center(
+        child: Icon(
+          Icons.broken_image_outlined,
+          size: 28,
+          color: colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
   return Material(
     color: colorScheme.surfaceContainerHighest,
     borderRadius: BorderRadius.circular(12),
@@ -198,7 +213,7 @@ Widget _buildUnavailablePlaceholder(BuildContext context) {
             color: colorScheme.onSurfaceVariant,
           ),
           const SizedBox(width: 12),
-          Expanded(
+          Flexible(
             child: Text(
               'image_unavailable'.tr(),
               style: theme.textTheme.bodyMedium?.copyWith(

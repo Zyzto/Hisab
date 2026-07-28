@@ -46,7 +46,7 @@ CREATE POLICY "group_members_insert" ON public.group_members
     public.get_user_role(group_id) IN ('owner', 'admin')
     OR (
       user_id = (SELECT auth.uid())
-      AND role = 'owner'
+      AND group_members.role = 'owner'
       AND (SELECT g.owner_id FROM public.groups g WHERE g.id = group_id) = (SELECT auth.uid())
     )
   );

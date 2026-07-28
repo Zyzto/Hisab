@@ -2,6 +2,7 @@
 
 import 'dart:js_interop';
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:web/web.dart' as web;
 
 /// Shows a browser Notification with [title] and [body]. On click, focuses the
@@ -17,9 +18,9 @@ void showWebForegroundNotification(String title, String body, String? groupId) {
 }
 
 void _show(String title, String body, String? groupId) {
-  final displayTitle = title.isNotEmpty ? title : 'Hisab';
+  final displayTitle = title.isNotEmpty ? title : 'app_name'.tr();
   final options = web.NotificationOptions(
-    body: body.isNotEmpty ? body : 'New notification',
+    body: body.isNotEmpty ? body : 'notification_new'.tr(),
   );
   final notification = web.Notification(displayTitle, options);
 

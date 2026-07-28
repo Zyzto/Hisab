@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -127,6 +129,18 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
       }
     }
 
+    void goPrev() {
+      final id = prevId;
+      if (id == null) return;
+      _navigateToExpense(context, id, direction: -1);
+    }
+
+    void goNext() {
+      final id = nextId;
+      if (id == null) return;
+      _navigateToExpense(context, id, direction: 1);
+    }
+
     final appBarLeading = IconButton(
       icon: const Icon(Icons.arrow_back),
       onPressed: () => context.pop(),
@@ -141,43 +155,11 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
     final appBarActions = <Widget>[
       IconButton(
         icon: const Icon(Icons.chevron_left),
-        onPressed: prevId != null
-            ? () {
-                ref.read(expenseNavigationDirectionProvider.notifier).state = -1;
-                if (widget.readOnlyPreview && widget.previewToken != null) {
-                  context.pushReplacement(
-                    RoutePaths.invitePreviewExpenseDetail(
-                      widget.previewToken!,
-                      prevId!,
-                    ),
-                  );
-                } else {
-                  context.pushReplacement(
-                    RoutePaths.groupExpenseDetail(widget.groupId, prevId!),
-                  );
-                }
-              }
-            : null,
+        onPressed: prevId != null ? goPrev : null,
       ),
       IconButton(
         icon: const Icon(Icons.chevron_right),
-        onPressed: nextId != null
-            ? () {
-                ref.read(expenseNavigationDirectionProvider.notifier).state = 1;
-                if (widget.readOnlyPreview && widget.previewToken != null) {
-                  context.pushReplacement(
-                    RoutePaths.invitePreviewExpenseDetail(
-                      widget.previewToken!,
-                      nextId!,
-                    ),
-                  );
-                } else {
-                  context.pushReplacement(
-                    RoutePaths.groupExpenseDetail(widget.groupId, nextId!),
-                  );
-                }
-              }
-            : null,
+        onPressed: nextId != null ? goNext : null,
       ),
       if (!widget.readOnlyPreview)
         PopupMenuButton<String>(
@@ -258,9 +240,48 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
           title: appBarTitle,
           actions: appBarActions,
         ),
-        body: ConstrainedContent(child: body),
+        body: ConstrainedContent(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onHorizontalDragEnd: (details) {
+              // Ignore while a page transition is already running.
+              if (_controller?.isAnimating == true) return;
+              final velocity = details.primaryVelocity ?? 0;
+              if (velocity.abs() < 250) return;
+              // easy_localization exports intl, which shadows Flutter's
+              // TextDirection (intl uses .RTL; Flutter uses .rtl).
+              final isRtl =
+                  Directionality.of(context) == ui.TextDirection.rtl;
+              // LTR: swipe left → next, swipe right → prev. RTL flips.
+              final toNext = isRtl ? velocity > 0 : velocity < 0;
+              if (toNext) {
+                goNext();
+              } else {
+                goPrev();
+              }
+            },
+            child: body,
+          ),
+        ),
       ),
     );
+  }
+
+  void _navigateToExpense(
+    BuildContext context,
+    String expenseId, {
+    required int direction,
+  }) {
+    ref.read(expenseNavigationDirectionProvider.notifier).state = direction;
+    if (widget.readOnlyPreview && widget.previewToken != null) {
+      context.pushReplacement(
+        RoutePaths.invitePreviewExpenseDetail(widget.previewToken!, expenseId),
+      );
+    } else {
+      context.pushReplacement(
+        RoutePaths.groupExpenseDetail(widget.groupId, expenseId),
+      );
+    }
   }
 
   Future<void> _confirmDelete(

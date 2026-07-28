@@ -5,6 +5,9 @@ abstract class IGroupRepository {
   Stream<List<Group>> watchAll();
   Stream<List<Group>> watchArchived();
   Future<Group?> getById(String id);
+
+  /// Live updates for a single group (native SQLite watch / web poll).
+  Stream<Group?> watchById(String id);
   Future<String> create(
     String name,
     String currencyCode, {

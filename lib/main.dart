@@ -172,7 +172,10 @@ void main() {
         // --------------------------------------------------------------------------
         if (supabaseConfigAvailable) {
           Log.info('main: Initializing Supabase...');
-          await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
+          await Supabase.initialize(
+            url: effectiveSupabaseUrl,
+            publishableKey: supabaseAnonKey,
+          );
           Log.info('main: Supabase client initialized');
 
           if (settingsProviders != null) {

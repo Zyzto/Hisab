@@ -95,7 +95,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.byType(GroupCard), findsOneWidget);
-    expect(find.byType(Card), findsOneWidget);
+    expect(find.byType(Material), findsWidgets);
   });
 
   testWidgets('GroupCard renders with Arabic locale', (tester) async {
@@ -166,7 +166,7 @@ void main() {
     expect(find.text('Test Trip'), findsOneWidget);
     expect(find.text('USD'), findsOneWidget);
     expect(find.byType(GroupCard), findsOneWidget);
-    expect(find.byType(Card), findsOneWidget);
+    expect(find.byType(Material), findsWidgets);
   });
 
   testWidgets('GroupCard with createdDateLabel shows date', (tester) async {

@@ -186,7 +186,11 @@ class FakeGroupInviteRepository implements IGroupInviteRepository {
   }
 
   @override
-  Future<String> accept(String token, {String? newParticipantName}) async =>
+  Future<String> accept(
+    String token, {
+    String? newParticipantName,
+    String? participantId,
+  }) async =>
       'group-id';
 
   @override

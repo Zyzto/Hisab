@@ -262,7 +262,6 @@ void main() {
           await signOutCurrentUser();
         });
       },
-      skip: true,
     );
 
     testWidgets(
@@ -865,6 +864,240 @@ void main() {
         });
 
         await stage('cleanup standard ui test group', () async {
+          final ok = await signInAs(testUserAEmail, testPassword);
+          expect(ok, isTrue);
+          if (groupId != null) {
+            await client.from('expenses').delete().eq('group_id', groupId!);
+            await client
+                .from('group_invites')
+                .delete()
+                .eq('group_id', groupId!);
+            await client
+                .from('group_members')
+                .delete()
+                .eq('group_id', groupId!);
+            await client.from('participants').delete().eq('group_id', groupId!);
+            await client.from('groups').delete().eq('id', groupId!);
+          }
+          await signOutCurrentUser();
+        });
+      },
+    );
+
+    testWidgets(
+      'accept edge cases: readonly_join, already-member, expired, max-uses, revoked',
+      (tester) async {
+        if (skipInviteFlows) return;
+        final ready = await runOnlineTestApp(
+          skipOnboarding: true,
+          signInEmail: testUserAEmail,
+          signInPassword: testPassword,
+        );
+        ensureBootstrapReady(
+          ready,
+          reason: lastOnlineBootstrapFailureReason,
+        );
+        await pumpAndSettleWithTimeout(tester);
+        await ensureUserASession(tester);
+
+        final client = Supabase.instance.client;
+        String? groupId;
+        String? inviteId;
+        String? joinToken;
+        String? expireToken;
+        String? maxUsesToken;
+        String? revokeToken;
+
+        Future<String> createToken({
+          String accessMode = 'standard',
+          int? maxUses,
+          String? expiresIn,
+        }) async {
+          final params = <String, dynamic>{
+            'p_group_id': groupId,
+            'p_access_mode': accessMode,
+          };
+          if (maxUses != null) params['p_max_uses'] = maxUses;
+          if (expiresIn != null) params['p_expires_in'] = expiresIn;
+          final result = await client.rpc('create_invite', params: params);
+          final rows = result as List;
+          return rows.first['token'] as String;
+        }
+
+        await stage('create edge-case group', () async {
+          final userAId = client.auth.currentUser!.id;
+          final inserted = await client
+              .from('groups')
+              .insert({
+                'name':
+                    'Invite Edge Cases ${DateTime.now().millisecondsSinceEpoch}',
+                'currency_code': 'USD',
+                'owner_id': userAId,
+              })
+              .select()
+              .single();
+          groupId = inserted['id'] as String;
+          final ownerMember = await client
+              .from('group_members')
+              .insert({
+                'group_id': groupId,
+                'user_id': userAId,
+                'role': 'owner',
+              })
+              .select()
+              .single();
+          final ownerParticipant = await client
+              .from('participants')
+              .insert({
+                'group_id': groupId,
+                'name': 'Owner',
+                'sort_order': 0,
+                'user_id': userAId,
+              })
+              .select()
+              .single();
+          await client
+              .from('group_members')
+              .update({'participant_id': ownerParticipant['id']})
+              .eq('id', ownerMember['id']);
+        });
+
+        await stage('owner cannot accept own invite (already member)', () async {
+          final token = await createToken();
+          await expectLater(
+            () => client.rpc(
+              'accept_invite',
+              params: {
+                'p_token': token,
+                'p_new_participant_name': 'Owner Again',
+              },
+            ),
+            throwsA(
+              isA<PostgrestException>().having(
+                (e) => e.message,
+                'message',
+                contains('Already a member'),
+              ),
+            ),
+          );
+        });
+
+        await stage('create invite variants', () async {
+          joinToken = await createToken(accessMode: 'readonly_join');
+          // No UPDATE RLS on group_invites — create already-invalid rows.
+          expireToken = await createToken(expiresIn: '-1 second');
+          maxUsesToken = await createToken(maxUses: 0);
+          final revokeRows = await client.rpc(
+            'create_invite',
+            params: {
+              'p_group_id': groupId,
+              'p_access_mode': 'standard',
+            },
+          ) as List;
+          revokeToken = revokeRows.first['token'] as String;
+          inviteId = revokeRows.first['id'] as String;
+          await client.rpc('revoke_invite', params: {'p_invite_id': inviteId});
+        });
+
+        // Reject paths before B joins — otherwise "Already a member" masks them.
+        await stage('user B: expired invite rejected', () async {
+          await signOutCurrentUser();
+          final ok = await signInAs(testUserBEmail, testPassword);
+          expect(ok, isTrue);
+          await expectLater(
+            () => client.rpc(
+              'accept_invite',
+              params: {
+                'p_token': expireToken,
+                'p_new_participant_name': 'User B',
+              },
+            ),
+            throwsA(
+              isA<PostgrestException>().having(
+                (e) => e.message,
+                'message',
+                contains('Invalid or expired'),
+              ),
+            ),
+          );
+        });
+
+        await stage('user B: max-uses invite rejected', () async {
+          await expectLater(
+            () => client.rpc(
+              'accept_invite',
+              params: {
+                'p_token': maxUsesToken,
+                'p_new_participant_name': 'User B',
+              },
+            ),
+            throwsA(
+              isA<PostgrestException>().having(
+                (e) => e.message.toLowerCase(),
+                'message',
+                anyOf(
+                  contains('max uses'),
+                  contains('invalid or expired'),
+                ),
+              ),
+            ),
+          );
+        });
+
+        await stage('user B: revoked invite rejected', () async {
+          await expectLater(
+            () => client.rpc(
+              'accept_invite',
+              params: {
+                'p_token': revokeToken,
+                'p_new_participant_name': 'User B',
+              },
+            ),
+            throwsA(
+              isA<PostgrestException>().having(
+                (e) => e.message.toLowerCase(),
+                'message',
+                anyOf(
+                  contains('not active'),
+                  contains('invalid or expired'),
+                ),
+              ),
+            ),
+          );
+        });
+
+        await stage('user B: readonly_join accept succeeds', () async {
+          final accepted = await client.rpc(
+            'accept_invite',
+            params: {
+              'p_token': joinToken,
+              'p_new_participant_name': 'User B',
+            },
+          );
+          expect(accepted, equals(groupId));
+        });
+
+        await stage('user B: already-member on second accept', () async {
+          await expectLater(
+            () => client.rpc(
+              'accept_invite',
+              params: {
+                'p_token': joinToken,
+                'p_new_participant_name': 'User B',
+              },
+            ),
+            throwsA(
+              isA<PostgrestException>().having(
+                (e) => e.message,
+                'message',
+                contains('Already a member'),
+              ),
+            ),
+          );
+        });
+
+        await stage('cleanup edge-case group', () async {
+          await signOutCurrentUser();
           final ok = await signInAs(testUserAEmail, testPassword);
           expect(ok, isTrue);
           if (groupId != null) {

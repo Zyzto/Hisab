@@ -35,13 +35,18 @@ PowerSyncDatabase powerSyncDatabase(Ref ref) {
 @Riverpod(keepAlive: true)
 class DataSyncService extends _$DataSyncService {
   Timer? _refreshTimer;
+  Timer? _debounceTimer;
   bool _isSyncing = false;
+
+  /// Coalesce auth/connectivity rebuilds so we don't stack full fetches.
+  static const _syncDebounce = Duration(milliseconds: 800);
 
   @override
   void build() {
     final localOnly = ref.watch(effectiveLocalOnlyProvider);
     if (localOnly || !supabaseConfigAvailable) {
       _refreshTimer?.cancel();
+      _debounceTimer?.cancel();
       Log.debug('DataSyncService: inactive (localOnly=$localOnly)');
       return;
     }
@@ -51,14 +56,19 @@ class DataSyncService extends _$DataSyncService {
 
     if (!isAuth) {
       _refreshTimer?.cancel();
+      _debounceTimer?.cancel();
       Log.debug('DataSyncService: inactive (not authenticated)');
       return;
     }
 
     if (hasNetwork) {
-      // Defer initial sync so we don't modify syncStatusProvider during build
-      // (Riverpod forbids modifying other providers while a provider is building).
-      Future.microtask(() => _syncNow());
+      // Defer + debounce: connectivity flaps must not hammer Supabase.
+      _debounceTimer?.cancel();
+      _debounceTimer = Timer(_syncDebounce, () {
+        if (!_isSyncing) {
+          unawaited(_syncNow());
+        }
+      });
 
       // Periodic refresh every 5 minutes
       _refreshTimer?.cancel();
@@ -68,11 +78,13 @@ class DataSyncService extends _$DataSyncService {
       );
     } else {
       _refreshTimer?.cancel();
+      _debounceTimer?.cancel();
       Log.debug('DataSyncService: offline, waiting for connectivity');
     }
 
     ref.onDispose(() {
       _refreshTimer?.cancel();
+      _debounceTimer?.cancel();
     });
   }
 

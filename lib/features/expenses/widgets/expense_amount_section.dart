@@ -115,16 +115,7 @@ class ExpenseAmountSection extends StatelessWidget {
                   decimal: true,
                 ),
                 inputFormatters: [decimalOnlyFormatter],
-                validator:
-                    validator ??
-                    (v) {
-                      final requiredErr = FormValidators.required(v);
-                      if (requiredErr != null) return requiredErr;
-                      if (double.tryParse(v!) == null) {
-                        return 'invalid_number'.tr();
-                      }
-                      return null;
-                    },
+                validator: validator ?? FormValidators.positiveAmount,
               ),
             ),
           ],
@@ -180,7 +171,9 @@ class ExpenseAmountSection extends StatelessWidget {
           Row(
             children: [
               Text(
-                '1 ${groupCurrencyCode!} =',
+                'exchange_rate_one_equals'.tr(
+                  namedArgs: {'currency': groupCurrencyCode!},
+                ),
                 style: theme.textTheme.bodyMedium,
               ),
               const SizedBox(width: 8),

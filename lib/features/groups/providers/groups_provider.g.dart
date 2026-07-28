@@ -167,12 +167,20 @@ final class LocallyArchivedGroupIdsProvider
 String _$locallyArchivedGroupIdsHash() =>
     r'fa92c92d006bc461b11e0adaf49ecfab0f21e962';
 
+/// Kept name `futureGroup` for call-site stability; backed by a live stream
+/// so group detail/settings/balance refresh after remote sync.
+
 @ProviderFor(futureGroup)
 final futureGroupProvider = FutureGroupFamily._();
 
+/// Kept name `futureGroup` for call-site stability; backed by a live stream
+/// so group detail/settings/balance refresh after remote sync.
+
 final class FutureGroupProvider
-    extends $FunctionalProvider<AsyncValue<Group?>, Group?, FutureOr<Group?>>
-    with $FutureModifier<Group?>, $FutureProvider<Group?> {
+    extends $FunctionalProvider<AsyncValue<Group?>, Group?, Stream<Group?>>
+    with $FutureModifier<Group?>, $StreamProvider<Group?> {
+  /// Kept name `futureGroup` for call-site stability; backed by a live stream
+  /// so group detail/settings/balance refresh after remote sync.
   FutureGroupProvider._({
     required FutureGroupFamily super.from,
     required String super.argument,
@@ -196,11 +204,11 @@ final class FutureGroupProvider
 
   @$internal
   @override
-  $FutureProviderElement<Group?> $createElement($ProviderPointer pointer) =>
-      $FutureProviderElement(pointer);
+  $StreamProviderElement<Group?> $createElement($ProviderPointer pointer) =>
+      $StreamProviderElement(pointer);
 
   @override
-  FutureOr<Group?> create(Ref ref) {
+  Stream<Group?> create(Ref ref) {
     final argument = this.argument as String;
     return futureGroup(ref, argument);
   }
@@ -216,10 +224,13 @@ final class FutureGroupProvider
   }
 }
 
-String _$futureGroupHash() => r'5a6ff2863b2b5e166622f6754231de992cccab5c';
+String _$futureGroupHash() => r'8951a22d3036cc322e86430f4bc9c6aa3feae8f5';
+
+/// Kept name `futureGroup` for call-site stability; backed by a live stream
+/// so group detail/settings/balance refresh after remote sync.
 
 final class FutureGroupFamily extends $Family
-    with $FunctionalFamilyOverride<FutureOr<Group?>, String> {
+    with $FunctionalFamilyOverride<Stream<Group?>, String> {
   FutureGroupFamily._()
     : super(
         retry: null,
@@ -228,6 +239,9 @@ final class FutureGroupFamily extends $Family
         $allTransitiveDependencies: null,
         isAutoDispose: true,
       );
+
+  /// Kept name `futureGroup` for call-site stability; backed by a live stream
+  /// so group detail/settings/balance refresh after remote sync.
 
   FutureGroupProvider call(String groupId) =>
       FutureGroupProvider._(argument: groupId, from: this);
@@ -316,8 +330,8 @@ final futureExpenseProvider = FutureExpenseFamily._();
 
 final class FutureExpenseProvider
     extends
-        $FunctionalProvider<AsyncValue<Expense?>, Expense?, FutureOr<Expense?>>
-    with $FutureModifier<Expense?>, $FutureProvider<Expense?> {
+        $FunctionalProvider<AsyncValue<Expense?>, Expense?, Stream<Expense?>>
+    with $FutureModifier<Expense?>, $StreamProvider<Expense?> {
   FutureExpenseProvider._({
     required FutureExpenseFamily super.from,
     required String super.argument,
@@ -341,11 +355,11 @@ final class FutureExpenseProvider
 
   @$internal
   @override
-  $FutureProviderElement<Expense?> $createElement($ProviderPointer pointer) =>
-      $FutureProviderElement(pointer);
+  $StreamProviderElement<Expense?> $createElement($ProviderPointer pointer) =>
+      $StreamProviderElement(pointer);
 
   @override
-  FutureOr<Expense?> create(Ref ref) {
+  Stream<Expense?> create(Ref ref) {
     final argument = this.argument as String;
     return futureExpense(ref, argument);
   }
@@ -361,10 +375,10 @@ final class FutureExpenseProvider
   }
 }
 
-String _$futureExpenseHash() => r'ec4d4fd8d1c104f65620a4a1c3802e3b1d9ffce4';
+String _$futureExpenseHash() => r'27c6c30e33f216da07e191e04b1b69f26279448d';
 
 final class FutureExpenseFamily extends $Family
-    with $FunctionalFamilyOverride<FutureOr<Expense?>, String> {
+    with $FunctionalFamilyOverride<Stream<Expense?>, String> {
   FutureExpenseFamily._()
     : super(
         retry: null,

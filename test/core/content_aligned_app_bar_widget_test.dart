@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hisab/core/layout/content_aligned_app_bar.dart';
+import 'package:hisab/core/layout/layout_breakpoints.dart';
 
 void main() {
   testWidgets(
@@ -67,6 +68,58 @@ void main() {
         titleRect.right,
         lessThanOrEqualTo(inviteButtonRect.left),
       );
+    },
+  );
+
+  testWidgets(
+    'content band stays viewport-centered in RTL with a right-side rail',
+    (tester) async {
+      const titleKey = Key('app-title');
+      const viewportWidth = 1000.0;
+      const viewportHeight = 800.0;
+      const railWidth = LayoutBreakpoints.navigationRailWidthCompact;
+      const contentAreaWidth = viewportWidth - railWidth;
+
+      final view = tester.view;
+      view.physicalSize = const Size(viewportWidth, viewportHeight);
+      view.devicePixelRatio = 1.0;
+      addTearDown(view.resetPhysicalSize);
+      addTearDown(view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          builder: (context, child) => Directionality(
+            textDirection: TextDirection.rtl,
+            child: child!,
+          ),
+          home: const Row(
+            textDirection: TextDirection.rtl,
+            children: [
+              SizedBox(width: railWidth),
+              SizedBox(
+                width: contentAreaWidth,
+                child: Scaffold(
+                  appBar: ContentAlignedAppBar(
+                    contentAreaWidth: contentAreaWidth,
+                    leading: Icon(Icons.cloud),
+                    title: Text('حساب', key: titleKey),
+                    actions: [
+                      Icon(Icons.view_list),
+                      Icon(Icons.archive_outlined),
+                    ],
+                  ),
+                  body: SizedBox.shrink(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final titleCenterX = tester.getCenter(find.byKey(titleKey)).dx;
+      expect(titleCenterX, closeTo(viewportWidth / 2, 1.0));
     },
   );
 }

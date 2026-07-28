@@ -11,6 +11,7 @@ import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/repository/repository_providers.dart';
+import '../../../core/theme/accent_style.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/error_report_helper.dart';
 import '../../../core/widgets/error_content.dart';
@@ -410,36 +411,51 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
         ? invite.label!
         : 'invite_untitled'.tr();
 
-    return Card(
-      margin: const EdgeInsets.symmetric(
+    final colorScheme = theme.colorScheme;
+    final radius = BorderRadius.circular(ThemeConfig.radiusL);
+    final panel = AccentSurfaces.flatPanel(
+      colorScheme,
+      radius: ThemeConfig.radiusL,
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(
         horizontal: ThemeConfig.spacingM,
         vertical: ThemeConfig.spacingXS,
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(ThemeConfig.cardBorderRadius),
-        onTap: () => setState(() => _expanded = !_expanded),
-        child: Padding(
-          padding: const EdgeInsets.all(ThemeConfig.spacingM),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header row
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                displayLabel,
-                                style: theme.textTheme.titleSmall,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+      child: Material(
+        color: panel.color,
+        shape: RoundedRectangleBorder(
+          borderRadius: radius,
+          side: panel.border?.top ?? BorderSide.none,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          borderRadius: radius,
+          onTap: () => setState(() => _expanded = !_expanded),
+          child: Padding(
+            padding: const EdgeInsets.all(ThemeConfig.spacingM),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header row
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  displayLabel,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                            ),
                             const SizedBox(width: 8),
                             _statusChip(context),
                             if (invite.role == 'admin') ...[
@@ -579,6 +595,7 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
                 ],
               ],
             ],
+            ),
           ),
         ),
       ),

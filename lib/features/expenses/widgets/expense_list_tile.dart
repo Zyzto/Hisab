@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../../domain/domain.dart';
@@ -47,62 +49,93 @@ class ExpenseListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final effectiveIcon = icon ?? defaultExpenseIcon;
     final (cents, currencyCode) = _primaryAmount;
+    final surface = colorScheme.surface;
+    final chrome = chromeForExpenseTag(
+      expense.tag,
+      brightness: theme.brightness,
+      surface: surface,
+    );
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            children: [
-              Icon(
-                effectiveIcon,
-                size: 28,
-                color: theme.colorScheme.onSurfaceVariant,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Material(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.45),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      expense.title,
-                      style: theme.textTheme.titleSmall,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (showPaidBy) ...[
-                      const SizedBox(height: 2),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: chrome.container,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    effectiveIcon,
+                    size: 22,
+                    color: chrome.onContainer,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
                       Text(
-                        'paid_by'.tr(namedArgs: {'name': payerName}),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                        expense.title,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
+                      if (showPaidBy) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          'paid_by'.tr(namedArgs: {'name': payerName}),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              Text(
-                CurrencyFormatter.formatCents(cents, currencyCode),
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
+                Text(
+                  CurrencyFormatter.formatCents(cents, currencyCode),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onSurface,
+                  ),
                 ),
-              ),
-              if (showDisclosure) ...[
-                const SizedBox(width: 6),
-                Icon(
-                  Icons.chevron_right,
-                  size: 20,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+                if (showDisclosure) ...[
+                  const SizedBox(width: 4),
+                  Icon(
+                    Directionality.of(context) == ui.TextDirection.rtl
+                        ? Icons.chevron_left_rounded
+                        : Icons.chevron_right_rounded,
+                    size: 20,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

@@ -52,6 +52,9 @@ class ContentAlignedAppBar extends StatelessWidget
         titleButtonGap;
     final titleInset = symmetricInset.clamp(0.0, bandWidth / 2).toDouble();
 
+    // Keep toolbar controls off the screen edges (esp. next to a nav rail).
+    const edgePadding = 12.0;
+
     return Material(
       color: appBarTheme.backgroundColor ?? theme.colorScheme.surface,
       elevation: appBarTheme.elevation ?? 0,
@@ -63,12 +66,36 @@ class ContentAlignedAppBar extends StatelessWidget
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              Row(
-                children: [
-                  leading ?? const SizedBox.shrink(),
-                  const Spacer(),
-                  ...(actions ?? []),
-                ],
+              // Fill the toolbar height so leading/actions center with the title.
+              // A bare Row is only as tall as its icons and would sit at the
+              // Stack's default top alignment (looks "pushed up" on group pages).
+              Positioned.fill(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    if (leading != null)
+                      Padding(
+                        padding: const EdgeInsetsDirectional.only(
+                          start: edgePadding,
+                        ),
+                        child: leading,
+                      )
+                    else
+                      const SizedBox.shrink(),
+                    const Spacer(),
+                    if (actions != null && actions!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsetsDirectional.only(
+                          end: edgePadding,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: actions!,
+                        ),
+                      ),
+                  ],
+                ),
               ),
               Positioned(
                 left: leftOffset,

@@ -12,6 +12,7 @@ import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/telemetry/telemetry_service.dart';
 import '../../../core/theme/theme_config.dart';
+import '../../../core/utils/form_validators.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../domain/domain.dart';
 import '../../settings/providers/settings_framework_providers.dart';
@@ -167,7 +168,9 @@ class _CreateInviteSheetState extends ConsumerState<_CreateInviteSheet> {
                 hintText: 'invite_label_hint'.tr(),
                 prefixIcon: const Icon(Icons.label_outline),
                 border: const OutlineInputBorder(),
+                counterText: '',
               ),
+              maxLength: FormValidators.inviteLabelMax,
               textCapitalization: TextCapitalization.sentences,
             ),
             const SizedBox(height: ThemeConfig.spacingM),
