@@ -79,6 +79,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
   bool _didAttemptPreviewRedirectForNotOnboarded = false;
   bool _didAttemptOnboardingRedirectForNotOnboarded = false;
   bool _didAttemptAutoJoin = false;
+  bool _didScheduleAutoJoin = false;
   bool _didScheduleUnauthResume = false;
 
   bool _shouldAutoRedirectToPreview(InviteAccessMode? mode) =>
@@ -653,9 +654,15 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
       isAuthenticated: isAuthenticated,
       localOnly: localOnly,
       canAcceptInvite: canAcceptInvite,
-      alreadyAttempted: _didAttemptAutoJoin || _accepting,
+      alreadyAttempted:
+          _didAttemptAutoJoin || _accepting || _didScheduleAutoJoin,
     )) {
-      _maybeAutoJoin(context, invite, group);
+      // Defer provider writes (_consumeAutoJoinFlag) until after build.
+      _didScheduleAutoJoin = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _maybeAutoJoin(context, invite, group);
+      });
     } else {
       final resume = unauthenticatedAutoJoinResume(
         autoJoinFlag: autoJoinFlag,
@@ -864,6 +871,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
   }
 
   /// View+join: after login/register, accept once and open the group.
+  /// Must not write providers during [build]; call from a post-frame callback.
   void _maybeAutoJoin(BuildContext context, GroupInvite invite, Group group) {
     if (_didAttemptAutoJoin || _accepting) return;
     if (invite.accessMode == InviteAccessMode.readonlyOnly) return;
@@ -871,10 +879,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
     if (ref.read(effectiveLocalOnlyProvider)) return;
     if (!_consumeAutoJoinFlag()) return;
     _didAttemptAutoJoin = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _accept(context, group);
-    });
+    unawaited(_accept(context, group));
   }
 
   void _goToOnboardingForInvite(BuildContext context) {
