@@ -1,16 +1,17 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hisab/features/expenses/widgets/expense_bill_breakdown_section.dart';
 
-import 'helpers/fake_image_picker.dart';
 import 'helpers/test_helpers.dart';
 
 void main() {
   group('Expense lifecycle', () {
+    // Photo attach lives in expense_photos_test.dart — it uses
+    // MockPlatformInterfaceMixin, which must not be imported into the web
+    // --release suite (empty failureDetails / false FAILED).
     testWidgets(
       'full form → group → tags → description → breakdown → long title → '
-      'splits → edit → chevrons → delete → income → transfer → photos',
+      'splits → edit → chevrons → delete → income → transfer',
       (tester) async {
         await ensureIntegrationTestReady(tester);
 
@@ -477,94 +478,8 @@ void main() {
           );
         });
 
-        // ── Stage: capture image and attach 4 photos ──
-        // MockPlatformInterfaceMixin throws in release builds (web uses --release),
-        // so skip the photo attachment test on web.
-        if (!kIsWeb) {
-          await stage('capture image and attach 4 photos', () async {
-            await installFakeImagePicker();
-
-            await waitForWidget(tester, find.byIcon(Icons.add));
-            await tapAndSettle(tester, find.byIcon(Icons.add));
-            await pumpAndSettleWithTimeout(tester);
-
-            await enterTextAndPump(
-              tester,
-              find.byType(TextField).first,
-              'Photo Receipt',
-            );
-            await enterTextAndPump(tester, find.byType(TextField).at(1), '42');
-
-            final cameraIcon = find.byIcon(Icons.camera_alt_outlined);
-            expect(
-              cameraIcon,
-              findsWidgets,
-              reason: 'Camera button should be visible on a fresh form',
-            );
-            await tapAndSettle(tester, cameraIcon.first);
-            await pumpAndSettleWithTimeout(tester);
-
-            expect(find.text('Camera'), findsWidgets);
-            expect(find.text('Gallery'), findsWidgets);
-
-            await tapAndSettle(tester, find.text('Gallery'));
-            await pumpAndSettleWithTimeout(tester);
-            await tester.pump(const Duration(seconds: 1));
-
-            await waitForWidget(tester, find.text('Photos'));
-            final addMoreIcon = find.byIcon(Icons.add_photo_alternate_outlined);
-            expect(
-              addMoreIcon,
-              findsOneWidget,
-              reason: 'Add-more button should appear after first photo',
-            );
-
-            for (var i = 2; i <= 4; i++) {
-              await scrollUntilVisible(
-                tester,
-                find.byIcon(Icons.add_photo_alternate_outlined),
-              );
-              await tapAndSettle(
-                tester,
-                find.byIcon(Icons.add_photo_alternate_outlined),
-              );
-              await pumpAndSettleWithTimeout(tester);
-
-              final galleryOption = find.text('Gallery');
-              if (galleryOption.evaluate().isNotEmpty) {
-                await tapAndSettle(tester, galleryOption);
-                await pumpAndSettleWithTimeout(tester);
-                await tester.pump(const Duration(seconds: 1));
-              }
-            }
-
-            final photosCount = find.textContaining('4/5');
-            expect(
-              photosCount,
-              findsWidgets,
-              reason: 'Should show "Photos (4/5)" after attaching 4 images',
-            );
-
-            final closeIcons = find.byIcon(Icons.close);
-            expect(
-              closeIcons.evaluate().length,
-              greaterThanOrEqualTo(4),
-              reason: 'Should have 4 remove buttons for 4 photos',
-            );
-
-            await tapSubmitExpenseButton(tester);
-            await ensureFormClosed(tester);
-
-            await waitForWidget(tester, find.text('Photo Receipt'));
-            expect(find.text('Photo Receipt'), findsWidgets);
-          });
-        }
-
         // (delete expense stage moved earlier — runs right after chevrons)
 
-        // Long suite leaves toast / sync-chip Timers; without draining them
-        // web release reports this testWidgets as FAILED with empty details
-        // even though every stage PASSED.
         await stage('drain app timers', () async {
           await drainAppTimers(tester);
         });

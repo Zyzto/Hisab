@@ -173,9 +173,10 @@ integration_test/
   group_flows_test.dart          -- create group, detail tabs, settings, archive
   personal_test.dart             -- create personal budget, simplified UI, add expense
   expense_flows_test.dart        -- add/edit/view expenses, all split types, income/transfer
+  expense_photos_test.dart       -- gallery photo attach (mobile only; not in app_test web suite)
   balance_test.dart              -- verify balances, record settlement
   settings_test.dart             -- theme, language, font size, telemetry toggle
-  app_test.dart                  -- barrel that imports all local-only test files
+  app_test.dart                  -- barrel that imports all local-only web-safe test files
   online/
     auth_online_test.dart        -- sign-in, sign-out, session verification
     sync_online_test.dart        -- create group/expense via UI, verify in Supabase DB
@@ -199,11 +200,11 @@ scripts/
   - **Onboarding:** Complete all 4 pages (Welcome → Preferences → Permissions → Connect) and land on home.
   - **Group flows:** Create group with participants (Alice, Bob) → verify detail tabs (Expenses/Balance/People) → open group settings → change icon/color/currency/settlement → archive group.
   - **Personal:** Create personal budget → verify simplified UI (no Balance/People tabs) → add expense.
-  - **Expense flows:** Create group with 2 participants → add expenses with tags, description, bill breakdown, long titles, currency change, exchange rates → all split types → photo attachment (skipped on web) → view detail → edit expense → add Income and Transfer.
+  - **Expense flows:** Create group with 2 participants → add expenses with tags, description, bill breakdown, long titles, currency change, exchange rates → all split types → view detail → edit expense → add Income and Transfer. Photo attach is `expense_photos_test.dart` (mobile only; `MockPlatformInterfaceMixin` must not ship in the web `--release` suite).
   - **Balance:** Create group, add expense → switch to Balance tab → verify balances and settlement suggestions → record and freeze settlements. The test user is the group owner, so they can record any settlement (by default only the owner or the debtor can record; see group setting "Members can record settlements for others").
   - **Settings:** Change theme, language (Arabic and back), font size, toggle telemetry; verify settings persist across navigation.
 - **Test flows — online mode** (`online_app_test.dart`, requires local Supabase):
-  - **Auth:** Sign in as User A → verify session → navigate to Settings → sign out → programmatic re-sign-in → sign in as User B.
+  - **Auth:** Sign in as User A → verify session → Settings → Profile → sign out → programmatic re-sign-in → sign in as User B.
   - **Sync:** Sign in → create group via UI → verify group exists in Supabase DB → add expense → verify expense synced → delete group via UI → verify deletion propagated.
   - **Invite:** User A creates group → creates invite token (RPC) → signs out → User B accepts invite (RPC) → verify membership → User A verifies member list → cleanup.
 - **Requirements:** For web, Chrome/Chromium must be installed (set `CHROME_EXECUTABLE` if needed). PowerSync is used; on web it uses the web-backed storage. If the bootstrap fails (e.g. PowerSync unavailable), tests fail with a clear message.
