@@ -34,7 +34,8 @@ class ExpenseDetailBody extends ConsumerWidget {
       data: (expense) {
         if (expense == null || expense.groupId != groupId) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (context.mounted) context.pop();
+            // May race with ExpenseDetailShell._confirmDelete's pop.
+            if (context.mounted && context.canPop()) context.pop();
           });
           return const SizedBox.shrink();
         }

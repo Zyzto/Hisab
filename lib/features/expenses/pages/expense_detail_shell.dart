@@ -396,7 +396,9 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
       ref.invalidate(futureExpenseProvider(expense.id));
       ref.invalidate(expensesByGroupProvider(widget.groupId));
       ref.invalidate(groupBalanceProvider(widget.groupId));
-      if (context.mounted) context.pop();
+      // ExpenseDetailBody also pops when the provider yields null — guard so
+      // the second caller does not throw GoError on web.
+      if (context.mounted && context.canPop()) context.pop();
     }
   }
 }
