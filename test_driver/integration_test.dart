@@ -64,7 +64,22 @@ Future<void> main() async {
       print((details != null && details.trim().isNotEmpty)
           ? details
           : '(no details captured — check Stage Log above for last stage)');
+      // Web --release often strips details; dump raw fields for diagnosis.
+      print('raw: methodName=${failure.methodName}');
+      print('raw: details=${failure.details}');
       print('=== END ===');
+    }
+  }
+  if (response.data != null) {
+    final flutterErrors = (response.data!['stage_log'] as List?)
+        ?.whereType<String>()
+        .where((e) => e.contains('[FlutterError]') || e.contains('[takeException]'))
+        .toList();
+    if (flutterErrors != null && flutterErrors.isNotEmpty) {
+      print('\nCaptured FlutterError / takeException entries:');
+      for (final e in flutterErrors) {
+        print('  $e');
+      }
     }
   }
 

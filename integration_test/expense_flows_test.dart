@@ -13,6 +13,7 @@ void main() {
       'full form → group → tags → description → breakdown → long title → '
       'splits → edit → chevrons → delete → income → transfer',
       (tester) async {
+        installFlutterErrorStageLogger();
         await ensureIntegrationTestReady(tester);
 
         // ── Stage: enable full form ──
@@ -483,6 +484,14 @@ void main() {
         await stage('drain app timers', () async {
           await drainAppTimers(tester);
         });
+
+        // Surface async exceptions that would otherwise become empty
+        // failureDetails on web --release.
+        final pending = tester.takeException();
+        if (pending != null) {
+          recordStage('takeException', '$pending');
+          fail('Pending exception after expense suite: $pending');
+        }
       },
     );
   });

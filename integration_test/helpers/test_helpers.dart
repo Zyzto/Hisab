@@ -329,6 +329,23 @@ Future<void> drainAppTimers(WidgetTester tester) async {
   await tester.pump(const Duration(seconds: 10));
 }
 
+/// Install a [FlutterError.onError] logger into [reportData] for the duration
+/// of the current test. Call at the start of long suites that fail with empty
+/// details on web release.
+void installFlutterErrorStageLogger() {
+  final previous = FlutterError.onError;
+  FlutterError.onError = (details) {
+    recordStage(
+      'FlutterError',
+      '${details.exceptionAsString()}\n${details.stack ?? StackTrace.empty}',
+    );
+    previous?.call(details);
+  };
+  addTearDown(() {
+    FlutterError.onError = previous;
+  });
+}
+
 /// True when [showResponsiveSheet] / [showConfirmSheet] chrome is on screen.
 ///
 /// Sheets use [showGeneralDialog], not [BottomSheet] / [Dialog], so type
