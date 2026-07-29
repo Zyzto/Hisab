@@ -208,121 +208,139 @@ class BreakdownPieChartState extends State<BreakdownPieChart> {
         ],
         SizedBox(
           height: widget.height,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              PieChart(
-                PieChartData(
-                  centerSpaceRadius: 54,
-                  sectionsSpace: 2.5,
-                  startDegreeOffset: -90,
-                  pieTouchData: PieTouchData(
-                    enabled: true,
-                    touchCallback: (event, response) {
-                      if (!event.isInterestedForInteractions) return;
-                      if (event is! FlTapUpEvent) return;
-                      final index =
-                          response?.touchedSection?.touchedSectionIndex;
-                      if (index == null ||
-                          index < 0 ||
-                          index >= slices.length) {
-                        _deselect();
-                        return;
-                      }
-                      _handleSliceTap(slices[index]);
-                    },
-                  ),
-                  sections: [
-                    for (final slice in slices)
-                      _section(
-                        context,
-                        slice,
-                        total,
-                        selected: slice.id == selectedId,
-                        hasSelection: selectedId != null ||
-                            widget.centerOverride != null,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final chartSize =
+                  constraints.maxWidth < constraints.maxHeight
+                  ? constraints.maxWidth
+                  : constraints.maxHeight;
+              // Scale hole to chart size so the center overlay never covers slices.
+              final centerRadius = (chartSize * 0.22).clamp(36.0, 54.0);
+              final holeHit = (centerRadius * 1.7).clamp(64.0, 100.0);
+              final sectionRadius = (chartSize * 0.20).clamp(34.0, 46.0);
+              final hasSelection =
+                  selectedId != null || widget.centerOverride != null;
+
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  PieChart(
+                    PieChartData(
+                      centerSpaceRadius: centerRadius,
+                      sectionsSpace: 2.5,
+                      startDegreeOffset: -90,
+                      pieTouchData: PieTouchData(
+                        enabled: true,
+                        // Use tap-down: fl_chart often clears touchedSection on
+                        // tap-up, and a remembered index made outside taps open
+                        // the already-selected slice's expense list.
+                        touchCallback: (event, response) {
+                          if (event is! FlTapDownEvent) return;
+                          if (!event.isInterestedForInteractions) return;
+                          final index =
+                              response?.touchedSection?.touchedSectionIndex;
+                          if (index == null ||
+                              index < 0 ||
+                              index >= slices.length) {
+                            _deselect();
+                            return;
+                          }
+                          _handleSliceTap(slices[index]);
+                        },
                       ),
-                  ],
-                ),
-              ),
-              // Center hole: open expenses for the selected slice.
-              SizedBox(
-                width: 100,
-                height: 100,
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    customBorder: const CircleBorder(),
-                    onTap: () {
-                      final center = widget.centerOverride ?? _selected;
-                      if (center != null &&
-                          center.canOpen &&
-                          widget.onOpenSlice != null) {
-                        widget.onOpenSlice!(center);
-                        return;
-                      }
-                      _deselect();
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            center?.label ?? widget.centerIdleLabel,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: center?.color ?? cs.onSurfaceVariant,
-                              fontWeight: FontWeight.w700,
-                            ),
+                      sections: [
+                        for (final slice in slices)
+                          _section(
+                            context,
+                            slice,
+                            total,
+                            selected: slice.id == selectedId,
+                            hasSelection: hasSelection,
+                            radius: sectionRadius,
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            CurrencyFormatter.formatCents(
-                              (center?.amountCents ?? total).abs(),
-                              widget.currencyCode,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w800,
-                            ),
+                      ],
+                    ),
+                  ),
+                  // Center hole only — keep smaller than the ring so slices stay tappable.
+                  SizedBox(
+                    width: holeHit,
+                    height: holeHit,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () {
+                          final center = widget.centerOverride ?? _selected;
+                          if (center != null &&
+                              center.canOpen &&
+                              widget.onOpenSlice != null) {
+                            widget.onOpenSlice!(center);
+                            return;
+                          }
+                          _deselect();
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                center?.label ?? widget.centerIdleLabel,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color:
+                                      center?.color ?? cs.onSurfaceVariant,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                CurrencyFormatter.formatCents(
+                                  (center?.amountCents ?? total).abs(),
+                                  widget.currencyCode,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: chartSize < 180 ? 14 : null,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                hint,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: cs.onSurfaceVariant,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            hint,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: cs.onSurfaceVariant,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ),
-              // Overlay — does not affect pie layout; enabled only when selected.
-              PositionedDirectional(
-                end: 0,
-                bottom: 0,
-                child: IconButton(
-                  key: const ValueKey('breakdown_pie_clear_selection'),
-                  tooltip: 'analytics_pie_clear_selection'.tr(),
-                  visualDensity: VisualDensity.compact,
-                  onPressed: selectedId != null || widget.centerOverride != null
-                      ? _deselect
-                      : null,
-                  icon: const Icon(Icons.filter_alt_off_outlined),
-                ),
-              ),
-            ],
+                  if (hasSelection)
+                    PositionedDirectional(
+                      end: 0,
+                      bottom: 0,
+                      child: IconButton(
+                        key: const ValueKey('breakdown_pie_clear_selection'),
+                        tooltip: 'analytics_pie_clear_selection'.tr(),
+                        visualDensity: VisualDensity.compact,
+                        onPressed: _deselect,
+                        icon: const Icon(Icons.filter_alt_off_outlined),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
         ),
         if (widget.legend != null)
@@ -365,6 +383,7 @@ class BreakdownPieChartState extends State<BreakdownPieChart> {
     int total, {
     required bool selected,
     required bool hasSelection,
+    required double radius,
   }) {
     final value = slice.amountCents.abs().toDouble();
     final pct = total <= 0 ? 0.0 : (value / total) * 100;
@@ -376,7 +395,7 @@ class BreakdownPieChartState extends State<BreakdownPieChart> {
     return PieChartSectionData(
       value: value <= 0 ? 0.0001 : value,
       color: color,
-      radius: 46,
+      radius: radius,
       title: pct >= 9 ? '${pct.toStringAsFixed(0)}%' : '',
       titleStyle: Theme.of(context).textTheme.labelSmall?.copyWith(
         color: Colors.white.withValues(alpha: !hasSelection || selected ? 1 : 0.7),

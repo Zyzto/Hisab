@@ -321,7 +321,11 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
           ),
         );
 
-    if (bothPie) {
+    // Side-by-side only when the content band is wide enough; phones stay stacked.
+    final sideBySide =
+        bothPie && LayoutBreakpoints.isTabletOrWider(context);
+
+    if (sideBySide) {
       return [
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,

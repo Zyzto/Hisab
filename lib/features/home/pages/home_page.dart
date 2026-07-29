@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/auth/auth_providers.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/content_aligned_fab_location.dart';
@@ -14,7 +13,6 @@ import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/theme/theme_providers.dart';
 import '../../../core/widgets/async_value_builder.dart';
-import '../../../core/widgets/participant_avatar.dart';
 import '../../../core/widgets/sheet_option_tile.dart';
 import '../../../core/widgets/shell_menu_button.dart';
 import '../../../core/widgets/sync_status_icon.dart';
@@ -367,22 +365,11 @@ class HomePage extends ConsumerWidget {
       child: LayoutBuilder(
         builder: (context, layoutConstraints) {
           final contentAreaWidth = layoutConstraints.maxWidth;
-          final showMobileProfileAvatar =
-              !LayoutBreakpoints.isTabletOrWider(context) && !inSelectionMode;
-          final profile = ref.watch(authUserProfileProvider).asData?.value;
-          final signedIn = ref.watch(currentUserProvider) != null;
-          final avatarName =
-              profile?.name ??
-              profile?.email ??
-              (signedIn ? 'account'.tr() : 'sign_in'.tr());
 
           return Scaffold(
             floatingActionButtonLocation: ContentAlignedFabLocation.of(
               context,
               contentAreaWidth: contentAreaWidth,
-              narrowFallback: showMobileProfileAvatar
-                  ? FloatingActionButtonLocation.centerFloat
-                  : FloatingActionButtonLocation.endFloat,
             ),
             appBar: ContentAlignedAppBar(
               contentAreaWidth: contentAreaWidth,
@@ -755,18 +742,10 @@ class HomePage extends ConsumerWidget {
             ),
             floatingActionButton: _HomeFabCluster(
               localOnly: localOnly,
-              showProfileAvatar: showMobileProfileAvatar,
-              avatarName: avatarName,
-              avatarId: profile?.avatarId,
               onCreate: () => _showCreateModal(context, ref),
               onScan: () {
                 clearSelection();
                 context.push(RoutePaths.scanInvite);
-              },
-              onProfile: () {
-                clearSelection();
-                // Profile shows local stats + sign-in / switch-online CTAs.
-                context.push(RoutePaths.profile);
               },
             ),
           );
@@ -779,21 +758,13 @@ class HomePage extends ConsumerWidget {
 class _HomeFabCluster extends StatelessWidget {
   const _HomeFabCluster({
     required this.localOnly,
-    required this.showProfileAvatar,
-    required this.avatarName,
     required this.onCreate,
     required this.onScan,
-    required this.onProfile,
-    this.avatarId,
   });
 
   final bool localOnly;
-  final bool showProfileAvatar;
-  final String avatarName;
-  final String? avatarId;
   final VoidCallback onCreate;
   final VoidCallback onScan;
-  final VoidCallback onProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -810,84 +781,42 @@ class _HomeFabCluster extends StatelessWidget {
       ),
     );
 
-    final Widget endFabs;
-    if (localOnly) {
-      endFabs = createFab;
-    } else {
-      endFabs = LayoutBuilder(
-        builder: (context, constraints) {
-          const fabHeight = 56.0;
-          const twoFabHeight = fabHeight * 2;
-          final spacing = (constraints.maxHeight >= twoFabHeight + 12)
-              ? 12.0
-              : (constraints.maxHeight - twoFabHeight).clamp(0.0, 12.0);
-          final column = Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Semantics(
-                label: 'scan_invite'.tr(),
-                button: true,
-                child: FloatingActionButton(
-                  heroTag: 'scan_invite',
-                  onPressed: onScan,
-                  child: const Icon(Icons.qr_code_scanner),
-                ),
+    if (localOnly) return createFab;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const fabHeight = 56.0;
+        const twoFabHeight = fabHeight * 2;
+        final spacing = (constraints.maxHeight >= twoFabHeight + 12)
+            ? 12.0
+            : (constraints.maxHeight - twoFabHeight).clamp(0.0, 12.0);
+        final column = Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Semantics(
+              label: 'scan_invite'.tr(),
+              button: true,
+              child: FloatingActionButton(
+                heroTag: 'scan_invite',
+                onPressed: onScan,
+                child: const Icon(Icons.qr_code_scanner),
               ),
-              SizedBox(height: spacing),
-              createFab,
-            ],
-          );
-          if (constraints.maxHeight.isFinite &&
-              constraints.maxHeight < twoFabHeight &&
-              constraints.maxHeight > 0) {
-            return FittedBox(
-              alignment: Alignment.bottomCenter,
-              child: column,
-            );
-          }
-          return column;
-        },
-      );
-    }
-
-    if (!showProfileAvatar) return endFabs;
-
-    final cs = Theme.of(context).colorScheme;
-    final avatarFab = Semantics(
-      label: 'profile'.tr(),
-      button: true,
-      child: Material(
-        elevation: 6,
-        shape: const CircleBorder(),
-        color: cs.primaryContainer,
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onProfile,
-          child: Padding(
-            padding: const EdgeInsets.all(4),
-            child: ParticipantAvatar(
-              name: avatarName,
-              avatarId: avatarId,
-              radius: 24,
-              backgroundColor: cs.primaryContainer,
-              foregroundColor: cs.onPrimaryContainer,
             ),
-          ),
-        ),
-      ),
-    );
-
-    return SizedBox(
-      width: MediaQuery.sizeOf(context).width - 32,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          avatarFab,
-          const Spacer(),
-          endFabs,
-        ],
-      ),
+            SizedBox(height: spacing),
+            createFab,
+          ],
+        );
+        if (constraints.maxHeight.isFinite &&
+            constraints.maxHeight < twoFabHeight &&
+            constraints.maxHeight > 0) {
+          return FittedBox(
+            alignment: Alignment.bottomCenter,
+            child: column,
+          );
+        }
+        return column;
+      },
     );
   }
 }
