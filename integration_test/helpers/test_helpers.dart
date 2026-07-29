@@ -320,6 +320,15 @@ Future<void> ensureFormClosed(WidgetTester tester) async {
   }
 }
 
+/// Advance time so app [Timer]s (sync-chip collapse, toasts) can finish.
+///
+/// Integration [testWidgets] fails after the body returns if a [Timer] is still
+/// pending — even when every [stage] already PASSED (empty failureDetails on
+/// web release). Keep this ≥ longest toast auto-close (8s).
+Future<void> drainAppTimers(WidgetTester tester) async {
+  await tester.pump(const Duration(seconds: 10));
+}
+
 /// True when [showResponsiveSheet] / [showConfirmSheet] chrome is on screen.
 ///
 /// Sheets use [showGeneralDialog], not [BottomSheet] / [Dialog], so type

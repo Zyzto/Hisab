@@ -562,10 +562,12 @@ void main() {
 
         // (delete expense stage moved earlier — runs right after chevrons)
 
-        // Drain shell/sheet motion timers so the suite does not fail after
-        // stages with a pending animation (empty failureDetails on web).
-        await tester.pump(const Duration(milliseconds: 500));
-        await tester.pump(const Duration(milliseconds: 500));
+        // Long suite leaves toast / sync-chip Timers; without draining them
+        // web release reports this testWidgets as FAILED with empty details
+        // even though every stage PASSED.
+        await stage('drain app timers', () async {
+          await drainAppTimers(tester);
+        });
       },
     );
   });
