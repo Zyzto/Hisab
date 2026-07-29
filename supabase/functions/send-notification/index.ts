@@ -10,6 +10,7 @@ interface TriggerPayload {
   expense_title?: string | null;
   amount_cents?: number | null;
   currency_code?: string | null;
+  expense_id?: string | null;
 }
 
 /** Localized strings for push notifications (must match app translations). */
@@ -169,24 +170,6 @@ async function handleNotificationRequest(req: Request): Promise<Response> {
   const fcmServiceAccountKey = Deno.env.get("FCM_SERVICE_ACCOUNT_KEY");
   const dryRun =
     Deno.env.get("DRY_RUN") === "true" || !fcmProjectId || !fcmServiceAccountKey;
-  if (dryRun) {
-    // Local / CI without FCM secrets: validate auth + payload, skip FCM.
-    console.log("send-notification: dry_run (FCM secrets missing or DRY_RUN=true)", {
-      action: payload.action,
-      group_id: payload.group_id,
-    });
-    return new Response(
-      JSON.stringify({
-        ok: true,
-        dry_run: true,
-        sent: 0,
-        message: "dry_run: FCM not configured",
-      }),
-      { status: 200, headers: { "Content-Type": "application/json" } },
-    );
-  }
-  const projectId = fcmProjectId;
-  const serviceAccountKey = fcmServiceAccountKey;
 
   // Normalize actor so joinee is never sent member_joined (handles UUID/casing from trigger).
   const actorNorm = String(payload?.actor_user_id ?? "").trim().toLowerCase();
@@ -229,22 +212,84 @@ async function handleNotificationRequest(req: Request): Promise<Response> {
     .from("device_tokens")
     .select("token, locale, user_id")
     .in("user_id", userIds);
+  const localeByUser = new Map<string, string | null>();
+  for (const r of tokenRows ?? []) {
+    const uid = String(r.user_id ?? "");
+    if (!uid) continue;
+    if (!localeByUser.has(uid)) {
+      localeByUser.set(uid, (r.locale as string | null) ?? null);
+    }
+  }
+
+  // Persist in-app history for every recipient (even without a device token / dry-run).
+  const historyRows = userIds.map((userId) => {
+    const { title, body } = buildNotificationText(payload, localeByUser.get(userId) ?? null);
+    return {
+      user_id: userId,
+      group_id: payload.group_id,
+      actor_user_id: payload.actor_user_id,
+      action: payload.action,
+      title,
+      body,
+      expense_id: payload.expense_id ?? null,
+      payload: {
+        expense_title: payload.expense_title ?? null,
+        amount_cents: payload.amount_cents ?? null,
+        currency_code: payload.currency_code ?? null,
+      },
+    };
+  });
+  const { error: historyError } = await supabase.from("user_notifications").insert(historyRows);
+  if (historyError) {
+    console.error("send-notification: failed to persist user_notifications", historyError.message);
+  } else {
+    console.log("send-notification: persisted history", { count: historyRows.length });
+  }
+
+  if (dryRun) {
+    console.log("send-notification: dry_run (FCM secrets missing or DRY_RUN=true)", {
+      action: payload.action,
+      group_id: payload.group_id,
+      persisted: historyRows.length,
+    });
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        dry_run: true,
+        sent: 0,
+        persisted: historyRows.length,
+        message: "dry_run: FCM not configured",
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  const projectId = fcmProjectId!;
+  const serviceAccountKey = fcmServiceAccountKey!;
+
   // Exclude actor from send list (defense-in-depth so joinee never gets member_joined).
   const rows = (tokenRows ?? []).filter(
     (r) => r.token && r.user_id && String(r.user_id).trim().toLowerCase() !== actorNorm,
   );
-  const tokenCount = rows.length;
-  if (tokenCount === 0) {
+  if (rows.length === 0) {
     console.log("send-notification: No device tokens for members", {
       group_id: payload.group_id,
       action: payload.action,
       memberCount: userIds.length,
       tokenCount: 0,
+      persisted: historyRows.length,
     });
-    return new Response(JSON.stringify({ sent: 0, message: "No device tokens for members" }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        sent: 0,
+        persisted: historyRows.length,
+        message: "No device tokens for members",
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   }
 
   let accessToken: string;
@@ -303,6 +348,7 @@ async function handleNotificationRequest(req: Request): Promise<Response> {
     memberCount: userIds.length,
     tokenCount: rows.length,
     sent,
+    persisted: historyRows.length,
     ...(errors.length > 0 && { errorSample: errors.slice(0, 2) }),
   });
 
@@ -310,6 +356,7 @@ async function handleNotificationRequest(req: Request): Promise<Response> {
     JSON.stringify({
       sent,
       total: rows.length,
+      persisted: historyRows.length,
       ...(errors.length > 0 && { errors: errors.slice(0, 5) }),
     }),
     {

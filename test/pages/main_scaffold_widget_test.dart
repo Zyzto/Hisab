@@ -8,6 +8,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hisab/core/navigation/main_scaffold.dart';
 import 'package:hisab/core/navigation/route_paths.dart';
+import 'package:hisab/core/navigation/shell_nav_layout.dart';
+import 'package:hisab/core/widgets/app_sidenav.dart';
+import 'package:hisab/core/widgets/floating_nav_bar.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:toastification/toastification.dart';
 
 GoRouter _buildRouter(String initialLocation) {
@@ -55,13 +59,19 @@ void main() {
     EasyLocalization.logger.enableBuildModes = [];
   });
 
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   Future<void> pumpRouterApp(
     WidgetTester tester, {
     required GoRouter router,
+    Size size = const Size(400, 800),
   }) async {
-    // Use narrow viewport so MainScaffold shows bottom nav (not rail).
-    tester.view.physicalSize = const Size(400, 800);
-    addTearDown(() => tester.view.resetPhysicalSize());
+    tester.view.physicalSize = size;
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       ProviderScope(
         child: EasyLocalization(
@@ -75,7 +85,7 @@ void main() {
         ),
       ),
     );
-    await tester.pump();
+    await tester.pumpAndSettle();
   }
 
   testWidgets('MainScaffold renders without error', (tester) async {
@@ -84,6 +94,86 @@ void main() {
     expect(find.byType(MainScaffold), findsOneWidget);
     // Advance time so any timers (e.g. SyncStatusChip collapse) can complete before teardown
     await tester.pump(const Duration(seconds: 3));
+  });
+
+  testWidgets('Phone shows floating bottom nav', (tester) async {
+    final router = _buildRouter(RoutePaths.home);
+    await pumpRouterApp(tester, router: router, size: const Size(400, 800));
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.byType(FloatingNavBar), findsOneWidget);
+    expect(find.byType(AppSidenav), findsNothing);
+    expect(find.byKey(const ValueKey('shell_menu_button')), findsNothing);
+    await tester.pump(const Duration(seconds: 2));
+  });
+
+  testWidgets('Mid band shows hamburger and opens temporary drawer', (
+    tester,
+  ) async {
+    final router = _buildRouter(RoutePaths.home);
+    await pumpRouterApp(tester, router: router, size: const Size(700, 800));
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.byType(FloatingNavBar), findsNothing);
+    expect(find.byType(AppSidenav), findsNothing);
+    expect(find.byType(Drawer), findsNothing);
+    expect(find.byKey(const ValueKey('shell_menu_button')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('shell_menu_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AppSidenav), findsOneWidget);
+    expect(find.byType(Drawer), findsOneWidget);
+    expect(find.byIcon(Icons.group), findsOneWidget);
+    expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
+    await tester.pump(const Duration(seconds: 2));
+  });
+
+  testWidgets('Desktop shows permanent drawer without menu button', (
+    tester,
+  ) async {
+    final router = _buildRouter(RoutePaths.home);
+    await pumpRouterApp(tester, router: router, size: const Size(1000, 800));
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.byType(FloatingNavBar), findsNothing);
+    expect(find.byType(AppSidenav), findsOneWidget);
+    expect(find.byType(Drawer), findsOneWidget);
+    expect(find.byKey(const ValueKey('shell_menu_button')), findsNothing);
+    expect(find.byIcon(Icons.group), findsOneWidget);
+    expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
+    expect(find.byKey(const ValueKey('shell_nav_collapse')), findsOneWidget);
+    await tester.pump(const Duration(seconds: 2));
+  });
+
+  testWidgets('Desktop sidenav collapses to icons-only and stays docked', (
+    tester,
+  ) async {
+    final router = _buildRouter(RoutePaths.home);
+    await pumpRouterApp(tester, router: router, size: const Size(1000, 800));
+    await tester.pump(const Duration(seconds: 1));
+
+    await tester.tap(find.byKey(const ValueKey('shell_nav_collapse')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('shell_menu_button')), findsNothing);
+    expect(find.byKey(const ValueKey('shell_nav_expand')), findsOneWidget);
+    expect(find.byKey(const ValueKey('shell_nav_collapse')), findsNothing);
+    expect(find.byType(AppSidenav), findsOneWidget);
+    expect(find.byType(Drawer), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+  });
+
+  testWidgets('Desktop sidenav collapse preference is restored', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      ShellNavLayout.desktopNavCollapsedKey: true,
+    });
+    final router = _buildRouter(RoutePaths.home);
+    await pumpRouterApp(tester, router: router, size: const Size(1000, 800));
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.byKey(const ValueKey('shell_nav_expand')), findsOneWidget);
+    expect(find.byKey(const ValueKey('shell_nav_collapse')), findsNothing);
+    await tester.pump(const Duration(seconds: 1));
   });
 
   testWidgets('Back on settings navigates to home', (tester) async {

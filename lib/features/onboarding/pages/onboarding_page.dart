@@ -15,11 +15,10 @@ import '../../../core/database/database_providers.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../core/constants/supabase_config.dart';
 import '../../../core/layout/constrained_content.dart';
-import '../../../core/layout/layout_breakpoints.dart';
-import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/services/permission_service.dart';
 import '../../../core/theme/theme_config.dart';
+import '../../../core/widgets/sheet_helpers.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 import '../../settings/settings_definitions.dart';
 import '../widgets/onboarding_connect_page.dart';
@@ -381,53 +380,17 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                           _languagePulseController.stop();
                         }
                         _languageTapController.forward(from: 0);
-                        final chosen = await showResponsiveSheet<Locale>(
-                          context: context,
+                        final chosen = await showOptionPickerSheet<Locale>(
+                          context,
                           title: 'language'.tr(),
-                          maxHeight: MediaQuery.of(context).size.height * 0.75,
-                          isScrollControlled: true,
-                          centerInFullViewport: true,
-                          child: Builder(
-                            builder: (ctx) => SafeArea(
-                              child: SingleChildScrollView(
-                                child: Padding(
-                                  padding: EdgeInsets.only(
-                                    bottom:
-                                        MediaQuery.of(ctx).padding.bottom +
-                                        ThemeConfig.spacingM,
-                                  ),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (!LayoutBreakpoints.isTabletOrWider(
-                                        context,
-                                      ))
-                                        Padding(
-                                          padding: const EdgeInsets.all(
-                                            ThemeConfig.spacingM,
-                                          ),
-                                          child: Text(
-                                            'language'.tr(),
-                                            style: Theme.of(
-                                              ctx,
-                                            ).textTheme.titleMedium,
-                                          ),
-                                        ),
-                                      ..._supportedLocales.map(
-                                        (locale) => ListTile(
-                                          title: Text(
-                                            _localeDisplayName(locale),
-                                          ),
-                                          onTap: () =>
-                                              Navigator.of(ctx).pop(locale),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                          selected: context.locale,
+                          options: [
+                            for (final locale in _supportedLocales)
+                              SheetPickerOption(
+                                value: locale,
+                                label: _localeDisplayName(locale),
                               ),
-                            ),
-                          ),
+                          ],
                         );
                         if (chosen != null && context.mounted) {
                           await ref

@@ -4,8 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 
-import '../../../core/layout/layout_breakpoints.dart';
-import '../../../core/layout/responsive_sheet.dart';
+import '../../../core/widgets/sheet_helpers.dart';
 import '../settings_definitions.dart';
 import '../providers/settings_framework_providers.dart';
 import '../widgets/setting_tile_helper.dart';
@@ -101,43 +100,18 @@ Widget _receiptAiProviderTile(
     title: Text('receipt_ai_provider'.tr()),
     subtitle: Text(labelKey.tr()),
     onTap: () async {
-      final chosen = await showResponsiveSheet<String>(
-        context: context,
+      final chosen = await showOptionPickerSheet<String>(
+        context,
         title: 'receipt_ai_provider'.tr(),
-        maxHeight: MediaQuery.of(context).size.height * 0.75,
-        isScrollControlled: true,
-        child: Builder(
-          builder: (ctx) => SafeArea(
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(ctx).padding.bottom + 16,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (!LayoutBreakpoints.isTabletOrWider(context))
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Text(
-                          'receipt_ai_provider'.tr(),
-                          style: Theme.of(ctx).textTheme.titleMedium,
-                        ),
-                      ),
-                    ..._receiptAiProviderOptions.map((option) {
-                      final optionLabelKey =
-                          _receiptAiProviderLabelKeys[option] ?? option;
-                      return ListTile(
-                        title: Text(optionLabelKey.tr()),
-                        onTap: () => Navigator.of(ctx).pop(option),
-                      );
-                    }),
-                  ],
-                ),
-              ),
+        centerInFullViewport: false,
+        selected: value,
+        options: [
+          for (final option in _receiptAiProviderOptions)
+            SheetPickerOption(
+              value: option,
+              label: (_receiptAiProviderLabelKeys[option] ?? option).tr(),
             ),
-          ),
-        ),
+        ],
       );
       if (chosen != null && context.mounted) {
         ref

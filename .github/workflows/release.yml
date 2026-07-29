@@ -346,9 +346,9 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
-      # PowerSync web needs sqlite3.wasm and worker JS (required for live site; missing = "Unexpected token '<'" / wrong WASM MIME).
-      - name: Set up PowerSync web (sqlite3.wasm + workers)
-        run: dart run powersync:setup_web
+      # PowerSync web needs sqlite3.wasm and powersync_db.worker.js (required for live site; missing = "Unexpected token '<'" / wrong WASM MIME).
+      - name: Set up PowerSync web (sqlite3.wasm + worker)
+        run: flutter pub run powersync:setup_web
 
       - name: Ensure PowerSync web assets exist
         run: |

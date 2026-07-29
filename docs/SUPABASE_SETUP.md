@@ -36,6 +36,7 @@ This guide walks you through setting up the Supabase backend for Hisab from scra
    - [Migration 20: Fix accept_invite null-expiry validation](#migration-20-fix-accept_invite-null-expiry-validation)
    - [Post–Migration 20: Invite access mode and read-only preview](#postmigration-20-invite-access-mode-and-read-only-preview)
    - [Migration 21: allow_expense_as_other, groups RLS, delete_my_data, feedback storage](#migration-21-allow_expense_as_other-groups-rls-delete_my_data-feedback-storage)
+   - [Migration 22: user_notifications (Profile activity feed)](#migration-22-user_notifications-profile-activity-feed)
 4. [Configure Authentication](#4-configure-authentication)
 5. [Deploy Edge Functions](#5-deploy-edge-functions)
    - [Push notifications: end-to-end flow and verification](#push-notifications-end-to-end-flow-and-verification)
@@ -1807,6 +1808,22 @@ Closes client/schema drift that broke online group settings sync and Delete clou
 
 Apply with `supabase db push` / `db reset` (local) or paste SQL via SQL Editor / MCP on hosted projects. After this, the Flutter client sends personal/budget/settle/permission fields on online `groups.update` (no longer stripped).
 
+Also apply (same release window):
+
+| File | Purpose |
+|------|---------|
+| `20260728130000_prevent_duplicate_active_participants.sql` | Partial unique index on active linked participants; hardens `accept_invite` / merge against duplicate `user_id` per group |
+
+### Migration 22: user_notifications (Profile activity feed)
+
+Adds synced in-app notification history for the Profile activity feed. Run after Migration 21.
+
+| File | Purpose |
+|------|---------|
+| `20260729010000_user_notifications.sql` | Creates `user_notifications` (RLS: user SELECT/UPDATE own rows; inserts via service role from `send-notification`); extends `get_delete_my_data_preview` / `delete_my_data` to count and delete notification rows |
+
+**Client contract:** SyncEngine fetches rows for `auth.uid()`; Profile marks read via UPDATE. Redeploy `send-notification` after applying so history rows are written on each trigger (including dry-run / no device tokens).
+
 ### Post–Migration 20: Invite access mode and read-only preview
 
 **Cloud vs repo:** Hosted Supabase should expose the same **schema and RPC behavior** as this repository. The ordered source of truth is every file under [`supabase/migrations/`](../supabase/migrations/) (lexicographic order matches apply order). Dashboard **migration version strings** may differ from these filenames (e.g. applied via SQL Editor or squashed under another timestamp); use live checks below—not only the migration list—to detect drift.
@@ -2068,7 +2085,7 @@ supabase functions deploy telemetry --no-verify-jwt
 
 ### send-notification
 
-Sends FCM push notifications to group members when expenses are created/updated or new members join. Called by the database trigger (Migration 6) via `pg_net`. The function queries `group_members` and `device_tokens` for the group (excluding the actor), then sends FCM HTTP v1 messages with `notification` (title/body) and `data.group_id` so the Flutter app can display and navigate to the group on tap.
+Persists in-app notification history and sends FCM push notifications to group members when expenses are created/updated or new members join. Called by the database trigger (Migration 6) via `pg_net`. The function queries `group_members` and `device_tokens` for the group (excluding the actor), inserts one `user_notifications` row per recipient (Migration 22), then — when FCM secrets are set — sends FCM HTTP v1 messages with `notification` (title/body) and `data.group_id` so the Flutter app can display and navigate to the group on tap. Dry-run (no FCM secrets) still persists history and returns `{ dry_run: true, persisted: N }`.
 
 **Prerequisites:**
 1. Create a Firebase project and add apps for Android, iOS, and Web.
@@ -2089,7 +2106,7 @@ SELECT vault.create_secret('YOUR_SERVICE_ROLE_KEY_HERE', 'service_role_key');
 
 **File**: `supabase/functions/send-notification/index.ts`
 
-The implementation in the repo uses the trigger payload (`group_id`, `actor_user_id`, `action`, `expense_title`, `amount_cents`, `currency_code`) to build a notification title/body, fetches FCM tokens for other group members from `device_tokens`, obtains an OAuth2 access token from the Firebase service account, and sends one FCM v1 request per token. The Flutter app expects `message.notification` (title, body) and `message.data.group_id` (string) for tap navigation; see `lib/core/services/notification_service.dart`.
+The implementation in the repo uses the trigger payload (`group_id`, `actor_user_id`, `action`, `expense_title`, `amount_cents`, `currency_code`, optional `expense_id`) to build a notification title/body, inserts localized history into `user_notifications`, fetches FCM tokens for other group members from `device_tokens`, obtains an OAuth2 access token from the Firebase service account, and sends one FCM v1 request per token. The Flutter app expects `message.notification` (title, body) and `message.data.group_id` (string) for tap navigation; see `lib/core/services/notification_service.dart`. Profile reads synced history via `UserNotificationRepository`.
 
 **Deploy with CLI**:
 ```bash
@@ -2106,9 +2123,9 @@ The following describes the full pipeline so you can verify or debug each step.
 
 1. **Flutter app** (online): User adds or edits an expense → [PowerSyncRepository](lib/core/repository/powersync_repository.dart) writes to Supabase `expenses` via `Supabase.instance.client` (authenticated). Offline writes are queued in `pending_writes` and pushed later by [DataSyncService](lib/core/database/database_providers.dart) using the same client, so the trigger runs with `auth.uid()` set.
 2. **Supabase Postgres**: `AFTER INSERT OR UPDATE ON expenses` fires trigger `notify_on_expense_change` → function `notify_group_activity()` runs. It reads `v_supabase_url` (must be your project URL, not `YOUR_SUPABASE_URL`) and the service role key from **Vault** (`service_role_key`). If either is missing, it logs and returns without calling the edge function.
-3. **pg_net**: `net.http_post` sends a POST to `{v_supabase_url}/functions/v1/send-notification` with JSON body `group_id`, `actor_user_id`, `action`, `expense_title`, `amount_cents`, `currency_code` and header `Authorization: Bearer <service_role_key>`.
-4. **Edge function `send-notification`**: Validates the Bearer token against `SUPABASE_SERVICE_ROLE_KEY`, then uses `FCM_PROJECT_ID` and `FCM_SERVICE_ACCOUNT_KEY` to obtain a Google OAuth2 access token and send FCM HTTP v1 messages to all group members’ device tokens (from `device_tokens`) except the actor. Each message includes `notification: { title, body }` and `data: { group_id }` (string).
-5. **Flutter app** (on other devices): Receives the message via Firebase; [NotificationService](lib/core/services/notification_service.dart) displays it and, on tap, navigates to the group using `message.data['group_id']`.
+3. **pg_net**: `net.http_post` sends a POST to `{v_supabase_url}/functions/v1/send-notification` with JSON body `group_id`, `actor_user_id`, `action`, `expense_title`, `amount_cents`, `currency_code` (and optional `expense_id`) and header `Authorization: Bearer <service_role_key>`.
+4. **Edge function `send-notification`**: Validates the Bearer token against `SUPABASE_SERVICE_ROLE_KEY`, inserts `user_notifications` for all other group members, then (when FCM secrets are set) uses `FCM_PROJECT_ID` and `FCM_SERVICE_ACCOUNT_KEY` to obtain a Google OAuth2 access token and send FCM HTTP v1 messages to those members’ device tokens. Each push includes `notification: { title, body }` and `data: { group_id }` (string).
+5. **Flutter app** (on other devices): Receives the push via Firebase; [NotificationService](lib/core/services/notification_service.dart) displays it and, on tap, navigates to the group using `message.data['group_id']`. SyncEngine also pulls `user_notifications` into the Profile activity feed.
 
 **Verification checklist:**
 
@@ -2191,7 +2208,7 @@ Add to `.vscode/launch.json`:
 
 After completing all steps:
 
-1. **Database**: Go to Supabase Table Editor and verify core tables exist: `groups`, `group_members`, `participants`, `expenses`, `expense_tags`, `group_invites`, `telemetry`, `public.device_tokens`, and (after Migration 7) `invite_usages`.
+1. **Database**: Go to Supabase Table Editor and verify core tables exist: `groups`, `group_members`, `participants`, `expenses`, `expense_tags`, `group_invites`, `telemetry`, `public.device_tokens`, (after Migration 7) `invite_usages`, and (after Migration 22) `user_notifications`.
 
 2. **RLS**: Go to **Authentication > Policies** and verify each table has its RLS policies enabled.
 

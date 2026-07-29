@@ -23,7 +23,7 @@ Future<void> showChangePasswordSheet(
     title: 'change_password_title'.tr(),
     isScrollControlled: true,
     useSafeArea: true,
-    centerInFullViewport: true,
+    centerInFullViewport: false,
     child: _ChangePasswordSheet(ref: ref),
   );
 }

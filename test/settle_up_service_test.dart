@@ -516,6 +516,65 @@ void main() {
     });
   });
 
+  group('participantSplitShareCents', () {
+    test('returns only my share when someone else paid', () {
+      final expense = Expense(
+        id: 'e1',
+        groupId: 'g1',
+        payerParticipantId: 'p-a',
+        amountCents: 3000,
+        currencyCode: 'USD',
+        title: 'Dinner',
+        date: now,
+        splitType: SplitType.equal,
+        splitShares: {'p-a': 1000, 'p-b': 1000, 'p-c': 1000},
+        createdAt: now,
+        updatedAt: now,
+      );
+      expect(expenseInvolvesParticipant(expense, 'p-b'), isTrue);
+      expect(participantSplitShareCents(expense, 'p-b'), 1000);
+      expect(participantSplitShareCents(expense, 'p-z'), isNull);
+    });
+
+    test('converts share to group base currency', () {
+      final expense = Expense(
+        id: 'e1',
+        groupId: 'g1',
+        payerParticipantId: 'p-a',
+        amountCents: 10000,
+        currencyCode: 'EUR',
+        baseAmountCents: 11000,
+        title: 'Taxi',
+        date: now,
+        splitType: SplitType.equal,
+        splitShares: {'p-a': 5000, 'p-b': 5000},
+        createdAt: now,
+        updatedAt: now,
+      );
+      expect(participantSplitShareCents(expense, 'p-b'), 5500);
+    });
+
+    test('transfers have no split share', () {
+      final expense = Expense(
+        id: 'e1',
+        groupId: 'g1',
+        payerParticipantId: 'p-a',
+        toParticipantId: 'p-b',
+        amountCents: 500,
+        currencyCode: 'USD',
+        title: 'Settle',
+        date: now,
+        transactionType: TransactionType.transfer,
+        splitType: SplitType.equal,
+        splitShares: const {},
+        createdAt: now,
+        updatedAt: now,
+      );
+      expect(expenseInvolvesParticipant(expense, 'p-b'), isTrue);
+      expect(participantSplitShareCents(expense, 'p-b'), isNull);
+    });
+  });
+
   group('computeSettleUp legacy alias', () {
     test('matches computeSettleUpGreedy', () {
       final balances = [
@@ -534,6 +593,98 @@ void main() {
       final legacy = computeSettleUp(balances, 'EUR');
       expect(legacy.length, greedy.length);
       expect(legacy.first.amountCents, greedy.first.amountCents);
+    });
+  });
+
+  group('computePairExpenseBreakdown', () {
+    test('shows both sides and net when each paid for the other', () {
+      // Alice paid dinner 60 split equally → Bob owes Alice 30
+      // Bob paid groceries 40 split equally → Alice owes Bob 20
+      // Net: Bob pays Alice 10
+      final expenses = [
+        Expense(
+          id: 'e-dinner',
+          groupId: 'g1',
+          payerParticipantId: 'p-a',
+          amountCents: 6000,
+          currencyCode: 'USD',
+          title: 'Dinner',
+          date: now,
+          splitType: SplitType.equal,
+          splitShares: const {'p-a': 3000, 'p-b': 3000},
+          createdAt: now,
+          updatedAt: now,
+        ),
+        Expense(
+          id: 'e-groceries',
+          groupId: 'g1',
+          payerParticipantId: 'p-b',
+          amountCents: 4000,
+          currencyCode: 'USD',
+          title: 'Groceries',
+          date: now,
+          splitType: SplitType.equal,
+          splitShares: const {'p-a': 2000, 'p-b': 2000},
+          createdAt: now,
+          updatedAt: now,
+        ),
+      ];
+
+      final breakdown = computePairExpenseBreakdown(
+        fromParticipantId: 'p-b',
+        toParticipantId: 'p-a',
+        expenses: expenses,
+      );
+
+      expect(breakdown.hasOffsettingExpenses, isTrue);
+      expect(breakdown.owedByFromTotal, 3000); // Bob owes Alice for dinner
+      expect(breakdown.owedByToTotal, 2000); // Alice owes Bob for groceries
+      expect(breakdown.netCents, 1000);
+      expect(breakdown.owedByFromToTo.single.title, 'Dinner');
+      expect(breakdown.owedByToToFrom.single.title, 'Groceries');
+    });
+
+    test('ignores prior settlement transfers', () {
+      final expenses = [
+        Expense(
+          id: 'e1',
+          groupId: 'g1',
+          payerParticipantId: 'p-a',
+          amountCents: 2000,
+          currencyCode: 'USD',
+          title: 'Taxi',
+          date: now,
+          splitType: SplitType.equal,
+          splitShares: const {'p-a': 1000, 'p-b': 1000},
+          createdAt: now,
+          updatedAt: now,
+        ),
+        Expense(
+          id: 'xfer',
+          groupId: 'g1',
+          payerParticipantId: 'p-b',
+          toParticipantId: 'p-a',
+          amountCents: 500,
+          currencyCode: 'USD',
+          title: 'Settlement',
+          date: now,
+          transactionType: TransactionType.transfer,
+          splitType: SplitType.amounts,
+          splitShares: const {'p-a': 500},
+          createdAt: now,
+          updatedAt: now,
+        ),
+      ];
+
+      final breakdown = computePairExpenseBreakdown(
+        fromParticipantId: 'p-b',
+        toParticipantId: 'p-a',
+        expenses: expenses,
+      );
+
+      expect(breakdown.owedByFromToTo.length, 1);
+      expect(breakdown.owedByFromToTo.single.title, 'Taxi');
+      expect(breakdown.owedByToToFrom, isEmpty);
     });
   });
 }

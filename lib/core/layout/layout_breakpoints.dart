@@ -5,10 +5,10 @@ import 'package:flutter/material.dart';
 class LayoutBreakpoints {
   LayoutBreakpoints._();
 
-  /// Width at which to show rail navigation and constrain content (tablet).
+  /// Width at which to show tablet layouts (temporary shell drawer, constrained content).
   static const double breakpointTablet = 600.0;
 
-  /// Width for larger desktop layout (optional; e.g. wider content cap).
+  /// Width for larger desktop layout (permanent sidenav, wider content cap).
   static const double breakpointDesktop = 840.0;
 
   /// Max content width when on tablet-sized or wider screens.
@@ -20,28 +20,53 @@ class LayoutBreakpoints {
   /// Max width for responsive sheets shown as dialogs on wide screens.
   static const double sheetDialogMaxWidth = 560.0;
 
-  /// Width of the navigation rail when extended (used to center dialogs in content area).
-  static const double navigationRailWidth = 180.0;
+  /// Width of the permanent shell sidenav on desktop (MUI-style drawer width).
+  static const double shellNavWidth = 240.0;
 
-  /// Width of the navigation rail when compact (icons only; Material default).
-  static const double navigationRailWidthCompact = 80.0;
+  /// Collapsed (icons-only) permanent sidenav width on desktop.
+  static const double shellNavWidthCompact = 72.0;
 
-  /// Returns the effective navigation rail width for the current context
-  /// (extended above [breakpointDesktop], compact between [breakpointTablet] and [breakpointDesktop]).
+  /// Alias for [shellNavWidth] (historical name used by sheet centering).
+  static const double navigationRailWidth = shellNavWidth;
+
+  /// Former compact rail width; mid band no longer reserves space (temporary drawer).
+  @Deprecated(
+    'Use shellNavWidthCompact for desktop collapse; mid band reserves 0.',
+  )
+  static const double navigationRailWidthCompact = shellNavWidthCompact;
+
+  /// Duration for shell sidenav width morph (mid↔desktop, expand/collapse).
+  static const Duration shellNavMorphDuration = Duration(milliseconds: 280);
+
+  /// Returns the reserved shell nav width for layout / dialog centering.
+  ///
+  /// Prefer [ShellNavLayout.reservedWidth] when set by the shell (tracks
+  /// collapse). Fallback: full width on desktop, **0** below desktop.
   static double navigationRailWidthFor(BuildContext context) {
-    return isDesktopOrWider(context)
-        ? navigationRailWidth
-        : navigationRailWidthCompact;
+    return shellNavWidthFor(context);
   }
 
-  /// True when width >= [breakpointTablet] (use rail, constrain content, optional sheet-as-dialog).
+  /// Same as [navigationRailWidthFor].
+  static double shellNavWidthFor(BuildContext context) {
+    // Imported lazily via callback in responsive_sheet to avoid cycles;
+    // callers that need live width should read ShellNavLayout.reservedWidth.
+    return isDesktopOrWider(context) ? shellNavWidth : 0.0;
+  }
+
+  /// True when width >= [breakpointTablet] (tablet layouts, sheet-as-dialog, etc.).
   static bool isTabletOrWider(BuildContext context) {
     return MediaQuery.sizeOf(context).width >= breakpointTablet;
   }
 
-  /// True when width >= [breakpointDesktop].
+  /// True when width >= [breakpointDesktop] (permanent sidenav).
   static bool isDesktopOrWider(BuildContext context) {
     return MediaQuery.sizeOf(context).width >= breakpointDesktop;
+  }
+
+  /// Tablet band between mobile and desktop: hamburger + temporary drawer.
+  static bool isMidBand(BuildContext context) {
+    final w = MediaQuery.sizeOf(context).width;
+    return w >= breakpointTablet && w < breakpointDesktop;
   }
 
   /// Returns the max content width to use for the current context.
@@ -72,7 +97,7 @@ class LayoutBreakpoints {
     final effectiveRailWidth = (viewportWidth - contentAreaWidth) > 5
         ? (viewportWidth - contentAreaWidth)
         : 0.0;
-    // Scaffold Row puts the rail at start: left in LTR, right in RTL.
+    // Scaffold Row puts the sidenav at start: left in LTR, right in RTL.
     final isRtl = Directionality.of(context) == TextDirection.rtl;
     final contentAreaLeftInViewport = isRtl ? 0.0 : effectiveRailWidth;
     final desiredBandLeftInViewport = (viewportWidth - maxW) / 2;

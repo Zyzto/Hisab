@@ -6,7 +6,10 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/repository/repository_providers.dart';
+import '../../../core/services/settle_up_service.dart';
+import '../../../core/theme/accent_style.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/widgets/participant_avatar.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../domain/domain.dart';
 import '../providers/balance_provider.dart';
@@ -22,6 +25,8 @@ Future<bool> showRecordSettlementSheet(
   required SettlementTransaction settlement,
   required String fromName,
   required String toName,
+  String? fromAvatarId,
+  String? toAvatarId,
 }) async {
   final result = await showResponsiveSheet<bool>(
     context: context,
@@ -34,6 +39,8 @@ Future<bool> showRecordSettlementSheet(
       settlement: settlement,
       fromName: fromName,
       toName: toName,
+      fromAvatarId: fromAvatarId,
+      toAvatarId: toAvatarId,
     ),
   );
   if (result == true) {
@@ -90,12 +97,14 @@ Future<bool> showRecordSettlementSheet(
   return false;
 }
 
-class _RecordSettlementSheet extends StatelessWidget {
+class _RecordSettlementSheet extends ConsumerWidget {
   final String groupId;
   final String currencyCode;
   final SettlementTransaction settlement;
   final String fromName;
   final String toName;
+  final String? fromAvatarId;
+  final String? toAvatarId;
 
   const _RecordSettlementSheet({
     required this.groupId,
@@ -103,48 +112,244 @@ class _RecordSettlementSheet extends StatelessWidget {
     required this.settlement,
     required this.fromName,
     required this.toName,
+    this.fromAvatarId,
+    this.toAvatarId,
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     final formattedAmount = CurrencyFormatter.formatCents(
       settlement.amountCents,
       currencyCode,
     );
+    final expensesAsync = ref.watch(expensesByGroupProvider(groupId));
+    final expenses = expensesAsync.asData?.value ?? const <Expense>[];
+    final breakdown = computePairExpenseBreakdown(
+      fromParticipantId: settlement.fromParticipantId,
+      toParticipantId: settlement.toParticipantId,
+      expenses: expenses,
+    );
+    // Consolidated settlements already carry one-direction items — don't mix in
+    // the reverse leg (that method does not net pairwise).
+    final hasAlgorithmItems =
+        settlement.items != null && settlement.items!.isNotEmpty;
+    final fromOwesItems = hasAlgorithmItems
+        ? settlement.items!
+        : breakdown.owedByFromToTo;
+    final toOwesItems = hasAlgorithmItems
+        ? const <SettlementItem>[]
+        : breakdown.owedByToToFrom;
+    final fromOwesTotal = fromOwesItems.fold<int>(
+      0,
+      (s, i) => s + i.amountCents,
+    );
+    final toOwesTotal = toOwesItems.fold<int>(0, (s, i) => s + i.amountCents);
+    final pairNet = fromOwesTotal - toOwesTotal;
+    final explainsTransfer = fromOwesItems.isNotEmpty || toOwesItems.isNotEmpty;
+    final isOptimized =
+        explainsTransfer && pairNet != settlement.amountCents;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
-        24,
-        24,
-        24,
-        24 + MediaQuery.of(context).padding.bottom,
+        16,
+        16,
+        16,
+        16 + MediaQuery.paddingOf(context).bottom,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.payments_outlined,
-            size: 48,
-            color: theme.colorScheme.primary,
-          ),
-          const SizedBox(height: 16),
           if (!LayoutBreakpoints.isTabletOrWider(context)) ...[
-            Text('record_settlement'.tr(), style: theme.textTheme.titleLarge),
+            Text(
+              'record_settlement'.tr(),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 12),
           ],
-          Text(
-            'record_settlement_confirm'.tr(
-              namedArgs: {
-                'from': fromName,
-                'to': toName,
-                'amount': formattedAmount,
-              },
+          DecoratedBox(
+            decoration: AccentSurfaces.panel(
+              cs,
+              subtle: context.subtleAccents,
             ),
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyLarge,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _SheetPerson(
+                          name: fromName,
+                          avatarId: fromAvatarId,
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Text(
+                          '\u200E\u2192\u200E',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: cs.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: _SheetPerson(
+                          name: toName,
+                          avatarId: toAvatarId,
+                          alignEnd: true,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    formattedAmount,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'record_settlement_confirm'.tr(
+                      namedArgs: {
+                        'from': fromName,
+                        'to': toName,
+                        'amount': formattedAmount,
+                      },
+                    ),
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 14),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: Text(
+              'settlement_breakdown_title'.tr(),
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          DecoratedBox(
+            decoration: AccentSurfaces.flatPanel(cs),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height * 0.35,
+              ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                child: !explainsTransfer
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            'settlement_no_shared_expenses'.tr(),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'settlement_optimized_hint'.tr(),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (fromOwesItems.isNotEmpty) ...[
+                            _BreakdownSectionHeader(
+                              label: 'settlement_paid_by'.tr(
+                                namedArgs: {'name': toName},
+                              ),
+                            ),
+                            ...fromOwesItems.map(
+                              (item) => _BreakdownLine(
+                                title: item.title,
+                                amountCents: item.amountCents,
+                                currencyCode: currencyCode,
+                                signedPositive: true,
+                              ),
+                            ),
+                          ],
+                          if (toOwesItems.isNotEmpty) ...[
+                            if (fromOwesItems.isNotEmpty)
+                              const SizedBox(height: 8),
+                            _BreakdownSectionHeader(
+                              label: 'settlement_paid_by'.tr(
+                                namedArgs: {'name': fromName},
+                              ),
+                            ),
+                            ...toOwesItems.map(
+                              (item) => _BreakdownLine(
+                                title: item.title,
+                                amountCents: item.amountCents,
+                                currencyCode: currencyCode,
+                                // Offsetting side — shown as reducing what from owes.
+                                signedPositive: false,
+                              ),
+                            ),
+                          ],
+                          if (fromOwesItems.isNotEmpty &&
+                              toOwesItems.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Divider(
+                              height: 1,
+                              color: cs.outlineVariant.withValues(alpha: 0.45),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'settlement_net'.tr(),
+                                    style: theme.textTheme.labelLarge?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  CurrencyFormatter.formatCents(
+                                    settlement.amountCents,
+                                    currencyCode,
+                                  ),
+                                  style: theme.textTheme.labelLarge?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                          if (isOptimized) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'settlement_optimized_hint'.tr(),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
@@ -161,6 +366,121 @@ class _RecordSettlementSheet extends StatelessWidget {
                 label: Text('record_settlement'.tr()),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SheetPerson extends StatelessWidget {
+  final String name;
+  final String? avatarId;
+  final bool alignEnd;
+
+  const _SheetPerson({
+    required this.name,
+    this.avatarId,
+    this.alignEnd = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final avatar = ParticipantAvatar(
+      name: name,
+      avatarId: avatarId,
+      radius: 16,
+      backgroundColor: cs.primary.withValues(alpha: 0.12),
+      foregroundColor: cs.primary,
+      textStyle: theme.textTheme.labelMedium,
+    );
+    final label = Text(
+      '\u2068$name\u2069',
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      textAlign: alignEnd ? TextAlign.end : TextAlign.start,
+      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+    );
+    return alignEnd
+        ? Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Flexible(child: label),
+              const SizedBox(width: 8),
+              avatar,
+            ],
+          )
+        : Row(
+            children: [
+              avatar,
+              const SizedBox(width: 8),
+              Flexible(child: label),
+            ],
+          );
+  }
+}
+
+class _BreakdownSectionHeader extends StatelessWidget {
+  final String label;
+
+  const _BreakdownSectionHeader({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Text(
+        label,
+        style: theme.textTheme.labelMedium?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _BreakdownLine extends StatelessWidget {
+  final String title;
+  final int amountCents;
+  final String currencyCode;
+  final bool signedPositive;
+
+  const _BreakdownLine({
+    required this.title,
+    required this.amountCents,
+    required this.currencyCode,
+    required this.signedPositive,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final amount = CurrencyFormatter.formatCents(amountCents, currencyCode);
+    final prefix = signedPositive ? '+' : '−';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '\u2068$title\u2069',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '$prefix$amount',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: signedPositive ? cs.onSurface : cs.onSurfaceVariant,
+            ),
           ),
         ],
       ),

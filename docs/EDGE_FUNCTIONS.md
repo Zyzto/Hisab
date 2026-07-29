@@ -12,7 +12,7 @@ Local smoke tests: [LOCAL_TEST_ENV.md](LOCAL_TEST_ENV.md).
 |----------|------|--------|
 | **invite-redirect** | `supabase/functions/invite-redirect/index.ts` | Validates invite token via `get_invite_by_token`, then 302 redirects to `redirect.html?token=...` (or error). Uses `SITE_URL` (default e.g. hisab.shenepoy.com) for the redirect base. |
 | **og-invite-image** | `supabase/functions/og-invite-image/` | GET `?token=...` → returns a 1200×630 PNG with themed QR code (encoding the invite URL), “Hisab” branding, and logo. Used as `og:image` / `twitter:image` for invite link previews (WhatsApp, Telegram, etc.). Uses `SITE_URL`. Deploy with `--no-verify-jwt`. |
-| **send-notification** | `supabase/functions/send-notification/index.ts` | Called by DB trigger `notify_group_activity()` (expenses + member_joined). Sends FCM push to other group members only; for `member_joined` the actor (new member) is never sent a notification. Requires secrets: `FCM_PROJECT_ID`, `FCM_SERVICE_ACCOUNT_KEY`. |
+| **send-notification** | `supabase/functions/send-notification/index.ts` | Called by DB trigger `notify_group_activity()` (expenses + member_joined). Inserts `user_notifications` rows for other group members (Profile activity feed), then sends FCM push when secrets are set. Actor is never notified. Dry-run still persists history. Requires secrets for push: `FCM_PROJECT_ID`, `FCM_SERVICE_ACCOUNT_KEY`. |
 | **telemetry** | `supabase/functions/telemetry/index.ts` | POST body `{ event, timestamp?, data? }`; inserts into `public.telemetry`. Used for optional anonymous usage analytics when enabled in app settings. |
 
 ## Local testing
@@ -24,7 +24,7 @@ Use the fuller local stack (Supabase + Edge Functions gateway + optional Firebas
 ./scripts/local_test_env.sh test-edge
 ```
 
-See [LOCAL_TEST_ENV.md](LOCAL_TEST_ENV.md). Locally, `send-notification` returns `{ dry_run: true }` when FCM secrets are not set (no real push). `SITE_URL` defaults to `http://localhost:8080` via `[edge_runtime.secrets]` in `supabase/config.toml`.
+See [LOCAL_TEST_ENV.md](LOCAL_TEST_ENV.md). Locally, `send-notification` returns `{ dry_run: true }` when FCM secrets are not set (no real push) but still inserts `user_notifications` for recipients. `SITE_URL` defaults to `http://localhost:8080` via `[edge_runtime.secrets]` in `supabase/config.toml`.
 
 ## Deploy
 

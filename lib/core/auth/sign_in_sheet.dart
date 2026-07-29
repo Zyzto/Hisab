@@ -351,26 +351,13 @@ class _SignInSheetState extends State<_SignInSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (!LayoutBreakpoints.isTabletOrWider(context)) ...[
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: colorScheme.outline.withValues(alpha: 0.4),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-              ],
-
-              // Title (omit on tablet+ when top bar shows it)
+              // Title (omit on tablet+ when top bar shows it).
+              // Drag handle comes from showResponsiveSheet — do not duplicate.
               if (!LayoutBreakpoints.isTabletOrWider(context)) ...[
                 Text(
                   _isSignUp ? 'auth_sign_up'.tr() : 'sign_in'.tr(),
-                  style: textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -384,7 +371,7 @@ class _SignInSheetState extends State<_SignInSheet> {
                   ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
               ],
 
               // Sign-up only: name and avatar

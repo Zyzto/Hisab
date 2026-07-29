@@ -180,13 +180,13 @@ Without these headers, the database falls back to IndexedDB (slower but compatib
 
 ### Web SQLite
 
-PowerSync on web requires `web/sqlite3.wasm` and (depending on version) worker files such as `powersync_db.worker.js` in the `web/` folder. If you see errors like `Unexpected token '<'` for `powersync_db.worker.js` or `Incorrect response MIME type` for WASM, run:
+PowerSync on web requires `web/sqlite3.wasm` and `web/powersync_db.worker.js` in the `web/` folder. If you see errors like `Unexpected token '<'` for `powersync_db.worker.js` or `Incorrect response MIME type` for WASM, run:
 
 ```bash
-dart run powersync:setup_web
+flutter pub run powersync:setup_web
 ```
 
-This should download the WASM and worker assets into `web/`. Rebuild and redeploy so `build/web/` (and Firebase Hosting) serve them. `firebase.json` is configured to serve `*.wasm` with `Content-Type: application/wasm`.
+This downloads the WASM and single DB/sync worker into `web/` (and removes any obsolete `powersync_sync.worker.js`). Rebuild and redeploy so `build/web/` (and Firebase Hosting) serve them. `firebase.json` is configured to serve `*.wasm` with `Content-Type: application/wasm`.
 
 ---
 
@@ -202,6 +202,8 @@ This should download the WASM and worker assets into `web/`. Rebuild and redeplo
 | Group invites | No | Yes | Requires connectivity |
 | Member management | No | Yes | Requires connectivity |
 | Telemetry | No | Yes | No |
+| Profile dashboard (local KPIs / budgets) | Yes | Yes | Yes (cached) |
+| In-app notification history (`user_notifications`) | No | Yes (synced) | Cached after sync |
 | Export/import backup | Yes | Yes | Yes |
 
 ---

@@ -2125,6 +2125,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         barrierColor: Theme.of(context).colorScheme.scrim,
         barrierDismissible: true,
         centerInFullViewport: true,
+        fadeScale: false,
         builder: (ctx) => Dialog(
           backgroundColor: Colors.transparent,
           insetPadding: EdgeInsets.zero,

@@ -1,7 +1,7 @@
 name: hisab
 description: "Group expense splitting and settle-up app."
 publish_to: 'none'
-version: 0.6.0+53
+version: 0.6.5+54
 
 environment:
   sdk: ^3.10.0
@@ -27,8 +27,7 @@ dependencies:
 
   # Backend & database
   supabase_flutter: ^2.8.4
-  # Stay on 1.x until sync/schema tests and app paths are migrated for PowerSync 2.
-  powersync: ^1.18.0
+  powersync: ^2.3.3
   path_provider: ^2.1.2
   path: ^1.9.0
   uuid: ^4.5.1

@@ -12,9 +12,9 @@ This plan is based on the [Flutter Adaptive and Responsive Design](https://docs.
 
 ### Current state
 
-- **Abstract:** Navigation is already abstracted: `MainScaffold` switches between `FloatingNavBar` (bottom) and `NavigationRail` by width; destinations are shared (groups, settings). Sheets use `showResponsiveSheet` (bottom sheet vs centered dialog by width).
+- **Abstract:** Navigation is abstracted in `MainScaffold`: **`FloatingNavBar`** below 600px; **temporary shell drawer** (hamburger) at 600–839px; **permanent `AppSidenav`** at ≥840px (collapsible to 72px icons-only). Width morphs when resizing across breakpoints. Destinations are shared (groups, settings). Sheets use `showResponsiveSheet` (adaptive dialog/sheet by width).
 - **Measure:** `LayoutBreakpoints` uses **`MediaQuery.sizeOf(context).width`** only (window size). No `LayoutBuilder` where local constraints matter.
-- **Branch:** Breakpoints align with [Material 3](https://m3.material.io/foundations/layout/applying-layout/window-size-classes): tablet ≥600px, desktop ≥840px; content max width 600/720.
+- **Branch:** Breakpoints align with [Material 3](https://m3.material.io/foundations/layout/applying-layout/window-size-classes): tablet ≥600px, desktop ≥840px; content max width 600/720; permanent sidenav width 240 (mid band reserves 0 — overlay drawer).
 
 ### Planned changes
 
@@ -125,7 +125,7 @@ This plan is based on the [Flutter Adaptive and Responsive Design](https://docs.
 |---------------|---------|--------------------------|
 | **LayoutBreakpoints** | MediaQuery.sizeOf, width-only, 600/840 | No change; already correct. |
 | **ConstrainedContent** | Centers + max width; infers rail from constraints | No change. |
-| **MainScaffold** | Rail vs bottom nav by width; IndexedStack for home/settings | Optional: wrap with Shortcuts/Actions for app-level shortcuts. |
+| **MainScaffold** | Bottom nav / mid temporary drawer / desktop permanent sidenav; IndexedStack for home/settings | Shortcuts/Actions already in `_ShellWithShortcuts`. |
 | **Home page** | ListView / ReorderableListView | Consider GridView on tablet+; add PageStorageKey to list(s). |
 | **Settings page** | ListView in ConstrainedContent | Add PageStorageKey. |
 | **Sheets / dialogs** | SafeArea, MediaQuery for max height | Keep; optional VisualDensity at theme. |

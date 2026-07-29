@@ -8,6 +8,7 @@ import 'package:pretty_qr_code/pretty_qr_code.dart';
 
 import '../../../core/constants/supabase_config.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
+import '../../../core/layout/content_aligned_fab_location.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/repository/repository_providers.dart';
@@ -49,6 +50,10 @@ class _InviteManagementPageState extends ConsumerState<InviteManagementPage> {
     return LayoutBuilder(
       builder: (context, layoutConstraints) {
         return Scaffold(
+          floatingActionButtonLocation: ContentAlignedFabLocation.of(
+            context,
+            contentAreaWidth: layoutConstraints.maxWidth,
+          ),
           appBar: ContentAlignedAppBar(
             contentAreaWidth: layoutConstraints.maxWidth,
             title: Text('invite_links'.tr()),

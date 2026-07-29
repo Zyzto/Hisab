@@ -1,12 +1,18 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:go_router/go_router.dart';
 
 import 'layout_breakpoints.dart';
+import '../motion/app_motion.dart';
 import '../navigation/route_paths.dart';
+import '../navigation/shell_nav_layout.dart';
 
-/// Corner radius used for the responsive-sheet dialog and its top bar.
-const double _kSheetDialogRadius = 28.0;
+/// Corner radius for sheet chrome (matches AccentSurfaces.flatPanel).
+const double _kSheetDialogRadius = 16.0;
+
+/// Top corner radius for phone bottom sheets.
+const double _kSheetBottomRadius = 16.0;
 
 /// Returns rail width when dialog should be centered in content area (shell routes only).
 /// Returns 0 when [centerInFullViewport] is true or when path is outside shell (groups, invite, etc.).
@@ -26,25 +32,20 @@ double _railWidthForDialog({
       path == RoutePaths.archivedGroups ||
       path == RoutePaths.settings ||
       path.startsWith('${RoutePaths.settings}/');
-  return isShellRoute ? LayoutBreakpoints.navigationRailWidthFor(context) : 0.0;
+  if (!isShellRoute) return 0.0;
+  // Published by MainScaffold (0 mid/archived/mobile; 72/240 desktop).
+  return ShellNavLayout.reservedWidth.value;
 }
 
-/// Shows [child] as a bottom sheet on narrow screens and as a centered dialog
-/// on tablet-or-wider screens (so it doesn't stretch on desktop/tablet).
+/// Shows [child] as an adaptive modal: centered dialog on tablet+ and a bottom
+/// sheet on narrow screens. The same route morphs smoothly when the viewport
+/// crosses the tablet breakpoint (e.g. window resize on web/desktop).
 ///
-/// When the navigation rail is visible (home or settings route), the dialog is
-/// centered in the content area to the right of the rail; otherwise it is
-/// centered in the full screen.
+/// When the navigation rail is visible and [centerInFullViewport] is false,
+/// the dialog is centered in the content area to the right of the rail.
 ///
-/// Returns the same value as [showModalBottomSheet] / [showDialog] (e.g. when
-/// the user taps outside or closes, returns null unless the child pops with a value).
-///
-/// Tapping/clicking outside the modal (on the barrier) closes it on all platforms
-/// (mobile and desktop web), unless [barrierDismissible] is false.
-///
-/// When [title] is non-null and non-empty, it is shown in a distinct top bar
-/// on tablet-or-wider (dialog) mode; on narrow screens the child typically
-/// includes the title in its body.
+/// Returns the same value as [showDialog] / [showModalBottomSheet] (null when
+/// dismissed unless the child pops with a value).
 Future<T?> showResponsiveSheet<T>({
   required BuildContext context,
   required Widget child,
@@ -52,355 +53,332 @@ Future<T?> showResponsiveSheet<T>({
   Widget? tabletTopBarAction,
   double? maxWidth,
   double? maxHeight,
+  // Retained for call-site compatibility; height is always content-driven
+  // with a max constraint in the adaptive host.
   bool isScrollControlled = true,
   bool useSafeArea = true,
   bool showDragHandle = true,
   ShapeBorder? sheetShape,
 
-  /// When true (default), tapping/clicking the barrier closes the modal. Same behavior on mobile and desktop.
+  /// When true (default), tapping/clicking the barrier closes the modal.
   bool barrierDismissible = true,
 
-  /// When true (default), never add rail padding (center in full viewport). When false, center in content area (e.g. next to rail on shell routes).
+  /// When true (default), never add rail padding (center in full viewport).
+  /// When false, center in content area (e.g. next to rail on shell routes).
   bool centerInFullViewport = true,
-}) async {
-  if (LayoutBreakpoints.isTabletOrWider(context)) {
-    final pathWhenOpened = GoRouter.of(
-      context,
-    ).routerDelegate.currentConfiguration.uri.path;
-    final railWidth = _railWidthForDialog(
-      path: pathWhenOpened,
-      centerInFullViewport: centerInFullViewport,
-      context: context,
-    );
+}) {
+  assert(isScrollControlled || !isScrollControlled);
 
-    return showDialog<T>(
-      context: context,
-      useRootNavigator: true,
-      barrierDismissible: barrierDismissible,
-      builder: (ctx) {
-        final size = MediaQuery.sizeOf(ctx);
-        final theme = Theme.of(ctx);
-        final effectiveMaxHeight = maxHeight ?? size.height * 0.85;
-        const topBarHeight = 56.0;
-        final showTitle = title != null && title.isNotEmpty;
-        const topBarContentPadding = 12.0;
-        final dialogBody = Center(
-          child: Dialog(
-            insetPadding: EdgeInsets.zero,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(_kSheetDialogRadius),
-            ),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: maxWidth ?? LayoutBreakpoints.sheetDialogMaxWidth,
-                maxHeight: effectiveMaxHeight,
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(_kSheetDialogRadius),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Distinct top bar: same shape as dialog (rounded top), title, close
-                    Container(
-                      height: topBarHeight,
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surfaceContainerHighest,
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(_kSheetDialogRadius),
-                        ),
-                        border: Border(
-                          bottom: BorderSide(
-                            color: theme.colorScheme.outlineVariant,
-                            width: 1,
-                          ),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          if (showTitle)
-                            Expanded(
-                              child: Align(
-                                alignment: AlignmentDirectional.centerStart,
-                                child: Padding(
-                                  padding: const EdgeInsetsDirectional.only(
-                                    start: 16,
-                                  ),
-                                  child: Text(
-                                    title,
-                                    style: theme.textTheme.titleLarge?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          if (tabletTopBarAction != null) ...[
-                            Focus(
-                              canRequestFocus: false,
-                              skipTraversal: true,
-                              descendantsAreFocusable: false,
-                              child: tabletTopBarAction,
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                          // Use InkWell instead of IconButton so the close control is not
-                          // focusable; otherwise the focus manager can steal focus from
-                          // sheet content (e.g. password fields) during applyFocusChangesIfNeeded.
-                          Tooltip(
-                            message: MaterialLocalizations.of(
-                              ctx,
-                            ).closeButtonTooltip,
-                            child: Material(
-                              type: MaterialType.button,
-                              color: Colors.transparent,
-                              child: InkWell(
-                                canRequestFocus: false,
-                                onTap: () => Navigator.of(
-                                  ctx,
-                                  rootNavigator: true,
-                                ).pop(null),
-                                customBorder: const CircleBorder(),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(12),
-                                  child: Icon(
-                                    Icons.close,
-                                    size: 24,
-                                    color: theme.colorScheme.onSurface,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.only(
-                        top: topBarContentPadding,
-                        bottom: MediaQuery.viewInsetsOf(ctx).bottom,
-                      ),
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxHeight:
-                              effectiveMaxHeight -
-                              topBarHeight -
-                              topBarContentPadding,
-                        ),
-                        child: FocusScope(autofocus: false, child: child),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-        // Use LayoutBuilder to get the actual constraints from the overlay so we
-        // fill the available space and center within it (fixes off-center on web
-        // when overlay size differs from MediaQuery viewport). Our root is
-        // full-size, so we add an explicit barrier: a full-screen GestureDetector
-        // that pops when tapped (so click-outside closes the dialog). Without this,
-        // the full-size content would absorb all taps and the route's barrier never
-        // receives them.
-        final viewportWidth = size.width;
-        final viewportHeight = size.height;
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            if (barrierDismissible)
-              Positioned.fill(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onTap: () {
-                    final navigator = Navigator.of(ctx, rootNavigator: true);
-                    if (navigator.canPop()) navigator.pop(null);
-                  },
-                  child: const SizedBox.expand(),
-                ),
-              ),
-            LayoutBuilder(
-              builder: (ctx, constraints) {
-                final cw = constraints.maxWidth.isFinite
-                    ? (railWidth > 0
-                          ? constraints.maxWidth - railWidth
-                          : (constraints.maxWidth < viewportWidth
-                                ? constraints.maxWidth
-                                : viewportWidth))
-                    : viewportWidth - railWidth;
-                final ch = constraints.maxHeight.isFinite
-                    ? (constraints.maxHeight < viewportHeight
-                          ? constraints.maxHeight
-                          : viewportHeight)
-                    : viewportHeight;
-                final centeringWrapper = SizedBox(
-                  width: cw,
-                  height: ch,
-                  child: dialogBody,
-                );
-                if (railWidth > 0) {
-                  return Padding(
-                    padding: EdgeInsetsDirectional.only(start: railWidth),
-                    child: centeringWrapper,
-                  );
-                }
-                return centeringWrapper;
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // On mobile web, showModalBottomSheet's barrier often does not receive
-  // pointer events, so use a custom overlay with an explicit barrier (same
-  // pattern as tablet+ dialog) so tap-outside reliably dismisses.
-  if (kIsWeb) {
-    return _showWebBottomSheet<T>(
-      context: context,
-      child: child,
-      barrierDismissible: barrierDismissible,
-      showDragHandle: showDragHandle,
-      sheetShape: sheetShape,
-      useSafeArea: useSafeArea,
-      maxHeight: maxHeight,
-    );
-  }
-
-  return showModalBottomSheet<T>(
-    context: context,
-    isScrollControlled: isScrollControlled,
-    useSafeArea: useSafeArea,
-    showDragHandle: showDragHandle,
-    isDismissible: barrierDismissible,
-    shape:
-        sheetShape ??
-        const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-    builder: (ctx) {
-      final viewInsetsBottom = MediaQuery.viewInsetsOf(ctx).bottom;
-      final paddedChild = Padding(
-        padding: EdgeInsets.only(bottom: viewInsetsBottom),
-        child: child,
-      );
-      return barrierDismissible
-          ? TapRegion(
-              onTapOutside: (_) {
-                final navigator = Navigator.of(ctx);
-                if (navigator.canPop()) navigator.pop();
-              },
-              child: paddedChild,
-            )
-          : paddedChild;
-    },
-  );
-}
-
-Future<T?> _showWebBottomSheet<T>({
-  required BuildContext context,
-  required Widget child,
-  required bool barrierDismissible,
-  required bool showDragHandle,
-  ShapeBorder? sheetShape,
-  bool useSafeArea = true,
-  double? maxHeight,
-}) async {
   final theme = Theme.of(context);
-  final size = MediaQuery.sizeOf(context);
-  final effectiveMaxHeight = maxHeight ?? size.height * 0.85;
-  final shape =
-      sheetShape ??
-      const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      );
+  final pathWhenOpened = GoRouter.of(
+    context,
+  ).routerDelegate.currentConfiguration.uri.path;
 
   return showGeneralDialog<T>(
     context: context,
     useRootNavigator: true,
     barrierDismissible: barrierDismissible,
-    barrierColor: theme.colorScheme.scrim.withValues(alpha: 0.32),
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-    transitionDuration: const Duration(milliseconds: 300),
+    barrierColor: theme.colorScheme.scrim.withValues(alpha: 0.32),
+    transitionDuration: AppMotion.modal,
     pageBuilder: (ctx, animation, secondaryAnimation) {
-      return Stack(
-        fit: StackFit.expand,
-        children: [
-          if (barrierDismissible)
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: () {
-                  final navigator = Navigator.of(ctx, rootNavigator: true);
-                  if (navigator.canPop()) navigator.pop(null);
-                },
-                child: const SizedBox.expand(),
-              ),
-            ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Material(
-              color: theme.colorScheme.surface,
-              shape: shape,
-              child: SafeArea(
-                top: false,
-                bottom: useSafeArea,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxHeight: effectiveMaxHeight),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (showDragHandle)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 12, bottom: 8),
-                          child: Center(
-                            child: Container(
-                              width: 32,
-                              height: 4,
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.onSurfaceVariant
-                                    .withValues(alpha: 0.4),
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxHeight:
-                              effectiveMaxHeight -
-                              (showDragHandle ? 24.0 : 0) -
-                              24,
-                        ),
-                        child: Padding(
-                          padding: EdgeInsets.only(
-                            bottom: MediaQuery.viewInsetsOf(ctx).bottom,
-                          ),
-                          child: child,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      );
-    },
-    transitionBuilder: (ctx, animation, secondaryAnimation, child) {
-      return SlideTransition(
-        position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
-            .animate(
-              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
-            ),
+      return _AdaptiveSheetHost(
+        title: title,
+        tabletTopBarAction: tabletTopBarAction,
+        maxWidth: maxWidth,
+        maxHeight: maxHeight,
+        useSafeArea: useSafeArea,
+        showDragHandle: showDragHandle,
+        sheetShape: sheetShape,
+        barrierDismissible: barrierDismissible,
+        centerInFullViewport: centerInFullViewport,
+        pathWhenOpened: pathWhenOpened,
+        openAnimation: animation,
         child: child,
       );
     },
+    transitionBuilder: (ctx, animation, secondaryAnimation, child) {
+      // Entrance is handled inside [_AdaptiveSheetHost] so resize morphs stay
+      // independent of the route animation.
+      return child;
+    },
   );
+}
+
+/// Adaptive host that rebuilds on MediaQuery changes and morphs between
+/// centered dialog and bottom-sheet layouts.
+class _AdaptiveSheetHost extends StatelessWidget {
+  const _AdaptiveSheetHost({
+    required this.child,
+    required this.pathWhenOpened,
+    required this.centerInFullViewport,
+    required this.barrierDismissible,
+    required this.useSafeArea,
+    required this.showDragHandle,
+    required this.openAnimation,
+    this.title,
+    this.tabletTopBarAction,
+    this.maxWidth,
+    this.maxHeight,
+    this.sheetShape,
+  });
+
+  final Widget child;
+  final String pathWhenOpened;
+  final bool centerInFullViewport;
+  final bool barrierDismissible;
+  final bool useSafeArea;
+  final bool showDragHandle;
+  final Animation<double> openAnimation;
+  final String? title;
+  final Widget? tabletTopBarAction;
+  final double? maxWidth;
+  final double? maxHeight;
+  final ShapeBorder? sheetShape;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final viewInsets = MediaQuery.viewInsetsOf(context);
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isWide = size.width >= LayoutBreakpoints.breakpointTablet;
+    final railWidth = isWide
+        ? _railWidthForDialog(
+            path: pathWhenOpened,
+            centerInFullViewport: centerInFullViewport,
+            context: context,
+          )
+        : 0.0;
+
+    final availableWidth = math.max(0.0, size.width - railWidth);
+    final dialogMaxWidth = maxWidth ?? LayoutBreakpoints.sheetDialogMaxWidth;
+    final panelWidth = isWide
+        ? math.min(dialogMaxWidth, math.max(0.0, availableWidth - 48))
+        : availableWidth;
+    final effectiveMaxHeight =
+        maxHeight ?? size.height * (isWide ? 0.85 : 0.92);
+
+    final showTitle = title != null && title!.isNotEmpty;
+    const topBarHeight = 56.0;
+    final chromeHeight = isWide
+        ? topBarHeight + 12
+        : (showDragHandle ? 24.0 : 8.0);
+    final bodyMaxHeight = math.max(
+      0.0,
+      effectiveMaxHeight - chromeHeight - viewInsets.bottom,
+    );
+
+    final BorderRadius radius = isWide
+        ? BorderRadius.circular(_kSheetDialogRadius)
+        : const BorderRadius.vertical(
+            top: Radius.circular(_kSheetBottomRadius),
+          );
+
+    final Widget header = isWide
+        ? SizedBox(
+            height: topBarHeight,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    color: cs.outlineVariant.withValues(alpha: 0.45),
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  if (showTitle)
+                    Expanded(
+                      child: Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Padding(
+                          padding: const EdgeInsetsDirectional.only(start: 16),
+                          child: Text(
+                            title!,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    const Spacer(),
+                  if (tabletTopBarAction != null) ...[
+                    Focus(
+                      canRequestFocus: false,
+                      skipTraversal: true,
+                      descendantsAreFocusable: false,
+                      child: tabletTopBarAction!,
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  Tooltip(
+                    message: MaterialLocalizations.of(
+                      context,
+                    ).closeButtonTooltip,
+                    child: Material(
+                      type: MaterialType.button,
+                      color: Colors.transparent,
+                      child: InkWell(
+                        canRequestFocus: false,
+                        onTap: () {
+                          final navigator = Navigator.of(
+                            context,
+                            rootNavigator: true,
+                          );
+                          if (navigator.canPop()) navigator.pop(null);
+                        },
+                        customBorder: const CircleBorder(),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Icon(
+                            Icons.close,
+                            size: 22,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+        : showDragHandle
+        ? Padding(
+            padding: const EdgeInsets.only(top: 12, bottom: 8),
+            child: Center(
+              child: Container(
+                width: 32,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+          )
+        : const SizedBox(height: 8);
+
+    // Custom [sheetShape] replaces the animated box decoration (rare).
+    final Widget panelBody = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AnimatedSize(
+          duration: AppMotion.modal,
+          curve: AppMotion.enterCurve,
+          alignment: Alignment.topCenter,
+          child: header,
+        ),
+        ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: bodyMaxHeight),
+          child: FocusScope(autofocus: false, child: child),
+        ),
+      ],
+    );
+
+    final Widget panel = sheetShape != null
+        ? Material(
+            key: const ValueKey('responsive_sheet_panel'),
+            color: cs.surfaceContainerLow,
+            elevation: 0,
+            clipBehavior: Clip.antiAlias,
+            shape: sheetShape,
+            child: panelBody,
+          )
+        : AnimatedContainer(
+            key: const ValueKey('responsive_sheet_panel'),
+            duration: AppMotion.modal,
+            curve: AppMotion.enterCurve,
+            width: panelWidth,
+            constraints: BoxConstraints(maxHeight: effectiveMaxHeight),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerLow,
+              borderRadius: radius,
+              border: Border.all(
+                color: cs.outlineVariant.withValues(alpha: 0.45),
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Material(
+              color: Colors.transparent,
+              child: panelBody,
+            ),
+          );
+
+    final alignedPanel = AnimatedPadding(
+      duration: AppMotion.modal,
+      curve: AppMotion.enterCurve,
+      padding: isWide
+          ? const EdgeInsets.symmetric(horizontal: 24, vertical: 24)
+          : EdgeInsets.zero,
+      child: AnimatedAlign(
+        duration: AppMotion.modal,
+        curve: AppMotion.enterCurve,
+        alignment: isWide ? Alignment.center : Alignment.bottomCenter,
+        child: sheetShape != null
+            ? ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: panelWidth,
+                  maxHeight: effectiveMaxHeight,
+                ),
+                child: panel,
+              )
+            : panel,
+      ),
+    );
+
+    // Entrance: wide fades/scales in place; narrow eases up slightly.
+    final entering = AnimatedBuilder(
+      animation: openAnimation,
+      builder: (context, child) {
+        if (isWide) {
+          return AppMotion.buildFadeScaleTransition(
+            animation: openAnimation,
+            child: child!,
+          );
+        }
+        return AppMotion.buildSlideUpTransition(
+          animation: openAnimation,
+          child: child!,
+        );
+      },
+      child: alignedPanel,
+    );
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (barrierDismissible)
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () {
+                final navigator = Navigator.of(context, rootNavigator: true);
+                if (navigator.canPop()) navigator.pop(null);
+              },
+              child: const SizedBox.expand(),
+            ),
+          ),
+        AnimatedPadding(
+          duration: AppMotion.modal,
+          curve: AppMotion.enterCurve,
+          padding: EdgeInsetsDirectional.only(start: railWidth),
+          child: SafeArea(
+            top: useSafeArea && isWide,
+            bottom: useSafeArea && !isWide,
+            left: false,
+            right: false,
+            child: entering,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 /// Shows a dialog that is centered in the content area on tablet when the
@@ -418,68 +396,106 @@ Future<T?> showAppDialog<T>({
 
   /// When true (default), center in full viewport (no rail padding). When false, center in content area (e.g. next to rail on shell routes).
   bool centerInFullViewport = true,
-}) async {
-  if (LayoutBreakpoints.isTabletOrWider(context)) {
-    final pathWhenOpened = GoRouter.of(
-      context,
-    ).routerDelegate.currentConfiguration.uri.path;
-    final railWidth = _railWidthForDialog(
-      path: pathWhenOpened,
-      centerInFullViewport: centerInFullViewport,
-      context: context,
-    );
 
-    return showDialog<T>(
-      context: context,
-      useRootNavigator: true,
-      barrierDismissible: barrierDismissible,
-      barrierColor: barrierColor,
-      builder: (ctx) {
-        final content = Center(child: builder(ctx));
-        final size = MediaQuery.sizeOf(ctx);
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            if (barrierDismissible)
-              Positioned.fill(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onTap: () {
-                    final navigator = Navigator.of(ctx, rootNavigator: true);
-                    if (navigator.canPop()) navigator.pop(null);
-                  },
-                  child: const SizedBox.expand(),
-                ),
-              ),
-            LayoutBuilder(
-              builder: (ctx, constraints) {
-                final cw = constraints.maxWidth.isFinite
-                    ? (railWidth > 0
-                          ? constraints.maxWidth - railWidth
-                          : constraints.maxWidth)
-                    : size.width - railWidth;
-                final ch = constraints.maxHeight.isFinite
-                    ? constraints.maxHeight
-                    : size.height;
-                final wrapper = SizedBox(width: cw, height: ch, child: content);
-                if (railWidth > 0) {
-                  return Padding(
-                    padding: EdgeInsetsDirectional.only(start: railWidth),
-                    child: wrapper,
-                  );
-                }
-                return wrapper;
+  /// When true (default), fade + scale like wide sheets. Pass false for
+  /// fullscreen image viewers (fade only).
+  bool fadeScale = true,
+}) {
+  final theme = Theme.of(context);
+  final pathWhenOpened = GoRouter.of(
+    context,
+  ).routerDelegate.currentConfiguration.uri.path;
+
+  return showGeneralDialog<T>(
+    context: context,
+    useRootNavigator: true,
+    barrierDismissible: barrierDismissible,
+    barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+    barrierColor:
+        barrierColor ?? theme.colorScheme.scrim.withValues(alpha: 0.32),
+    transitionDuration: AppMotion.modal,
+    pageBuilder: (ctx, animation, secondaryAnimation) {
+      return _AdaptiveAppDialogHost(
+        builder: builder,
+        pathWhenOpened: pathWhenOpened,
+        centerInFullViewport: centerInFullViewport,
+        barrierDismissible: barrierDismissible,
+        fadeScale: fadeScale,
+        openAnimation: animation,
+      );
+    },
+    transitionBuilder: (ctx, animation, secondaryAnimation, child) => child,
+  );
+}
+
+class _AdaptiveAppDialogHost extends StatelessWidget {
+  const _AdaptiveAppDialogHost({
+    required this.builder,
+    required this.pathWhenOpened,
+    required this.centerInFullViewport,
+    required this.barrierDismissible,
+    required this.fadeScale,
+    required this.openAnimation,
+  });
+
+  final WidgetBuilder builder;
+  final String pathWhenOpened;
+  final bool centerInFullViewport;
+  final bool barrierDismissible;
+  final bool fadeScale;
+  final Animation<double> openAnimation;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final isWide = size.width >= LayoutBreakpoints.breakpointTablet;
+    final railWidth = isWide
+        ? _railWidthForDialog(
+            path: pathWhenOpened,
+            centerInFullViewport: centerInFullViewport,
+            context: context,
+          )
+        : 0.0;
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (barrierDismissible)
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () {
+                final navigator = Navigator.of(context, rootNavigator: true);
+                if (navigator.canPop()) navigator.pop(null);
               },
+              child: const SizedBox.expand(),
             ),
-          ],
-        );
-      },
+          ),
+        AnimatedPadding(
+          duration: AppMotion.modal,
+          curve: AppMotion.enterCurve,
+          padding: EdgeInsetsDirectional.only(start: railWidth),
+          child: AnimatedBuilder(
+            animation: openAnimation,
+            builder: (context, child) {
+              if (fadeScale) {
+                return AppMotion.buildFadeScaleTransition(
+                  animation: openAnimation,
+                  child: child!,
+                );
+              }
+              return AppMotion.buildFadeTransition(
+                animation: openAnimation,
+                child: child!,
+              );
+            },
+            child: Align(
+              alignment: Alignment.center,
+              child: builder(context),
+            ),
+          ),
+        ),
+      ],
     );
   }
-  return showDialog<T>(
-    context: context,
-    barrierDismissible: barrierDismissible,
-    barrierColor: barrierColor,
-    builder: builder,
-  );
 }

@@ -79,14 +79,22 @@ class SyncEngine {
         .map<String>((r) => r['group_id'] as String)
         .toList();
 
+    final notifications = await backend.getUserNotifications(userId);
+
     if (groupIds.isEmpty) {
-      await db.execute('DELETE FROM groups');
-      await db.execute('DELETE FROM group_members');
-      await db.execute('DELETE FROM participants');
-      await db.execute('DELETE FROM expenses');
-      await db.execute('DELETE FROM expense_tags');
-      await db.execute('DELETE FROM group_invites');
-      await db.execute('DELETE FROM invite_usages');
+      await db.writeTransaction((tx) async {
+        await tx.execute('DELETE FROM groups');
+        await tx.execute('DELETE FROM group_members');
+        await tx.execute('DELETE FROM participants');
+        await tx.execute('DELETE FROM expenses');
+        await tx.execute('DELETE FROM expense_tags');
+        await tx.execute('DELETE FROM group_invites');
+        await tx.execute('DELETE FROM invite_usages');
+        await tx.execute('DELETE FROM user_notifications');
+        for (final n in notifications) {
+          await _insertUserNotification(tx, n);
+        }
+      });
       return;
     }
 
@@ -110,6 +118,7 @@ class SyncEngine {
       }
       await tx.execute('DELETE FROM invite_usages');
       await tx.execute('DELETE FROM groups');
+      await tx.execute('DELETE FROM user_notifications');
 
       for (final g in groups) {
         final isPersonal = (g['is_personal'] ?? false) == true;
@@ -257,6 +266,36 @@ class SyncEngine {
           ],
         );
       }
+      for (final n in notifications) {
+        await _insertUserNotification(tx, n);
+      }
     });
+  }
+
+  static Future<void> _insertUserNotification(
+    dynamic tx,
+    Map<String, dynamic> n,
+  ) async {
+    final payload = n['payload'];
+    await tx.execute(
+      '''INSERT INTO user_notifications (id, user_id, group_id, actor_user_id, action,
+        title, body, expense_id, payload_json, read_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+      [
+        n['id'],
+        n['user_id'],
+        n['group_id'],
+        n['actor_user_id'],
+        n['action'],
+        n['title'],
+        n['body'],
+        n['expense_id'],
+        payload == null
+            ? null
+            : (payload is String ? payload : jsonEncode(payload)),
+        n['read_at'],
+        n['created_at'],
+      ],
+    );
   }
 }

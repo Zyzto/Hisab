@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../motion/app_motion.dart';
 import '../theme/theme_providers.dart';
 
 class FloatingNavBar extends ConsumerWidget {
@@ -81,7 +82,7 @@ class FloatingNavBar extends ConsumerWidget {
                       minWidth: 44,
                     ),
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
+                      duration: AppMotion.shellTab,
                       curve: Curves.easeInOut,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       child: Column(
@@ -97,7 +98,7 @@ class FloatingNavBar extends ConsumerWidget {
                           if (destination.label != null) ...[
                             const SizedBox(height: 4),
                             AnimatedDefaultTextStyle(
-                              duration: const Duration(milliseconds: 200),
+                              duration: AppMotion.shellTab,
                               style: theme.textTheme.labelSmall!.copyWith(
                                 color: color,
                                 fontWeight: isSelected

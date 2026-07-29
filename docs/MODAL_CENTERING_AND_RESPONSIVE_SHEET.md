@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD060 -->
 
-This document describes modal/dialog centering on web (tablet and desktop), **click-outside-to-close** behavior, and how modals behave when opened from shell vs non–shell routes. For the broader adaptive/responsive plan (breakpoints, SafeArea, large screens), see [ADAPTIVE_RESPONSIVE_PLAN.md](ADAPTIVE_RESPONSIVE_PLAN.md).
+This document describes modal/dialog centering on web (tablet and desktop), **click-outside-to-close** behavior, shell vs non-shell centering, and the shared flat-panel sheet design language. For the broader adaptive/responsive plan (breakpoints, SafeArea, large screens), see [ADAPTIVE_RESPONSIVE_PLAN.md](ADAPTIVE_RESPONSIVE_PLAN.md).
 
 ## Problems addressed
 
@@ -17,52 +17,83 @@ This document describes modal/dialog centering on web (tablet and desktop), **cl
 4. **Shared rail logic** – Extracted `_railWidthForDialog()` in `responsive_sheet.dart` so path/rail handling is in one place and both `showResponsiveSheet` and `showAppDialog` use it.
 5. **Explicit barrier for click-outside** – On tablet+ the dialog builder returns full-size content (for centering), which would otherwise absorb all taps. A **Stack** is used: underneath, a full-screen `GestureDetector` (when `barrierDismissible` is true) that calls `Navigator.pop` on tap; on top, the centered dialog. Hit testing runs top-down, so taps on the dialog hit the dialog; taps outside hit the barrier and close the modal. On narrow screens, `showModalBottomSheet` is called with `isDismissible: barrierDismissible` so the bottom sheet also closes on barrier tap. Default is **barrierDismissible: true** for all modals (same behavior on mobile and desktop web).
 
-## Files changed
+## Adaptive morph (resize)
 
-### Core
+`showResponsiveSheet` uses a **single** `showGeneralDialog` route. Layout is driven by live `MediaQuery` width:
 
-| File | Change |
-|------|--------|
-| `lib/app.dart` | Wrapped main content in `Positioned.fill(child: innerContent)` so the root navigator receives full viewport size. |
-| `lib/core/layout/responsive_sheet.dart` | Added `_railWidthForDialog()`; added `centerInFullViewport` to `showResponsiveSheet` and `showAppDialog`; use caller path and viewport-sized centering with `LayoutBuilder`; **Stack** with full-screen barrier `GestureDetector` (when `barrierDismissible`) so click-outside closes on desktop web; bottom sheet uses `isDismissible: barrierDismissible`; `Dialog` uses `insetPadding: EdgeInsets.zero`. |
-| `lib/core/widgets/sheet_helpers.dart` | Added optional `centerInFullViewport` to `showConfirmSheet` and `showTextInputSheet`, passed through to `showResponsiveSheet`. |
+- **≥ 600** – centered floating panel (optional rail inset when `centerInFullViewport: false`)
+- **&lt; 600** – bottom-aligned sheet
 
-### Modals with `centerInFullViewport: true` (non–home/settings)
+Crossing the breakpoint (window shrink/grow on web/desktop) **animates** alignment, width, radius, and chrome (title bar ↔ drag handle) over ~320ms. Callers do not need to close/reopen the sheet.
 
-- **Groups:** `create_invite_sheet.dart`, `invite_management_page.dart` (QR sheet, revoke confirm), `group_detail_page.dart` (merge, change role, archive/delete/kick participant, edit name, add participant), `group_settings_page.dart` (my_budget, change_currency confirm, settlement_method, edit name, change_icon_color, transfer_ownership, share/use_as_personal/archive/hide confirm, delete_group, leave_group).
-- **Expenses:** `expense_form_page.dart` (full features tooltip, category, create_new_tag, add_photo, image dialog, to, paid_by, split_type), `expense_detail_shell.dart` (delete expense confirm), `date_time_picker_dialog.dart`.
-- **Balance:** `record_settlement_sheet.dart`.
-- **Onboarding:** `onboarding_page.dart` (language picker).
-- **Auth:** `sign_in_sheet.dart`.
-- **Permission:** `permission_service.dart` (permission denied sheet).
-- **Images:** `receipt_image_view_stub.dart`, `receipt_image_view_io.dart` (full-screen image dialogs and fallback sheet).
-- **Currency:** `currency_helpers.dart` – `CurrencyHelpers.showPicker(..., centerInFullViewport: true)` from group settings / group create; **`centerInFullViewport: false`** from app settings (favorite currencies) so the picker is centered in the content area next to the rail.
+## Visual language (phone + large)
 
-### Unchanged (home/settings only)
+One composition language; **two layouts**, not two brands:
 
-Modals opened from **home** or **settings** that should stay in the content area (to the right of the navigation rail when the rail is visible) pass **`centerInFullViewport: false`**. Affected call sites remain in `home_page.dart`, `settings_page.dart`, `edit_profile_sheet.dart`, `services_status_sheet.dart`, and `debug_menu.dart`.
+| Aspect | Rule |
+|--------|------|
+| Radius | **16** for dialog and phone bottom sheet (matches `AccentSurfaces.flatPanel`) |
+| Fill / border | `surfaceContainerLow` + `outlineVariant` @ 0.45 |
+| Tablet title bar | Flat, hairline bottom, close icon — not elevated card chrome |
+| Phone drag handle | **One** affordance from `showResponsiveSheet`; sheet bodies must not draw a second pill |
+| Option rows | `SheetOptionTile` / `SheetOptionList` or `showOptionPickerSheet` |
+| Confirm / text input | `showConfirmSheet` / `showTextInputSheet` with body in `AccentSurfaces.flatPanel` |
+| Actions | Primary filled + secondary text; destructive = error-toned; phone Cancel; tablet close/barrier |
+
+Shared APIs: `lib/core/layout/responsive_sheet.dart`, `lib/core/widgets/sheet_helpers.dart`, `lib/core/widgets/sheet_option_tile.dart`.
+
+## Files changed (core)
+
+| File | Role |
+|------|------|
+| `lib/app.dart` | `Positioned.fill` so root navigator gets full viewport size |
+| `lib/core/layout/responsive_sheet.dart` | Adaptive chrome, rail padding, barrier dismiss, flat panel surfaces |
+| `lib/core/widgets/sheet_helpers.dart` | `buildSheetShell`, `showConfirmSheet`, `showTextInputSheet`, `showOptionPickerSheet` |
+| `lib/core/widgets/sheet_option_tile.dart` | Dense bordered option rows for pickers and action lists |
+
+## Centering contract
+
+### Shell routes → `centerInFullViewport: false`
+
+Opened from **home**, **settings** (incl. nested settings routes), **archived**, debug menu, or services status chip so the dialog sits in the content area next to the permanent desktop sidenav (240px; mid-band temporary drawer reserves 0):
+
+- `home_page.dart` — create chooser, list options
+- `settings_page.dart` — language/theme/scheme/color/font pickers, currency/favorites, confirms, delete local/cloud, migration, API key, logs, about, import
+- `edit_profile_sheet.dart`, `change_password_sheet.dart`
+- `services_status_sheet.dart`
+- `debug_menu.dart`
+- Transaction scanner confirms/sheets (opened from settings hub)
+- `CurrencyHelpers.showPicker(..., centerInFullViewport: false)` from app settings
+
+### Non-shell routes → default `true`
+
+Group, invite, expense, balance, onboarding, auth, permission sheets keep full-viewport centering unless a nested sheet explicitly opts out.
 
 ## API
 
-- **`showResponsiveSheet`**  
-  - `bool centerInFullViewport = true` – When `true` (default), the dialog is centered in the full viewport (no rail padding) on tablet+. When `false`, center in content area (e.g. next to rail on shell routes).  
-  - `bool showDragHandle = true` – When `true` (default), on narrow screens the bottom sheet shows the Material drag handle at the top; on tablet+ the dialog uses a title bar instead. Pass `showDragHandle: false` to hide the handle for a specific sheet.  
-  - `bool barrierDismissible = true` – When `true` (default), tapping/clicking outside the modal (on the barrier) closes it on all platforms. On tablet+ an explicit full-screen barrier `GestureDetector` is used so the overlay content does not absorb taps; on narrow screens `showModalBottomSheet(..., isDismissible: barrierDismissible)`.
+- **`showResponsiveSheet`**
+  - `bool centerInFullViewport = true` – When `true` (default), the dialog is centered in the full viewport (no rail padding) on tablet+. When `false`, center in content area (e.g. next to rail on shell routes).
+  - `bool showDragHandle = true` – When `true` (default), on narrow screens the bottom sheet shows the Material drag handle at the top; on tablet+ the dialog uses a title bar instead. Pass `showDragHandle: false` to hide the handle for a specific sheet.
+  - `bool barrierDismissible = true` – When `true` (default), tapping/clicking outside the modal (on the barrier) closes it on all platforms via an explicit full-screen barrier `GestureDetector`.
 
-- **`showAppDialog`**  
-  - `bool centerInFullViewport = true` – Same semantics as above for full-screen/custom dialogs (default: full viewport).  
+- **`showAppDialog`**
+  - `bool centerInFullViewport = true` – Same semantics as above for full-screen/custom dialogs (default: full viewport).
   - `bool barrierDismissible = true` – Same click-outside-to-close behavior; explicit barrier used on tablet+.
 
-- **`showConfirmSheet`** / **`showTextInputSheet`**  
+- **`showConfirmSheet`** / **`showTextInputSheet`** / **`showOptionPickerSheet`**
   - `bool centerInFullViewport = true` – Passed through to `showResponsiveSheet` (default: full viewport).
 
 ## Other behavior
 
-- **Drag handle** – The drag handle is provided by `showResponsiveSheet` on narrow screens (and web bottom sheet). **Sheet content must not draw its own drag handle**; otherwise two handles appear. On tablet+ the dialog uses a title bar instead of a handle.
+- **Drag handle** – Provided by `showResponsiveSheet` on narrow screens (and web bottom sheet). **Sheet content must not draw its own drag handle**; otherwise two handles appear. On tablet+ the dialog uses a title bar instead of a handle.
+- **Services status** – Nests a `DraggableScrollableSheet` inside the responsive sheet; chrome changes must preserve height/drag sizing.
+- **Scanner** – Destructive/confirm flows use `showConfirmSheet` / `showResponsiveSheet` (not raw `AlertDialog`).
 
 ## Adding new modals
 
 - If the modal is only ever opened from **home** or **settings** (shell routes), pass **`centerInFullViewport: false`** so it is centered in the content area next to the rail.
 - If the modal can be opened from **group**, **invite**, **expense**, **balance**, **onboarding**, or any other non–shell route, you can rely on the default (`centerInFullViewport` is `true`).
+- Prefer `showConfirmSheet` / `showTextInputSheet` / `showOptionPickerSheet` over ad-hoc `AlertDialog` or dense `ListTile` stacks.
 - All modals close when the user taps/clicks outside (barrier) by default; pass `barrierDismissible: false` only when the modal must not be dismissible (e.g. critical progress).
 - Do not add a drag handle inside the sheet content; the responsive sheet provides it on narrow screens.
+- Prefer `AccentSurfaces.flatPanel` / `panel` for form blocks; avoid nested Material Cards inside sheets.

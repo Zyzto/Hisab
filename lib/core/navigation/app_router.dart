@@ -3,10 +3,12 @@ import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
+import 'app_page.dart';
 import 'invite_nav_redirect.dart';
 import 'navigation_trace.dart';
 import 'route_paths.dart';
 import '../../features/home/routes.dart';
+import '../../features/profile/routes.dart';
 import '../../features/settings/routes.dart';
 import '../../features/onboarding/routes.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
@@ -223,7 +225,10 @@ GoRouter router(Ref ref) {
       ...getOnboardingRoutes(),
       GoRoute(
         path: RoutePaths.privacyPolicy,
-        builder: (context, state) => const PrivacyPolicyPage(),
+        pageBuilder: (context, state) => appFadeSlidePage(
+          key: state.pageKey,
+          child: const PrivacyPolicyPage(),
+        ),
       ),
       ShellRoute(
         builder: (context, state, child) {
@@ -238,26 +243,36 @@ GoRouter router(Ref ref) {
             child: child,
           );
         },
-        routes: [...getHomeRoutes(), ...getSettingsRoutes()],
+        routes: [
+          ...getHomeRoutes(),
+          ...getSettingsRoutes(),
+          ...getProfileRoutes(),
+        ],
       ),
       GoRoute(
         path: '/invite',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final token =
               state.pathParameters['token'] ??
               state.uri.queryParameters['token'] ??
               '';
-          return InviteAcceptPage(token: token);
+          return appFadeSlidePage(
+            key: state.pageKey,
+            child: InviteAcceptPage(token: token),
+          );
         },
       ),
       GoRoute(
         path: '/invite/:token/preview/expenses/:eid',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final token = state.pathParameters['token'] ?? '';
           final expenseId = state.pathParameters['eid'] ?? '';
-          return InvitePreviewExpenseDetailPage(
-            token: token,
-            expenseId: expenseId,
+          return appNoTransitionPage(
+            key: state.pageKey,
+            child: InvitePreviewExpenseDetailPage(
+              token: token,
+              expenseId: expenseId,
+            ),
           );
         },
       ),
@@ -271,61 +286,83 @@ GoRouter router(Ref ref) {
       ),
       GoRoute(
         path: '/invite/:token/preview/expenses',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final token = state.pathParameters['token'] ?? '';
-          return InviteGroupPreviewPage(
-            token: token,
-            initialTab: GroupDetailTab.expenses,
+          return appFadeSlidePage(
+            key: state.pageKey,
+            child: InviteGroupPreviewPage(
+              token: token,
+              initialTab: GroupDetailTab.expenses,
+            ),
           );
         },
       ),
       GoRoute(
         path: '/invite/:token/preview/balance',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final token = state.pathParameters['token'] ?? '';
-          return InviteGroupPreviewPage(
-            token: token,
-            initialTab: GroupDetailTab.balance,
+          return appFadeSlidePage(
+            key: state.pageKey,
+            child: InviteGroupPreviewPage(
+              token: token,
+              initialTab: GroupDetailTab.balance,
+            ),
           );
         },
       ),
       GoRoute(
         path: '/invite/:token/preview/people',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final token = state.pathParameters['token'] ?? '';
-          return InviteGroupPreviewPage(
-            token: token,
-            initialTab: GroupDetailTab.people,
+          return appFadeSlidePage(
+            key: state.pageKey,
+            child: InviteGroupPreviewPage(
+              token: token,
+              initialTab: GroupDetailTab.people,
+            ),
           );
         },
       ),
       GoRoute(
         path: '/invite/:token',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final token = state.pathParameters['token'] ?? '';
-          return InviteAcceptPage(token: token);
+          return appFadeSlidePage(
+            key: state.pageKey,
+            child: InviteAcceptPage(token: token),
+          );
         },
       ),
       GoRoute(
         path: RoutePaths.scanInvite,
-        builder: (context, state) => const InviteScanPage(),
+        pageBuilder: (context, state) => appFadeSlidePage(
+          key: state.pageKey,
+          child: const InviteScanPage(),
+        ),
       ),
       // Custom-domain invite link: hisab.shenepoy.com/functions/v1/invite-redirect?token=...
       // Redirects to Supabase Edge Function so token is validated and user sent to redirect.html.
       GoRoute(
         path: '/functions/v1/invite-redirect',
-        builder: (context, state) => InviteRedirectProxyPage(uri: state.uri),
+        pageBuilder: (context, state) => appFadeSlidePage(
+          key: state.pageKey,
+          child: InviteRedirectProxyPage(uri: state.uri),
+        ),
       ),
       // One shell per wizard so PageView state is not disposed on step changes.
       GoRoute(
         path: RoutePaths.groupCreate,
-        builder: (context, state) =>
-            const GroupCreatePage(isPersonal: false),
+        pageBuilder: (context, state) => appFadeSlidePage(
+          key: state.pageKey,
+          child: const GroupCreatePage(isPersonal: false),
+        ),
       ),
       GoRoute(
         path: RoutePaths.groupCreatePersonal,
-        builder: (context, state) =>
-            const GroupCreatePage(isPersonal: true),
+        pageBuilder: (context, state) => appFadeSlidePage(
+          key: state.pageKey,
+          child: const GroupCreatePage(isPersonal: true),
+        ),
       ),
       // Legacy per-step URLs (bookmarks / old links) → canonical wizard routes.
       GoRoute(
@@ -366,53 +403,80 @@ GoRouter router(Ref ref) {
       ),
       GoRoute(
         path: '/groups/:id/people',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final id = state.pathParameters['id'] ?? '';
-          return GroupDetailPage(groupId: id, initialTab: GroupDetailTab.people);
+          return appFadeSlidePage(
+            key: state.pageKey,
+            child: GroupDetailPage(
+              groupId: id,
+              initialTab: GroupDetailTab.people,
+            ),
+          );
         },
       ),
       GoRoute(
         path: '/groups/:id/balance',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final id = state.pathParameters['id'] ?? '';
-          return GroupDetailPage(groupId: id, initialTab: GroupDetailTab.balance);
+          return appFadeSlidePage(
+            key: state.pageKey,
+            child: GroupDetailPage(
+              groupId: id,
+              initialTab: GroupDetailTab.balance,
+            ),
+          );
         },
       ),
       GoRoute(
         path: '/groups/:id/settings',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final groupId = state.pathParameters['id'] ?? '';
-          return GroupSettingsPage(groupId: groupId);
+          return appFadeSlidePage(
+            key: state.pageKey,
+            child: GroupSettingsPage(groupId: groupId),
+          );
         },
       ),
       GoRoute(
         path: '/groups/:id/analytics',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final groupId = state.pathParameters['id'] ?? '';
-          return GroupAnalyticsPage(groupId: groupId);
+          return appFadeSlidePage(
+            key: state.pageKey,
+            child: GroupAnalyticsPage(groupId: groupId),
+          );
         },
       ),
       GoRoute(
         path: '/groups/:id/invites',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final groupId = state.pathParameters['id'] ?? '';
-          return InviteManagementPage(groupId: groupId);
+          return appFadeSlidePage(
+            key: state.pageKey,
+            child: InviteManagementPage(groupId: groupId),
+          );
         },
       ),
       GoRoute(
         path: '/groups/:id/expenses/add',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final groupId = state.pathParameters['id'] ?? '';
-          return ExpenseFormPage(groupId: groupId);
+          return appFadeSlidePage(
+            key: state.pageKey,
+            child: ExpenseFormPage(groupId: groupId),
+          );
         },
       ),
       GoRoute(
         path: '/groups/:id/expenses',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final groupId = state.pathParameters['id'] ?? '';
-          return GroupDetailPage(
-            groupId: groupId,
-            initialTab: GroupDetailTab.expenses,
+          return appFadeSlidePage(
+            key: state.pageKey,
+            child: GroupDetailPage(
+              groupId: groupId,
+              initialTab: GroupDetailTab.expenses,
+            ),
           );
         },
         routes: [
@@ -432,12 +496,15 @@ GoRouter router(Ref ref) {
             routes: [
               GoRoute(
                 path: ':eid',
-                builder: (context, state) {
+                pageBuilder: (context, state) {
                   final groupId = state.pathParameters['id'] ?? '';
                   final expenseId = state.pathParameters['eid'] ?? '';
-                  return ExpenseDetailBody(
-                    groupId: groupId,
-                    expenseId: expenseId,
+                  return appNoTransitionPage(
+                    key: state.pageKey,
+                    child: ExpenseDetailBody(
+                      groupId: groupId,
+                      expenseId: expenseId,
+                    ),
                   );
                 },
               ),
@@ -447,10 +514,13 @@ GoRouter router(Ref ref) {
       ),
       GoRoute(
         path: '/groups/:id/expenses/:eid/edit',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final groupId = state.pathParameters['id'] ?? '';
           final expenseId = state.pathParameters['eid'] ?? '';
-          return ExpenseFormPage(groupId: groupId, expenseId: expenseId);
+          return appFadeSlidePage(
+            key: state.pageKey,
+            child: ExpenseFormPage(groupId: groupId, expenseId: expenseId),
+          );
         },
       ),
     ],

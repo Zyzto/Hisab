@@ -13,6 +13,7 @@ abstract class SyncBackend {
   Future<List<Map<String, dynamic>>> getTags(List<String> groupIds);
   Future<List<Map<String, dynamic>>> getInvites(List<String> groupIds);
   Future<List<Map<String, dynamic>>> getInviteUsages(List<String> inviteIds);
+  Future<List<Map<String, dynamic>>> getUserNotifications(String userId);
 
   Future<void> upsert(String table, Map<String, dynamic> data);
   Future<void> update(String table, Map<String, dynamic> data, String id);
@@ -105,6 +106,21 @@ class SupabaseSyncBackend implements SyncBackend {
           .from('invite_usages')
           .select()
           .inFilter('invite_id', inviteIds);
+      return List<Map<String, dynamic>>.from(rows);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getUserNotifications(String userId) async {
+    try {
+      final rows = await _client
+          .from('user_notifications')
+          .select()
+          .eq('user_id', userId)
+          .order('created_at', ascending: false)
+          .limit(200);
       return List<Map<String, dynamic>>.from(rows);
     } catch (_) {
       return [];

@@ -18,3 +18,4 @@ export 'settlement_method.dart';
 export 'settlement_snapshot.dart';
 export 'group_balance_result.dart';
 export 'delete_my_data_preview.dart';
+export 'user_notification.dart';

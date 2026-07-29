@@ -298,7 +298,10 @@ List<ParticipantBalance> computeBalances(
 /// For an expense, compute how much each participant owes (in cents).
 /// When the expense has a different currency from the group, shares are
 /// scaled to the base (group) currency using the stored exchange rate.
-Map<String, int> _computeShares(Expense e) {
+Map<String, int> _computeShares(Expense e) => computeExpenseShares(e);
+
+/// Public share map in group base-currency cents (same rules as settle-up).
+Map<String, int> computeExpenseShares(Expense e) {
   final rawShares = <String, int>{};
   switch (e.splitType) {
     case SplitType.equal:
@@ -318,6 +321,104 @@ Map<String, int> _computeShares(Expense e) {
   }
 
   return rawShares;
+}
+
+/// True when [participantId] is in the split (or transfer endpoints).
+bool expenseInvolvesParticipant(Expense expense, String participantId) {
+  if (expense.transactionType == TransactionType.transfer) {
+    return expense.payerParticipantId == participantId ||
+        expense.toParticipantId == participantId;
+  }
+  final share = expense.splitShares[participantId];
+  return share != null && share > 0;
+}
+
+/// [participantId]'s split share in group base-currency cents, or null if not involved.
+/// Transfers return null (not a split share).
+int? participantSplitShareCents(Expense expense, String participantId) {
+  if (expense.transactionType == TransactionType.transfer) return null;
+  final shares = computeExpenseShares(expense);
+  final share = shares[participantId];
+  if (share == null || share <= 0) return null;
+  return share;
+}
+
+/// Expense legs between two people that explain (or contextualize) a settle-up
+/// transfer from [fromParticipantId] to [toParticipantId].
+///
+/// - [owedByFromToTo]: expenses [to] paid where [from] owes a share
+/// - [owedByToToFrom]: expenses [from] paid where [to] owes a share (offsets)
+///
+/// Net positive means [from] should pay [to] after offsets — the common case
+/// where each paid for things and the balance flipped or shrank.
+class PairExpenseBreakdown {
+  final List<SettlementItem> owedByFromToTo;
+  final List<SettlementItem> owedByToToFrom;
+
+  const PairExpenseBreakdown({
+    required this.owedByFromToTo,
+    required this.owedByToToFrom,
+  });
+
+  int get owedByFromTotal =>
+      owedByFromToTo.fold<int>(0, (s, i) => s + i.amountCents);
+
+  int get owedByToTotal =>
+      owedByToToFrom.fold<int>(0, (s, i) => s + i.amountCents);
+
+  /// Positive => from pays to; negative => to pays from; zero => even.
+  int get netCents => owedByFromTotal - owedByToTotal;
+
+  bool get isEmpty => owedByFromToTo.isEmpty && owedByToToFrom.isEmpty;
+
+  bool get hasOffsettingExpenses =>
+      owedByFromToTo.isNotEmpty && owedByToToFrom.isNotEmpty;
+}
+
+/// Build a pairwise expense explanation for a suggested transfer.
+/// Skips transfer expenses (prior settlements).
+PairExpenseBreakdown computePairExpenseBreakdown({
+  required String fromParticipantId,
+  required String toParticipantId,
+  required List<Expense> expenses,
+}) {
+  final owedByFromToTo = <SettlementItem>[];
+  final owedByToToFrom = <SettlementItem>[];
+
+  for (final e in expenses) {
+    if (e.transactionType == TransactionType.transfer) continue;
+    final shares = computeExpenseShares(e);
+    final payer = e.payerParticipantId;
+
+    if (payer == toParticipantId) {
+      final amount = shares[fromParticipantId] ?? 0;
+      if (amount > 0) {
+        owedByFromToTo.add(
+          SettlementItem(
+            expenseId: e.id,
+            title: e.title,
+            amountCents: amount,
+          ),
+        );
+      }
+    } else if (payer == fromParticipantId) {
+      final amount = shares[toParticipantId] ?? 0;
+      if (amount > 0) {
+        owedByToToFrom.add(
+          SettlementItem(
+            expenseId: e.id,
+            title: e.title,
+            amountCents: amount,
+          ),
+        );
+      }
+    }
+  }
+
+  return PairExpenseBreakdown(
+    owedByFromToTo: owedByFromToTo,
+    owedByToToFrom: owedByToToFrom,
+  );
 }
 
 // Legacy alias for backward compatibility.

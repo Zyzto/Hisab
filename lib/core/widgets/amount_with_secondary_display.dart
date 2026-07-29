@@ -49,6 +49,20 @@ class AmountWithSecondaryDisplay extends ConsumerWidget {
   }
 
   /// Convert [amountCents] in group currency to display-currency cents using [rate].
+  static int toDisplayCents(
+    int amountCents,
+    String groupCurrencyCode,
+    String displayCurrencyCode,
+    double rate,
+  ) {
+    return _toDisplayCents(
+      amountCents,
+      groupCurrencyCode,
+      displayCurrencyCode,
+      rate,
+    );
+  }
+
   static int _toDisplayCents(
     int amountCents,
     String groupCurrencyCode,

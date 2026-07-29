@@ -90,6 +90,18 @@ const schema = Schema([
     Column.text('user_id'),
     Column.text('accepted_at'),
   ]),
+  Table('user_notifications', [
+    Column.text('user_id'),
+    Column.text('group_id'),
+    Column.text('actor_user_id'),
+    Column.text('action'),
+    Column.text('title'),
+    Column.text('body'),
+    Column.text('expense_id'),
+    Column.text('payload_json'),
+    Column.text('read_at'),
+    Column.text('created_at'),
+  ]),
 
   // ── Local-only (not synced) ──────────────────────────────────────────
   // Per-user "hide from my list" for non-owners; never written by sync.

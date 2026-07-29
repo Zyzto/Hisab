@@ -2,6 +2,8 @@ class RoutePaths {
   static const String home = '/';
   static const String homeModeBase = '/home';
   static const String settings = '/settings';
+  static const String profile = '/profile';
+  static const String profileExpenses = '/profile/expenses';
   static const String onboarding = '/onboarding';
   static const String onboardingWelcome = '/onboarding/welcome';
   static const String onboardingPreferences = '/onboarding/preferences';

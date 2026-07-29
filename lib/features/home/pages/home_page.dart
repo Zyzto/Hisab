@@ -4,14 +4,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/auth/auth_providers.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
+import '../../../core/layout/content_aligned_fab_location.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/theme/theme_providers.dart';
 import '../../../core/widgets/async_value_builder.dart';
+import '../../../core/widgets/participant_avatar.dart';
+import '../../../core/widgets/sheet_option_tile.dart';
+import '../../../core/widgets/shell_menu_button.dart';
 import '../../../core/widgets/sync_status_icon.dart';
 import '../../groups/providers/groups_provider.dart';
 import '../../settings/providers/settings_framework_providers.dart';
@@ -52,50 +57,60 @@ class HomePage extends ConsumerWidget {
     showResponsiveSheet<void>(
       context: context,
       title: 'create'.tr(),
+      centerInFullViewport: false,
       child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: Icon(
-                Icons.group_outlined,
-                color: colorScheme.onSurfaceVariant,
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).padding.bottom + 16,
+          ),
+          child: SheetOptionList(
+            children: [
+              SheetOptionTile(
+                title: 'create_group'.tr(),
+                leading: Icon(
+                  Icons.group_outlined,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                onTap: () {
+                  ref.read(selectedGroupIdsProvider.notifier).state = {};
+                  Navigator.pop(context);
+                  context.push(RoutePaths.groupCreate);
+                },
               ),
-              title: Text('create_group'.tr()),
-              onTap: () {
-                ref.read(selectedGroupIdsProvider.notifier).state = {};
-                Navigator.pop(context);
-                context.push(RoutePaths.groupCreate);
-              },
-            ),
-            ListTile(
-              leading: Icon(
-                Icons.person_outline,
-                color: colorScheme.onSurfaceVariant,
+              SheetOptionTile(
+                title: 'create_personal'.tr(),
+                leading: Icon(
+                  Icons.person_outline,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                onTap: () {
+                  ref.read(selectedGroupIdsProvider.notifier).state = {};
+                  Navigator.pop(context);
+                  context.push(RoutePaths.groupCreatePersonal);
+                },
               ),
-              title: Text('create_personal'.tr()),
-              onTap: () {
-                ref.read(selectedGroupIdsProvider.notifier).state = {};
-                Navigator.pop(context);
-                context.push(RoutePaths.groupCreatePersonal);
-              },
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
   static void _showListOptionsSheet(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     final settings = ref.read(hisabSettingsProvidersProvider);
     if (settings == null) return;
 
     showResponsiveSheet<void>(
       context: context,
       title: 'home_list_options'.tr(),
+      maxHeight: MediaQuery.of(context).size.height * 0.75,
+      isScrollControlled: true,
+      centerInFullViewport: true,
       child: Consumer(
         builder: (context, ref, _) {
+          final theme = Theme.of(context);
+          final cs = theme.colorScheme;
+          final isTablet = LayoutBreakpoints.isTabletOrWider(context);
           final rawDisplay = ref.watch(homeListDisplayProvider);
           const validDisplays = {'list_separate', 'list_combined'};
           final display = validDisplays.contains(rawDisplay)
@@ -104,106 +119,146 @@ class HomePage extends ConsumerWidget {
           final sort = ref.watch(homeListSortProvider);
           final showCreatedAt = ref.watch(homeListShowCreatedAtProvider);
 
+          void setDisplay(String value) {
+            ref
+                .read(settings.provider(homeListDisplaySettingDef).notifier)
+                .set(value);
+            Log.info(
+              'Setting changed: ${homeListDisplaySettingDef.key}=$value',
+            );
+            context.go(RoutePaths.homeMode(_modePathForDisplay(value)));
+          }
+
+          void setSort(String value) {
+            ref
+                .read(settings.provider(homeListSortSettingDef).notifier)
+                .set(value);
+            Log.info('Setting changed: ${homeListSortSettingDef.key}=$value');
+          }
+
+          void setShowCreatedAt(bool value) {
+            ref
+                .read(
+                  settings.provider(homeListShowCreatedAtSettingDef).notifier,
+                )
+                .set(value);
+            Log.info(
+              'Setting changed: ${homeListShowCreatedAtSettingDef.key}=$value',
+            );
+          }
+
+          Widget sectionLabel(String text) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+              child: Text(
+                text,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: cs.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            );
+          }
+
           return SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (!LayoutBreakpoints.isTabletOrWider(context))
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      child: Text(
-                        'home_list_options'.tr(),
-                        style: theme.textTheme.titleLarge,
-                      ),
-                    ),
-                  ListTile(
-                    title: Text('home_list_display'.tr()),
-                    trailing: DropdownButton<String>(
-                      value: display,
-                      items: [
-                        DropdownMenuItem(
-                          value: 'list_separate',
-                          child: Text('home_list_display_list_separate'.tr()),
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).padding.bottom + 16,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (!isTablet)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                        child: Text(
+                          'home_list_options'.tr(),
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                        DropdownMenuItem(
-                          value: 'list_combined',
-                          child: Text('home_list_display_list_combined'.tr()),
+                      ),
+                    sectionLabel('home_list_display'.tr()),
+                    SheetOptionList(
+                      padding: EdgeInsets.fromLTRB(16, isTablet ? 8 : 0, 16, 8),
+                      children: [
+                        SheetOptionTile(
+                          title: 'home_list_display_list_separate'.tr(),
+                          leading: Icon(
+                            Icons.view_agenda_outlined,
+                            color: cs.onSurfaceVariant,
+                          ),
+                          selected: display == 'list_separate',
+                          onTap: () => setDisplay('list_separate'),
+                        ),
+                        SheetOptionTile(
+                          title: 'home_list_display_list_combined'.tr(),
+                          leading: Icon(
+                            Icons.view_list_outlined,
+                            color: cs.onSurfaceVariant,
+                          ),
+                          selected: display == 'list_combined',
+                          onTap: () => setDisplay('list_combined'),
                         ),
                       ],
-                      onChanged: (v) {
-                        if (v != null) {
-                          ref
-                              .read(
-                                settings
-                                    .provider(homeListDisplaySettingDef)
-                                    .notifier,
-                              )
-                              .set(v);
-                          Log.info(
-                            'Setting changed: ${homeListDisplaySettingDef.key}=$v',
-                          );
-                          context.go(RoutePaths.homeMode(_modePathForDisplay(v)));
-                        }
-                      },
                     ),
-                  ),
-                  ListTile(
-                    title: Text('home_list_sort'.tr()),
-                    trailing: DropdownButton<String>(
-                      value: sort,
-                      items: [
-                        DropdownMenuItem(
-                          value: 'created_at',
-                          child: Text('home_list_sort_created'.tr()),
+                    sectionLabel('home_list_sort'.tr()),
+                    SheetOptionList(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      children: [
+                        SheetOptionTile(
+                          title: 'home_list_sort_created'.tr(),
+                          leading: Icon(
+                            Icons.event_outlined,
+                            color: cs.onSurfaceVariant,
+                          ),
+                          selected: sort == 'created_at',
+                          onTap: () => setSort('created_at'),
                         ),
-                        DropdownMenuItem(
-                          value: 'updated_at',
-                          child: Text('home_list_sort_updated'.tr()),
+                        SheetOptionTile(
+                          title: 'home_list_sort_updated'.tr(),
+                          leading: Icon(
+                            Icons.update_outlined,
+                            color: cs.onSurfaceVariant,
+                          ),
+                          selected: sort == 'updated_at',
+                          onTap: () => setSort('updated_at'),
                         ),
-                        DropdownMenuItem(
-                          value: 'custom',
-                          child: Text('home_list_sort_custom'.tr()),
+                        SheetOptionTile(
+                          title: 'home_list_sort_custom'.tr(),
+                          leading: Icon(
+                            Icons.drag_handle_rounded,
+                            color: cs.onSurfaceVariant,
+                          ),
+                          selected: sort == 'custom',
+                          onTap: () => setSort('custom'),
                         ),
                       ],
-                      onChanged: (v) {
-                        if (v != null) {
-                          ref
-                              .read(
-                                settings
-                                    .provider(homeListSortSettingDef)
-                                    .notifier,
-                              )
-                              .set(v);
-                          Log.info(
-                            'Setting changed: ${homeListSortSettingDef.key}=$v',
-                          );
-                        }
-                      },
                     ),
-                  ),
-                  SwitchListTile(
-                    title: Text('home_list_show_created_at'.tr()),
-                    value: showCreatedAt,
-                    onChanged: (v) {
-                      ref
-                          .read(
-                            settings
-                                .provider(homeListShowCreatedAtSettingDef)
-                                .notifier,
-                          )
-                          .set(v);
-                      Log.info(
-                        'Setting changed: ${homeListShowCreatedAtSettingDef.key}=$v',
-                      );
-                    },
-                  ),
-                ],
+                    sectionLabel('home_list_show_created_at'.tr()),
+                    SheetOptionList(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      children: [
+                        SheetOptionTile(
+                          title: 'home_list_show_created_at'.tr(),
+                          leading: Icon(
+                            Icons.calendar_today_outlined,
+                            color: cs.onSurfaceVariant,
+                          ),
+                          selected: showCreatedAt,
+                          trailing: Switch.adaptive(
+                            value: showCreatedAt,
+                            onChanged: setShowCreatedAt,
+                          ),
+                          onTap: () => setShowCreatedAt(!showCreatedAt),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           );
@@ -312,16 +367,33 @@ class HomePage extends ConsumerWidget {
       child: LayoutBuilder(
         builder: (context, layoutConstraints) {
           final contentAreaWidth = layoutConstraints.maxWidth;
+          final showMobileProfileAvatar =
+              !LayoutBreakpoints.isTabletOrWider(context) && !inSelectionMode;
+          final profile = ref.watch(authUserProfileProvider).asData?.value;
+          final signedIn = ref.watch(currentUserProvider) != null;
+          final avatarName =
+              profile?.name ??
+              profile?.email ??
+              (signedIn ? 'account'.tr() : 'sign_in'.tr());
+
           return Scaffold(
+            floatingActionButtonLocation: ContentAlignedFabLocation.of(
+              context,
+              contentAreaWidth: contentAreaWidth,
+              narrowFallback: showMobileProfileAvatar
+                  ? FloatingActionButtonLocation.centerFloat
+                  : FloatingActionButtonLocation.endFloat,
+            ),
             appBar: ContentAlignedAppBar(
               contentAreaWidth: contentAreaWidth,
+              leadingWidth: ShellAppBarLeading.widthFor(context),
               leading: inSelectionMode
                   ? IconButton(
                       icon: const Icon(Icons.close),
                       onPressed: clearSelection,
                       tooltip: 'cancel'.tr(),
                     )
-                  : const SyncStatusChip(),
+                  : const ShellAppBarLeading(fallback: SyncStatusChip()),
               title: inSelectionMode
                   ? Text(
                       selectedGroups.length == 1
@@ -345,6 +417,8 @@ class HomePage extends ConsumerWidget {
                       ),
                     ]
                   : [
+                      if (ShellAppBarLeading.syncInActions(context))
+                        const SyncStatusChip(),
                       Semantics(
                         label: 'home_list_options'.tr(),
                         button: true,
@@ -679,72 +753,140 @@ class HomePage extends ConsumerWidget {
                 },
               ),
             ),
-            floatingActionButton: localOnly
-                ? Semantics(
-                    label: 'create_group'.tr(),
-                    button: true,
-                    child: GestureDetector(
-                      onLongPress: () => _showCreateModal(context, ref),
-                      child: FloatingActionButton(
-                        onPressed: () => _showCreateModal(context, ref),
-                        child: const Icon(Icons.add),
-                      ),
-                    ),
-                  )
-                : LayoutBuilder(
-                    builder: (context, constraints) {
-                      const fabHeight = 56.0;
-                      const twoFabHeight = fabHeight * 2;
-                      final spacing =
-                          (constraints.maxHeight >= twoFabHeight + 12)
-                          ? 12.0
-                          : (constraints.maxHeight - twoFabHeight).clamp(
-                              0.0,
-                              12.0,
-                            );
-                      final column = Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Semantics(
-                            label: 'scan_invite'.tr(),
-                            button: true,
-                            child: FloatingActionButton(
-                              heroTag: 'scan_invite',
-                              onPressed: () {
-                                clearSelection();
-                                context.push(RoutePaths.scanInvite);
-                              },
-                              child: const Icon(Icons.qr_code_scanner),
-                            ),
-                          ),
-                          SizedBox(height: spacing),
-                          Semantics(
-                            label: 'create_group'.tr(),
-                            button: true,
-                            child: GestureDetector(
-                              onLongPress: () => _showCreateModal(context, ref),
-                              child: FloatingActionButton(
-                                onPressed: () => _showCreateModal(context, ref),
-                                child: const Icon(Icons.add),
-                              ),
-                            ),
-                          ),
-                        ],
-                      );
-                      if (constraints.maxHeight.isFinite &&
-                          constraints.maxHeight < twoFabHeight &&
-                          constraints.maxHeight > 0) {
-                        return FittedBox(
-                          alignment: Alignment.bottomCenter,
-                          child: column,
-                        );
-                      }
-                      return column;
-                    },
-                  ),
+            floatingActionButton: _HomeFabCluster(
+              localOnly: localOnly,
+              showProfileAvatar: showMobileProfileAvatar,
+              avatarName: avatarName,
+              avatarId: profile?.avatarId,
+              onCreate: () => _showCreateModal(context, ref),
+              onScan: () {
+                clearSelection();
+                context.push(RoutePaths.scanInvite);
+              },
+              onProfile: () {
+                clearSelection();
+                // Profile shows local stats + sign-in / switch-online CTAs.
+                context.push(RoutePaths.profile);
+              },
+            ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _HomeFabCluster extends StatelessWidget {
+  const _HomeFabCluster({
+    required this.localOnly,
+    required this.showProfileAvatar,
+    required this.avatarName,
+    required this.onCreate,
+    required this.onScan,
+    required this.onProfile,
+    this.avatarId,
+  });
+
+  final bool localOnly;
+  final bool showProfileAvatar;
+  final String avatarName;
+  final String? avatarId;
+  final VoidCallback onCreate;
+  final VoidCallback onScan;
+  final VoidCallback onProfile;
+
+  @override
+  Widget build(BuildContext context) {
+    final createFab = Semantics(
+      label: 'create_group'.tr(),
+      button: true,
+      child: GestureDetector(
+        onLongPress: onCreate,
+        child: FloatingActionButton(
+          heroTag: 'create_group',
+          onPressed: onCreate,
+          child: const Icon(Icons.add),
+        ),
+      ),
+    );
+
+    final Widget endFabs;
+    if (localOnly) {
+      endFabs = createFab;
+    } else {
+      endFabs = LayoutBuilder(
+        builder: (context, constraints) {
+          const fabHeight = 56.0;
+          const twoFabHeight = fabHeight * 2;
+          final spacing = (constraints.maxHeight >= twoFabHeight + 12)
+              ? 12.0
+              : (constraints.maxHeight - twoFabHeight).clamp(0.0, 12.0);
+          final column = Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Semantics(
+                label: 'scan_invite'.tr(),
+                button: true,
+                child: FloatingActionButton(
+                  heroTag: 'scan_invite',
+                  onPressed: onScan,
+                  child: const Icon(Icons.qr_code_scanner),
+                ),
+              ),
+              SizedBox(height: spacing),
+              createFab,
+            ],
+          );
+          if (constraints.maxHeight.isFinite &&
+              constraints.maxHeight < twoFabHeight &&
+              constraints.maxHeight > 0) {
+            return FittedBox(
+              alignment: Alignment.bottomCenter,
+              child: column,
+            );
+          }
+          return column;
+        },
+      );
+    }
+
+    if (!showProfileAvatar) return endFabs;
+
+    final cs = Theme.of(context).colorScheme;
+    final avatarFab = Semantics(
+      label: 'profile'.tr(),
+      button: true,
+      child: Material(
+        elevation: 6,
+        shape: const CircleBorder(),
+        color: cs.primaryContainer,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onProfile,
+          child: Padding(
+            padding: const EdgeInsets.all(4),
+            child: ParticipantAvatar(
+              name: avatarName,
+              avatarId: avatarId,
+              radius: 24,
+              backgroundColor: cs.primaryContainer,
+              foregroundColor: cs.onPrimaryContainer,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    return SizedBox(
+      width: MediaQuery.sizeOf(context).width - 32,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          avatarFab,
+          const Spacer(),
+          endFabs,
+        ],
       ),
     );
   }
@@ -762,13 +904,21 @@ class _ExperimentTitle extends ConsumerWidget {
         final nextIndex = (index + 1) % 6;
         ref.read(experimentStyleIndexProvider.notifier).state = nextIndex;
       },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Text('app_name'.tr()),
-          Text(experimentStyleNameAt(index), style: theme.textTheme.bodySmall),
-        ],
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text('app_name'.tr(), maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(
+              experimentStyleNameAt(index),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
+        ),
       ),
     );
   }

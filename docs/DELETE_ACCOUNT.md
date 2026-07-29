@@ -15,10 +15,10 @@ After this, no app data remains on your device. Data stored on our servers (if y
 When signed in and online:
 
 1. Go to **Settings** → **Advanced** → **Delete cloud data**.
-2. Read the summary (group memberships, ownership transfer for groups you own, sole-member groups that will be deleted, device tokens, invite records). You can optionally check **Also delete local data on this device** to wipe the device and return to onboarding after cloud deletion.
-3. Wait for the 30-second countdown, then confirm. The app leaves all your groups (transferring ownership to the next member by join date where you are owner; groups where you are the only member are deleted), removes your device tokens and invite-usage records from the server, then signs you out. If you chose to also delete local data, the device is wiped and you are taken to onboarding.
+2. Read the summary (group memberships, ownership transfer for groups you own, sole-member groups that will be deleted, device tokens, invite records, in-app notifications). You can optionally check **Also delete local data on this device** to wipe the device and return to onboarding after cloud deletion.
+3. Wait for the 30-second countdown, then confirm. The app leaves all your groups (transferring ownership to the next member by join date where you are owner; groups where you are the only member are deleted), removes your device tokens, invite-usage records, and `user_notifications` from the server, then signs you out. If you chose to also delete local data, the device is wiped and you are taken to onboarding.
 
-Server-side app data (group memberships, device_tokens, invite_usages) is removed by this action. Your auth account (email/social login) is not deleted; you can request that separately (see below).
+Server-side app data (group memberships, device_tokens, invite_usages, user_notifications) is removed by this action. Your auth account (email/social login) is not deleted; you can request that separately (see below).
 
 ## Request deletion of your account and server data
 
@@ -32,7 +32,7 @@ Once we process your request, we will delete your account and associated data fr
 ## What is deleted
 
 - **Delete local data:** All data on this device (local groups, expenses, participants, invites) is deleted. Server-side data is not deleted. You are not signed out.
-- **Delete cloud data:** Your presence on the server is removed: you leave all groups (ownership is transferred where applicable; groups where you are the only member are deleted), your device tokens and invite-usage records are deleted, and you are signed out. Optionally you can also delete local data on the device. Your auth account (login) is not deleted by this action.
+- **Delete cloud data:** Your presence on the server is removed: you leave all groups (ownership is transferred where applicable; groups where you are the only member are deleted), your device tokens, invite-usage records, and in-app notification history are deleted, and you are signed out. Optionally you can also delete local data on the device. Your auth account (login) is not deleted by this action.
 - **When you request account deletion:** Your auth account and all associated data stored on our servers (e.g. in Supabase) are deleted. When your account is deleted, your display name in any group (in expense history) is replaced with a neutral placeholder so past expenses remain meaningful without showing your name. We do not retain deleted user data.
 
 ## Retention

@@ -11,7 +11,7 @@ Guides for running, shipping, and extending **Hisab**. Start with the root [READ
 | [CONFIGURATION.md](CONFIGURATION.md) | Pass `--dart-define` / define files; online vs local-only |
 | [LOCAL_TEST_ENV.md](LOCAL_TEST_ENV.md) | Run Supabase + Edge Functions on LAN (Podman) for device tests |
 | [SUPABASE_SETUP.md](SUPABASE_SETUP.md) | Create a hosted project, migrations, Auth, Edge deploy |
-| [CODEBASE.md](CODEBASE.md) | Map features, sync, navigation, and where code lives |
+| [CODEBASE.md](CODEBASE.md) | Map features (incl. Profile), sync, shell nav, notifications, and where code lives |
 | [../SECURITY.md](../SECURITY.md) | Know what never lands in a public commit |
 
 ---

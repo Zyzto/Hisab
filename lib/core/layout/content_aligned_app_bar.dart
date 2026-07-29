@@ -12,12 +12,18 @@ class ContentAlignedAppBar extends StatelessWidget
     super.key,
     required this.contentAreaWidth,
     this.leading,
+    this.leadingWidth,
     required this.title,
     this.actions,
   });
 
   final double contentAreaWidth;
   final Widget? leading;
+
+  /// Horizontal space reserved for [leading] when computing title insets.
+  /// Defaults to [kToolbarHeight] when [leading] is non-null.
+  final double? leadingWidth;
+
   final Widget title;
   final List<Widget>? actions;
 
@@ -41,7 +47,9 @@ class ContentAlignedAppBar extends StatelessWidget
 
     // Reserve horizontal space symmetrically so the title stays centered in
     // the content band (not shifted by leading/actions width differences).
-    final leadingReservedWidth = leading != null ? kToolbarHeight : 0.0;
+    final leadingReservedWidth = leading != null
+        ? (leadingWidth ?? kToolbarHeight)
+        : 0.0;
     final actionsReservedWidth =
         (actions?.length ?? 0) * kToolbarHeight.toDouble();
     const titleButtonGap = 8.0;
