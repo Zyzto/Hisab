@@ -15,22 +15,30 @@ class GroupAnalyticsUiState {
   const GroupAnalyticsUiState({
     this.trendChartMode = AnalyticsTrendChartMode.totalBar,
     this.categoryChartMode = AnalyticsCategoryChartMode.pie,
+    this.personChartMode = AnalyticsCategoryChartMode.pie,
     this.excludedCategoryIds = const <String>{},
+    this.excludedPersonIds = const <String>{},
   });
 
   final AnalyticsTrendChartMode trendChartMode;
   final AnalyticsCategoryChartMode categoryChartMode;
+  final AnalyticsCategoryChartMode personChartMode;
   final Set<String> excludedCategoryIds;
+  final Set<String> excludedPersonIds;
 
   GroupAnalyticsUiState copyWith({
     AnalyticsTrendChartMode? trendChartMode,
     AnalyticsCategoryChartMode? categoryChartMode,
+    AnalyticsCategoryChartMode? personChartMode,
     Set<String>? excludedCategoryIds,
+    Set<String>? excludedPersonIds,
   }) {
     return GroupAnalyticsUiState(
       trendChartMode: trendChartMode ?? this.trendChartMode,
       categoryChartMode: categoryChartMode ?? this.categoryChartMode,
+      personChartMode: personChartMode ?? this.personChartMode,
       excludedCategoryIds: excludedCategoryIds ?? this.excludedCategoryIds,
+      excludedPersonIds: excludedPersonIds ?? this.excludedPersonIds,
     );
   }
 }
@@ -61,6 +69,14 @@ class GroupAnalyticsUiStateNotifier
     );
   }
 
+  void setPersonChartMode(String groupId, AnalyticsCategoryChartMode mode) {
+    final current = _stateFor(groupId);
+    _upsert(
+      groupId,
+      current.copyWith(personChartMode: mode),
+    );
+  }
+
   void toggleExcludedCategory(String groupId, String categoryId) {
     final current = _stateFor(groupId);
     final next = current.excludedCategoryIds.toSet();
@@ -75,12 +91,35 @@ class GroupAnalyticsUiStateNotifier
     );
   }
 
+  void toggleExcludedPerson(String groupId, String personId) {
+    final current = _stateFor(groupId);
+    final next = current.excludedPersonIds.toSet();
+    if (next.contains(personId)) {
+      next.remove(personId);
+    } else {
+      next.add(personId);
+    }
+    _upsert(
+      groupId,
+      current.copyWith(excludedPersonIds: next),
+    );
+  }
+
   void clearExcludedCategories(String groupId) {
     final current = _stateFor(groupId);
     if (current.excludedCategoryIds.isEmpty) return;
     _upsert(
       groupId,
       current.copyWith(excludedCategoryIds: const <String>{}),
+    );
+  }
+
+  void clearExcludedPersons(String groupId) {
+    final current = _stateFor(groupId);
+    if (current.excludedPersonIds.isEmpty) return;
+    _upsert(
+      groupId,
+      current.copyWith(excludedPersonIds: const <String>{}),
     );
   }
 
@@ -210,6 +249,7 @@ class GroupAnalyticsData {
     required this.participants,
     required this.tags,
     required this.filteredExpenses,
+    required this.availableCategoryIds,
     required this.totalAmountCents,
     required this.myAmountCents,
     required this.averagePerDayCents,
@@ -226,6 +266,8 @@ class GroupAnalyticsData {
   final List<Participant> participants;
   final List<ExpenseTag> tags;
   final List<Expense> filteredExpenses;
+  /// Tag ids seen on non-transfer expenses (before payer/category filters).
+  final Set<String> availableCategoryIds;
   final int totalAmountCents;
   final int myAmountCents;
   final int averagePerDayCents;
@@ -301,19 +343,23 @@ GroupAnalyticsData computeGroupAnalytics({
   required String? currentUserParticipantId,
   DateTime? now,
 }) {
-  final localNow = now ?? DateTime.now();
-  final rangeStart = _rangeStart(query.range, localNow);
+  final fallbackNow = now ?? DateTime.now();
+  final eligible = expenses.where((expense) => !_isTransferOnly(expense)).toList();
+  final activityEnd = _activityEndDay(eligible) ??
+      DateTime(fallbackNow.year, fallbackNow.month, fallbackNow.day);
+  final rangeStart = _rangeStart(query.range, activityEnd);
 
-  final filtered = expenses.where((expense) {
-    if (_isTransferOnly(expense)) return false;
-
+  final filtered = eligible.where((expense) {
     final localDate = expense.date.isUtc ? expense.date.toLocal() : expense.date;
     if (rangeStart != null && localDate.isBefore(rangeStart)) return false;
     if (query.participantId != null && query.participantId!.isNotEmpty) {
       if (expense.payerParticipantId != query.participantId) return false;
     }
     if (query.tagId != null && query.tagId!.isNotEmpty) {
-      if (expense.tag != query.tagId) return false;
+      final expenseTag = (expense.tag == null || expense.tag!.isEmpty)
+          ? 'untagged'
+          : expense.tag!;
+      if (expenseTag != query.tagId) return false;
     }
     return true;
   }).toList()
@@ -332,14 +378,24 @@ GroupAnalyticsData computeGroupAnalytics({
 
   final averagePerDay = filtered.isEmpty
       ? 0
-      : (totalCents / _effectiveDays(filtered, rangeStart, localNow)).round();
-  final trend = _buildTrendPoints(filtered, query.range, localNow);
+      : (totalCents / _effectiveDays(filtered, query.range)).round();
+  final trend = _buildTrendPoints(filtered, query.range, activityEnd);
+  final availableCategoryIds = <String>{};
+  for (final expense in eligible) {
+    final tag = expense.tag;
+    if (tag != null && tag.isNotEmpty) {
+      availableCategoryIds.add(tag);
+    } else {
+      availableCategoryIds.add('untagged');
+    }
+  }
 
   return GroupAnalyticsData(
     group: group,
     participants: participants,
     tags: tags,
     filteredExpenses: filtered,
+    availableCategoryIds: availableCategoryIds,
     totalAmountCents: totalCents,
     myAmountCents: myCents,
     averagePerDayCents: averagePerDay,
@@ -357,6 +413,16 @@ GroupAnalyticsData computeGroupAnalytics({
   );
 }
 
+DateTime? _activityEndDay(List<Expense> expenses) {
+  DateTime? end;
+  for (final expense in expenses) {
+    final date = expense.date.isUtc ? expense.date.toLocal() : expense.date;
+    final day = DateTime(date.year, date.month, date.day);
+    if (end == null || day.isAfter(end)) end = day;
+  }
+  return end;
+}
+
 String resolveTagLabel(String tagId, List<ExpenseTag> tags) {
   for (final custom in tags) {
     if (custom.id == tagId) return custom.label;
@@ -372,27 +438,36 @@ String _presetCategoryLabelKey(String presetId) => 'category_$presetId';
 bool _isTransferOnly(Expense expense) =>
     contributionToExpenseTotal(expense) == 0;
 
-DateTime? _rangeStart(AnalyticsRangePreset range, DateTime now) {
-  final today = DateTime(now.year, now.month, now.day);
+DateTime? _rangeStart(AnalyticsRangePreset range, DateTime activityEnd) {
+  final end = DateTime(activityEnd.year, activityEnd.month, activityEnd.day);
   switch (range) {
     case AnalyticsRangePreset.days30:
-      return today.subtract(const Duration(days: 29));
+      return end.subtract(const Duration(days: 29));
     case AnalyticsRangePreset.days90:
-      return today.subtract(const Duration(days: 89));
+      return end.subtract(const Duration(days: 89));
     case AnalyticsRangePreset.all:
       return null;
   }
 }
 
-int _effectiveDays(List<Expense> filtered, DateTime? rangeStart, DateTime now) {
+int _effectiveDays(List<Expense> filtered, AnalyticsRangePreset range) {
   if (filtered.isEmpty) return 1;
-  final localNow = DateTime(now.year, now.month, now.day);
-  if (rangeStart != null) {
-    return localNow.difference(rangeStart).inDays + 1;
+  switch (range) {
+    case AnalyticsRangePreset.days30:
+      return 30;
+    case AnalyticsRangePreset.days90:
+      return 90;
+    case AnalyticsRangePreset.all:
+      final first = filtered.first.date.isUtc
+          ? filtered.first.date.toLocal()
+          : filtered.first.date;
+      final last = filtered.last.date.isUtc
+          ? filtered.last.date.toLocal()
+          : filtered.last.date;
+      final firstDay = DateTime(first.year, first.month, first.day);
+      final lastDay = DateTime(last.year, last.month, last.day);
+      return lastDay.difference(firstDay).inDays + 1;
   }
-  final first = filtered.first.date;
-  final firstDay = DateTime(first.year, first.month, first.day);
-  return localNow.difference(firstDay).inDays + 1;
 }
 
 const _maxComparisonSeries = 4;
@@ -400,37 +475,37 @@ const _maxComparisonSeries = 4;
 TrendBuildResult _buildTrendPoints(
   List<Expense> expenses,
   AnalyticsRangePreset range,
-  DateTime now,
+  DateTime activityEnd,
 ) {
-  final DateTime localNow = DateTime(now.year, now.month, now.day);
+  final DateTime endDay = DateTime(
+    activityEnd.year,
+    activityEnd.month,
+    activityEnd.day,
+  );
   late final TrendGranularity granularity;
   late List<TrendWindow> windows;
   switch (range) {
     case AnalyticsRangePreset.days30:
       granularity = TrendGranularity.daily;
       windows = _buildDailyWindows(
-        localNow.subtract(const Duration(days: 29)),
-        localNow,
+        endDay.subtract(const Duration(days: 29)),
+        endDay,
       );
       break;
     case AnalyticsRangePreset.days90:
       granularity = TrendGranularity.weekly;
       windows = _buildWeeklyWindows(
-        localNow.subtract(const Duration(days: 90 - 1)),
-        localNow,
+        endDay.subtract(const Duration(days: 90 - 1)),
+        endDay,
       );
       break;
     case AnalyticsRangePreset.all:
       if (expenses.isEmpty) {
         granularity = TrendGranularity.monthly;
-        windows = _buildMonthlyWindows(localNow, localNow);
+        windows = _buildMonthlyWindows(endDay, endDay);
       } else {
-        DateTime firstDay = DateTime(
-          localNow.year,
-          localNow.month,
-          localNow.day,
-        );
-        DateTime lastDay = firstDay;
+        DateTime firstDay = endDay;
+        DateTime lastDay = endDay;
         for (final expense in expenses) {
           final date = expense.date.isUtc ? expense.date.toLocal() : expense.date;
           final day = DateTime(date.year, date.month, date.day);
@@ -449,7 +524,6 @@ TrendBuildResult _buildTrendPoints(
           granularity = TrendGranularity.monthly;
           windows = _buildMonthlyWindows(firstDay, lastDay);
         }
-
       }
       break;
   }

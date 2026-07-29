@@ -298,9 +298,10 @@ void main() {
     test('throws when pending writes exist before fetch', () async {
       if (!_powerSyncAvailable || db == null) return;
       await db!.execute(
-        '''INSERT INTO pending_writes (table_name, operation, row_id, data_json, created_at)
-          VALUES (?, ?, ?, ?, ?)''',
+        '''INSERT INTO pending_writes (id, table_name, operation, row_id, data_json, created_at)
+          VALUES (?, ?, ?, ?, ?, ?)''',
         [
+          'pw-pending',
           'groups',
           'insert',
           'g-pending',
@@ -332,9 +333,10 @@ void main() {
       final rowId = 'row-${DateTime.now().millisecondsSinceEpoch}';
       final data = {'id': rowId, 'name': 'A Group', 'currency_code': 'USD'};
       await db!.execute(
-        '''INSERT INTO pending_writes (table_name, operation, row_id, data_json, created_at)
-          VALUES (?, ?, ?, ?, ?)''',
+        '''INSERT INTO pending_writes (id, table_name, operation, row_id, data_json, created_at)
+          VALUES (?, ?, ?, ?, ?, ?)''',
         [
+          'pw-$rowId',
           'groups',
           'insert',
           rowId,
@@ -367,9 +369,10 @@ void main() {
       final baseTime = DateTime.now().toUtc();
 
       await db!.execute(
-        '''INSERT INTO pending_writes (table_name, operation, row_id, data_json, created_at)
-          VALUES (?, ?, ?, ?, ?)''',
+        '''INSERT INTO pending_writes (id, table_name, operation, row_id, data_json, created_at)
+          VALUES (?, ?, ?, ?, ?, ?)''',
         [
+          'pw-order-1',
           'groups',
           'insert',
           'group-1',
@@ -378,9 +381,10 @@ void main() {
         ],
       );
       await db!.execute(
-        '''INSERT INTO pending_writes (table_name, operation, row_id, data_json, created_at)
-          VALUES (?, ?, ?, ?, ?)''',
+        '''INSERT INTO pending_writes (id, table_name, operation, row_id, data_json, created_at)
+          VALUES (?, ?, ?, ?, ?, ?)''',
         [
+          'pw-order-2',
           'groups',
           'update',
           'group-1',
@@ -389,9 +393,10 @@ void main() {
         ],
       );
       await db!.execute(
-        '''INSERT INTO pending_writes (table_name, operation, row_id, data_json, created_at)
-          VALUES (?, ?, ?, ?, ?)''',
+        '''INSERT INTO pending_writes (id, table_name, operation, row_id, data_json, created_at)
+          VALUES (?, ?, ?, ?, ?, ?)''',
         [
+          'pw-order-3',
           'groups',
           'delete',
           'group-1',
@@ -425,6 +430,7 @@ class _FakeSyncBackend implements SyncBackend {
     this.tags = const [],
     this.invites = const [],
     this.inviteUsages = const [],
+    this.userNotifications = const [],
     List<Map<String, dynamic>>? capture,
   }) : _captured = capture;
 
@@ -437,6 +443,7 @@ class _FakeSyncBackend implements SyncBackend {
   final List<Map<String, dynamic>> tags;
   final List<Map<String, dynamic>> invites;
   final List<Map<String, dynamic>> inviteUsages;
+  final List<Map<String, dynamic>> userNotifications;
   final List<Map<String, dynamic>>? _captured;
 
   @override
@@ -480,6 +487,11 @@ class _FakeSyncBackend implements SyncBackend {
   @override
   Future<List<Map<String, dynamic>>> getInviteUsages(List<String> ids) async {
     return inviteUsages.where((u) => ids.contains(u['invite_id'])).toList();
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getUserNotifications(String id) async {
+    return userNotifications.where((n) => n['user_id'] == id).toList();
   }
 
   @override

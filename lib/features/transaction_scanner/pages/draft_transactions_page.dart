@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/layout/constrained_content.dart';
+import '../../../core/widgets/sheet_helpers.dart';
 import '../domain/draft_transaction.dart';
 import '../providers/scanner_providers.dart';
 import 'draft_transaction_detail_page.dart';
@@ -96,26 +97,14 @@ class DraftTransactionsPage extends ConsumerWidget {
     final highConfidence = drafts.where((d) => d.confidence >= 0.7).toList();
     if (highConfidence.isEmpty) return;
 
-    showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('scanner_confirm_all_title'.tr()),
-        content: Text(
-          'scanner_confirm_all_body'.tr(
-            args: [highConfidence.length.toString()],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('confirm'.tr()),
-          ),
-        ],
+    showConfirmSheet(
+      context,
+      title: 'scanner_confirm_all_title'.tr(),
+      content: 'scanner_confirm_all_body'.tr(
+        args: [highConfidence.length.toString()],
       ),
+      confirmLabel: 'confirm'.tr(),
+      centerInFullViewport: false,
     ).then((confirmed) {
       if (confirmed == true) {
         for (final d in highConfidence) {

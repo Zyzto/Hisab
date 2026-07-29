@@ -182,6 +182,122 @@ void main() {
     expect(all.categoryTrendSeries, isNotEmpty);
   });
 
+  test('30d and 90d anchor to latest expense not calendar now', () {
+    final pastExpenses = [
+      Expense(
+        id: 'past1',
+        groupId: groupId,
+        payerParticipantId: 'p1',
+        amountCents: 1500,
+        currencyCode: 'USD',
+        title: 'Old coffee',
+        date: DateTime(2024, 6, 10),
+        splitType: SplitType.equal,
+        splitShares: const {},
+        createdAt: now,
+        updatedAt: now,
+        tag: 't1',
+      ),
+      Expense(
+        id: 'past2',
+        groupId: groupId,
+        payerParticipantId: 'p2',
+        amountCents: 2500,
+        currencyCode: 'USD',
+        title: 'Old groceries',
+        date: DateTime(2024, 6, 15),
+        splitType: SplitType.equal,
+        splitShares: const {},
+        createdAt: now,
+        updatedAt: now,
+        tag: 'groceries',
+      ),
+    ];
+
+    final d30 = computeGroupAnalytics(
+      group: makeGroup(),
+      participants: makeParticipants(),
+      tags: makeTags(),
+      expenses: pastExpenses,
+      query: const GroupAnalyticsQuery(
+        groupId: groupId,
+        range: AnalyticsRangePreset.days30,
+      ),
+      currentUserParticipantId: 'p1',
+      now: now,
+    );
+    final d90 = computeGroupAnalytics(
+      group: makeGroup(),
+      participants: makeParticipants(),
+      tags: makeTags(),
+      expenses: pastExpenses,
+      query: const GroupAnalyticsQuery(
+        groupId: groupId,
+        range: AnalyticsRangePreset.days90,
+      ),
+      currentUserParticipantId: 'p1',
+      now: now,
+    );
+
+    expect(d30.transactionCount, 2);
+    expect(d30.totalAmountCents, 4000);
+    expect(d30.trendPoints.length, 30);
+    expect(d30.trendPoints.last.start, DateTime(2024, 6, 15));
+    expect(d90.transactionCount, 2);
+    expect(d90.totalAmountCents, 4000);
+    expect(d90.trendPoints, isNotEmpty);
+    expect(d90.trendPoints.last.start.isBefore(DateTime(2024, 6, 16)), isTrue);
+  });
+
+  test('all-time average uses expense span not calendar now', () {
+    final pastExpenses = [
+      Expense(
+        id: 'a',
+        groupId: groupId,
+        payerParticipantId: 'p1',
+        amountCents: 3000,
+        currencyCode: 'USD',
+        title: 'A',
+        date: DateTime(2024, 1, 1),
+        splitType: SplitType.equal,
+        splitShares: const {},
+        createdAt: now,
+        updatedAt: now,
+        tag: 't1',
+      ),
+      Expense(
+        id: 'b',
+        groupId: groupId,
+        payerParticipantId: 'p1',
+        amountCents: 3000,
+        currencyCode: 'USD',
+        title: 'B',
+        date: DateTime(2024, 1, 3),
+        splitType: SplitType.equal,
+        splitShares: const {},
+        createdAt: now,
+        updatedAt: now,
+        tag: 't1',
+      ),
+    ];
+
+    final result = computeGroupAnalytics(
+      group: makeGroup(),
+      participants: makeParticipants(),
+      tags: makeTags(),
+      expenses: pastExpenses,
+      query: const GroupAnalyticsQuery(
+        groupId: groupId,
+        range: AnalyticsRangePreset.all,
+      ),
+      currentUserParticipantId: 'p1',
+      now: now,
+    );
+
+    // 6000 over 3 days (Jan 1..3), not diluted by years until 2026.
+    expect(result.averagePerDayCents, 2000);
+  });
+
   test('all-time uses monthly buckets for long spans', () {
     final longSpanExpenses = [
       Expense(
@@ -240,13 +356,17 @@ void main() {
     final notifier = container.read(groupAnalyticsUiStateProvider.notifier);
     notifier.setTrendChartMode('g-default', AnalyticsTrendChartMode.userComparison);
     notifier.setCategoryChartMode('g-default', AnalyticsCategoryChartMode.bars);
+    notifier.setPersonChartMode('g-default', AnalyticsCategoryChartMode.bars);
     notifier.toggleExcludedCategory('g-default', 'food');
     notifier.toggleExcludedCategory('g-default', 'transport');
+    notifier.toggleExcludedPerson('g-default', 'p1');
 
     final updated = container.read(groupAnalyticsUiStateByGroupProvider('g-default'));
     expect(updated.trendChartMode, AnalyticsTrendChartMode.userComparison);
     expect(updated.categoryChartMode, AnalyticsCategoryChartMode.bars);
+    expect(updated.personChartMode, AnalyticsCategoryChartMode.bars);
     expect(updated.excludedCategoryIds, {'food', 'transport'});
+    expect(updated.excludedPersonIds, {'p1'});
   });
 
   test('analytics ui state cache evicts oldest and resets on restart', () {

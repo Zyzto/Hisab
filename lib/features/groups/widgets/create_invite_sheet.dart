@@ -11,8 +11,10 @@ import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/telemetry/telemetry_service.dart';
+import '../../../core/theme/accent_style.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/form_validators.dart';
+import '../../../core/widgets/group_section_header.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../domain/domain.dart';
 import '../../settings/providers/settings_framework_providers.dart';
@@ -139,6 +141,13 @@ class _CreateInviteSheetState extends ConsumerState<_CreateInviteSheet> {
     Navigator.of(context).pop(result.token);
   }
 
+  Widget _sectionPanel(BuildContext context, {required Widget child}) {
+    return DecoratedBox(
+      decoration: AccentSurfaces.flatPanel(Theme.of(context).colorScheme),
+      child: Padding(padding: const EdgeInsets.all(14), child: child),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -156,124 +165,146 @@ class _CreateInviteSheetState extends ConsumerState<_CreateInviteSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (!LayoutBreakpoints.isTabletOrWider(context)) ...[
-              Text('create_invite'.tr(), style: theme.textTheme.titleLarge),
+              Text(
+                'create_invite'.tr(),
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               const SizedBox(height: ThemeConfig.spacingM),
             ],
 
-            // Label
-            TextField(
-              controller: _labelController,
-              decoration: InputDecoration(
-                labelText: 'invite_label'.tr(),
-                hintText: 'invite_label_hint'.tr(),
-                prefixIcon: const Icon(Icons.label_outline),
-                border: const OutlineInputBorder(),
-                counterText: '',
+            GroupSectionHeader(label: 'invite_label'.tr()),
+            const SizedBox(height: 8),
+            _sectionPanel(
+              context,
+              child: TextField(
+                controller: _labelController,
+                decoration: InputDecoration(
+                  hintText: 'invite_label_hint'.tr(),
+                  prefixIcon: const Icon(Icons.label_outline),
+                  border: const OutlineInputBorder(),
+                  counterText: '',
+                  isDense: true,
+                ),
+                maxLength: FormValidators.inviteLabelMax,
+                textCapitalization: TextCapitalization.sentences,
               ),
-              maxLength: FormValidators.inviteLabelMax,
-              textCapitalization: TextCapitalization.sentences,
             ),
             const SizedBox(height: ThemeConfig.spacingM),
 
-            // Role
-            Text('invite_role'.tr(), style: theme.textTheme.titleSmall),
-            const SizedBox(height: ThemeConfig.spacingS),
-            SegmentedButton<String>(
-              segments: [
-                ButtonSegment(
-                  value: 'member',
-                  label: Text('group_member'.tr()),
-                  icon: const Icon(Icons.person_outline, size: 18),
-                ),
-                ButtonSegment(
-                  value: 'admin',
-                  label: Text('group_admin'.tr()),
-                  icon: const Icon(
-                    Icons.admin_panel_settings_outlined,
-                    size: 18,
+            GroupSectionHeader(label: 'invite_role'.tr()),
+            const SizedBox(height: 8),
+            _sectionPanel(
+              context,
+              child: SegmentedButton<String>(
+                segments: [
+                  ButtonSegment(
+                    value: 'member',
+                    label: Text('group_member'.tr()),
+                    icon: const Icon(Icons.person_outline, size: 18),
                   ),
-                ),
-              ],
-              selected: {_role},
-              onSelectionChanged: (v) => setState(() => _role = v.first),
+                  ButtonSegment(
+                    value: 'admin',
+                    label: Text('group_admin'.tr()),
+                    icon: const Icon(
+                      Icons.admin_panel_settings_outlined,
+                      size: 18,
+                    ),
+                  ),
+                ],
+                selected: {_role},
+                onSelectionChanged: (v) => setState(() => _role = v.first),
+              ),
             ),
             const SizedBox(height: ThemeConfig.spacingM),
 
-            // Expiry
-            Text('invite_expiry'.tr(), style: theme.textTheme.titleSmall),
-            const SizedBox(height: ThemeConfig.spacingS),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: List.generate(_expiryOptions.length, (i) {
-                final opt = _expiryOptions[i];
-                return ChoiceChip(
-                  label: Text(opt.labelKey.tr()),
-                  selected: _expiryIndex == i,
-                  onSelected: (_) => setState(() => _expiryIndex = i),
-                );
-              }),
+            GroupSectionHeader(label: 'invite_expiry'.tr()),
+            const SizedBox(height: 8),
+            _sectionPanel(
+              context,
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: List.generate(_expiryOptions.length, (i) {
+                  final opt = _expiryOptions[i];
+                  return ChoiceChip(
+                    label: Text(opt.labelKey.tr()),
+                    selected: _expiryIndex == i,
+                    showCheckmark: false,
+                    onSelected: (_) => setState(() => _expiryIndex = i),
+                  );
+                }),
+              ),
             ),
             const SizedBox(height: ThemeConfig.spacingM),
 
-            // Max uses
-            Text('invite_max_uses'.tr(), style: theme.textTheme.titleSmall),
-            const SizedBox(height: ThemeConfig.spacingS),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: List.generate(_maxUsesOptions.length, (i) {
-                final opt = _maxUsesOptions[i];
-                return ChoiceChip(
-                  label: Text(opt.value?.toString() ?? 'invite_unlimited'.tr()),
-                  selected: _maxUsesIndex == i,
-                  onSelected: (_) => setState(() => _maxUsesIndex = i),
-                );
-              }),
+            GroupSectionHeader(label: 'invite_max_uses'.tr()),
+            const SizedBox(height: 8),
+            _sectionPanel(
+              context,
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: List.generate(_maxUsesOptions.length, (i) {
+                  final opt = _maxUsesOptions[i];
+                  return ChoiceChip(
+                    label: Text(
+                      opt.value?.toString() ?? 'invite_unlimited'.tr(),
+                    ),
+                    selected: _maxUsesIndex == i,
+                    showCheckmark: false,
+                    onSelected: (_) => setState(() => _maxUsesIndex = i),
+                  );
+                }),
+              ),
             ),
-            const SizedBox(height: ThemeConfig.spacingL),
+            const SizedBox(height: ThemeConfig.spacingM),
 
-            // Access mode
-            Text(
-              'invite_access_mode_title'.tr(),
-              style: theme.textTheme.titleSmall,
-            ),
-            const SizedBox(height: ThemeConfig.spacingS),
-            SegmentedButton<InviteAccessMode>(
-              segments: [
-                ButtonSegment(
-                  value: InviteAccessMode.standard,
-                  label: Text('invite_access_mode_standard'.tr()),
-                ),
-                ButtonSegment(
-                  value: InviteAccessMode.readonlyJoin,
-                  label: Text('invite_access_mode_readonly_join'.tr()),
-                ),
-                ButtonSegment(
-                  value: InviteAccessMode.readonlyOnly,
-                  label: Text('invite_access_mode_readonly_only'.tr()),
-                ),
-              ],
-              selected: {_accessMode},
-              showSelectedIcon: false,
-              onSelectionChanged: (value) {
-                setState(() => _accessMode = value.first);
-              },
-            ),
-            const SizedBox(height: ThemeConfig.spacingS),
-            Text(
-              _accessMode == InviteAccessMode.standard
-                  ? 'invite_access_mode_standard_hint'.tr()
-                  : _accessMode == InviteAccessMode.readonlyJoin
-                  ? 'invite_access_mode_readonly_join_hint'.tr()
-                  : 'invite_access_mode_readonly_only_hint'.tr(),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+            GroupSectionHeader(label: 'invite_access_mode_title'.tr()),
+            const SizedBox(height: 8),
+            _sectionPanel(
+              context,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SegmentedButton<InviteAccessMode>(
+                    segments: [
+                      ButtonSegment(
+                        value: InviteAccessMode.standard,
+                        label: Text('invite_access_mode_standard'.tr()),
+                      ),
+                      ButtonSegment(
+                        value: InviteAccessMode.readonlyJoin,
+                        label: Text('invite_access_mode_readonly_join'.tr()),
+                      ),
+                      ButtonSegment(
+                        value: InviteAccessMode.readonlyOnly,
+                        label: Text('invite_access_mode_readonly_only'.tr()),
+                      ),
+                    ],
+                    selected: {_accessMode},
+                    showSelectedIcon: false,
+                    onSelectionChanged: (value) {
+                      setState(() => _accessMode = value.first);
+                    },
+                  ),
+                  const SizedBox(height: ThemeConfig.spacingS),
+                  Text(
+                    _accessMode == InviteAccessMode.standard
+                        ? 'invite_access_mode_standard_hint'.tr()
+                        : _accessMode == InviteAccessMode.readonlyJoin
+                        ? 'invite_access_mode_readonly_join_hint'.tr()
+                        : 'invite_access_mode_readonly_only_hint'.tr(),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: ThemeConfig.spacingL),
 
-            // Create button
             FilledButton.icon(
               onPressed: _creating ? null : _create,
               icon: _creating
@@ -362,12 +393,10 @@ class _InviteResultViewState extends State<_InviteResultView> {
               final logoSize = (qrSize * 0.22).clamp(32.0, 56.0);
               return RepaintBoundary(
                 key: _qrKey,
-                child: Container(
+                child: DecoratedBox(
+                  decoration: AccentSurfaces.flatPanel(colorScheme, radius: 16),
+                  child: Padding(
                   padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surface,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
                   child: SizedBox(
                     width: qrSize,
                     height: qrSize,
@@ -402,6 +431,7 @@ class _InviteResultViewState extends State<_InviteResultView> {
                         ),
                       ],
                     ),
+                  ),
                   ),
                 ),
               );

@@ -5,14 +5,14 @@ import '../layout/responsive_sheet.dart';
 /// Shows a full-screen dialog with [Image.network] for an image URL.
 /// Shared by [receipt_image_view_io.dart] and [receipt_image_view_stub.dart].
 ///
-/// Tap the dimmed area outside the image to close; the image itself stays
-/// interactive for pinch-zoom.
+/// Tap the dimmed area or the close button to dismiss; pinch to zoom.
 void showImageDialogForUrl(BuildContext context, String url) {
   showAppDialog<void>(
     context: context,
     barrierColor: Theme.of(context).colorScheme.scrim,
     barrierDismissible: true,
     centerInFullViewport: true,
+    fadeScale: false,
     builder: (ctx) => _FullscreenImageDialog(
       image: Image.network(
         url,
@@ -31,7 +31,7 @@ void showImageDialogForUrl(BuildContext context, String url) {
   );
 }
 
-/// Full-screen transparent dialog: tap outside the image to dismiss.
+/// Full-screen transparent dialog: tap outside / close to dismiss, pinch to zoom.
 class FullscreenImageDialog extends StatelessWidget {
   final Widget image;
 
@@ -46,40 +46,53 @@ class _FullscreenImageDialog extends StatelessWidget {
 
   const _FullscreenImageDialog({required this.image});
 
+  void _dismiss(BuildContext context) {
+    final nav = Navigator.of(context, rootNavigator: true);
+    if (nav.canPop()) nav.pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: EdgeInsets.zero,
-      child: SizedBox.expand(
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Backdrop: tap anywhere not on the image to close.
-            GestureDetector(
+      // Bypass Material's default maxWidth: 560 so the viewer fills the screen.
+      constraints: const BoxConstraints.expand(),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Full-screen dismiss target behind the viewer.
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _dismiss(context),
+            child: const ColoredBox(color: Colors.transparent),
+          ),
+          // Default constrained:true sizes the child to the viewport so the
+          // image is centered; extreme scale range for free pinch zoom.
+          InteractiveViewer(
+            minScale: 0.05,
+            maxScale: 100,
+            boundaryMargin: const EdgeInsets.all(double.infinity),
+            child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () {
-                final nav = Navigator.of(context);
-                if (nav.canPop()) nav.pop();
-              },
-              child: const ColoredBox(color: Colors.transparent),
+              onTap: () => _dismiss(context),
+              child: Center(child: image),
             ),
-            // Image keeps its intrinsic size so letterboxed areas hit the
-            // backdrop. [constrained: false] sizes the viewer to the child.
-            Center(
-              child: GestureDetector(
-                // Stop backdrop taps when pressing on the image itself.
-                onTap: () {},
-                child: InteractiveViewer(
-                  constrained: false,
-                  minScale: 0.5,
-                  maxScale: 4,
-                  child: image,
+          ),
+          SafeArea(
+            child: Align(
+              alignment: AlignmentDirectional.topEnd,
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: IconButton.filledTonal(
+                  onPressed: () => _dismiss(context),
+                  icon: const Icon(Icons.close),
+                  tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

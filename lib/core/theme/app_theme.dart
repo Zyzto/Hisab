@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../motion/app_motion.dart';
 import 'theme_config.dart';
 import 'theme_extensions.dart';
 
@@ -22,6 +23,7 @@ class AppTheme {
       useMaterial3: true,
       textTheme: textTheme,
       colorScheme: colorScheme,
+      pageTransitionsTheme: appPageTransitionsTheme(),
       scrollbarTheme: alwaysShowScrollbars
           ? ScrollbarThemeData(
               thumbVisibility: WidgetStateProperty.all(true),
@@ -83,6 +85,13 @@ class AppTheme {
         ),
       ),
       iconTheme: IconThemeData(color: iconColor),
+      // Tag / filter chips: selection via color only — no Material checkmark.
+      chipTheme: ChipThemeData(
+        showCheckmark: false,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(ThemeConfig.radiusXL),
+        ),
+      ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: colorScheme.surfaceContainerHighest,
         contentTextStyle: TextStyle(color: colorScheme.onSurface),

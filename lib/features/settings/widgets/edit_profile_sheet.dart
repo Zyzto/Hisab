@@ -10,6 +10,7 @@ import '../../../core/auth/predefined_avatars.dart';
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/repository/repository_providers.dart';
+import '../../../core/theme/accent_style.dart';
 import '../../../core/utils/form_validators.dart';
 import '../../groups/providers/groups_provider.dart';
 import '../providers/settings_framework_providers.dart';
@@ -25,6 +26,7 @@ Future<void> showEditProfileSheet(
     title: 'edit_profile'.tr(),
     isScrollControlled: true,
     useSafeArea: true,
+    centerInFullViewport: false,
     child: _EditProfileSheet(ref: ref, profile: profile),
   );
 }
@@ -153,19 +155,19 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
             if (!LayoutBreakpoints.isTabletOrWider(context)) ...[
               Text(
                 'profile_edit'.tr(),
-                style: textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
+                style: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
             ],
             if (_error != null) ...[
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: colorScheme.errorContainer,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: Row(
                   children: [
@@ -188,56 +190,73 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
               ),
               const SizedBox(height: 16),
             ],
-            TextField(
-              controller: _nameController,
-              decoration: InputDecoration(
-                labelText: 'auth_name'.tr(),
-                hintText: 'auth_name_hint'.tr(),
-                prefixIcon: const Icon(Icons.badge_outlined),
-                border: const OutlineInputBorder(),
-                counterText: '',
-              ),
-              maxLength: FormValidators.participantNameMax,
-              textInputAction: TextInputAction.done,
-              enabled: !_saving,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'auth_avatar'.tr(),
-              style: textTheme.labelLarge?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: predefinedAvatars.map((e) {
-                final selected = _selectedAvatarId == e.key;
-                return GestureDetector(
-                  onTap: _saving
-                      ? null
-                      : () => setState(() => _selectedAvatarId = e.key),
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? colorScheme.primaryContainer
-                          : colorScheme.surfaceContainerHighest,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: selected
-                            ? colorScheme.primary
-                            : colorScheme.outline.withValues(alpha: 0.3),
-                        width: selected ? 2.5 : 1,
+            DecoratedBox(
+              decoration: AccentSurfaces.flatPanel(colorScheme),
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      controller: _nameController,
+                      decoration: InputDecoration(
+                        labelText: 'auth_name'.tr(),
+                        hintText: 'auth_name_hint'.tr(),
+                        prefixIcon: const Icon(Icons.badge_outlined),
+                        border: const OutlineInputBorder(),
+                        counterText: '',
+                        isDense: true,
+                      ),
+                      maxLength: FormValidators.participantNameMax,
+                      textInputAction: TextInputAction.done,
+                      enabled: !_saving,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'auth_avatar'.tr(),
+                      style: textTheme.labelLarge?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    alignment: Alignment.center,
-                    child: Text(e.value, style: const TextStyle(fontSize: 22)),
-                  ),
-                );
-              }).toList(),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: predefinedAvatars.map((e) {
+                        final selected = _selectedAvatarId == e.key;
+                        return GestureDetector(
+                          onTap: _saving
+                              ? null
+                              : () =>
+                                  setState(() => _selectedAvatarId = e.key),
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: selected
+                                  ? colorScheme.primaryContainer
+                                  : colorScheme.surfaceContainerHighest,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: selected
+                                    ? colorScheme.primary
+                                    : colorScheme.outline
+                                        .withValues(alpha: 0.3),
+                                width: selected ? 2.5 : 1,
+                              ),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              e.value,
+                              style: const TextStyle(fontSize: 22),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: 24),
             Focus(

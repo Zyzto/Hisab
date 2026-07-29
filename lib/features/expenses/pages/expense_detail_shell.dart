@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/constrained_content.dart';
+import '../../../core/motion/app_motion.dart';
 import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/repository/repository_providers.dart';
@@ -40,10 +41,11 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
     with TickerProviderStateMixin {
   late Widget _displayedChild;
   String? _displayedExpenseId;
-  int? _direction;
-  static const _duration = Duration(milliseconds: 280);
   AnimationController? _controller;
   Animation<Offset>? _incomingSlide;
+  Animation<double>? _incomingFade;
+  bool _pendingEnter = true;
+  bool _hasPlayedEnter = false;
 
   @override
   void initState() {
@@ -52,35 +54,103 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
     _displayedExpenseId = widget.expenseId;
   }
 
+  /// Next (1) enters from the end edge; prev from the start. Flipped in RTL.
+  double _slideDxForDirection(int direction) {
+    final isRtl = Directionality.of(context) == ui.TextDirection.rtl;
+    var dx = direction == 1 ? 1.0 : -1.0;
+    if (isRtl) dx = -dx;
+    return dx;
+  }
+
+  double _subtleEnterDx() {
+    final isRtl = Directionality.of(context) == ui.TextDirection.rtl;
+    return isRtl ? -AppMotion.pageSlideFraction : AppMotion.pageSlideFraction;
+  }
+
+  void _clearDirectionProvider() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(expenseNavigationDirectionProvider.notifier).state = null;
+      }
+    });
+  }
+
+  /// Dispose [controller] only after the tree has dropped its listeners.
+  void _disposeControllerAfterFrame(AnimationController? controller) {
+    if (controller == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.dispose();
+    });
+  }
+
+  void _runMotion({
+    required double beginDx,
+    required bool withFade,
+  }) {
+    final previous = _controller;
+    // Detach old animations from fields first so the next build drops listeners.
+    _incomingSlide = null;
+    _incomingFade = null;
+
+    final next = AnimationController(vsync: this, duration: AppMotion.page);
+    _controller = next;
+    final curved = next.drive(CurveTween(curve: AppMotion.enterCurve));
+    _incomingFade = withFade ? curved : null;
+    _incomingSlide = Tween<Offset>(
+      begin: Offset(beginDx, 0),
+      end: Offset.zero,
+    ).animate(curved);
+
+    _disposeControllerAfterFrame(previous);
+
+    next.forward().then((_) {
+      if (!mounted || !identical(_controller, next)) return;
+      setState(() {
+        _incomingSlide = null;
+        _incomingFade = null;
+        _controller = null;
+      });
+      _disposeControllerAfterFrame(next);
+    });
+  }
+
+  /// First paint of ready body: subtle enter, or full paging slide when this
+  /// shell was remounted via invite `pushReplacement` with a direction set.
+  void _startEnterIfNeeded() {
+    if (!_pendingEnter || _hasPlayedEnter) return;
+    _pendingEnter = false;
+    _hasPlayedEnter = true;
+    final direction = ref.read(expenseNavigationDirectionProvider);
+    if (direction != null) {
+      _clearDirectionProvider();
+      _runMotion(beginDx: _slideDxForDirection(direction), withFade: false);
+    } else {
+      _runMotion(beginDx: _subtleEnterDx(), withFade: true);
+    }
+    setState(() {});
+  }
+
+  void _startPagingMotion(int? direction) {
+    _clearDirectionProvider();
+    if (direction == null) {
+      // Unknown direction — subtle fade+slide, not a fake "prev" full slide.
+      _runMotion(beginDx: _subtleEnterDx(), withFade: true);
+      return;
+    }
+    _runMotion(beginDx: _slideDxForDirection(direction), withFade: false);
+  }
+
   @override
   void didUpdateWidget(ExpenseDetailShell oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.expenseId != _displayedExpenseId) {
-      _direction = ref.read(expenseNavigationDirectionProvider);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          ref.read(expenseNavigationDirectionProvider.notifier).state = null;
-        }
-      });
+      final direction = ref.read(expenseNavigationDirectionProvider);
       _displayedChild = widget.child;
       _displayedExpenseId = widget.expenseId;
-      _controller?.dispose();
-      _controller = AnimationController(vsync: this, duration: _duration);
-      final dx = _direction == 1 ? 1.0 : -1.0; // 1 = next (new from right)
-      _incomingSlide = Tween<Offset>(
-        begin: Offset(dx, 0),
-        end: Offset.zero,
-      ).animate(CurvedAnimation(parent: _controller!, curve: Curves.easeInOut));
-      _controller!.forward().then((_) {
-        if (mounted) {
-          setState(() {
-            _controller?.dispose();
-            _controller = null;
-            _incomingSlide = null;
-          });
-        }
-      });
+      _startPagingMotion(direction);
       setState(() {});
+    } else if (widget.child != oldWidget.child) {
+      _displayedChild = widget.child;
     }
   }
 
@@ -89,6 +159,29 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
     _controller?.dispose();
     super.dispose();
   }
+
+  bool get _awaitingEnter => _pendingEnter && !_hasPlayedEnter;
+
+  Widget _animatedBody(Widget child) {
+    // Hold transparent until first enter starts (avoids a full-opacity flash).
+    if (_awaitingEnter) {
+      return IgnorePointer(
+        child: Opacity(opacity: 0, child: child),
+      );
+    }
+    Widget result = child;
+    if (_incomingSlide != null && _controller != null) {
+      result = SlideTransition(position: _incomingSlide!, child: result);
+    }
+    if (_incomingFade != null && _controller != null) {
+      result = FadeTransition(opacity: _incomingFade!, child: result);
+    }
+    return ClipRect(child: result);
+  }
+
+  bool get _isAnimating => _controller?.isAnimating == true;
+
+  bool get _blockInteraction => _awaitingEnter || _isAnimating;
 
   @override
   Widget build(BuildContext context) {
@@ -155,11 +248,11 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
     final appBarActions = <Widget>[
       IconButton(
         icon: const Icon(Icons.chevron_left),
-        onPressed: prevId != null ? goPrev : null,
+        onPressed: prevId != null && !_blockInteraction ? goPrev : null,
       ),
       IconButton(
         icon: const Icon(Icons.chevron_right),
-        onPressed: nextId != null ? goNext : null,
+        onPressed: nextId != null && !_blockInteraction ? goNext : null,
       ),
       if (!widget.readOnlyPreview)
         PopupMenuButton<String>(
@@ -206,31 +299,30 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
         ),
     ];
 
-    final body = expenseAsync.when(
-      data: (e) {
-        if (e == null || e.groupId != widget.groupId) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        return participantsAsync.when(
-          data: (_) => expensesAsync.when(
-            data: (_) => ClipRect(
-              child: _incomingSlide != null && _controller != null
-                  ? SlideTransition(
-                      position: _incomingSlide!,
-                      child: _displayedChild,
-                    )
-                  : _displayedChild,
-            ),
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, _) => const Center(child: CircularProgressIndicator()),
-          ),
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, _) => const Center(child: CircularProgressIndicator()),
-        );
-      },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (_, _) => const Center(child: CircularProgressIndicator()),
+    final bodyReady = expenseAsync.maybeWhen(
+      data: (e) =>
+          e != null &&
+          e.groupId == widget.groupId &&
+          participantsAsync.hasValue &&
+          expensesAsync.hasValue,
+      orElse: () => false,
     );
+
+    // Keep sliding the previous/current child while the next id loads so the
+    // enter/paging animation is not replaced by a spinner mid-flight.
+    final Widget body;
+    if (bodyReady) {
+      if (_pendingEnter && !_hasPlayedEnter) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _startEnterIfNeeded();
+        });
+      }
+      body = _animatedBody(_displayedChild);
+    } else if (_isAnimating || _hasPlayedEnter) {
+      body = _animatedBody(_displayedChild);
+    } else {
+      body = const Center(child: CircularProgressIndicator());
+    }
 
     return LayoutBuilder(
       builder: (context, layoutConstraints) => Scaffold(
@@ -241,26 +333,27 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
           actions: appBarActions,
         ),
         body: ConstrainedContent(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onHorizontalDragEnd: (details) {
-              // Ignore while a page transition is already running.
-              if (_controller?.isAnimating == true) return;
-              final velocity = details.primaryVelocity ?? 0;
-              if (velocity.abs() < 250) return;
-              // easy_localization exports intl, which shadows Flutter's
-              // TextDirection (intl uses .RTL; Flutter uses .rtl).
-              final isRtl =
-                  Directionality.of(context) == ui.TextDirection.rtl;
-              // LTR: swipe left → next, swipe right → prev. RTL flips.
-              final toNext = isRtl ? velocity > 0 : velocity < 0;
-              if (toNext) {
-                goNext();
-              } else {
-                goPrev();
-              }
-            },
-            child: body,
+          child: IgnorePointer(
+            ignoring: _blockInteraction,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onHorizontalDragEnd: (details) {
+                final velocity = details.primaryVelocity ?? 0;
+                if (velocity.abs() < 250) return;
+                // easy_localization exports intl, which shadows Flutter's
+                // TextDirection (intl uses .RTL; Flutter uses .rtl).
+                final isRtl =
+                    Directionality.of(context) == ui.TextDirection.rtl;
+                // LTR: swipe left → next, swipe right → prev. RTL flips.
+                final toNext = isRtl ? velocity > 0 : velocity < 0;
+                if (toNext) {
+                  goNext();
+                } else {
+                  goPrev();
+                }
+              },
+              child: body,
+            ),
           ),
         ),
       ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../motion/app_motion.dart';
 import 'theme_config.dart';
 import 'theme_extensions.dart';
 
@@ -121,6 +122,7 @@ class FlexThemeBuilder {
     return theme.copyWith(
       colorScheme: colorScheme,
       extensions: exts,
+      pageTransitionsTheme: appPageTransitionsTheme(),
       textTheme: _scaleTextTheme(
         GoogleFonts.cairoTextTheme(theme.textTheme),
         scaleFactor,
@@ -183,6 +185,13 @@ class FlexThemeBuilder {
             color: colorScheme.error,
             width: ThemeConfig.inputDefaultBorderWidth,
           ),
+        ),
+      ),
+      // Tag / filter chips: selection via color only — no Material checkmark.
+      chipTheme: ChipThemeData(
+        showCheckmark: false,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(ThemeConfig.radiusXL),
         ),
       ),
       snackBarTheme: SnackBarThemeData(

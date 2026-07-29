@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:custom_sliding_segmented_control/custom_sliding_segmented_control.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
+import '../../../core/layout/content_aligned_fab_location.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
@@ -27,10 +28,12 @@ import '../../../core/widgets/async_value_builder.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/participant_avatar.dart';
 import '../../../core/widgets/sheet_helpers.dart';
+import '../../../core/widgets/sheet_option_tile.dart';
 import '../../../core/widgets/toast.dart';
 import '../../expenses/widgets/expense_list_tile.dart';
 import '../../expenses/category_icons.dart';
 import '../../balance/widgets/balance_list.dart';
+import '../../profile/widgets/personal_budget_card.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 import '../../settings/settings_definitions.dart';
 import '../../../domain/domain.dart';
@@ -434,6 +437,10 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
     return LayoutBuilder(
       builder: (context, layoutConstraints) {
         return Scaffold(
+          floatingActionButtonLocation: ContentAlignedFabLocation.of(
+            context,
+            contentAreaWidth: layoutConstraints.maxWidth,
+          ),
           appBar: ContentAlignedAppBar(
             contentAreaWidth: layoutConstraints.maxWidth,
             leading: IconButton(
@@ -697,10 +704,6 @@ class _PersonalBudgetHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final expensesAsync = ref.watch(expensesByGroupProvider(group.id));
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final currencyCode = group.currencyCode;
-    final budgetCents = group.budgetAmountCents;
 
     return expensesAsync.when(
       data: (expenses) {
@@ -708,118 +711,13 @@ class _PersonalBudgetHeader extends ConsumerWidget {
           0,
           (s, e) => s + contributionToExpenseTotal(e),
         );
-        final hasBudget = budgetCents != null && budgetCents > 0;
-        final overBudget = hasBudget && totalSpentCents >= budgetCents;
-        final nearBudget =
-            hasBudget &&
-            !overBudget &&
-            totalSpentCents >= (budgetCents * 0.8).round();
-        final attentionColor = overBudget
-            ? colorScheme.error
-            : (nearBudget ? colorScheme.tertiary : null);
-
-        final progress = hasBudget
-            ? (totalSpentCents / budgetCents).clamp(0.0, 1.2)
-            : 0.0;
-        final barColor = attentionColor ?? colorScheme.primary;
-
-        final subtle = context.subtleAccents;
-        final BoxDecoration panelDecoration;
-        if (subtle) {
-          panelDecoration = AccentSurfaces.panel(
-            colorScheme,
-            subtle: true,
-            radius: ThemeConfig.radiusL,
-          );
-        } else if (attentionColor != null) {
-          panelDecoration = BoxDecoration(
-            borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                attentionColor.withValues(alpha: 0.9),
-                colorScheme.surfaceContainerLow,
-              ],
-            ),
-            border: Border.all(
-              color: attentionColor.withValues(alpha: 0.45),
-            ),
-          );
-        } else {
-          panelDecoration = AccentSurfaces.panel(
-            colorScheme,
-            subtle: false,
-            radius: ThemeConfig.radiusL,
-          );
-        }
-
         return Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-            decoration: panelDecoration,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'my_budget'.tr(),
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  hasBudget
-                      ? CurrencyFormatter.formatCentsAsWholeUnits(
-                          budgetCents,
-                          currencyCode,
-                        )
-                      : '—',
-                  key: const Key('personal_budget_amount'),
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.3,
-                    color: attentionColor ?? colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Text(
-                      '${'my_expenses'.tr()}: ',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    AmountWithSecondaryDisplay(
-                      amountCents: totalSpentCents,
-                      groupCurrencyCode: currencyCode,
-                      primaryStyle: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: attentionColor ?? colorScheme.onSurface,
-                      ),
-                    ),
-                  ],
-                ),
-                if (hasBudget) ...[
-                  const SizedBox(height: 12),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: LinearProgressIndicator(
-                      value: progress > 1 ? 1 : progress,
-                      minHeight: 7,
-                      backgroundColor: colorScheme.surface.withValues(
-                        alpha: 0.7,
-                      ),
-                      color: barColor,
-                    ),
-                  ),
-                ],
-              ],
-            ),
+          child: PersonalBudgetCard(
+            group: group,
+            spentCents: totalSpentCents,
+            budgetCents: group.budgetAmountCents,
+            showTitle: false,
           ),
         );
       },
@@ -1399,36 +1297,55 @@ class _PeopleTab extends ConsumerWidget {
       centerInFullViewport: true,
       child: Builder(
         builder: (ctx) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (!LayoutBreakpoints.isTabletOrWider(context))
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    participant.name,
-                    style: Theme.of(ctx).textTheme.titleLarge,
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).padding.bottom + 16,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!LayoutBreakpoints.isTabletOrWider(context))
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: Text(
+                      participant.name,
+                      style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
-                ),
-              ListTile(
-                title: Text('edit_name'.tr()),
-                onTap: () => Navigator.pop(ctx, 'edit'),
-              ),
-              if (myRole == GroupRole.owner) ...[
-                ListTile(
-                  title: Text('change_role'.tr()),
-                  onTap: () => Navigator.pop(ctx, 'role'),
-                ),
-                ListTile(
-                  title: Text('transfer_ownership'.tr()),
-                  onTap: () => Navigator.pop(ctx, 'transfer'),
+                SheetOptionList(
+                  children: [
+                    SheetOptionTile(
+                      title: 'edit_name'.tr(),
+                      leading: const Icon(Icons.edit_outlined),
+                      onTap: () => Navigator.pop(ctx, 'edit'),
+                    ),
+                    if (myRole == GroupRole.owner) ...[
+                      SheetOptionTile(
+                        title: 'change_role'.tr(),
+                        leading: const Icon(Icons.manage_accounts_outlined),
+                        onTap: () => Navigator.pop(ctx, 'role'),
+                      ),
+                      SheetOptionTile(
+                        title: 'transfer_ownership'.tr(),
+                        leading: const Icon(Icons.swap_horiz),
+                        onTap: () => Navigator.pop(ctx, 'transfer'),
+                      ),
+                    ],
+                    SheetOptionTile(
+                      title: 'kick_member'.tr(),
+                      leading: Icon(
+                        Icons.person_remove_outlined,
+                        color: Theme.of(ctx).colorScheme.error,
+                      ),
+                      destructive: true,
+                      onTap: () => Navigator.pop(ctx, 'kick'),
+                    ),
+                  ],
                 ),
               ],
-              ListTile(
-                title: Text('kick_member'.tr()),
-                onTap: () => Navigator.pop(ctx, 'kick'),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -1454,22 +1371,34 @@ class _PeopleTab extends ConsumerWidget {
       centerInFullViewport: true,
       child: Builder(
         builder: (ctx) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (!LayoutBreakpoints.isTabletOrWider(context))
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    participant.name,
-                    style: Theme.of(ctx).textTheme.titleLarge,
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).padding.bottom + 16,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!LayoutBreakpoints.isTabletOrWider(context))
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: Text(
+                      participant.name,
+                      style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
+                SheetOptionList(
+                  children: [
+                    SheetOptionTile(
+                      title: 'archive_participant'.tr(),
+                      leading: const Icon(Icons.archive_outlined),
+                      onTap: () => Navigator.pop(ctx, 'archive'),
+                    ),
+                  ],
                 ),
-              ListTile(
-                title: Text('archive_participant'.tr()),
-                onTap: () => Navigator.pop(ctx, 'archive'),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1494,31 +1423,49 @@ class _PeopleTab extends ConsumerWidget {
       centerInFullViewport: true,
       child: Builder(
         builder: (ctx) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (!LayoutBreakpoints.isTabletOrWider(context))
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    participant.name,
-                    style: Theme.of(ctx).textTheme.titleLarge,
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).padding.bottom + 16,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!LayoutBreakpoints.isTabletOrWider(context))
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: Text(
+                      participant.name,
+                      style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
+                SheetOptionList(
+                  children: [
+                    SheetOptionTile(
+                      title: 'edit_name'.tr(),
+                      leading: const Icon(Icons.edit_outlined),
+                      onTap: () => Navigator.pop(ctx, 'edit'),
+                    ),
+                    if (!localOnly)
+                      SheetOptionTile(
+                        title: 'merge_with_user'.tr(),
+                        leading: const Icon(Icons.merge_type),
+                        onTap: () => Navigator.pop(ctx, 'merge'),
+                      ),
+                    SheetOptionTile(
+                      title: 'delete_participant'.tr(),
+                      leading: Icon(
+                        Icons.delete_outline,
+                        color: Theme.of(ctx).colorScheme.error,
+                      ),
+                      destructive: true,
+                      onTap: () => Navigator.pop(ctx, 'delete'),
+                    ),
+                  ],
                 ),
-              ListTile(
-                title: Text('edit_name'.tr()),
-                onTap: () => Navigator.pop(ctx, 'edit'),
-              ),
-              if (!localOnly)
-                ListTile(
-                  title: Text('merge_with_user'.tr()),
-                  onTap: () => Navigator.pop(ctx, 'merge'),
-                ),
-              ListTile(
-                title: Text('delete_participant'.tr()),
-                onTap: () => Navigator.pop(ctx, 'delete'),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

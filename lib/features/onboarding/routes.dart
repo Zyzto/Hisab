@@ -1,4 +1,5 @@
 import 'package:go_router/go_router.dart';
+import '../../../core/navigation/app_page.dart';
 import '../../../core/navigation/route_paths.dart';
 import 'pages/onboarding_page.dart';
 
@@ -10,19 +11,31 @@ List<RouteBase> getOnboardingRoutes() {
     ),
     GoRoute(
       path: RoutePaths.onboardingWelcome,
-      builder: (context, state) => const OnboardingPage(initialPage: 0),
+      pageBuilder: (context, state) => appNoTransitionPage(
+        key: state.pageKey,
+        child: const OnboardingPage(initialPage: 0),
+      ),
     ),
     GoRoute(
       path: RoutePaths.onboardingPreferences,
-      builder: (context, state) => const OnboardingPage(initialPage: 1),
+      pageBuilder: (context, state) => appNoTransitionPage(
+        key: state.pageKey,
+        child: const OnboardingPage(initialPage: 1),
+      ),
     ),
     GoRoute(
       path: RoutePaths.onboardingPermissions,
-      builder: (context, state) => const OnboardingPage(initialPage: 2),
+      pageBuilder: (context, state) => appNoTransitionPage(
+        key: state.pageKey,
+        child: const OnboardingPage(initialPage: 2),
+      ),
     ),
     GoRoute(
       path: RoutePaths.onboardingConnect,
-      builder: (context, state) => const OnboardingPage(initialPage: 3),
+      pageBuilder: (context, state) => appNoTransitionPage(
+        key: state.pageKey,
+        child: const OnboardingPage(initialPage: 3),
+      ),
     ),
   ];
 }

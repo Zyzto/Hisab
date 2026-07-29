@@ -16,6 +16,7 @@ void showExpenseImageFullScreen(BuildContext context, String imagePath) {
       barrierColor: Theme.of(context).colorScheme.scrim,
       barrierDismissible: true,
       centerInFullViewport: true,
+      fadeScale: false,
       builder: (ctx) => FullscreenImageDialog(
         image: _ReceiptCachedOrNetworkImage(
           imageUrl: imagePath,
@@ -32,6 +33,7 @@ void showExpenseImageFullScreen(BuildContext context, String imagePath) {
     barrierColor: Theme.of(context).colorScheme.scrim,
     barrierDismissible: true,
     centerInFullViewport: true,
+    fadeScale: false,
     builder: (ctx) => FullscreenImageDialog(
       image: Image.file(
         file,

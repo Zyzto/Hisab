@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/layout/constrained_content.dart';
+import '../../../core/layout/content_aligned_fab_location.dart';
+import '../../../core/widgets/sheet_helpers.dart';
 import '../domain/scanner_pattern.dart';
 import '../providers/scanner_providers.dart';
 import '../utils/scanner_pattern_labels.dart';
@@ -17,27 +19,35 @@ class ScannerPatternsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final patternsAsync = ref.watch(scannerPatternsProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('scanner_patterns_title'.tr()),
-      ),
-      body: ConstrainedContent(
-        child: patternsAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(
-            child: Text(
-              'error_with_details'.tr(namedArgs: {'details': '$e'}),
+    return LayoutBuilder(
+      builder: (context, layoutConstraints) {
+        return Scaffold(
+          floatingActionButtonLocation: ContentAlignedFabLocation.of(
+            context,
+            contentAreaWidth: layoutConstraints.maxWidth,
+          ),
+          appBar: AppBar(
+            title: Text('scanner_patterns_title'.tr()),
+          ),
+          body: ConstrainedContent(
+            child: patternsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(
+                child: Text(
+                  'error_with_details'.tr(namedArgs: {'details': '$e'}),
+                ),
+              ),
+              data: (patterns) => patterns.isEmpty
+                  ? _buildEmptyState(context)
+                  : _buildList(context, ref, patterns),
             ),
           ),
-          data: (patterns) => patterns.isEmpty
-              ? _buildEmptyState(context)
-              : _buildList(context, ref, patterns),
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _openEditor(context, ref, null),
-        child: const Icon(Icons.add),
-      ),
+          floatingActionButton: FloatingActionButton(
+            onPressed: () => _openEditor(context, ref, null),
+            child: const Icon(Icons.add),
+          ),
+        );
+      },
     );
   }
 
@@ -162,25 +172,13 @@ class _PatternTile extends ConsumerWidget {
   }
 
   void _confirmDelete(BuildContext context, WidgetRef ref) {
-    showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('scanner_delete_pattern'.tr()),
-        content: Text(scannerPatternDisplayName(pattern.name)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: Text('delete'.tr()),
-          ),
-        ],
-      ),
+    showConfirmSheet(
+      context,
+      title: 'scanner_delete_pattern'.tr(),
+      content: scannerPatternDisplayName(pattern.name),
+      confirmLabel: 'delete'.tr(),
+      isDestructive: true,
+      centerInFullViewport: false,
     ).then((confirmed) {
       if (confirmed == true) {
         ref

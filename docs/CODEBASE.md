@@ -24,14 +24,14 @@ Product and install overview: [../README.md](../README.md). Doc index: [README.m
 |---|---|
 | `lib/` | Main Flutter application code |
 | `lib/core/` | Cross-cutting: auth, constants, database, debug, navigation, receipt, repository, services, telemetry, theme, update, utils, widgets |
-| `lib/features/` | Feature modules (`home`, `groups`, `expenses`, `balance`, `settings`, `onboarding`, `transaction_scanner`) |
+| `lib/features/` | Feature modules (`home`, `profile`, `groups`, `expenses`, `balance`, `settings`, `onboarding`, `transaction_scanner`) |
 | `lib/domain/` | Domain entities and value types; barrel export in `domain.dart` |
 | `assets/translations/` | Localization JSON files |
 | `web/` | PWA shell, Firebase web messaging config, redirect pages, static privacy page |
 | `ios/Runner/Info.plist` | iOS permissions/deep-link/background notification config |
 | `supabase/functions/invite-redirect/` | Edge Function: invite token validation and redirect |
 | `supabase/functions/og-invite-image/` | Edge Function: GET `?token=...` → 1200×630 PNG (QR, branding) for invite previews |
-| `supabase/functions/send-notification/` | Edge Function: FCM push (expenses, member_joined; excludes joinee) |
+| `supabase/functions/send-notification/` | Edge Function: `user_notifications` + FCM push (expenses, member_joined; excludes actor) |
 | `supabase/functions/telemetry/` | Edge Function: anonymous telemetry ingest |
 | `docs/` | Setup and architecture documentation; see [docs/README.md](README.md) for an index |
 | `test/` | Tests mirroring `lib/` layout; see [test/README.md](../test/README.md) |
@@ -58,21 +58,21 @@ Product and install overview: [../README.md](../README.md). Doc index: [README.m
 ### Data Layer
 
 - `lib/core/database/powersync_schema.dart` defines local schema:
-  - `groups`, `group_members`, `participants`, `expenses`, `expense_tags`, `group_invites`, `invite_usages`
+  - `groups`, `group_members`, `participants`, `expenses`, `expense_tags`, `group_invites`, `invite_usages`, `user_notifications`
   - `local_archived_groups` — per-user “hide from my list” (not synced)
   - `draft_transactions`, `scanner_sender_rules`, `scanner_patterns` — Transaction Scanner (local-only; not synced); see [TRANSACTION_SCANNER.md](TRANSACTION_SCANNER.md)
   - `pending_writes` queue for offline-online deferred writes
-- **PowerSync `id` column:** PowerSync adds an `id` column automatically to each table. Do not add `Column.text('id')` (or any custom `id` column) in the schema — it will trigger: *"id column is automatically added, custom id columns are not supported"*.
-- **Repositories** (`lib/core/repository/`): `group_repository`, `participant_repository`, `expense_repository`, `group_member_repository`, `group_invite_repository`, `tag_repository`, `powersync_repository`. Wired in `repository_providers.dart` with `effectiveLocalOnlyProvider` and connectivity; implementations in `powersync_repository.dart` and per-entity repositories.
+- **PowerSync `id` column:** PowerSync adds an `id` column automatically to each table. Do not add `Column.text('id')` (or any custom `id` column) in the schema — it will trigger: *"id column is automatically added, custom id columns are not supported"*. Hisab uses PowerSync 2.x as the **local SQLite engine** with a custom `SyncEngine` (not PowerSync Cloud Sync Streams).
+- **Repositories** (`lib/core/repository/`): `group_repository`, `participant_repository`, `expense_repository`, `group_member_repository`, `group_invite_repository`, `tag_repository`, `user_notification_repository`, `powersync_repository`. Wired in `repository_providers.dart` / profile providers with `effectiveLocalOnlyProvider` and connectivity; implementations in `powersync_repository.dart` and per-entity repositories.
 - Reads come from local DB; online mode writes target Supabase then local cache.
 - In online mode while temporarily offline, some writes (notably expense writes) are queued to `pending_writes`.
 - **Expense exchange rate:** Each expense stores `exchange_rate` and `base_amount_cents` (group-currency amount). Display and settle-up **always** use these stored values so amounts stay consistent over time and when editing; do not recalculate from a live API for existing expenses.
 
-**Schema alignment:** The source of truth for synced table columns is the INSERT column list in `lib/core/database/sync_engine.dart`. When adding or changing columns in Supabase (or in the local schema), keep all three in sync: (1) Supabase table definition (migrations), (2) `lib/core/database/powersync_schema.dart`, and (3) the corresponding INSERT in `sync_engine.dart`. PowerSync adds an `id` column automatically to each table — do not add a custom `Column.text('id')` in the schema (it will trigger an assertion). The test in `test/sync_test.dart` that runs `fetchAllWithBackend` with full rows for all seven synced tables helps catch missing-column mismatches.
+**Schema alignment:** The source of truth for synced table columns is the INSERT column list in `lib/core/database/sync_engine.dart`. When adding or changing columns in Supabase (or in the local schema), keep all three in sync: (1) Supabase table definition (migrations), (2) `lib/core/database/powersync_schema.dart`, and (3) the corresponding INSERT in `sync_engine.dart`. PowerSync adds an `id` column automatically to each table — do not add a custom `Column.text('id')` in the schema (it will trigger an assertion). The test in `test/schema_alignment_test.dart` covers all eight synced tables (including user-scoped `user_notifications`).
 
 ### Domain
 
-`lib/domain/domain.dart` is the barrel export. Main entities: `group`, `group_member`, `group_invite`, `invite_usage`, `group_role`, `participant`, `expense`, `expense_tag`, `receipt_line_item`, `split_type`, `transaction_type`, `settlement_transaction`, `settlement_item`, `settlement_method`, `settlement_snapshot`, `participant_balance`, `group_balance_result`, `delete_my_data_preview`.
+`lib/domain/domain.dart` is the barrel export. Main entities: `group`, `group_member`, `group_invite`, `invite_usage`, `group_role`, `participant`, `expense`, `expense_tag`, `receipt_line_item`, `split_type`, `transaction_type`, `settlement_transaction`, `settlement_item`, `settlement_method`, `settlement_snapshot`, `participant_balance`, `group_balance_result`, `delete_my_data_preview`, `user_notification`.
 
 ### Sync Layer
 
@@ -102,11 +102,11 @@ Key services: `lib/core/services/` — **notification_service** (FCM token, fore
 
 ### Core widgets
 
-Shared widgets in `lib/core/widgets/`: **AsyncValueBuilder**, **BackButtonKeyboardDismiss**, **ConnectionBanner**, **CurrencyPickerList**, **ErrorContentWidget** (Share / Report issue; optional `summaryEnglish` for GitHub title), **ExpandableSection**, **FloatingNavBar**, **PwaInstallBanner**, **ServicesStatusSheet**, **SyncStatusChip** (`sync_status_icon.dart`), **Toast** (`toast.dart`: `showErrorWithActions` dismisses the toastification overlay before awaiting share / external browser on Android to avoid a stuck hit target at the bottom of the screen).
+Shared widgets in `lib/core/widgets/`: **AsyncValueBuilder**, **BackButtonKeyboardDismiss**, **ConnectionBanner**, **CurrencyPickerList**, **ErrorContentWidget** (Share / Report issue; optional `summaryEnglish` for GitHub title), **ExpandableSection**, **FloatingNavBar**, **AppSidenav**, **ShellMenuButton**, **SheetOptionTile** / **SheetOptionList**, **PwaInstallBanner**, **ServicesStatusSheet**, **SyncStatusChip** (`sync_status_icon.dart`), **Toast** (`toast.dart`: `showErrorWithActions` dismisses the toastification overlay before awaiting share / external browser on Android to avoid a stuck hit target at the bottom of the screen).
 
 ### Layout (core/layout)
 
-- **LayoutBreakpoints** (`layout_breakpoints.dart`) — width breakpoints (tablet ≥600px, desktop ≥840px), content max widths (600/720), navigation rail width, and **`contentBandMetrics(context, contentAreaWidth)`** returning `(leftOffset, contentMaxWidth)` so the app bar title and body share the same horizontal band.
+- **LayoutBreakpoints** (`layout_breakpoints.dart`) — width breakpoints (tablet ≥600px, desktop ≥840px), content max widths (600/720), permanent shell sidenav width (240; mid band 0), and **`contentBandMetrics(context, contentAreaWidth)`** returning `(leftOffset, contentMaxWidth)` so the app bar title and body share the same horizontal band. Shell nav: `FloatingNavBar` (phone), temporary drawer + `ShellMenuButton` (mid), `AppSidenav` (desktop).
 - **ConstrainedContent** (`constrained_content.dart`) — on tablet+ wraps [child] in a centered band using `contentBandMetrics`; on narrow screens returns [child] unchanged. Body content is wrapped in this so it does not span full width on large screens.
 - **ContentAlignedAppBar** (`content_aligned_app_bar.dart`) — a `PreferredSizeWidget` that places the title in the same horizontal band as the body (via `contentBandMetrics`). The title is absolutely positioned so it is not affected by leading/actions width. Titles use the normal app bar text size (no `FittedBox` shrink-to-fit); long titles should use `maxLines` / `TextOverflow.ellipsis` (or elide in the parent), e.g. group detail’s app bar name (`group_detail_page.dart`: grapheme cap + ellipsis). Use with a **LayoutBuilder** around the scaffold and pass `layoutConstraints.maxWidth` as `contentAreaWidth`. Used on all pages that have an app bar and `ConstrainedContent` body (home, settings, group detail/settings/create, invite management/scan/accept, archived groups, expense form, privacy policy).
 
@@ -118,13 +118,20 @@ Expense form **photos**: add up to 5 images (camera or gallery on all platforms,
 
 - Router: `lib/core/navigation/app_router.dart`
   - onboarding redirect guard
-  - shell route for home/settings tabs
+  - shell route for home/settings tabs; `/profile` is a shell child (like `/archived`) opened from sidenav avatar or mobile home avatar opposite the FAB
   - group/invite/expense routes
   - **Navigation trace** (`navigation_trace.dart`): `GoRouter`’s `routerDelegate` listener records recent locations (UTC + URI) for **Share / Report issue** payloads (`error_report_helper.dart`). Decorative-only URL updates that do not change the delegate may not appear in the trace.
 - **Group / personal create wizard:** Canonical routes are `/groups/create` and `/groups/create-personal` (each mounts one `GroupCreatePage` so `PageView` state is not disposed between steps). Legacy paths such as `/groups/create/details` **redirect** to the canonical URL (bookmarks still work; refresh on a legacy step URL restarts the wizard at step 0). In-wizard step labels in the address bar use `SystemNavigator.routeInformationUpdated` (decorative), not `context.go`, so state and animations stay intact.
 - **Onboarding wizard:** Per-step routes (`/onboarding/welcome`, …) remain for deep links and cold starts; swiping between steps updates the browser URL the same way (**decorative** `routeInformationUpdated`) so `OnboardingPage` state is not recreated by `go()` on every page.
 - **Group detail tabs:** Tab changes still use `SystemNavigator.routeInformationUpdated` in `group_detail_page.dart` (same pattern: URL reflects tab without replacing the route).
 - **Modals/sheets:** `lib/core/layout/responsive_sheet.dart` — `showResponsiveSheet` (bottom sheet on narrow, centered dialog on tablet+) and `showAppDialog`; both support `centerInFullViewport` and **click-outside-to-close** (barrier dismiss on all platforms, including desktop web via an explicit barrier gesture). See [MODAL_CENTERING_AND_RESPONSIVE_SHEET.md](MODAL_CENTERING_AND_RESPONSIVE_SHEET.md).
+- **Page / window motion:** Shared tokens and builders in `lib/core/motion/app_motion.dart` (`page` 280ms, `shellTab` 200ms, `modal` 320ms, `shellNav` 280ms). GoRouter helpers in `lib/core/navigation/app_page.dart`:
+  - **Fade + end-slide** (`appFadeSlidePage`) for hierarchical pushes (groups, invites, profile, archived, forms, etc.) and via `PageTransitionsTheme` for scanner `MaterialPageRoute`s.
+  - **No transition** (`appNoTransitionPage`) for IndexedStack roots (`/`, `/home/:mode`, `/settings`), onboarding step routes, and expense detail paging (`/groups/.../expenses/:eid` and invite preview `:eid`) so in-page slides / PageViews are not double-animated. Expense first-open enter runs inside `ExpenseDetailShell`.
+  - **Shell tabs:** `MainScaffold` keeps home/settings always mounted (`Offstage` + `TickerMode` when on profile/archived) and crossfades on index change only.
+  - **Managed back** on settings/profile/archived uses `context.go(home)` — no reverse page transition on that path (intentional). Nested profile expenses AppBar `pop` still reverses.
+  - **Dialogs:** `showAppDialog` defaults to fade+scale (parity with wide sheets); pass `fadeScale: false` for fullscreen image viewers.
+  - Decorative URL updates for group tabs / onboarding / create wizards must not use `go`/`push` for in-flow step changes (same as before).
 - **App bar title alignment:** Pages that use `ConstrainedContent` for the body use **ContentAlignedAppBar** (see Layout above) so the app bar title sits in the same horizontal band as the content (tablet/desktop with rail and max-width content).
 - Deep link handling: `lib/core/navigation/invite_link_handler.dart`
   - reads initial and streamed app links
@@ -156,9 +163,9 @@ Redirect behavior:
 - Web uses `SITE_URL` if provided.
 - Native uses deep link callback `io.supabase.hisab://callback`.
 
-## Notifications (FCM)
+## Notifications (FCM + in-app history)
 
-Push notifications are sent when expenses are added/edited or members join a group. The pipeline is: **Supabase (trigger) → pg_net → send-notification Edge Function → Firebase Cloud Messaging → Flutter**. Full setup and verification are in [SUPABASE_SETUP.md](SUPABASE_SETUP.md) (Section 5: send-notification, “Push notifications: end-to-end flow and verification”, and Section 9: “Push notifications not received”).
+Push notifications are sent when expenses are added/edited or members join a group. The pipeline is: **Supabase (trigger) → pg_net → send-notification Edge Function → (1) insert `user_notifications` rows → (2) Firebase Cloud Messaging → Flutter**. Full setup and verification are in [SUPABASE_SETUP.md](SUPABASE_SETUP.md) (Section 5: send-notification, “Push notifications: end-to-end flow and verification”, and Section 9: “Push notifications not received”).
 
 **Flutter** (`lib/core/services/notification_service.dart`):
 
@@ -166,22 +173,25 @@ Push notifications are sent when expenses are added/edited or members join a gro
 - Handles token refresh, foreground display (mobile: local notifications), and tap → navigate to group detail using `message.data['group_id']`.
 - Expects incoming messages to have `notification` (title, body) and `data.group_id` (string).
 
-**Backend:** Database trigger `notify_on_expense_change` (and `notify_on_member_join`) calls `notify_group_activity()`, which POSTs to the `send-notification` Edge Function with `group_id`, `actor_user_id`, `action`, and optional expense fields. **Personal groups** (groups with `is_personal = true`; see [PERSONAL_FEATURE.md](PERSONAL_FEATURE.md)) do not trigger push notifications—the trigger function skips the HTTP call for them. The Edge Function (`supabase/functions/send-notification/index.ts`) loads other group members’ tokens and `locale` from `device_tokens` and sends FCM v1 messages (one per token). For **expense_created** and **expense_updated**, the actor is the user who created or last updated the expense; the Edge Function excludes that actor so only **other** group members receive the push. For `member_joined`, the actor is the new member; the Edge Function excludes the actor so the joinee does not receive a push notification. Notification title and body are localized per device using the stored `locale` (en/ar; fallback en).
+**In-app activity feed:** The same Edge Function persists one `user_notifications` row per recipient (including when FCM is dry-run or the user has no device token). SyncEngine fetches the signed-in user’s rows into local SQLite; Profile (`features/profile`) shows a grouped feed and mark-as-read. Migration: `20260729010000_user_notifications.sql`.
+
+**Backend:** Database trigger `notify_on_expense_change` (and `notify_on_member_join`) calls `notify_group_activity()`, which POSTs to the `send-notification` Edge Function with `group_id`, `actor_user_id`, `action`, and optional expense fields (including `expense_id` when present). **Personal groups** (groups with `is_personal = true`; see [PERSONAL_FEATURE.md](PERSONAL_FEATURE.md)) do not trigger notifications—the trigger function skips the HTTP call for them. The Edge Function (`supabase/functions/send-notification/index.ts`) loads other group members’ tokens and `locale` from `device_tokens`, inserts history rows, then sends FCM v1 messages (one per token) when FCM secrets are configured. For **expense_created** and **expense_updated**, the actor is the user who created or last updated the expense; the Edge Function excludes that actor so only **other** group members receive the push/history. For `member_joined`, the actor is the new member; the Edge Function excludes the actor so the joinee does not receive a notification. Title and body are localized per recipient using stored `locale` (en/ar; fallback en).
 
 **Web:** `web/index.html` initializes Firebase web SDK; `web/firebase-messaging-sw.js` handles background push and clicks. Web token registration requires `FCM_VAPID_KEY` at build time.
 
-**Settings:** `notifications_enabled` controls initialization and token registration; the toggle is shown only in online mode.
+**Settings:** `notifications_enabled` controls FCM initialization and token registration; the toggle is shown only in online mode. In-app history still syncs when present on the server.
 
 **Transaction Scanner:** Separate from FCM — Android Notification Listener → local drafts → personal expenses. See [TRANSACTION_SCANNER.md](TRANSACTION_SCANNER.md).
 
 ## Feature Modules
 
-- `features/home`: groups list (Personal and Groups sections) via **home_list_provider** (ordered list, pinned/custom order), **routes**, create FAB + modal (Create group / Create personal), manual refresh trigger
+- `features/home`: groups list (Personal and Groups sections) via **home_list_provider** (ordered list, pinned/custom order), **routes**, create FAB + modal (Create group / Create personal), mobile profile avatar opposite FAB, manual refresh trigger
+- `features/profile`: `/profile` dashboard (account header moved from Settings, global display-currency net, KPIs, balances, personal budgets, grouped `user_notifications` feed); SyncEngine fetches notifications by user
 - `features/groups`: create/detail/settings (including personal vs group branches and convert flows), invite management, invite acceptance; group settings include permission toggles (e.g. Members can add expenses, Members can record settlements for others). **Group create** uses a single shell route per flow plus decorative step URLs (see Navigation). `invite_redirect_proxy` (and `invite_redirect_proxy_web`, `invite_redirect_proxy_stub`, `invite_redirect_proxy_page`) for web/invite redirect; **create_invite_sheet** (invite creation UI)
 - `features/expenses`: create/edit/detail expenses (**expense_detail_shell**), split logic UI, image input hooks; **expense_navigation_direction** (provider), **expense_form_constants**, **category_icons**
-- `features/balance`: settlement list and record settlement flow. By default only the group owner or the debtor (participant who owes) can record a settlement; group setting **Members can record settlements for others** (Group.allowMemberSettleForOthers) allows any member to record. Balance list (`balance_list.dart`) uses `myMemberInGroupProvider` and `myRoleInGroupProvider` to enable or disable the record button per row.
+- `features/balance`: you-centric balance list (Your balance hero → everyone else → Settle Up) and record settlement flow. By default only the group owner or the debtor (participant who owes) can record a settlement; group setting **Members can record settlements for others** (Group.allowMemberSettleForOthers) allows any member to record. Balance list (`balance_list.dart`) uses `myMemberInGroupProvider` and `myRoleInGroupProvider` for the hero (when linked) and to enable or disable the record button per row.
 - `features/settings`:
-  - account mode and auth controls; **edit_profile_sheet**
+  - Account section links to `/profile` (account UI lives on Profile); **account_mode_actions**, **edit_profile_sheet**
   - theme/language/font/favorite currencies
   - local-only toggle + migration
   - import/export backup JSON (**backup_helper**: `parseBackupJson`, etc.)
@@ -207,7 +217,7 @@ Major persisted keys include:
 
 - PWA manifest: `web/manifest.json`
 - Web bootstrap: `web/flutter_bootstrap.js` (custom bootstrap; loads Flutter without default service-worker settings)
-- PowerSync workers: `web/powersync_db.worker.js`, `web/powersync_sync.worker.js`
+- PowerSync web assets: `web/sqlite3.wasm`, `web/powersync_db.worker.js` (single worker for DB + sync; refresh with `flutter pub run powersync:setup_web`)
 - Install prompt integration: `pwa_install` package + `PwaInstallBanner` widget
 - Invite links use the web app domain (e.g. hisab.shenepoy.com) when `INVITE_BASE_URL` is set. On deploy, the route `/functions/v1/invite-redirect` is served by **Firebase Hosting** via a rewrite to static `invite-redirect.html` (built from `web/invite-redirect-template.html`); that page redirects to the Supabase Edge Function, which validates the token and redirects the user to `redirect.html`. This works on the Firebase free (Spark) plan with no Cloud Function. When the user is already inside the web app, the same path is handled by the Flutter app (GoRouter), which redirects to the Supabase Edge Function.
 - Invite redirect static page: `web/redirect.html`
@@ -224,14 +234,14 @@ This repo is the **source of truth** for all Supabase Edge Functions. See [EDGE_
 
 - `supabase/functions/invite-redirect/index.ts` — validates invite token and redirects to `redirect.html`
 - `supabase/functions/og-invite-image/` — GET `?token=...` returns 1200×630 PNG (QR code, branding) for invite link previews; deploy with `--no-verify-jwt`
-- `supabase/functions/send-notification/index.ts` — sends FCM push notifications (expenses, member_joined; excludes joinee)
+- `supabase/functions/send-notification/index.ts` — persists `user_notifications` and sends FCM push (expenses, member_joined; excludes actor)
 - `supabase/functions/telemetry/index.ts` — accepts anonymous usage telemetry events
 
 On the free plan, invite redirect uses only static Hosting files (`invite-redirect.html` + `redirect.html`). A **Firebase Cloud Function** can optionally serve the same path with dynamic OG meta for crawlers (see [EDGE_FUNCTIONS.md](EDGE_FUNCTIONS.md) for `functions/` and hosting rewrites).
 
 The app also depends on Supabase-side schema, RLS, and RPCs documented in `docs/SUPABASE_SETUP.md`, including:
 
-- tables such as `groups`, `group_members`, `participants`, `expenses`, `expense_tags`, `group_invites`, `invite_usages`, `telemetry`, `device_tokens`
+- tables such as `groups`, `group_members`, `participants`, `expenses`, `expense_tags`, `group_invites`, `invite_usages`, `telemetry`, `device_tokens`, `user_notifications`
 - RPCs such as `accept_invite`, `transfer_ownership`, `leave_group`, `kick_member`, `update_member_role`, `create_invite`, etc.
 
 Schema and security/performance can be re-verified via [Supabase MCP](https://supabase.com/docs/guides/getting-started/mcp) (`list_tables`, `get_advisors`).

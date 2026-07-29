@@ -79,6 +79,7 @@ class DebugMenuFab extends ConsumerWidget {
             context: navContext,
             title: 'debug_menu_title'.tr(),
             isScrollControlled: true,
+            centerInFullViewport: false,
             child: EasyLocalization(
               supportedLocales: const [Locale('en'), Locale('ar')],
               path: 'assets/translations',
@@ -156,6 +157,7 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
       context: context,
       title: 'Error (debug)',
       isScrollControlled: true,
+      centerInFullViewport: false,
       child: Builder(
         builder: (sheetContext) => SingleChildScrollView(
           child: ErrorContentWidget(

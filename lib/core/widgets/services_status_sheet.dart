@@ -28,6 +28,7 @@ void showServicesStatusSheet(BuildContext context, WidgetRef ref) {
     title: 'services_status_title'.tr(),
     isScrollControlled: true,
     useSafeArea: true,
+    centerInFullViewport: false,
     child: _ServicesStatusSheet(ref: ref),
   );
 }

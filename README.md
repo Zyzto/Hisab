@@ -32,6 +32,7 @@
 | **Groups & people** | Trips, events, or household lists — with participants linked to real accounts when online. |
 | **Expenses** | Multi-currency amounts, categories, receipts, equal / parts / amounts splits, transfers. |
 | **Balance & settle-up** | Who owes whom, minimal settlement suggestions, record payments in one tap. |
+| **Profile** | Cross-group dashboard: net balances, KPIs, personal budgets, and an in-app activity feed (online). |
 | **Personal lists** | Solo budgets and spending (no split UI); optional Android notification scanner drafts. |
 | **Offline-first** | Full local SQLite. Sync, invites, and members when you connect Supabase. |
 | **Locales** | English and Arabic (RTL), themes, and subtle accent controls. |
@@ -109,7 +110,7 @@ Or use define files (gitignored): copy `dart_defines_online.example.json` / `dar
 **Web:** generate WASM once if needed:
 
 ```bash
-dart run powersync:setup_web
+flutter pub run powersync:setup_web
 ```
 
 **Fuller local stack** (Supabase + Edge Functions on LAN):
@@ -125,7 +126,7 @@ Details: [docs/LOCAL_TEST_ENV.md](docs/LOCAL_TEST_ENV.md) · [docs/CONFIGURATION
 | Issue | Fix |
 |-------|-----|
 | Stays local-only | Pass both `SUPABASE_URL` and `SUPABASE_ANON_KEY` |
-| SQLite crash on web | `dart run powersync:setup_web` |
+| SQLite crash on web | `flutter pub run powersync:setup_web` |
 | OAuth redirect fails | Align Supabase Auth redirect URLs with your app / `SITE_URL` |
 | Migration errors | Stable network; migrations are idempotent — see Supabase setup docs |
 

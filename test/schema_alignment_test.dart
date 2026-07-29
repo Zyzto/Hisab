@@ -17,6 +17,7 @@ void main() {
     'expense_tags',
     'group_invites',
     'invite_usages',
+    'user_notifications',
   ];
 
   test(

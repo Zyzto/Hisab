@@ -321,7 +321,367 @@ void main() {
 
     expect(find.text('علي'), findsAny);
     expect(find.text('Bob'), findsAny);
-    expect(find.textContaining('\u2192'), findsAny);
+    expect(find.byIcon(Icons.payments_outlined), findsOneWidget);
+  });
+
+  testWidgets('BalanceList shows You Owe hero and excludes self from everyone else', (
+    tester,
+  ) async {
+    final memberAsBob = GroupMember(
+      id: 'm1',
+      groupId: groupId,
+      userId: 'u1',
+      role: 'member',
+      participantId: 'p-b',
+      joinedAt: now,
+    );
+    await pumpBalanceList(
+      tester,
+      myMemberOverride: AsyncValue.data(memberAsBob),
+      myRoleOverride: const AsyncValue.data(GroupRole.member),
+    );
+    await tester.pumpAndSettle();
+
+    // EasyLocalization falls back to keys in this widget-test harness.
+    expect(find.text('your_balance'), findsOneWidget);
+    expect(find.text('you_owe'), findsOneWidget);
+    expect(find.text('everyone_else'), findsOneWidget);
+    expect(find.text('Alice'), findsWidgets);
+    expect(find.text('balance_is_owed'), findsOneWidget);
+    // Bob appears in the hero and settlement title, not as an everyone-else card.
+    expect(find.text('balance_owes'), findsNothing);
+  });
+
+  testWidgets('BalanceList shows You are owed hero for creditor', (
+    tester,
+  ) async {
+    final memberAsAlice = GroupMember(
+      id: 'm1',
+      groupId: groupId,
+      userId: 'u1',
+      role: 'member',
+      participantId: 'p-a',
+      joinedAt: now,
+    );
+    await pumpBalanceList(
+      tester,
+      myMemberOverride: AsyncValue.data(memberAsAlice),
+      myRoleOverride: const AsyncValue.data(GroupRole.member),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('you_are_owed'), findsOneWidget);
+    expect(find.text('everyone_else'), findsOneWidget);
+    expect(find.text('Bob'), findsWidgets);
+    expect(find.text('balance_owes'), findsOneWidget);
+    expect(find.text('balance_is_owed'), findsNothing);
+  });
+
+  testWidgets('BalanceList shows You are even when linked member net is zero', (
+    tester,
+  ) async {
+    fakeResult = GroupBalanceResult(
+      group: Group(
+        id: groupId,
+        name: 'Even Group',
+        currencyCode: 'USD',
+        createdAt: now,
+        updatedAt: now,
+      ),
+      participants: [
+        Participant(
+          id: 'p-a',
+          groupId: groupId,
+          name: 'Alice',
+          order: 0,
+          createdAt: now,
+          updatedAt: now,
+        ),
+        Participant(
+          id: 'p-b',
+          groupId: groupId,
+          name: 'Bob',
+          order: 1,
+          createdAt: now,
+          updatedAt: now,
+        ),
+        Participant(
+          id: 'p-c',
+          groupId: groupId,
+          name: 'Carol',
+          order: 2,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      ],
+      balances: const [
+        ParticipantBalance(
+          participantId: 'p-a',
+          balanceCents: 0,
+          currencyCode: 'USD',
+        ),
+        ParticipantBalance(
+          participantId: 'p-b',
+          balanceCents: 3000,
+          currencyCode: 'USD',
+        ),
+        ParticipantBalance(
+          participantId: 'p-c',
+          balanceCents: -3000,
+          currencyCode: 'USD',
+        ),
+      ],
+      settlements: const [
+        SettlementTransaction(
+          fromParticipantId: 'p-c',
+          toParticipantId: 'p-b',
+          amountCents: 3000,
+          currencyCode: 'USD',
+        ),
+      ],
+    );
+
+    final memberAsAlice = GroupMember(
+      id: 'm1',
+      groupId: groupId,
+      userId: 'u1',
+      role: 'owner',
+      participantId: 'p-a',
+      joinedAt: now,
+    );
+    await pumpBalanceList(
+      tester,
+      myMemberOverride: AsyncValue.data(memberAsAlice),
+      myRoleOverride: const AsyncValue.data(GroupRole.owner),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('you_are_even'), findsOneWidget);
+    expect(find.text('everyone_else'), findsOneWidget);
+    expect(find.text('Alice'), findsOneWidget);
+    expect(find.text('Bob'), findsWidgets);
+    expect(find.text('Carol'), findsWidgets);
+  });
+
+  testWidgets('Settle Up Me filter hides transfers that do not involve me', (
+    tester,
+  ) async {
+    fakeResult = GroupBalanceResult(
+      group: Group(
+        id: groupId,
+        name: 'Filter Group',
+        currencyCode: 'USD',
+        createdAt: now,
+        updatedAt: now,
+      ),
+      participants: [
+        Participant(
+          id: 'p-a',
+          groupId: groupId,
+          name: 'Alice',
+          order: 0,
+          createdAt: now,
+          updatedAt: now,
+        ),
+        Participant(
+          id: 'p-b',
+          groupId: groupId,
+          name: 'Bob',
+          order: 1,
+          createdAt: now,
+          updatedAt: now,
+        ),
+        Participant(
+          id: 'p-c',
+          groupId: groupId,
+          name: 'Carol',
+          order: 2,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      ],
+      balances: const [
+        ParticipantBalance(
+          participantId: 'p-a',
+          balanceCents: 0,
+          currencyCode: 'USD',
+        ),
+        ParticipantBalance(
+          participantId: 'p-b',
+          balanceCents: 4000,
+          currencyCode: 'USD',
+        ),
+        ParticipantBalance(
+          participantId: 'p-c',
+          balanceCents: -4000,
+          currencyCode: 'USD',
+        ),
+      ],
+      settlements: const [
+        SettlementTransaction(
+          fromParticipantId: 'p-c',
+          toParticipantId: 'p-b',
+          amountCents: 4000,
+          currencyCode: 'USD',
+        ),
+      ],
+    );
+
+    final memberAsAlice = GroupMember(
+      id: 'm1',
+      groupId: groupId,
+      userId: 'u1',
+      role: 'owner',
+      participantId: 'p-a',
+      joinedAt: now,
+    );
+    await pumpBalanceList(
+      tester,
+      myMemberOverride: AsyncValue.data(memberAsAlice),
+      myRoleOverride: const AsyncValue.data(GroupRole.owner),
+    );
+    await tester.pumpAndSettle();
+
+    // Default Me filter: Carol → Bob does not involve Alice.
+    expect(find.text('settle_up_none_for_me'), findsOneWidget);
+    expect(find.byIcon(Icons.payments_outlined), findsNothing);
+
+    await tester.tap(find.text('settle_filter_all'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('settle_up_none_for_me'), findsNothing);
+    expect(find.byIcon(Icons.payments_outlined), findsOneWidget);
+    expect(find.text('Carol'), findsWidgets);
+  });
+
+  testWidgets('Settle Up sorts you-pay before you-receive before others', (
+    tester,
+  ) async {
+    fakeResult = GroupBalanceResult(
+      group: Group(
+        id: groupId,
+        name: 'Sort Group',
+        currencyCode: 'USD',
+        createdAt: now,
+        updatedAt: now,
+      ),
+      participants: [
+        Participant(
+          id: 'p-a',
+          groupId: groupId,
+          name: 'Alice',
+          order: 0,
+          createdAt: now,
+          updatedAt: now,
+        ),
+        Participant(
+          id: 'p-b',
+          groupId: groupId,
+          name: 'Bob',
+          order: 1,
+          createdAt: now,
+          updatedAt: now,
+        ),
+        Participant(
+          id: 'p-c',
+          groupId: groupId,
+          name: 'Carol',
+          order: 2,
+          createdAt: now,
+          updatedAt: now,
+        ),
+        Participant(
+          id: 'p-d',
+          groupId: groupId,
+          name: 'Dave',
+          order: 3,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      ],
+      // Zero nets so names only appear in settle-up rows (plus Alice in hero).
+      balances: const [
+        ParticipantBalance(
+          participantId: 'p-a',
+          balanceCents: 0,
+          currencyCode: 'USD',
+        ),
+        ParticipantBalance(
+          participantId: 'p-b',
+          balanceCents: 0,
+          currencyCode: 'USD',
+        ),
+        ParticipantBalance(
+          participantId: 'p-c',
+          balanceCents: 0,
+          currencyCode: 'USD',
+        ),
+        ParticipantBalance(
+          participantId: 'p-d',
+          balanceCents: 0,
+          currencyCode: 'USD',
+        ),
+      ],
+      // Intentionally unordered: others, receive, pay.
+      settlements: const [
+        SettlementTransaction(
+          fromParticipantId: 'p-c',
+          toParticipantId: 'p-b',
+          amountCents: 500,
+          currencyCode: 'USD',
+        ),
+        SettlementTransaction(
+          fromParticipantId: 'p-b',
+          toParticipantId: 'p-a',
+          amountCents: 2000,
+          currencyCode: 'USD',
+        ),
+        SettlementTransaction(
+          fromParticipantId: 'p-a',
+          toParticipantId: 'p-d',
+          amountCents: 1500,
+          currencyCode: 'USD',
+        ),
+      ],
+    );
+
+    final memberAsAlice = GroupMember(
+      id: 'm1',
+      groupId: groupId,
+      userId: 'u1',
+      role: 'owner',
+      participantId: 'p-a',
+      joinedAt: now,
+    );
+    await pumpBalanceList(
+      tester,
+      myMemberOverride: AsyncValue.data(memberAsAlice),
+      myRoleOverride: const AsyncValue.data(GroupRole.owner),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('settle_filter_all'));
+    await tester.pumpAndSettle();
+
+    // Names are wrapped in bidi isolates in settle rows.
+    String unwrap(String? value) =>
+        (value ?? '').replaceAll('\u2068', '').replaceAll('\u2069', '');
+    final texts = tester
+        .widgetList<Text>(find.byType(Text))
+        .map((t) => unwrap(t.data))
+        .where((t) => t.isNotEmpty)
+        .toList();
+    final daveAsPayee = texts.indexOf('Dave');
+    // First Bob in settle-up is payer on Bob→Alice (you receive).
+    final bobAsPayer = texts.indexOf('Bob');
+    final carolIndex = texts.indexOf('Carol');
+
+    // Alice→Dave (you pay) before Bob→Alice (you receive) before Carol→Bob (others).
+    expect(daveAsPayee, greaterThanOrEqualTo(0));
+    expect(bobAsPayer, greaterThanOrEqualTo(0));
+    expect(carolIndex, greaterThanOrEqualTo(0));
+    expect(daveAsPayee, lessThan(bobAsPayer));
+    expect(bobAsPayer, lessThan(carolIndex));
   });
 
   testWidgets('BalanceList disables record when not owner and not debtor', (

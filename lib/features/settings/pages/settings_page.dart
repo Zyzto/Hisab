@@ -17,7 +17,6 @@ import 'package:feedback/feedback.dart';
 import 'package:flex_color_picker/flex_color_picker.dart';
 
 import '../../../core/auth/auth_providers.dart';
-import '../../../core/auth/sign_in_sheet.dart';
 import '../../../core/log_web.dart';
 import '../../../core/constants/app_config.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
@@ -29,8 +28,6 @@ import '../../../core/database/database_providers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/update/update_check_providers.dart';
-import '../../../core/services/migration_service.dart';
-import '../../../core/services/connectivity_service.dart';
 import '../../../core/services/delete_my_data_service.dart';
 import '../../../core/services/github_user_client.dart';
 import '../../../core/utils/currency_helpers.dart';
@@ -41,8 +38,7 @@ import '../feedback_handler.dart';
 import '../widgets/logs_viewer_dialog.dart';
 import '../../../core/theme/flex_theme_builder.dart'
     show flexSchemeOptionIds, primaryColorForSchemeId;
-import '../widgets/change_password_sheet.dart';
-import '../widgets/edit_profile_sheet.dart';
+import '../account_mode_actions.dart';
 import '../widgets/apply_setting.dart';
 import '../widgets/setting_tile_helper.dart';
 import '../../transaction_scanner/pages/scanner_hub_page.dart';
@@ -55,6 +51,8 @@ import '../sections/settings_data_backup_section.dart';
 import '../sections/settings_receipt_ai_section.dart';
 import '../../../core/widgets/participant_avatar.dart';
 import '../../../core/widgets/sheet_helpers.dart';
+import '../../../core/widgets/sheet_option_tile.dart';
+import '../../../core/widgets/shell_menu_button.dart';
 import '../../../core/widgets/sync_status_icon.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../domain/domain.dart';
@@ -99,8 +97,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           return Scaffold(
             appBar: ContentAlignedAppBar(
               contentAreaWidth: layoutConstraints.maxWidth,
-              leading: const SyncStatusChip(),
+              leadingWidth: ShellAppBarLeading.widthFor(context),
+              leading: const ShellAppBarLeading(fallback: SyncStatusChip()),
               title: Text('settings'.tr()),
+              actions: [
+                if (ShellAppBarLeading.syncInActions(context))
+                  const SyncStatusChip(),
+              ],
             ),
             body: Center(child: Text('settings_unavailable'.tr())),
           );
@@ -113,8 +116,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         return Scaffold(
           appBar: ContentAlignedAppBar(
             contentAreaWidth: layoutConstraints.maxWidth,
-            leading: const SyncStatusChip(),
+            leadingWidth: ShellAppBarLeading.widthFor(context),
+            leading: const ShellAppBarLeading(fallback: SyncStatusChip()),
             title: Text('settings'.tr()),
+            actions: [
+              if (ShellAppBarLeading.syncInActions(context))
+                const SyncStatusChip(),
+            ],
           ),
           body: ConstrainedContent(
             child: ListView(
@@ -241,280 +249,37 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     WidgetRef ref,
     SettingsProviders settings,
   ) {
-    final onlineAvailable = supabaseConfigAvailable;
-    final localOnly = ref.watch(effectiveLocalOnlyProvider);
+    final profile = ref.watch(authUserProfileProvider).asData?.value;
+    final colorScheme = Theme.of(context).colorScheme;
+    final displayName =
+        profile?.name ?? profile?.email ?? 'profile'.tr();
 
     return _buildSection(context, ref, settings, accountSection, [
-      if (!onlineAvailable)
-        ListTile(
-          leading: CircleAvatar(
-            backgroundColor: Theme.of(
-              context,
-            ).colorScheme.surfaceContainerHighest,
-            child: Icon(
-              Icons.cloud_off,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-          title: Text('account'.tr()),
-          subtitle: Text('onboarding_online_unavailable'.tr()),
-        )
-      else if (localOnly)
-        ..._buildLocalModeTiles(context, ref, settings)
-      else
-        ..._buildOnlineAccountTiles(context, ref, settings),
-    ]);
-  }
-
-  List<Widget> _buildLocalModeTiles(
-    BuildContext context,
-    WidgetRef ref,
-    SettingsProviders settings,
-  ) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return [
       ListTile(
-        leading: CircleAvatar(
-          backgroundColor: colorScheme.primaryContainer,
-          child: Icon(Icons.smartphone, color: colorScheme.onPrimaryContainer),
-        ),
-        title: Text(
-          'local_only'.tr(),
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        subtitle: Text('account_local_mode_description'.tr()),
-      ),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: FilledButton.icon(
-          onPressed: () =>
-              _handleLocalOnlyChanged(context, ref, settings, false),
-          icon: const Icon(Icons.cloud_upload_outlined),
-          label: Text('switch_to_online'.tr()),
-          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-        ),
-      ),
-    ];
-  }
-
-  List<Widget> _buildOnlineAccountTiles(
-    BuildContext context,
-    WidgetRef ref,
-    SettingsProviders settings,
-  ) {
-    final profileAsync = ref.watch(authUserProfileProvider);
-    final user = ref.watch(currentUserProvider);
-    final syncStatus = ref.watch(syncStatusForDisplayProvider);
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return profileAsync.when(
-      data: (profile) {
-        if (profile == null) {
-          return [
-            ListTile(
-              leading: CircleAvatar(
-                backgroundColor: colorScheme.errorContainer,
+        leading: profile != null
+            ? ParticipantAvatar(
+                name: displayName,
+                avatarId: profile.avatarId,
+                initials: AccountModeActions.initials(
+                  profile.name,
+                  profile.email,
+                ),
+                backgroundColor: colorScheme.primaryContainer,
+                foregroundColor: colorScheme.onPrimaryContainer,
+              )
+            : CircleAvatar(
+                backgroundColor: colorScheme.primaryContainer,
                 child: Icon(
-                  Icons.person_off,
-                  color: colorScheme.onErrorContainer,
+                  Icons.person_outline,
+                  color: colorScheme.onPrimaryContainer,
                 ),
               ),
-              title: Text('account'.tr()),
-              subtitle: Text('account_not_signed_in'.tr()),
-              trailing: FilledButton(
-                onPressed: () =>
-                    _handleLocalOnlyChanged(context, ref, settings, false),
-                child: Text('sign_in'.tr()),
-              ),
-            ),
-          ];
-        }
-
-        final provider = _getProviderLabel(user);
-        final displayName = profile.name ?? profile.email ?? profile.sub;
-        final initials = _getInitials(profile.name, profile.email);
-
-        return [
-          // User info card (tappable to edit profile)
-          ListTile(
-            leading: ParticipantAvatar(
-              name: displayName,
-              avatarId: profile.avatarId,
-              initials: initials,
-              backgroundColor: colorScheme.primaryContainer,
-              foregroundColor: colorScheme.onPrimaryContainer,
-              textStyle: textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            title: Text(
-              displayName,
-              style: textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            subtitle: profile.email != null ? Text(profile.email!) : null,
-            trailing: const Icon(Icons.edit_outlined),
-            onTap: () => showEditProfileSheet(context, ref, profile),
-          ),
-          // Sync status & provider
-          _buildAccountSyncTile(context, syncStatus, provider),
-          // Change password (email/password users only)
-          if (user != null &&
-              (user.appMetadata['provider'] as String?) == 'email') ...[
-            ActionSettingsTile(
-              leading: const Icon(Icons.lock_outline),
-              title: Text('change_password'.tr()),
-              onTap: () => showChangePasswordSheet(context, ref),
-            ),
-          ],
-          // Sign out
-          ActionSettingsTile(
-            leading: const Icon(Icons.logout),
-            title: Text('sign_out'.tr()),
-            onTap: () => _handleSignOut(context, ref, settings),
-          ),
-        ];
-      },
-      loading: () => [
-        ListTile(
-          leading: CircleAvatar(
-            backgroundColor: colorScheme.surfaceContainerHighest,
-            child: const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          ),
-          title: const Text('…'),
-        ),
-      ],
-      error: (_, _) => [
-        ListTile(
-          leading: CircleAvatar(
-            backgroundColor: colorScheme.errorContainer,
-            child: Icon(
-              Icons.error_outline,
-              color: colorScheme.onErrorContainer,
-            ),
-          ),
-          title: Text('account'.tr()),
-          subtitle: Text('account_not_signed_in'.tr()),
-          trailing: FilledButton(
-            onPressed: () =>
-                _handleLocalOnlyChanged(context, ref, settings, false),
-            child: Text('sign_in'.tr()),
-          ),
-        ),
-      ],
-    );
-  }
-
-  static Widget _buildAccountSyncTile(
-    BuildContext context,
-    SyncStatus status,
-    String provider,
-  ) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final (icon, color, label) = switch (status) {
-      SyncStatus.connected => (
-        Icons.cloud_done_outlined,
-        colorScheme.primary,
-        'sync_connected'.tr(),
+        title: Text('profile'.tr()),
+        subtitle: Text('profile_settings_link_subtitle'.tr()),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => context.push(RoutePaths.profile),
       ),
-      SyncStatus.syncing => (
-        Icons.sync,
-        colorScheme.tertiary,
-        'sync_syncing'.tr(),
-      ),
-      SyncStatus.offline => (
-        Icons.cloud_off_outlined,
-        colorScheme.error,
-        'sync_offline'.tr(),
-      ),
-      SyncStatus.syncFailed => (
-        Icons.cloud_off_outlined,
-        colorScheme.error,
-        'sync_failed'.tr(),
-      ),
-      SyncStatus.localOnly => (
-        Icons.storage,
-        colorScheme.onSurfaceVariant,
-        'local_only'.tr(),
-      ),
-    };
-
-    return ListTile(
-      leading: Icon(icon, color: color),
-      title: Text(label),
-      subtitle: provider.isNotEmpty
-          ? Text('account_signed_in_via'.tr(namedArgs: {'provider': provider}))
-          : null,
-      trailing: Container(
-        width: 10,
-        height: 10,
-        decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-      ),
-    );
-  }
-
-  static String _getInitials(String? name, String? email) {
-    if (name != null && name.isNotEmpty) {
-      final parts = name.trim().split(' ');
-      if (parts.length >= 2) {
-        return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
-      }
-      return name[0].toUpperCase();
-    }
-    if (email != null && email.isNotEmpty) {
-      return email[0].toUpperCase();
-    }
-    return '?';
-  }
-
-  static String _getProviderLabel(User? user) {
-    if (user == null) return '';
-    final provider = user.appMetadata['provider'] as String?;
-    return switch (provider) {
-      'google' => 'Google',
-      'github' => 'GitHub',
-      'email' => 'account_provider_email'.tr(),
-      _ => provider ?? '',
-    };
-  }
-
-  static Future<void> _handleSignOut(
-    BuildContext context,
-    WidgetRef ref,
-    SettingsProviders settings,
-  ) async {
-    final confirmed = await showConfirmSheet(
-      context,
-      title: 'sign_out_confirm_title'.tr(),
-      content: 'sign_out_confirm_body'.tr(),
-      confirmLabel: 'sign_out'.tr(),
-    );
-    if (confirmed != true || !context.mounted) return;
-    // Record current user so we can skip migration when they sign back in (same flow as online→local→online)
-    final currentUser = ref.read(currentUserProvider);
-    if (currentUser != null) {
-      ref
-          .read(settings.provider(localDataFromOnlineUserIdSettingDef).notifier)
-          .set(currentUser.id);
-      Log.info(
-        'Setting changed: ${localDataFromOnlineUserIdSettingDef.key}=${currentUser.id}',
-      );
-    }
-    ref.read(settings.provider(localOnlySettingDef).notifier).set(true);
-    Log.info('Setting changed: ${localOnlySettingDef.key}=true');
-    try {
-      await ref.read(authServiceProvider).signOut();
-    } catch (e, st) {
-      Log.warning('Sign-out failed', error: e, stackTrace: st);
-    }
-    if (!context.mounted) return;
-    context.showToast('signed_out_message'.tr());
+    ]);
   }
 
   Widget _buildSection(
@@ -549,6 +314,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       title: 'return_to_onboarding'.tr(),
       content: 'return_to_onboarding_confirm'.tr(),
       confirmLabel: 'return_to_onboarding'.tr(),
+      centerInFullViewport: false,
     );
     if (confirmed == true && context.mounted) {
       ref
@@ -571,6 +337,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       title: 'reset_all_settings'.tr(),
       content: 'reset_all_settings_confirm'.tr(),
       confirmLabel: 'reset_all_settings'.tr(),
+      centerInFullViewport: false,
     );
     if (confirmed != true || !context.mounted) return;
     await settings.controller.resetAll();
@@ -591,6 +358,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       title: 'delete_local_data'.tr(),
       maxHeight: MediaQuery.of(context).size.height * 0.75,
       isScrollControlled: true,
+      centerInFullViewport: false,
       child: _DeleteLocalDataDialogContent(
         groups: counts.groups,
         participants: counts.participants,
@@ -688,6 +456,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         title: 'delete_cloud_data'.tr(),
         maxHeight: MediaQuery.of(context).size.height * 0.75,
         isScrollControlled: true,
+        centerInFullViewport: false,
         child: _DeleteCloudDataDialogContent(preview: preview),
       );
       // result: null = cancel, true = alsoDeleteLocal, false = cloud only
@@ -730,177 +499,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
   }
 
-  Future<void> _handleLocalOnlyChanged(
-    BuildContext context,
-    WidgetRef ref,
-    SettingsProviders settings,
-    bool v,
-  ) async {
-    // Switching to local: show confirm then set.
-    if (v == true) {
-      if (!context.mounted) return;
-      final confirmed = await showConfirmSheet(
-        context,
-        title: 'local_only_confirm_title'.tr(),
-        content: 'local_only_confirm_body'.tr(),
-        confirmLabel: 'local_only'.tr(),
-      );
-      if (confirmed != true || !context.mounted) return;
-      ref.read(settings.provider(localOnlySettingDef).notifier).set(true);
-      ref
-          .read(settings.provider(settingsOnlinePendingSettingDef).notifier)
-          .set(false);
-      Log.info(
-        'Setting changed: ${localOnlySettingDef.key}=true, '
-        '${settingsOnlinePendingSettingDef.key}=false',
-      );
-      // Record that local data was from online so we can skip migration when switching back with same user
-      final currentUser = ref.read(currentUserProvider);
-      if (currentUser != null) {
-        ref
-            .read(
-              settings.provider(localDataFromOnlineUserIdSettingDef).notifier,
-            )
-            .set(currentUser.id);
-        Log.info(
-          'Setting changed: ${localDataFromOnlineUserIdSettingDef.key}=${currentUser.id}',
-        );
-      }
-      return;
-    }
-
-    // Switching to online: need auth.
-    if (!supabaseConfigAvailable) return;
-
-    // Check if already signed in.
-    final authService = ref.read(authServiceProvider);
-    if (authService.isAuthenticated) {
-      ref.read(settings.provider(localOnlySettingDef).notifier).set(false);
-      ref
-          .read(settings.provider(localDataFromOnlineUserIdSettingDef).notifier)
-          .set('');
-      Log.info(
-        'Setting changed: ${localOnlySettingDef.key}=false, '
-        '${localDataFromOnlineUserIdSettingDef.key}=(cleared)',
-      );
-      await ref.read(dataSyncServiceProvider.notifier).syncNow();
-      return;
-    }
-
-    // Show sign-in sheet
-    if (!context.mounted) return;
-    final result = await showSignInSheet(context, ref);
-    switch (result) {
-      case SignInResult.success:
-        if (!context.mounted) return;
-        // Skip migration if local data was from server (online → local → online, same user)
-        final fromOnlineUserId = ref.read(
-          settings.provider(localDataFromOnlineUserIdSettingDef),
-        );
-        final currentUser = ref.read(currentUserProvider);
-        if (fromOnlineUserId.isNotEmpty &&
-            currentUser != null &&
-            fromOnlineUserId == currentUser.id) {
-          ref.read(settings.provider(localOnlySettingDef).notifier).set(false);
-          ref
-              .read(
-                settings.provider(localDataFromOnlineUserIdSettingDef).notifier,
-              )
-              .set('');
-          Log.info(
-            'Setting changed: ${localOnlySettingDef.key}=false, '
-            '${localDataFromOnlineUserIdSettingDef.key}=(cleared)',
-          );
-          Log.info(
-            'Switched to online (data was from server, skipping migration)',
-          );
-          await ref.read(dataSyncServiceProvider.notifier).syncNow();
-          if (context.mounted) {
-            context.showSuccess('switched_to_online_syncing'.tr());
-          }
-          return;
-        }
-        // Migrate local data to Supabase before switching
-        await _runMigration(context, ref, settings);
-      case SignInResult.pendingRedirect:
-        // OAuth redirect on web — set pending flag, page will reload
-        ref
-            .read(settings.provider(settingsOnlinePendingSettingDef).notifier)
-            .set(true);
-        Log.info(
-          'Setting changed: ${settingsOnlinePendingSettingDef.key}=true '
-          '(OAuth redirect pending)',
-        );
-      case SignInResult.cancelled:
-        // User cancelled, keep localOnly as-is
-        break;
-    }
-  }
-
-  static Future<void> _runMigration(
-    BuildContext context,
-    WidgetRef ref,
-    SettingsProviders settings,
-  ) async {
-    final client = supabaseClientIfConfigured;
-    if (client == null) return;
-    final db = ref.read(powerSyncDatabaseProvider);
-    final migrationService = MigrationService(db, client);
-
-    // Check if there is data to migrate
-    final hasData = await migrationService.hasLocalData();
-    if (!hasData) {
-      // No data — just switch to online
-      ref.read(settings.provider(localOnlySettingDef).notifier).set(false);
-      ref
-          .read(settings.provider(localDataFromOnlineUserIdSettingDef).notifier)
-          .set('');
-      Log.info(
-        'Setting changed: ${localOnlySettingDef.key}=false, '
-        '${localDataFromOnlineUserIdSettingDef.key}=(cleared)',
-      );
-      Log.info('Switched to online mode (no data to migrate)');
-      await ref.read(dataSyncServiceProvider.notifier).syncNow();
-      return;
-    }
-
-    if (!context.mounted) return;
-
-    // Show migration progress sheet
-    final migrationResult = await showResponsiveSheet<MigrationResult>(
-      context: context,
-      title: 'migration_title'.tr(),
-      barrierDismissible: true,
-      maxHeight: MediaQuery.of(context).size.height * 0.5,
-      isScrollControlled: true,
-      child: _MigrationProgressDialog(migrationService: migrationService),
-    );
-
-    if (!context.mounted) return;
-    switch (migrationResult) {
-      case MigrationResult.success:
-      case MigrationResult.noData:
-        ref.read(settings.provider(localOnlySettingDef).notifier).set(false);
-        ref
-            .read(
-              settings.provider(localDataFromOnlineUserIdSettingDef).notifier,
-            )
-            .set('');
-        Log.info(
-          'Setting changed: ${localOnlySettingDef.key}=false, '
-          '${localDataFromOnlineUserIdSettingDef.key}=(cleared)',
-        );
-        Log.info('Switched to online mode after migration');
-        await ref.read(dataSyncServiceProvider.notifier).syncNow();
-        if (!context.mounted) return;
-        context.showSuccess('migration_success'.tr());
-        break;
-      case MigrationResult.failed:
-      case null:
-        if (context.mounted) context.showError('migration_failed'.tr());
-    }
-  }
-
   Widget _buildLocalOnlyTile(
     BuildContext context,
     WidgetRef ref,
@@ -917,7 +515,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       title: 'local_only'.tr(),
       subtitle: subtitle,
       value: value,
-      onChanged: (v) => _handleLocalOnlyChanged(context, ref, settings, v),
+      onChanged: (v) =>
+          AccountModeActions.handleLocalOnlyChanged(context, ref, settings, v),
       enabled: onlineAvailable,
     );
   }
@@ -937,41 +536,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             : _localeDisplayName(const Locale('en')),
       ),
       onTap: () async {
-        final chosen = await showResponsiveSheet<Locale>(
-          context: context,
+        final chosen = await showOptionPickerSheet<Locale>(
+          context,
           title: 'language'.tr(),
-          maxHeight: MediaQuery.of(context).size.height * 0.75,
-          isScrollControlled: true,
-          child: Builder(
-            builder: (ctx) => SafeArea(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    bottom: MediaQuery.of(ctx).padding.bottom + 16,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (!LayoutBreakpoints.isTabletOrWider(context))
-                        Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Text(
-                            'language'.tr(),
-                            style: Theme.of(ctx).textTheme.titleMedium,
-                          ),
-                        ),
-                      ..._supportedLocales.map(
-                        (locale) => ListTile(
-                          title: Text(_localeDisplayName(locale)),
-                          onTap: () => Navigator.of(ctx).pop(locale),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+          centerInFullViewport: false,
+          selected: currentLang == 'ar'
+              ? const Locale('ar')
+              : const Locale('en'),
+          options: [
+            for (final locale in _supportedLocales)
+              SheetPickerOption(
+                value: locale,
+                label: _localeDisplayName(locale),
               ),
-            ),
-          ),
+          ],
         );
         if (chosen != null && context.mounted) {
           final langCode = chosen.languageCode;
@@ -995,41 +573,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       title: Text('theme'.tr()),
       subtitle: Text(value.tr()),
       onTap: () async {
-        final chosen = await showResponsiveSheet<String>(
-          context: context,
+        final chosen = await showOptionPickerSheet<String>(
+          context,
           title: 'theme'.tr(),
-          maxHeight: MediaQuery.of(context).size.height * 0.75,
-          isScrollControlled: true,
-          child: Builder(
-            builder: (ctx) => SafeArea(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    bottom: MediaQuery.of(ctx).padding.bottom + 16,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (!LayoutBreakpoints.isTabletOrWider(context))
-                        Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Text(
-                            'theme'.tr(),
-                            style: Theme.of(ctx).textTheme.titleMedium,
-                          ),
-                        ),
-                      ..._themeModeOptions.map(
-                        (option) => ListTile(
-                          title: Text(option.tr()),
-                          onTap: () => Navigator.of(ctx).pop(option),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
+          centerInFullViewport: false,
+          selected: value,
+          options: [
+            for (final option in _themeModeOptions)
+              SheetPickerOption(value: option, label: option.tr()),
+          ],
         );
         if (chosen != null && context.mounted) {
           await applySetting(ref, settings, themeModeSettingDef, chosen);
@@ -1081,59 +633,40 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       title: Text('color_scheme'.tr()),
       subtitle: Text(currentLabel),
       onTap: () async {
-        final chosenScheme = await showResponsiveSheet<String>(
-          context: context,
+        final chosenScheme = await showOptionPickerSheet<String>(
+          context,
           title: 'color_scheme'.tr(),
-          maxHeight: MediaQuery.of(context).size.height * 0.75,
-          isScrollControlled: true,
-          child: Builder(
-            builder: (ctx) => SafeArea(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    bottom: MediaQuery.of(ctx).padding.bottom + 16,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (!LayoutBreakpoints.isTabletOrWider(context))
-                        Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Text(
-                            'color_scheme'.tr(),
-                            style: Theme.of(ctx).textTheme.titleMedium,
-                          ),
+          centerInFullViewport: false,
+          selected: schemeValue,
+          options: [
+            for (final schemeId in flexSchemeOptionIds)
+              SheetPickerOption(
+                value: schemeId,
+                label: 'theme_scheme_$schemeId'.tr(),
+                leading: Builder(
+                  builder: (ctx) {
+                    final chipColor = schemeId == 'custom'
+                        ? Color(themeColorValue)
+                        : primaryColorForSchemeId(schemeId);
+                    return Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: chipColor != Colors.transparent
+                            ? chipColor
+                            : Theme.of(ctx)
+                                .colorScheme
+                                .surfaceContainerHighest,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Theme.of(ctx).colorScheme.outline,
                         ),
-                      ...flexSchemeOptionIds.map((schemeId) {
-                        final chipColor = schemeId == 'custom'
-                            ? Color(themeColorValue)
-                            : primaryColorForSchemeId(schemeId);
-                        return ListTile(
-                          leading: Container(
-                            width: 24,
-                            height: 24,
-                            decoration: BoxDecoration(
-                              color: chipColor != Colors.transparent
-                                  ? chipColor
-                                  : Theme.of(
-                                      ctx,
-                                    ).colorScheme.surfaceContainerHighest,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Theme.of(ctx).colorScheme.outline,
-                              ),
-                            ),
-                          ),
-                          title: Text('theme_scheme_$schemeId'.tr()),
-                          onTap: () => Navigator.of(ctx).pop(schemeId),
-                        );
-                      }),
-                    ],
-                  ),
+                      ),
+                    );
+                  },
                 ),
               ),
-            ),
-          ),
+          ],
         );
         if (chosenScheme != null && context.mounted) {
           await applySetting(
@@ -1148,6 +681,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               title: 'select_theme_color'.tr(),
               maxHeight: MediaQuery.of(context).size.height * 0.75,
               isScrollControlled: true,
+              centerInFullViewport: false,
               child: Builder(
                 builder: (ctx) => SafeArea(
                   child: SingleChildScrollView(
@@ -1160,68 +694,71 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         children: [
                           if (!LayoutBreakpoints.isTabletOrWider(context))
                             Padding(
-                              padding: const EdgeInsets.all(16),
+                              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                               child: Text(
                                 'select_theme_color'.tr(),
-                                style: Theme.of(ctx).textTheme.titleMedium,
+                                style: Theme.of(ctx).textTheme.titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.w700),
                               ),
                             ),
-                          ..._themeColorPresets.map(
-                            (preset) => ListTile(
-                              leading: Container(
-                                width: 24,
-                                height: 24,
-                                decoration: BoxDecoration(
-                                  color: Color(preset.$1),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Theme.of(ctx).colorScheme.outline,
+                          SheetOptionList(
+                            children: [
+                              for (final preset in _themeColorPresets)
+                                SheetOptionTile(
+                                  title: preset.$2.tr(),
+                                  selected: themeColorValue == preset.$1,
+                                  leading: Container(
+                                    width: 24,
+                                    height: 24,
+                                    decoration: BoxDecoration(
+                                      color: Color(preset.$1),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: Theme.of(ctx).colorScheme.outline,
+                                      ),
+                                    ),
                                   ),
+                                  onTap: () =>
+                                      Navigator.of(ctx).pop(preset.$1),
                                 ),
-                              ),
-                              title: Text(preset.$2.tr()),
-                              onTap: () => Navigator.of(ctx).pop(preset.$1),
-                            ),
-                          ),
-                          ListTile(
-                            leading: Icon(
-                              Icons.palette_outlined,
-                              color: Theme.of(ctx).colorScheme.primary,
-                            ),
-                            title: Text('pick_custom_theme_color'.tr()),
-                            onTap: () async {
-                              final picked = await showColorPickerDialog(
-                                ctx,
-                                Color(themeColorValue),
-                                barrierDismissible: true,
-                                pickersEnabled: const <ColorPickerType, bool>{
-                                  ColorPickerType.primary: false,
-                                  ColorPickerType.accent: false,
-                                  ColorPickerType.bw: false,
-                                  ColorPickerType.both: false,
-                                  ColorPickerType.custom: false,
-                                  ColorPickerType.wheel: true,
+                              SheetOptionTile(
+                                title: 'pick_custom_theme_color'.tr(),
+                                leading: Icon(
+                                  Icons.palette_outlined,
+                                  color: Theme.of(ctx).colorScheme.primary,
+                                ),
+                                onTap: () async {
+                                  final picked = await showColorPickerDialog(
+                                    ctx,
+                                    Color(themeColorValue),
+                                    barrierDismissible: true,
+                                    pickersEnabled:
+                                        const <ColorPickerType, bool>{
+                                          ColorPickerType.primary: false,
+                                          ColorPickerType.accent: false,
+                                          ColorPickerType.bw: false,
+                                          ColorPickerType.both: false,
+                                          ColorPickerType.custom: false,
+                                          ColorPickerType.wheel: true,
+                                        },
+                                  );
+                                  if (!context.mounted || !ctx.mounted) return;
+                                  final colorChanged =
+                                      picked.toARGB32() != themeColorValue;
+                                  if (colorChanged) {
+                                    applySetting(
+                                      ref,
+                                      settings,
+                                      themeColorSettingDef,
+                                      picked.toARGB32(),
+                                    );
+                                    if (ctx.mounted) {
+                                      Navigator.of(ctx).pop();
+                                    }
+                                  }
                                 },
-                              );
-                              if (!context.mounted || !ctx.mounted) return;
-                              // Only apply and close when user confirmed a choice (OK).
-                              // On Cancel/barrier dismiss the dialog returns initial color.
-                              final colorChanged =
-                                  picked.toARGB32() != themeColorValue;
-                              if (colorChanged) {
-                                applySetting(
-                                  ref,
-                                  settings,
-                                  themeColorSettingDef,
-                                  picked.toARGB32(),
-                                );
-                                if (ctx.mounted) {
-                                  Navigator.of(ctx).pop();
-                                }
-                              }
-                              // If same color (cancel/dismiss): leave sheet open so user
-                              // can pick a preset or try again.
-                            },
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -1257,41 +794,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       title: Text('font_size'.tr()),
       subtitle: Text(value.tr()),
       onTap: () async {
-        final chosen = await showResponsiveSheet<String>(
-          context: context,
+        final chosen = await showOptionPickerSheet<String>(
+          context,
           title: 'font_size'.tr(),
-          maxHeight: MediaQuery.of(context).size.height * 0.75,
-          isScrollControlled: true,
-          child: Builder(
-            builder: (ctx) => SafeArea(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    bottom: MediaQuery.of(ctx).padding.bottom + 16,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (!LayoutBreakpoints.isTabletOrWider(context))
-                        Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Text(
-                            'font_size'.tr(),
-                            style: Theme.of(ctx).textTheme.titleMedium,
-                          ),
-                        ),
-                      ..._fontSizeOptions.map(
-                        (option) => ListTile(
-                          title: Text(option.tr()),
-                          onTap: () => Navigator.of(ctx).pop(option),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
+          centerInFullViewport: false,
+          selected: value,
+          options: [
+            for (final option in _fontSizeOptions)
+              SheetPickerOption(value: option, label: option.tr()),
+          ],
         );
         if (chosen != null && context.mounted) {
           await applySetting(ref, settings, fontSizeScaleSettingDef, chosen);
@@ -1399,7 +910,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     CurrencyHelpers.showPicker(
       context: context,
       title: 'display_currency'.tr(),
-      centerInFullViewport: true,
+      centerInFullViewport: false,
       favorite: favorites,
       onSelect: (currency) {
         applySetting(
@@ -1427,6 +938,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       title: 'favorite_currencies'.tr(),
       maxHeight: MediaQuery.of(context).size.height * 0.75,
       isScrollControlled: true,
+      centerInFullViewport: false,
       child: _FavoriteCurrenciesSheet(
         initial: current,
         onSave: (updated) {
@@ -1568,6 +1080,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       hint: 'receipt_ai_key_hint'.tr(),
       initialValue: currentValue,
       obscureText: true,
+      centerInFullViewport: false,
     );
     if (value != null && context.mounted) {
       try {
@@ -1625,6 +1138,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 title: 'clear_logs'.tr(),
                 content: 'clear_logs_confirm'.tr(),
                 confirmLabel: 'clear_logs'.tr(),
+                centerInFullViewport: false,
               );
               if (confirmed == true) {
                 if (kIsWeb) {
@@ -1670,6 +1184,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         title: 'report_issue'.tr(),
         hint: 'report_issue_description_hint'.tr(),
         maxLines: 3,
+        centerInFullViewport: false,
       );
       if (result == null) return;
       description = result;
@@ -1736,6 +1251,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       title: 'import_data'.tr(),
       content: 'import_confirm'.tr(),
       confirmLabel: 'import_data'.tr(),
+      centerInFullViewport: false,
     );
     if (confirmed != true || !context.mounted) return;
     try {
@@ -1868,6 +1384,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       title: 'about_me'.tr(),
       maxHeight: MediaQuery.of(context).size.height * 0.75,
       isScrollControlled: true,
+      centerInFullViewport: false,
       child: Builder(
         builder: (ctx) => SafeArea(
           child: SingleChildScrollView(
@@ -2059,81 +1576,6 @@ class _AboutMeDialogContentState extends State<_AboutMeDialogContent> {
 // =============================================================================
 // Migration Progress Dialog
 // =============================================================================
-
-class _MigrationProgressDialog extends StatefulWidget {
-  final MigrationService migrationService;
-  const _MigrationProgressDialog({required this.migrationService});
-
-  @override
-  State<_MigrationProgressDialog> createState() =>
-      _MigrationProgressDialogState();
-}
-
-class _MigrationProgressDialogState extends State<_MigrationProgressDialog> {
-  int _completed = 0;
-  int _total = 1;
-
-  @override
-  void initState() {
-    super.initState();
-    _runMigration();
-  }
-
-  Future<void> _runMigration() async {
-    final result = await widget.migrationService.migrateLocalToOnline(
-      onProgress: (completed, total) {
-        if (mounted) {
-          setState(() {
-            _completed = completed;
-            _total = total;
-          });
-        }
-      },
-    );
-    if (mounted) {
-      Navigator.of(context).pop(result);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final progress = _total > 0 ? _completed / _total : 0.0;
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).padding.bottom + 16,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (!LayoutBreakpoints.isTabletOrWider(context))
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  'migration_title'.tr(),
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('migration_uploading'.tr()),
-                  const SizedBox(height: 16),
-                  LinearProgressIndicator(value: progress),
-                  const SizedBox(height: 8),
-                  Text('$_completed / $_total'),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 // =============================================================================
 // Favorite Currencies Editor Sheet

@@ -30,6 +30,7 @@ import '../../../core/utils/error_report_helper.dart';
 import '../../../core/utils/form_validators.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/sheet_helpers.dart';
+import '../../../core/widgets/sheet_option_tile.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../domain/domain.dart';
 import '../../settings/providers/settings_framework_providers.dart';
@@ -827,7 +828,6 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     WidgetRef ref,
   ) async {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
 
     final chosen = await showResponsiveSheet<SettlementMethod>(
       context: context,
@@ -835,9 +835,6 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
       maxHeight: MediaQuery.of(context).size.height * 0.75,
       isScrollControlled: true,
       centerInFullViewport: true,
-      sheetShape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
       child: Builder(
         builder: (ctx) => SafeArea(
           child: SingleChildScrollView(
@@ -851,46 +848,25 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                 children: [
                   if (!LayoutBreakpoints.isTabletOrWider(context))
                     Padding(
-                      padding: const EdgeInsets.only(
-                        bottom: ThemeConfig.spacingM,
-                      ),
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                       child: Text(
                         'settlement_method'.tr(),
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
-                  ...SettlementMethod.values.map((method) {
-                    final isSelected = method == group.settlementMethod;
-                    return ListTile(
-                      selected: isSelected,
-                      selectedTileColor: colorScheme.primaryContainer
-                          .withValues(alpha: 0.3),
-                      leading: Icon(
-                        isSelected
-                            ? Icons.radio_button_checked
-                            : Icons.radio_button_unchecked,
-                        color: isSelected
-                            ? colorScheme.primary
-                            : colorScheme.onSurfaceVariant,
-                      ),
-                      title: Text(
-                        _methodLabel(method),
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: isSelected ? FontWeight.w600 : null,
-                          color: isSelected ? colorScheme.primary : null,
+                  SheetOptionList(
+                    children: [
+                      for (final method in SettlementMethod.values)
+                        SheetOptionTile(
+                          title: _methodLabel(method),
+                          subtitle: _methodDescription(method),
+                          selected: method == group.settlementMethod,
+                          onTap: () => Navigator.pop(ctx, method),
                         ),
-                      ),
-                      subtitle: Text(
-                        _methodDescription(method),
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      onTap: () => Navigator.pop(ctx, method),
-                    );
-                  }),
+                    ],
+                  ),
                   const SizedBox(height: ThemeConfig.spacingM),
                 ],
               ),
@@ -2224,7 +2200,18 @@ class _TimedConfirmSheetContentState extends State<_TimedConfirmSheetContent> {
       showTitleInBody: !LayoutBreakpoints.isTabletOrWider(ctx),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Text(widget.content),
+        child: DecoratedBox(
+          decoration: AccentSurfaces.flatPanel(colorScheme),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Text(
+              widget.content,
+              style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ),
       ),
       actions: [
         if (!LayoutBreakpoints.isTabletOrWider(ctx))
@@ -2238,6 +2225,9 @@ class _TimedConfirmSheetContentState extends State<_TimedConfirmSheetContent> {
             disabledBackgroundColor: widget.isDestructive
                 ? colorScheme.error.withValues(alpha: 0.3)
                 : null,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
           ),
           onPressed: enabled ? () => Navigator.pop(ctx, true) : null,
           child: Text(

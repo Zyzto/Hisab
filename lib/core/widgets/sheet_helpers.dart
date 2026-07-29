@@ -3,10 +3,82 @@ import 'package:easy_localization/easy_localization.dart';
 
 import '../layout/layout_breakpoints.dart';
 import '../layout/responsive_sheet.dart';
+import '../theme/accent_style.dart';
+import 'sheet_option_tile.dart';
+
+/// One row for [showOptionPickerSheet].
+class SheetPickerOption<T> {
+  const SheetPickerOption({
+    required this.value,
+    required this.label,
+    this.leading,
+  });
+
+  final T value;
+  final String label;
+  final Widget? leading;
+}
+
+/// Simple single-select option sheet using [SheetOptionTile]s.
+Future<T?> showOptionPickerSheet<T>(
+  BuildContext context, {
+  required String title,
+  required List<SheetPickerOption<T>> options,
+  T? selected,
+  bool centerInFullViewport = true,
+}) {
+  final isTablet = LayoutBreakpoints.isTabletOrWider(context);
+  return showResponsiveSheet<T>(
+    context: context,
+    title: title,
+    maxHeight: MediaQuery.of(context).size.height * 0.75,
+    isScrollControlled: true,
+    centerInFullViewport: centerInFullViewport,
+    child: Builder(
+      builder: (ctx) => SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).padding.bottom + 16,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (!isTablet)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: Text(
+                      title,
+                      style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                SheetOptionList(
+                  padding: EdgeInsets.fromLTRB(16, isTablet ? 16 : 8, 16, 8),
+                  children: [
+                    for (final opt in options)
+                      SheetOptionTile(
+                        title: opt.label,
+                        leading: opt.leading,
+                        selected: selected != null && opt.value == selected,
+                        onTap: () => Navigator.of(ctx).pop(opt.value),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
 
 const double _kSheetPadding = 16.0;
 const double _kSheetActionsSpacing = 8.0;
-const double _kSheetBodyActionsGap = 24.0;
+const double _kSheetBodyActionsGap = 20.0;
 
 /// Builds the shared sheet layout: optional title (in body), body, and action row.
 /// When [showTitleInBody] is false, the title is not rendered here (caller shows
@@ -30,8 +102,18 @@ Widget buildSheetShell(
           children: [
             if (showTitleInBody)
               Padding(
-                padding: const EdgeInsets.all(_kSheetPadding),
-                child: Text(title, style: Theme.of(ctx).textTheme.titleMedium),
+                padding: const EdgeInsets.fromLTRB(
+                  _kSheetPadding,
+                  _kSheetPadding,
+                  _kSheetPadding,
+                  8,
+                ),
+                child: Text(
+                  title,
+                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             body,
             if (actions.isNotEmpty) ...[
@@ -61,6 +143,20 @@ Widget buildSheetShell(
   );
 }
 
+Widget _sheetBodyPanel(BuildContext context, {required Widget child}) {
+  final cs = Theme.of(context).colorScheme;
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: _kSheetPadding),
+    child: DecoratedBox(
+      decoration: AccentSurfaces.flatPanel(cs),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: child,
+      ),
+    ),
+  );
+}
+
 /// Shows a confirmation sheet in the same style as the language picker.
 /// Returns true if confirmed, false if cancelled, null if dismissed.
 Future<bool?> showConfirmSheet(
@@ -83,9 +179,14 @@ Future<bool?> showConfirmSheet(
       builder: (ctx) => buildSheetShell(
         ctx,
         title: title,
-        body: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: _kSheetPadding),
-          child: Text(content),
+        body: _sheetBodyPanel(
+          ctx,
+          child: Text(
+            content,
+            style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+            ),
+          ),
         ),
         actions: [
           if (!isTablet)
@@ -135,8 +236,8 @@ Future<String?> showTextInputSheet(
       builder: (ctx) => buildSheetShell(
         ctx,
         title: title,
-        body: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: _kSheetPadding),
+        body: _sheetBodyPanel(
+          ctx,
           child: TextField(
             controller: controller,
             obscureText: obscureText,
@@ -144,6 +245,7 @@ Future<String?> showTextInputSheet(
               hintText: hint,
               border: const OutlineInputBorder(),
               counterText: maxLength != null ? '' : null,
+              isDense: true,
             ),
             maxLines: maxLines,
             maxLength: maxLength,
@@ -210,11 +312,11 @@ class _ConfirmSheetButton extends StatelessWidget {
 
     return Material(
       color: backgroundColor,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(14),
       child: InkWell(
         canRequestFocus: false,
         onTap: onConfirm,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(14),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
           child: Text(

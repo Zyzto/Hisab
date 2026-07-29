@@ -12,16 +12,28 @@ import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/theme/accent_style.dart';
+import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/widgets/error_content.dart';
+import '../../../domain/domain.dart';
+import '../../expenses/category_icons.dart';
+import '../../expenses/widgets/breakdown_pie_chart.dart';
+import '../../expenses/widgets/filtered_expenses_sheet.dart';
 import '../providers/group_analytics_provider.dart';
 import '../widgets/group_section_header.dart';
 
+const _kBreakdownPreviewCount = 6;
+
 class _ModalSelectOption<T> {
-  const _ModalSelectOption({required this.value, required this.label});
+  const _ModalSelectOption({
+    required this.value,
+    required this.label,
+    this.subtitle,
+  });
 
   final T value;
   final String label;
+  final String? subtitle;
 }
 
 Future<T?> _showModalSelectSheet<T>({
@@ -42,14 +54,14 @@ Future<T?> _showModalSelectSheet<T>({
         child: SingleChildScrollView(
           child: Padding(
             padding: EdgeInsets.only(
-              bottom: MediaQuery.of(ctx).padding.bottom + 16,
+              bottom: MediaQuery.of(ctx).padding.bottom + ThemeConfig.spacingM,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (!isTablet)
                   Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(ThemeConfig.spacingM),
                     child: Text(
                       title,
                       style: Theme.of(ctx).textTheme.titleMedium,
@@ -59,12 +71,10 @@ Future<T?> _showModalSelectSheet<T>({
                   final isSelected = option.value == selectedValue;
                   return ListTile(
                     title: Text(option.label),
-                    trailing: isSelected
-                        ? Icon(
-                            Icons.check,
-                            color: Theme.of(ctx).colorScheme.primary,
-                          )
-                        : null,
+                    subtitle: option.subtitle == null
+                        ? null
+                        : Text(option.subtitle!),
+                    selected: isSelected,
                     onTap: () => Navigator.of(ctx, rootNavigator: true).pop(option.value),
                   );
                 }),
@@ -151,7 +161,6 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
               error: (e, st) => Center(
                 child: ErrorContentWidget(
                   message: e.toString(),
-                  details: e.toString(),
                   stackTrace: st,
                 ),
               ),
@@ -179,14 +188,19 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
     final uiNotifier = ref.read(groupAnalyticsUiStateProvider.notifier);
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      padding: const EdgeInsets.fromLTRB(
+        ThemeConfig.spacingM,
+        ThemeConfig.spacingS + ThemeConfig.spacingXS,
+        ThemeConfig.spacingM,
+        ThemeConfig.spacingL,
+      ),
       children: [
         _buildFilters(context, data),
-        const SizedBox(height: 12),
+        const SizedBox(height: ThemeConfig.spacingS + ThemeConfig.spacingXS),
         if (!hasData)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(ThemeConfig.spacingM),
             decoration: AccentSurfaces.flatPanel(theme.colorScheme),
             child: Row(
               children: [
@@ -194,7 +208,7 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
                   Icons.insights_outlined,
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: ThemeConfig.spacingS + ThemeConfig.spacingXS),
                 Expanded(
                   child: Text(
                     'analytics_empty'.tr(),
@@ -219,53 +233,112 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
             categorySeries: data.categoryTrendSeries,
             currencyCode: currency,
           ),
-          const SizedBox(height: 12),
-        ],
-        _KpiGrid(
-          total: CurrencyFormatter.formatCents(data.totalAmountCents, currency),
-          mine: CurrencyFormatter.formatCents(data.myAmountCents, currency),
-          avgPerDay: CurrencyFormatter.formatCents(
-            data.averagePerDayCents,
-            currency,
-          ),
-          txCount: data.transactionCount.toString(),
-          isPersonal: data.group.isPersonal,
-        ),
-        if (hasData) ...[
-          const SizedBox(height: 12),
-          _BreakdownBarsCard(
-            title: 'analytics_category_title'.tr(),
-            emptyLabel: 'analytics_empty_chart'.tr(),
-            rows: data.byTag.take(6).toList(),
-            currencyCode: currency,
-            translateUntagged: true,
-            allowPieMode: true,
-            mode: uiState.categoryChartMode,
-            onModeChanged: (mode) =>
-                uiNotifier.setCategoryChartMode(widget.groupId, mode),
-            excludedCategoryIds: uiState.excludedCategoryIds,
-            onToggleCategory: (categoryId) =>
-                uiNotifier.toggleExcludedCategory(widget.groupId, categoryId),
-            onOpenCategoryExpenses: (categoryId, categoryLabel) =>
-                _showCategoryExpensesSheet(
-                  context,
-                  data,
-                  categoryId: categoryId,
-                  categoryLabel: categoryLabel,
-                ),
-          ),
-          if (!data.group.isPersonal) ...[
-            const SizedBox(height: 12),
-            _BreakdownBarsCard(
-              title: 'analytics_by_person_title'.tr(),
-              emptyLabel: 'analytics_empty_chart'.tr(),
-              rows: data.byParticipant.take(6).toList(),
-              currencyCode: currency,
+          const SizedBox(height: ThemeConfig.spacingS + ThemeConfig.spacingXS),
+          _KpiGrid(
+            total: CurrencyFormatter.formatCents(data.totalAmountCents, currency),
+            mine: CurrencyFormatter.formatCents(data.myAmountCents, currency),
+            avgPerDay: CurrencyFormatter.formatCents(
+              data.averagePerDayCents,
+              currency,
             ),
-          ],
+            txCount: data.transactionCount.toString(),
+            isPersonal: data.group.isPersonal,
+          ),
+          const SizedBox(height: ThemeConfig.spacingS + ThemeConfig.spacingXS),
+          ..._buildBreakdownCards(
+            data: data,
+            currency: currency,
+            uiState: uiState,
+            uiNotifier: uiNotifier,
+          ),
         ],
       ],
     );
+  }
+
+  List<Widget> _buildBreakdownCards({
+    required GroupAnalyticsData data,
+    required String currency,
+    required GroupAnalyticsUiState uiState,
+    required GroupAnalyticsUiStateNotifier uiNotifier,
+  }) {
+    final showPerson = !data.group.isPersonal;
+    final bothPie = showPerson &&
+        uiState.categoryChartMode == AnalyticsCategoryChartMode.pie &&
+        uiState.personChartMode == AnalyticsCategoryChartMode.pie;
+
+    Widget categoryCard({required bool compact}) => _BreakdownBarsCard(
+          title: 'analytics_category_title'.tr(),
+          emptyLabel: 'analytics_empty_chart'.tr(),
+          rows: data.byTag,
+          currencyCode: currency,
+          translateUntagged: true,
+          allowPieMode: true,
+          compact: compact,
+          mode: uiState.categoryChartMode,
+          chartModeMenuTitle: 'analytics_category_chart_mode_menu'.tr(),
+          onModeChanged: (mode) =>
+              uiNotifier.setCategoryChartMode(widget.groupId, mode),
+          excludedIds: uiState.excludedCategoryIds,
+          onToggleExcluded: (categoryId) =>
+              uiNotifier.toggleExcludedCategory(widget.groupId, categoryId),
+          onClearExcluded: () =>
+              uiNotifier.clearExcludedCategories(widget.groupId),
+          onOpenRowExpenses: (categoryId, categoryLabel) =>
+              _showCategoryExpensesSheet(
+                context,
+                data,
+                categoryId: categoryId,
+                categoryLabel: categoryLabel,
+              ),
+        );
+
+    if (!showPerson) {
+      return [categoryCard(compact: false)];
+    }
+
+    Widget personCard({required bool compact}) => _BreakdownBarsCard(
+          title: 'analytics_by_person_title'.tr(),
+          emptyLabel: 'analytics_empty_chart'.tr(),
+          rows: data.byParticipant,
+          currencyCode: currency,
+          allowPieMode: true,
+          compact: compact,
+          mode: uiState.personChartMode,
+          chartModeMenuTitle: 'analytics_person_chart_mode_menu'.tr(),
+          onModeChanged: (mode) =>
+              uiNotifier.setPersonChartMode(widget.groupId, mode),
+          excludedIds: uiState.excludedPersonIds,
+          onToggleExcluded: (personId) =>
+              uiNotifier.toggleExcludedPerson(widget.groupId, personId),
+          onClearExcluded: () =>
+              uiNotifier.clearExcludedPersons(widget.groupId),
+          onOpenRowExpenses: (payerId, payerLabel) => _showPayerExpensesSheet(
+            context,
+            data,
+            payerId: payerId,
+            payerLabel: payerLabel,
+          ),
+        );
+
+    if (bothPie) {
+      return [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: categoryCard(compact: true)),
+            const SizedBox(width: ThemeConfig.spacingS),
+            Expanded(child: personCard(compact: true)),
+          ],
+        ),
+      ];
+    }
+
+    return [
+      categoryCard(compact: false),
+      const SizedBox(height: ThemeConfig.spacingS + ThemeConfig.spacingXS),
+      personCard(compact: false),
+    ];
   }
 
   String _trendSubtitle(AnalyticsRangePreset range, TrendGranularity granularity) {
@@ -294,119 +367,132 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
     final participants = data.participants.where((p) => p.leftAt == null).toList()
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
-    final allTagOptions = <_DropdownOption>[const _DropdownOption(id: '', label: '')];
-    final uniqueTagIds = <String>{};
-    for (final expense in data.filteredExpenses) {
-      final tag = expense.tag;
-      if (tag != null && tag.isNotEmpty) uniqueTagIds.add(tag);
-    }
-    for (final tagId in uniqueTagIds) {
-      allTagOptions.add(
-        _DropdownOption(id: tagId, label: resolveTagLabel(tagId, data.tags)),
+    final categoryIds = <String>{
+      ...data.tags.map((tag) => tag.id),
+      ...data.availableCategoryIds,
+    };
+    final allTagOptions = categoryIds.map((tagId) {
+      final label = tagId == 'untagged'
+          ? 'untagged'
+          : resolveTagLabel(tagId, data.tags);
+      return _DropdownOption(id: tagId, label: label);
+    }).toList()
+      ..sort(
+        (a, b) => _translateCategoryLike(a.label).toLowerCase().compareTo(
+              _translateCategoryLike(b.label).toLowerCase(),
+            ),
       );
-    }
-    allTagOptions.sort(
-      (a, b) => _translateCategoryLike(
-        a.label,
-      ).toLowerCase().compareTo(_translateCategoryLike(b.label).toLowerCase()),
+
+    final categoryDropdown = _FilterDropdown(
+      label: 'analytics_filter_category'.tr(),
+      value: _tagId ?? '',
+      items: [
+        _DropdownMenuItemData(
+          value: '',
+          label: 'analytics_filter_all_categories'.tr(),
+        ),
+        ...allTagOptions.map(
+          (o) => _DropdownMenuItemData(
+            value: o.id,
+            label: _translateCategoryLike(o.label),
+          ),
+        ),
+      ],
+      onChanged: (v) => setState(() => _tagId = v.isEmpty ? null : v),
     );
+
+    final narrow = MediaQuery.sizeOf(context).width < 420;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+      padding: const EdgeInsets.fromLTRB(
+        ThemeConfig.spacingS + ThemeConfig.spacingXS,
+        ThemeConfig.spacingS + ThemeConfig.spacingXS,
+        ThemeConfig.spacingS + ThemeConfig.spacingXS,
+        ThemeConfig.spacingS,
+      ),
       decoration: AccentSurfaces.flatPanel(Theme.of(context).colorScheme),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           GroupSectionHeader(label: 'analytics_filters'.tr()),
-          const SizedBox(height: 10),
+          const SizedBox(height: ThemeConfig.spacingS + 2),
           Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                ChoiceChip(
-                  label: Text('analytics_range_30d'.tr()),
-                  selected: _range == AnalyticsRangePreset.days30,
-                  onSelected: (_) => setState(() => _range = AnalyticsRangePreset.days30),
-                ),
-                ChoiceChip(
-                  label: Text('analytics_range_90d'.tr()),
-                  selected: _range == AnalyticsRangePreset.days90,
-                  onSelected: (_) => setState(() => _range = AnalyticsRangePreset.days90),
-                ),
-                ChoiceChip(
-                  label: Text('analytics_range_all'.tr()),
-                  selected: _range == AnalyticsRangePreset.all,
-                  onSelected: (_) => setState(() => _range = AnalyticsRangePreset.all),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            if (!data.group.isPersonal)
-              Row(
-                children: [
-                  Expanded(
-                    child: _FilterDropdown(
-                      label: 'analytics_filter_member'.tr(),
-                      value: _participantId ?? '',
-                      items: [
-                        _DropdownMenuItemData(
-                          value: '',
-                          label: 'analytics_filter_all_members'.tr(),
-                        ),
-                        ...participants.map(
-                          (p) => _DropdownMenuItemData(value: p.id, label: p.name),
-                        ),
-                      ],
-                      onChanged: (v) => setState(() => _participantId = v.isEmpty ? null : v),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _FilterDropdown(
-                      label: 'analytics_filter_category'.tr(),
-                      value: _tagId ?? '',
-                      items: [
-                        _DropdownMenuItemData(
-                          value: '',
-                          label: 'analytics_filter_all_categories'.tr(),
-                        ),
-                        ...allTagOptions
-                            .where((o) => o.id.isNotEmpty)
-                            .map(
-                              (o) => _DropdownMenuItemData(
-                                value: o.id,
-                                label: _translateCategoryLike(o.label),
-                              ),
+            spacing: ThemeConfig.spacingS,
+            runSpacing: ThemeConfig.spacingS,
+            children: [
+              ChoiceChip(
+                label: Text('analytics_range_30d'.tr()),
+                selected: _range == AnalyticsRangePreset.days30,
+                showCheckmark: false,
+                onSelected: (_) => setState(() => _range = AnalyticsRangePreset.days30),
+              ),
+              ChoiceChip(
+                label: Text('analytics_range_90d'.tr()),
+                selected: _range == AnalyticsRangePreset.days90,
+                showCheckmark: false,
+                onSelected: (_) => setState(() => _range = AnalyticsRangePreset.days90),
+              ),
+              ChoiceChip(
+                label: Text('analytics_range_all'.tr()),
+                selected: _range == AnalyticsRangePreset.all,
+                showCheckmark: false,
+                onSelected: (_) => setState(() => _range = AnalyticsRangePreset.all),
+              ),
+            ],
+          ),
+          const SizedBox(height: ThemeConfig.spacingS + 2),
+          if (!data.group.isPersonal)
+            narrow
+                ? Column(
+                    children: [
+                      _FilterDropdown(
+                        label: 'analytics_filter_payer'.tr(),
+                        value: _participantId ?? '',
+                        items: [
+                          _DropdownMenuItemData(
+                            value: '',
+                            label: 'analytics_filter_all_payers'.tr(),
+                          ),
+                          ...participants.map(
+                            (p) => _DropdownMenuItemData(value: p.id, label: p.name),
+                          ),
+                        ],
+                        onChanged: (v) =>
+                            setState(() => _participantId = v.isEmpty ? null : v),
+                      ),
+                      const SizedBox(height: ThemeConfig.spacingS + 2),
+                      categoryDropdown,
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: _FilterDropdown(
+                          label: 'analytics_filter_payer'.tr(),
+                          value: _participantId ?? '',
+                          items: [
+                            _DropdownMenuItemData(
+                              value: '',
+                              label: 'analytics_filter_all_payers'.tr(),
                             ),
-                      ],
-                      onChanged: (v) => setState(() => _tagId = v.isEmpty ? null : v),
-                    ),
-                  ),
-                ],
-              )
-            else
-              _FilterDropdown(
-                label: 'analytics_filter_category'.tr(),
-                value: _tagId ?? '',
-                items: [
-                  _DropdownMenuItemData(
-                    value: '',
-                    label: 'analytics_filter_all_categories'.tr(),
-                  ),
-                  ...allTagOptions
-                      .where((o) => o.id.isNotEmpty)
-                      .map(
-                        (o) => _DropdownMenuItemData(
-                          value: o.id,
-                          label: _translateCategoryLike(o.label),
+                            ...participants.map(
+                              (p) =>
+                                  _DropdownMenuItemData(value: p.id, label: p.name),
+                            ),
+                          ],
+                          onChanged: (v) =>
+                              setState(() => _participantId = v.isEmpty ? null : v),
                         ),
                       ),
-                ],
-                onChanged: (v) => setState(() => _tagId = v.isEmpty ? null : v),
-              ),
-          ],
-        ),
+                      const SizedBox(width: ThemeConfig.spacingS + 2),
+                      Expanded(child: categoryDropdown),
+                    ],
+                  )
+          else
+            categoryDropdown,
+        ],
+      ),
     );
   }
 
@@ -421,7 +507,7 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
     GroupAnalyticsData data, {
     required String categoryId,
     required String categoryLabel,
-  }) async {
+  }) {
     final expenses = data.filteredExpenses.where((expense) {
       final normalizedTag = (expense.tag == null || expense.tag!.isEmpty)
           ? 'untagged'
@@ -429,58 +515,90 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
       return normalizedTag == categoryId;
     }).toList()
       ..sort((a, b) => b.date.compareTo(a.date));
-    final participantNames = {
-      for (final participant in data.participants) participant.id: participant.name,
-    };
 
-    await showResponsiveSheet<void>(
-      context: context,
+    return _showExpensesSheet(
+      context,
+      data,
       title: 'analytics_category_expenses_title'.tr(
         namedArgs: {'category': _translateCategoryLike(categoryLabel)},
       ),
-      maxHeight: MediaQuery.of(context).size.height * 0.8,
-      isScrollControlled: true,
-      centerInFullViewport: true,
-      child: SafeArea(
-        child: expenses.isEmpty
-            ? Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-                child: Text(
-                  'analytics_category_expenses_empty'.tr(),
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              )
-            : ListView.separated(
-                shrinkWrap: true,
-                itemCount: expenses.length,
-                separatorBuilder: (_, _) => const Divider(height: 1),
-                itemBuilder: (ctx, index) {
-                  final expense = expenses[index];
-                  final payerName = participantNames[expense.payerParticipantId] ??
-                      expense.payerParticipantId;
-                  final amount = CurrencyFormatter.formatCents(
-                    expense.amountCents,
-                    data.group.currencyCode,
-                  );
-                  return ListTile(
-                    title: Text(
-                      expense.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: Text(
-                      '$payerName • ${DateFormat.yMMMd().format(expense.date)}',
-                    ),
-                    trailing: Text(
-                      amount,
-                      style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  );
-                },
-              ),
+      emptyLabel: 'analytics_category_expenses_empty'.tr(),
+      expenses: expenses,
+      subtitleFor: (expense, names) {
+        final payerName =
+            names[expense.payerParticipantId] ?? expense.payerParticipantId;
+        return '$payerName • ${DateFormat.yMMMd().format(expense.date)}';
+      },
+    );
+  }
+
+  Future<void> _showPayerExpensesSheet(
+    BuildContext context,
+    GroupAnalyticsData data, {
+    required String payerId,
+    required String payerLabel,
+  }) {
+    final expenses = data.filteredExpenses
+        .where((expense) => expense.payerParticipantId == payerId)
+        .toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+
+    return _showExpensesSheet(
+      context,
+      data,
+      title: 'analytics_payer_expenses_title'.tr(
+        namedArgs: {'payer': payerLabel},
       ),
+      emptyLabel: 'analytics_payer_expenses_empty'.tr(),
+      expenses: expenses,
+      subtitleFor: (expense, _) {
+        final tag = (expense.tag == null || expense.tag!.isEmpty)
+            ? 'analytics_untagged'.tr()
+            : _translateCategoryLike(resolveTagLabel(expense.tag!, data.tags));
+        return '$tag • ${DateFormat.yMMMd().format(expense.date)}';
+      },
+    );
+  }
+
+  Future<void> _showExpensesSheet(
+    BuildContext context,
+    GroupAnalyticsData data, {
+    required String title,
+    required String emptyLabel,
+    required List<Expense> expenses,
+    required String Function(
+      Expense expense,
+      Map<String, String> participantNames,
+    ) subtitleFor,
+  }) async {
+    final participantNames = {
+      for (final participant in data.participants)
+        participant.id: participant.name,
+    };
+    final isPersonal = data.group.isPersonal;
+    final rows = expenses
+        .map((expense) {
+          final payerName =
+              participantNames[expense.payerParticipantId] ??
+              expense.payerParticipantId;
+          return FilteredExpenseRow(
+            expense: expense,
+            payerName: payerName,
+            groupId: data.group.id,
+            groupCurrencyCode: data.group.currencyCode,
+            detailLine: subtitleFor(expense, participantNames),
+            customTags: data.tags,
+            showPaidBy: !isPersonal,
+            showManageMenu: true,
+          );
+        })
+        .toList(growable: false);
+
+    await showFilteredExpensesSheet(
+      context: context,
+      title: title,
+      emptyLabel: emptyLabel,
+      rows: rows,
     );
   }
 }
@@ -506,9 +624,9 @@ class _KpiGrid extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisCount: 2,
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
-      childAspectRatio: 2.2,
+      mainAxisSpacing: ThemeConfig.spacingS,
+      crossAxisSpacing: ThemeConfig.spacingS,
+      childAspectRatio: 2.85,
       children: [
         _KpiCard(label: 'analytics_kpi_total'.tr(), value: total),
         _KpiCard(
@@ -533,11 +651,14 @@ class _KpiCard extends StatelessWidget {
     final theme = Theme.of(context);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(
+        horizontal: ThemeConfig.spacingS + 2,
+        vertical: ThemeConfig.spacingXS + 2,
+      ),
       decoration: AccentSurfaces.panel(
         theme.colorScheme,
         subtle: context.subtleAccents,
-        radius: 14,
+        radius: 12,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -545,17 +666,20 @@ class _KpiCard extends StatelessWidget {
         children: [
           Text(
             label,
-            style: theme.textTheme.bodySmall?.copyWith(
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w700,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],
@@ -594,7 +718,7 @@ class _TrendChartCard extends StatelessWidget {
     final availableModes = _availableModes;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(ThemeConfig.spacingS + ThemeConfig.spacingXS),
       decoration: AccentSurfaces.flatPanel(theme.colorScheme),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -615,6 +739,7 @@ class _TrendChartCard extends StatelessWidget {
                           (mode) => _ModalSelectOption<AnalyticsTrendChartMode>(
                             value: mode,
                             label: mode.labelKey.tr(),
+                            subtitle: _modeHint(mode).tr(),
                           ),
                         )
                         .toList(),
@@ -635,28 +760,21 @@ class _TrendChartCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: ThemeConfig.spacingXS),
                     const Icon(Icons.keyboard_arrow_down, size: 18),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: ThemeConfig.spacingXS),
           Text(
             subtitle,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            _modeHint(activeMode).tr(),
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 12),
+          const SizedBox(height: ThemeConfig.spacingS + ThemeConfig.spacingXS),
           _buildChartContent(context, theme, activeMode),
         ],
       ),
@@ -669,6 +787,52 @@ class _TrendChartCard extends StatelessWidget {
     Color(0xFFEA580C),
     Color(0xFF7C3AED),
   ];
+
+  AxisTitles _yAxisTitles(ThemeData theme) {
+    return AxisTitles(
+      sideTitles: SideTitles(
+        showTitles: true,
+        reservedSize: 40,
+        getTitlesWidget: (value, meta) {
+          // fl_chart already picks intervals; show only edge and mid-ish labels.
+          final isEdge = value == meta.min || value == meta.max;
+          final mid = (meta.min + meta.max) / 2;
+          final isMid = (value - mid).abs() <= (meta.max - meta.min) * 0.02;
+          if (!isEdge && !isMid && value != 0) {
+            return const SizedBox.shrink();
+          }
+          return SideTitleWidget(
+            meta: meta,
+            child: Text(
+              _formatAxisCents(value.round()),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontSize: 10,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  String _formatAxisCents(int amountCents) {
+    final absCents = amountCents.abs();
+    final units = absCents / 100.0;
+    final sign = amountCents < 0 ? '-' : '';
+    if (units >= 1000000) {
+      return '$sign${(units / 1000000).toStringAsFixed(1)}M';
+    }
+    if (units >= 1000) {
+      return '$sign${(units / 1000).toStringAsFixed(units >= 10000 ? 0 : 1)}k';
+    }
+    if (units == units.roundToDouble()) {
+      return '$sign${units.toStringAsFixed(0)}';
+    }
+    return '$sign${CurrencyFormatter.formatCompactCents(amountCents)}';
+  }
 
   List<AnalyticsTrendChartMode> get _availableModes => isPersonal
       ? const [
@@ -717,7 +881,7 @@ class _TrendChartCard extends StatelessWidget {
             return _LineSeries(
               label: series.label,
               points: series.points,
-              color: _seriesColorForId(series.id),
+              color: _seriesColorForId(series.id, theme.colorScheme),
             );
           }).toList(),
         );
@@ -759,7 +923,7 @@ class _TrendChartCard extends StatelessWidget {
           titlesData: FlTitlesData(
             topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
             rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            leftTitles: _yAxisTitles(theme),
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
@@ -910,7 +1074,7 @@ class _TrendChartCard extends StatelessWidget {
               titlesData: FlTitlesData(
                 topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                 rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                leftTitles: _yAxisTitles(Theme.of(context)),
                 bottomTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
@@ -974,7 +1138,8 @@ class _TrendChartCard extends StatelessWidget {
     final step = _xLabelStep(pointCount);
     final maxY = _maxStackedAmount(series);
     final colorBySeriesId = {
-      for (final item in series) item.id: _seriesColorForId(item.id),
+      for (final item in series)
+        item.id: _seriesColorForId(item.id, Theme.of(context).colorScheme),
     };
 
     final groups = <BarChartGroupData>[];
@@ -1048,7 +1213,7 @@ class _TrendChartCard extends StatelessWidget {
               titlesData: FlTitlesData(
                 topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                 rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                leftTitles: _yAxisTitles(Theme.of(context)),
                 bottomTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
@@ -1087,10 +1252,10 @@ class _TrendChartCard extends StatelessWidget {
   }
 
   Widget _emptyChart(BuildContext context) {
-    return SizedBox(
-      height: 120,
-      child: Align(
-        alignment: Alignment.centerLeft,
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: ThemeConfig.spacingM),
         child: Text(
           'analytics_empty_chart'.tr(),
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -1129,7 +1294,19 @@ class _TrendChartCard extends StatelessWidget {
     return math.max(1, (count / 4).ceil());
   }
 
-  Color _seriesColorForId(String id) {
+  Color _seriesColorForId(String id, [ColorScheme? scheme]) {
+    if (scheme != null) {
+      final themed = [
+        scheme.primary,
+        ..._seriesPalette.skip(1),
+        scheme.tertiary,
+      ];
+      int hash = 17;
+      for (final unit in id.codeUnits) {
+        hash = 37 * hash + unit;
+      }
+      return themed[hash.abs() % themed.length];
+    }
     int hash = 17;
     for (final unit in id.codeUnits) {
       hash = 37 * hash + unit;
@@ -1236,7 +1413,7 @@ class _LegendChip extends StatelessWidget {
   }
 }
 
-class _BreakdownBarsCard extends StatelessWidget {
+class _BreakdownBarsCard extends StatefulWidget {
   const _BreakdownBarsCard({
     required this.title,
     required this.emptyLabel,
@@ -1244,11 +1421,14 @@ class _BreakdownBarsCard extends StatelessWidget {
     required this.currencyCode,
     this.translateUntagged = false,
     this.allowPieMode = false,
+    this.compact = false,
     this.mode = AnalyticsCategoryChartMode.pie,
+    this.chartModeMenuTitle,
     this.onModeChanged,
-    this.excludedCategoryIds = const <String>{},
-    this.onToggleCategory,
-    this.onOpenCategoryExpenses,
+    this.excludedIds = const <String>{},
+    this.onToggleExcluded,
+    this.onClearExcluded,
+    this.onOpenRowExpenses,
   });
 
   final String title;
@@ -1257,255 +1437,162 @@ class _BreakdownBarsCard extends StatelessWidget {
   final String currencyCode;
   final bool translateUntagged;
   final bool allowPieMode;
+  /// Smaller pie when two breakdown cards sit side by side.
+  final bool compact;
   final AnalyticsCategoryChartMode mode;
+  final String? chartModeMenuTitle;
   final ValueChanged<AnalyticsCategoryChartMode>? onModeChanged;
-  final Set<String> excludedCategoryIds;
-  final ValueChanged<String>? onToggleCategory;
-  final void Function(String categoryId, String categoryLabel)?
-      onOpenCategoryExpenses;
+  final Set<String> excludedIds;
+  final ValueChanged<String>? onToggleExcluded;
+  final VoidCallback? onClearExcluded;
+  final void Function(String rowId, String rowLabel)? onOpenRowExpenses;
+
+  @override
+  State<_BreakdownBarsCard> createState() => _BreakdownBarsCardState();
+}
+
+class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
+  static const _otherSliceId = '__other__';
+  static const _minStandalonePct = 4.0;
+
+  bool _expanded = false;
+  String? _selectedRowId;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final maxAmount = rows.isEmpty
-        ? 1
-        : rows.map((r) => r.amountCents.abs()).reduce(math.max).clamp(1, 1 << 30);
+    final rows = widget.rows;
+    final previewRows = rows.take(_kBreakdownPreviewCount).toList();
+    final showToggle = rows.length > _kBreakdownPreviewCount;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(ThemeConfig.spacingS + ThemeConfig.spacingXS),
       decoration: AccentSurfaces.flatPanel(theme.colorScheme),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Expanded(child: GroupSectionHeader(label: title)),
-              if (allowPieMode && onModeChanged != null)
+              Expanded(child: GroupSectionHeader(label: widget.title)),
+              if (widget.allowPieMode && widget.onModeChanged != null)
                 InkWell(
-                    borderRadius: BorderRadius.circular(8),
-                    onTap: () async {
-                      final selected =
-                          await _showModalSelectSheet<AnalyticsCategoryChartMode>(
-                        context: context,
-                        title: 'analytics_category_chart_mode_menu'.tr(),
-                        selectedValue: mode,
-                        options: [
-                          _ModalSelectOption<AnalyticsCategoryChartMode>(
-                            value: AnalyticsCategoryChartMode.bars,
-                            label: AnalyticsCategoryChartMode.bars.labelKey.tr(),
-                          ),
-                          _ModalSelectOption<AnalyticsCategoryChartMode>(
-                            value: AnalyticsCategoryChartMode.pie,
-                            label: AnalyticsCategoryChartMode.pie.labelKey.tr(),
-                          ),
-                        ],
-                      );
-                      if (selected != null) onModeChanged!(selected);
-                    },
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 100),
-                          child: Text(
-                            mode.labelKey.tr(),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: theme.colorScheme.primary,
-                            ),
-                          ),
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () async {
+                    final selected =
+                        await _showModalSelectSheet<AnalyticsCategoryChartMode>(
+                      context: context,
+                      title: widget.chartModeMenuTitle ??
+                          'analytics_breakdown_chart_mode_menu'.tr(),
+                      selectedValue: widget.mode,
+                      options: [
+                        _ModalSelectOption<AnalyticsCategoryChartMode>(
+                          value: AnalyticsCategoryChartMode.bars,
+                          label: AnalyticsCategoryChartMode.bars.labelKey.tr(),
                         ),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.keyboard_arrow_down, size: 18),
+                        _ModalSelectOption<AnalyticsCategoryChartMode>(
+                          value: AnalyticsCategoryChartMode.pie,
+                          label: AnalyticsCategoryChartMode.pie.labelKey.tr(),
+                        ),
                       ],
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            if (rows.isEmpty)
-              Text(
-                emptyLabel,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              )
-            else if (allowPieMode && mode == AnalyticsCategoryChartMode.pie)
-              _buildPieChart(context, rows)
-            else
-              ...rows.map((row) {
-                final label = _resolvedRowLabel(row);
-                final progress = row.amountCents.abs() / maxAmount;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    );
+                    if (selected != null) widget.onModeChanged!(selected);
+                  },
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              label,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 100),
+                        child: Text(
+                          widget.mode.labelKey.tr(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: theme.colorScheme.primary,
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            CurrencyFormatter.formatCents(
-                              row.amountCents,
-                              currencyCode,
-                            ),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          minHeight: 8,
-                          backgroundColor: theme.colorScheme.surfaceContainerHighest,
                         ),
                       ),
+                      const SizedBox(width: ThemeConfig.spacingXS),
+                      const Icon(Icons.keyboard_arrow_down, size: 18),
                     ],
                   ),
-                );
-              }),
-          ],
-        ),
+                ),
+            ],
+          ),
+          const SizedBox(height: ThemeConfig.spacingS + 2),
+          if (rows.isEmpty)
+            Text(
+              widget.emptyLabel,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            )
+          else if (widget.allowPieMode &&
+              widget.mode == AnalyticsCategoryChartMode.pie)
+            _buildPieChart(context, previewRows, allRows: rows)
+          else
+            _buildBarsChart(context, previewRows, allRows: rows),
+          if (showToggle &&
+              !(widget.allowPieMode &&
+                  widget.mode == AnalyticsCategoryChartMode.pie))
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton(
+                onPressed: () => setState(() => _expanded = !_expanded),
+                child: Text(
+                  (_expanded ? 'analytics_show_less' : 'analytics_show_more')
+                      .tr(),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
-  String _resolvedRowLabel(AmountBreakdownItem row) {
-    if (translateUntagged && row.id == 'untagged') {
-      return 'analytics_untagged'.tr();
-    }
-    if (row.label.startsWith('category_')) return row.label.tr();
-    return row.label;
-  }
-
-  List<PieChartSectionData> _buildPieSections(
+  Widget _buildBarsChart(
     BuildContext context,
-    List<AmountBreakdownItem> visibleRows,
-    int total,
-    Map<String, Color> colorByCategoryId,
-    List<Color> palette,
-  ) {
-    // fl_chart draws clockwise from top (0° = 12 o'clock).
-    // cos(angle) > 0 means the badge is in the upper half → line below text.
-    double cumulativeAngle = 0;
-    return visibleRows.asMap().entries.map((entry) {
-      final index = entry.key;
-      final row = entry.value;
-      final value = row.amountCents.abs().toDouble();
-      final sweepDeg = (value / total) * 360;
-      final midDeg = cumulativeAngle + sweepDeg / 2;
-      cumulativeAngle += sweepDeg;
+    List<AmountBreakdownItem> previewRows, {
+    required List<AmountBreakdownItem> allRows,
+  }) {
+    final theme = Theme.of(context);
+    final palette = _paletteFor(context);
+    final colorById = <String, Color>{
+      for (final entry in allRows.asMap().entries)
+        entry.value.id: palette[entry.key % palette.length],
+    };
+    final activeRows =
+        allRows.where((row) => !widget.excludedIds.contains(row.id)).toList();
+    final total = activeRows.fold<int>(
+      0,
+      (sum, row) => sum + row.amountCents.abs(),
+    );
+    final maxAmount = activeRows.isEmpty
+        ? 1
+        : activeRows
+            .map((r) => r.amountCents.abs())
+            .reduce(math.max)
+            .clamp(1, 1 << 30);
+    final legendRows = _expanded || allRows.length <= _kBreakdownPreviewCount
+        ? allRows
+        : previewRows;
+    final hasExcluded = widget.excludedIds.isNotEmpty;
 
-      final pct = (value / total) * 100;
-      final showOutsidePct = pct > 0 && pct < 8;
-      final color =
-          colorByCategoryId[row.id] ?? palette[index % palette.length];
-
-      // Badge is above center when midDeg is in [0,90) or (270,360)
-      final badgeAboveCenter = math.cos(midDeg * math.pi / 180) > 0;
-
-      final line = Container(width: 1.6, height: 12, color: color);
-      const gap = SizedBox(height: 3);
-      final label = Text(
-        '${pct.toStringAsFixed(0)}%',
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: Theme.of(context).colorScheme.onSurface,
-          fontWeight: FontWeight.w700,
-        ),
-      );
-
-      return PieChartSectionData(
-        value: value,
-        color: color,
-        radius: 42,
-        title: showOutsidePct
-            ? ''
-            : (pct >= 8 ? '${pct.toStringAsFixed(0)}%' : ''),
-        titleStyle: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: Colors.white,
-          fontWeight: FontWeight.w700,
-          shadows: const [
-            Shadow(
-              color: Color(0x99000000),
-              offset: Offset(0, 1),
-              blurRadius: 2,
-            ),
-          ],
-        ),
-        badgePositionPercentageOffset: 1.22,
-        badgeWidget: showOutsidePct
-            ? GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () =>
-                    onOpenCategoryExpenses?.call(row.id, row.label),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: badgeAboveCenter
-                      ? [label, gap, line]
-                      : [line, gap, label],
-                ),
-              )
-            : null,
-      );
-    }).toList();
-  }
-
-  Widget _buildPieChart(BuildContext context, List<AmountBreakdownItem> rows) {
-    final palette = <Color>[
-      const Color(0xFF2563EB),
-      const Color(0xFF059669),
-      const Color(0xFFEA580C),
-      const Color(0xFF7C3AED),
-      const Color(0xFF0EA5E9),
-      const Color(0xFFEF4444),
-    ];
-    final allRows = rows;
-    final visibleRows = allRows
-        .where((row) => !excludedCategoryIds.contains(row.id))
-        .toList();
-    final hasExcluded = excludedCategoryIds.isNotEmpty;
-    final colorByCategoryId = <String, Color>{};
-    for (final entry in allRows.asMap().entries) {
-      colorByCategoryId.putIfAbsent(
-        entry.value.id,
-        () => palette[entry.key % palette.length],
-      );
-    }
-    final total = visibleRows.fold<int>(0, (sum, row) => sum + row.amountCents.abs());
     if (total <= 0) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            emptyLabel,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            widget.emptyLabel,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          if (hasExcluded && onToggleCategory != null)
+          if (hasExcluded && widget.onClearExcluded != null)
             Align(
               alignment: AlignmentDirectional.centerEnd,
               child: TextButton.icon(
-                onPressed: () {
-                  for (final id in excludedCategoryIds.toList()) {
-                    onToggleCategory!.call(id);
-                  }
-                },
+                onPressed: widget.onClearExcluded,
                 icon: const Icon(Icons.refresh),
                 label: Text('analytics_show_all_categories'.tr()),
               ),
@@ -1516,113 +1603,532 @@ class _BreakdownBarsCard extends StatelessWidget {
 
     return Column(
       children: [
-        SizedBox(
-          height: 190,
-          child: PieChart(
-            PieChartData(
-              centerSpaceRadius: 34,
-              sectionsSpace: 2,
-              pieTouchData: PieTouchData(
-                touchCallback: (event, response) {
-                  if (event is! FlTapUpEvent) return;
-                  final touched = response?.touchedSection;
-                  final index = touched?.touchedSectionIndex;
-                  if (index == null || index < 0 || index >= visibleRows.length) return;
-                  final selectedRow = visibleRows[index];
-                  onOpenCategoryExpenses?.call(
-                    selectedRow.id,
-                    selectedRow.label,
-                  );
-                },
-              ),
-              sections: _buildPieSections(
-                context,
-                visibleRows,
-                total,
-                colorByCategoryId,
-                palette,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        ...allRows.asMap().entries.map((entry) {
-          final index = entry.key;
-          final row = entry.value;
-          final isExcluded = excludedCategoryIds.contains(row.id);
+        ...legendRows.map((row) {
+          final isExcluded = widget.excludedIds.contains(row.id);
           final label = _resolvedRowLabel(row);
-          final value = CurrencyFormatter.formatCents(
-            row.amountCents,
-            currencyCode,
-          );
-          final isLastVisible = !isExcluded && visibleRows.length <= 1;
-          final canToggle = onToggleCategory != null && (isExcluded || !isLastVisible);
-          return Opacity(
-            opacity: isExcluded ? 0.45 : 1,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: canToggle ? () => onToggleCategory!.call(row.id) : null,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: colorByCategoryId[row.id] ?? palette[index % palette.length],
-                        borderRadius: BorderRadius.circular(3),
+          final pct = total <= 0
+              ? 0
+              : ((row.amountCents.abs() / total) * 100).round();
+          final progress =
+              isExcluded ? 0.0 : row.amountCents.abs() / maxAmount;
+          final isLastVisible = !isExcluded && activeRows.length <= 1;
+          final canToggle = widget.onToggleExcluded != null &&
+              (isExcluded || !isLastVisible);
+          final color = colorById[row.id] ?? palette.first;
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Opacity(
+              opacity: isExcluded ? 0.45 : 1,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: isExcluded || widget.onOpenRowExpenses == null
+                    ? null
+                    : () => _openSelectedOrRow(row),
+                onLongPress: canToggle
+                    ? () => widget.onToggleExcluded!.call(row.id)
+                    : null,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 10, 6, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: color,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    decoration: isExcluded
+                                        ? TextDecoration.lineThrough
+                                        : null,
+                                  ),
+                                ),
+                                Text(
+                                  isExcluded
+                                      ? _expenseCountLabel(row.count)
+                                      : '${_expenseCountLabel(row.count)} · $pct%',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            CurrencyFormatter.formatCents(
+                              row.amountCents,
+                              widget.currencyCode,
+                            ),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          if (canToggle)
+                            IconButton(
+                              visualDensity: VisualDensity.compact,
+                              tooltip: (isExcluded
+                                      ? 'analytics_pie_show'
+                                      : 'analytics_pie_hide')
+                                  .tr(),
+                              icon: Icon(
+                                isExcluded
+                                    ? Icons.visibility_off_rounded
+                                    : Icons.visibility_rounded,
+                                size: 18,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                              onPressed: () =>
+                                  widget.onToggleExcluded!.call(row.id),
+                            )
+                          else if (isLastVisible)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
+                              child: Icon(
+                                Icons.lock_outline_rounded,
+                                size: 16,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          if (widget.onOpenRowExpenses != null && !isExcluded)
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).colorScheme.onSurface,
-                          decoration: isExcluded ? TextDecoration.lineThrough : null,
+                      const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(999),
+                        child: TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0, end: progress.toDouble()),
+                          duration: const Duration(milliseconds: 420),
+                          curve: Curves.easeOutCubic,
+                          builder: (context, value, _) {
+                            return LinearProgressIndicator(
+                              value: value,
+                              minHeight: 9,
+                              backgroundColor:
+                                  theme.colorScheme.surfaceContainerHighest,
+                              color: color,
+                            );
+                          },
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    if (isExcluded)
-                      Icon(
-                        Icons.visibility_off_rounded,
-                        size: 16,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      )
-                    else if (isLastVisible)
-                      Icon(
-                        Icons.lock_outline_rounded,
-                        size: 16,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    if (isExcluded || isLastVisible) const SizedBox(width: 6),
-                    Text(
-                      value,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
           );
         }),
-        if (hasExcluded && onToggleCategory != null)
+        if (hasExcluded && widget.onClearExcluded != null)
           Align(
             alignment: AlignmentDirectional.centerEnd,
             child: TextButton.icon(
-              onPressed: () {
-                for (final id in excludedCategoryIds.toList()) {
-                  onToggleCategory!.call(id);
-                }
-              },
+              onPressed: widget.onClearExcluded,
+              icon: const Icon(Icons.refresh),
+              label: Text('analytics_show_all_categories'.tr()),
+            ),
+          ),
+      ],
+    );
+  }
+
+  String _expenseCountLabel(int count) {
+    final key = count == 1
+        ? 'analytics_expense_count_one'
+        : 'analytics_expense_count';
+    return key.tr(namedArgs: {'count': '$count'});
+  }
+
+  String _resolvedRowLabel(AmountBreakdownItem row) {
+    if (row.id == _otherSliceId) return 'analytics_pie_other'.tr();
+    if (widget.translateUntagged && row.id == 'untagged') {
+      return 'analytics_untagged'.tr();
+    }
+    if (row.label.startsWith('category_')) return row.label.tr();
+    return row.label;
+  }
+
+  List<Color> _paletteFor(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return [
+      scheme.primary,
+      const Color(0xFF059669),
+      const Color(0xFFEA580C),
+      const Color(0xFF7C3AED),
+      const Color(0xFF0EA5E9),
+      scheme.error,
+      const Color(0xFFD97706),
+      const Color(0xFFDB2777),
+      const Color(0xFF0891B2),
+      const Color(0xFF65A30D),
+    ];
+  }
+
+  List<AmountBreakdownItem> _chartSlices(List<AmountBreakdownItem> visibleRows) {
+    if (visibleRows.isEmpty) return const [];
+    final total = visibleRows.fold<int>(
+      0,
+      (sum, row) => sum + row.amountCents.abs(),
+    );
+    if (total <= 0) return const [];
+
+    final major = <AmountBreakdownItem>[];
+    final minor = <AmountBreakdownItem>[];
+    for (final row in visibleRows) {
+      final pct = row.amountCents.abs() * 100 / total;
+      if (pct >= _minStandalonePct) {
+        major.add(row);
+      } else {
+        minor.add(row);
+      }
+    }
+
+    // Keep the chart readable: at least one major slice when possible.
+    if (major.isEmpty) {
+      return visibleRows.take(math.min(5, visibleRows.length)).toList();
+    }
+    if (minor.isEmpty) return major;
+
+    final otherAmount = minor.fold<int>(
+      0,
+      (sum, row) => sum + row.amountCents.abs(),
+    );
+    final otherCount = minor.fold<int>(0, (sum, row) => sum + row.count);
+    return [
+      ...major,
+      AmountBreakdownItem(
+        id: _otherSliceId,
+        label: 'analytics_pie_other',
+        amountCents: otherAmount,
+        count: otherCount,
+      ),
+    ];
+  }
+
+  /// 1st tap selects (highlights pie); 2nd tap on same openable row opens expenses.
+  /// "Other" / non-openable: 2nd tap deselects.
+  void _onSliceOrLegendTap(AmountBreakdownItem row) {
+    if (_selectedRowId == row.id) {
+      if (row.id == _otherSliceId || widget.onOpenRowExpenses == null) {
+        setState(() => _selectedRowId = null);
+        return;
+      }
+      _openSelectedOrRow(row);
+      return;
+    }
+    setState(() => _selectedRowId = row.id);
+  }
+
+  void _openSelectedOrRow(AmountBreakdownItem row) {
+    if (row.id == _otherSliceId) return;
+    widget.onOpenRowExpenses?.call(row.id, _resolvedRowLabel(row));
+  }
+
+  Widget _buildPieChart(
+    BuildContext context,
+    List<AmountBreakdownItem> previewRows, {
+    required List<AmountBreakdownItem> allRows,
+  }) {
+    final theme = Theme.of(context);
+    final palette = _paletteFor(context);
+    final otherColor = theme.colorScheme.outline;
+    final visibleRows = allRows
+        .where((row) => !widget.excludedIds.contains(row.id))
+        .toList();
+    final hasExcluded = widget.excludedIds.isNotEmpty;
+    final colorByCategoryId = <String, Color>{};
+    for (final entry in allRows.asMap().entries) {
+      colorByCategoryId.putIfAbsent(
+        entry.value.id,
+        () => palette[entry.key % palette.length],
+      );
+    }
+    final total =
+        visibleRows.fold<int>(0, (sum, row) => sum + row.amountCents.abs());
+    final showToggle = allRows.length > _kBreakdownPreviewCount;
+    final legendRows = _expanded || allRows.length <= _kBreakdownPreviewCount
+        ? allRows
+        : previewRows;
+    final slices = _chartSlices(visibleRows);
+    final pieSliceIds = {for (final s in slices) s.id};
+
+    // Drop selection only when the row itself is gone (excluded/filtered out).
+    // Keep selections for small rows rolled into the pie "Other" slice so
+    // legend taps after "Show more" still select → open expenses.
+    final selectedStillValid = _selectedRowId != null &&
+        (_selectedRowId == _otherSliceId
+            ? pieSliceIds.contains(_otherSliceId)
+            : visibleRows.any((r) => r.id == _selectedRowId));
+    if (_selectedRowId != null && !selectedStillValid) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _selectedRowId = null);
+      });
+    }
+
+    if (total <= 0) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            widget.emptyLabel,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          if (hasExcluded && widget.onClearExcluded != null)
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: TextButton.icon(
+                onPressed: widget.onClearExcluded,
+                icon: const Icon(Icons.refresh),
+                label: Text('analytics_show_all_categories'.tr()),
+              ),
+            ),
+        ],
+      );
+    }
+
+    AmountBreakdownItem? selectedItem;
+    if (_selectedRowId != null) {
+      for (final row in slices) {
+        if (row.id == _selectedRowId) {
+          selectedItem = row;
+          break;
+        }
+      }
+      selectedItem ??= () {
+        for (final row in visibleRows) {
+          if (row.id == _selectedRowId) return row;
+        }
+        return null;
+      }();
+    }
+
+    final pieSlices = [
+      for (final entry in slices.asMap().entries)
+        BreakdownPieSlice(
+          id: entry.value.id,
+          label: _resolvedRowLabel(entry.value),
+          amountCents: entry.value.amountCents.abs(),
+          count: entry.value.count,
+          color: entry.value.id == _otherSliceId
+              ? otherColor
+              : (colorByCategoryId[entry.value.id] ??
+                    palette[entry.key % palette.length]),
+          icon: entry.value.id == _otherSliceId
+              ? Icons.more_horiz_rounded
+              : iconForExpenseTag(
+                  entry.value.id == 'untagged' ? null : entry.value.id,
+                  null,
+                ),
+          canOpen:
+              entry.value.id != _otherSliceId &&
+              widget.onOpenRowExpenses != null,
+        ),
+    ];
+
+    // Highlight own slice, or Other when the legend row is rolled up.
+    final pieHighlightId = _selectedRowId == null
+        ? null
+        : (pieSliceIds.contains(_selectedRowId!)
+            ? _selectedRowId
+            : (pieSliceIds.contains(_otherSliceId) ? _otherSliceId : null));
+
+    BreakdownPieSlice? centerOverride;
+    if (selectedItem != null &&
+        _selectedRowId != null &&
+        !pieSliceIds.contains(_selectedRowId)) {
+      final color = colorByCategoryId[selectedItem.id] ?? palette.first;
+      centerOverride = BreakdownPieSlice(
+        id: selectedItem.id,
+        label: _resolvedRowLabel(selectedItem),
+        amountCents: selectedItem.amountCents.abs(),
+        count: selectedItem.count,
+        color: color,
+        icon: iconForExpenseTag(
+          selectedItem.id == 'untagged' ? null : selectedItem.id,
+          null,
+        ),
+        canOpen: widget.onOpenRowExpenses != null,
+      );
+    }
+
+    return Column(
+      children: [
+        BreakdownPieChart(
+          slices: pieSlices,
+          currencyCode: widget.currencyCode,
+          centerIdleLabel: 'analytics_kpi_total'.tr(),
+          height: widget.compact ? 168 : 220,
+          showLegend: false,
+          selectedId: pieHighlightId,
+          centerOverride: centerOverride,
+          onSelectionChanged: (id) => setState(() => _selectedRowId = id),
+          onOpenSlice: (slice) {
+            if (slice.id == _otherSliceId) return;
+            // [slice.label] is already resolved/translated for display.
+            widget.onOpenRowExpenses?.call(slice.id, slice.label);
+          },
+        ),
+        const SizedBox(height: ThemeConfig.spacingL),
+        ...legendRows.map((row) {
+          final isExcluded = widget.excludedIds.contains(row.id);
+          final isSelected = _selectedRowId == row.id;
+          final label = _resolvedRowLabel(row);
+          final pct = total <= 0
+              ? 0
+              : ((row.amountCents.abs() / total) * 100).round();
+          final isLastVisible = !isExcluded && visibleRows.length <= 1;
+          final canToggle = widget.onToggleExcluded != null &&
+              (isExcluded || !isLastVisible);
+          final color = colorByCategoryId[row.id] ?? palette.first;
+
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            margin: const EdgeInsets.only(bottom: 2),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? color.withValues(alpha: 0.14)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
+              border: isSelected
+                  ? Border.all(color: color.withValues(alpha: 0.55))
+                  : null,
+            ),
+            child: Opacity(
+              opacity: isExcluded ? 0.45 : 1,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: isExcluded ? null : () => _onSliceOrLegendTap(row),
+                onLongPress: canToggle
+                    ? () => widget.onToggleExcluded!.call(row.id)
+                    : null,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 8,
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: color,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: theme.colorScheme.onSurface,
+                                decoration: isExcluded
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                              ),
+                            ),
+                            Text(
+                              isExcluded
+                                  ? _expenseCountLabel(row.count)
+                                  : '${_expenseCountLabel(row.count)} · $pct%',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        CurrencyFormatter.formatCents(
+                          row.amountCents,
+                          widget.currencyCode,
+                        ),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      if (canToggle) ...[
+                        const SizedBox(width: 2),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          tooltip: (isExcluded
+                                  ? 'analytics_pie_show'
+                                  : 'analytics_pie_hide')
+                              .tr(),
+                          icon: Icon(
+                            isExcluded
+                                ? Icons.visibility_off_rounded
+                                : Icons.visibility_rounded,
+                            size: 18,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          onPressed: () =>
+                              widget.onToggleExcluded!.call(row.id),
+                        ),
+                      ] else if (isLastVisible) ...[
+                        const SizedBox(width: 8),
+                        Icon(
+                          Icons.lock_outline_rounded,
+                          size: 16,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ],
+                      if (widget.onOpenRowExpenses != null && !isExcluded)
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+        if (showToggle)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton(
+              onPressed: () => setState(() => _expanded = !_expanded),
+              child: Text(
+                (_expanded ? 'analytics_show_less' : 'analytics_show_more').tr(),
+              ),
+            ),
+          ),
+        if (hasExcluded && widget.onClearExcluded != null)
+          Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: TextButton.icon(
+              onPressed: widget.onClearExcluded,
               icon: const Icon(Icons.refresh),
               label: Text('analytics_show_all_categories'.tr()),
             ),

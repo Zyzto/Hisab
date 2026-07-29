@@ -25,6 +25,15 @@ class ExpenseListTile extends StatelessWidget {
   /// Show a trailing chevron when the tile is navigable.
   final bool showDisclosure;
 
+  /// When set, shows this amount instead of the expense total (e.g. profile my-share).
+  final int? amountCentsOverride;
+
+  /// Optional second line; when null and [showPaidBy], shows paid_by.
+  final String? detailLine;
+
+  /// Extra trailing controls inside the card (e.g. edit / open-group icons).
+  final Widget? trailing;
+
   const ExpenseListTile({
     super.key,
     required this.expense,
@@ -34,10 +43,19 @@ class ExpenseListTile extends StatelessWidget {
     this.groupCurrencyCode,
     this.onTap,
     this.showDisclosure = false,
+    this.amountCentsOverride,
+    this.detailLine,
+    this.trailing,
   });
 
   /// Primary amount for display: group currency when [groupCurrencyCode] is set and differs from expense currency, else expense amount.
   (int cents, String currencyCode) get _primaryAmount {
+    if (amountCentsOverride != null) {
+      final code = (groupCurrencyCode != null && groupCurrencyCode!.isNotEmpty)
+          ? groupCurrencyCode!
+          : expense.currencyCode;
+      return (amountCentsOverride!, code);
+    }
     if (groupCurrencyCode != null &&
         groupCurrencyCode!.isNotEmpty &&
         expense.currencyCode != groupCurrencyCode) {
@@ -59,83 +77,109 @@ class ExpenseListTile extends StatelessWidget {
       surface: surface,
     );
 
+    final content = Row(
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: chrome.container,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          alignment: Alignment.center,
+          child: Icon(
+            effectiveIcon,
+            size: 22,
+            color: chrome.onContainer,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                expense.title,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (detailLine != null || showPaidBy) ...[
+                const SizedBox(height: 3),
+                Text(
+                  detailLine ??
+                      'paid_by'.tr(namedArgs: {'name': payerName}),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ],
+          ),
+        ),
+        Text(
+          CurrencyFormatter.formatCents(cents, currencyCode),
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: colorScheme.onSurface,
+          ),
+        ),
+        // Gap between amount and trailing actions / chevron.
+        if (trailing != null || showDisclosure) const SizedBox(width: 10),
+        if (showDisclosure && trailing == null)
+          Icon(
+            Directionality.of(context) == ui.TextDirection.rtl
+                ? Icons.chevron_left_rounded
+                : Icons.chevron_right_rounded,
+            size: 20,
+            color: colorScheme.onSurfaceVariant,
+          ),
+      ],
+    );
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Material(
         color: colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(14),
+        clipBehavior: Clip.antiAlias,
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
           onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: DecoratedBox(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: colorScheme.outlineVariant.withValues(alpha: 0.45),
               ),
             ),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: chrome.container,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  alignment: Alignment.center,
-                  child: Icon(
-                    effectiveIcon,
-                    size: 22,
-                    color: chrome.onContainer,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        expense.title,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (showPaidBy) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          'paid_by'.tr(namedArgs: {'name': payerName}),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
+            child: trailing == null
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
+                    child: content,
+                  )
+                : IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 12, 0, 12),
+                            child: content,
                           ),
                         ),
+                        trailing!,
                       ],
-                    ],
+                    ),
                   ),
-                ),
-                Text(
-                  CurrencyFormatter.formatCents(cents, currencyCode),
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-                if (showDisclosure) ...[
-                  const SizedBox(width: 4),
-                  Icon(
-                    Directionality.of(context) == ui.TextDirection.rtl
-                        ? Icons.chevron_left_rounded
-                        : Icons.chevron_right_rounded,
-                    size: 20,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ],
-              ],
-            ),
           ),
         ),
       ),

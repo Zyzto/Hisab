@@ -1,17 +1,17 @@
 import 'package:go_router/go_router.dart';
+import '../../../core/navigation/app_page.dart';
 import '../../../core/navigation/route_paths.dart';
 import 'pages/settings_page.dart';
-import 'widgets/privacy_policy_page.dart';
 
 List<RouteBase> getSettingsRoutes() {
   return [
     GoRoute(
       path: RoutePaths.settings,
-      builder: (context, state) => const SettingsPage(),
+      pageBuilder: (context, state) => appNoTransitionPage(
+        key: state.pageKey,
+        child: const SettingsPage(),
+      ),
     ),
-    GoRoute(
-      path: RoutePaths.privacyPolicy,
-      builder: (context, state) => const PrivacyPolicyPage(),
-    ),
+    // Privacy policy lives on the top-level route in app_router (outside shell).
   ];
 }

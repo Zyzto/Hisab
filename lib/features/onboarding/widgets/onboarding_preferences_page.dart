@@ -4,11 +4,11 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 
-import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/theme/flex_theme_builder.dart'
     show flexSchemeOptionIds, primaryColorForSchemeId;
 import '../../../core/utils/currency_helpers.dart';
+import '../../../core/widgets/sheet_helpers.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 import '../../settings/settings_definitions.dart';
 import 'onboarding_shared.dart';
@@ -188,36 +188,14 @@ List<Widget> _buildPreferencesTiles(
         ],
       ),
       onTap: () {
-        showResponsiveSheet<String>(
-          context: context,
+        showOptionPickerSheet<String>(
+          context,
           title: 'font_size'.tr(),
-          maxHeight: MediaQuery.of(context).size.height * 0.75,
-          isScrollControlled: true,
-          centerInFullViewport: true,
-          child: Builder(
-            builder: (ctx) => SafeArea(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    bottom:
-                        MediaQuery.of(ctx).padding.bottom +
-                        ThemeConfig.spacingM,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: _fontSizeOptions
-                        .map(
-                          (option) => ListTile(
-                            title: Text(option.tr()),
-                            onTap: () => Navigator.of(ctx).pop(option),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ),
-              ),
-            ),
-          ),
+          selected: fontSize,
+          options: [
+            for (final option in _fontSizeOptions)
+              SheetPickerOption(value: option, label: option.tr()),
+          ],
         ).then((chosen) {
           if (chosen != null && context.mounted) {
             ref
@@ -270,50 +248,37 @@ List<Widget> _buildPreferencesTiles(
         ],
       ),
       onTap: () {
-        showResponsiveSheet<String>(
-          context: context,
+        showOptionPickerSheet<String>(
+          context,
           title: 'color_scheme'.tr(),
-          maxHeight: MediaQuery.of(context).size.height * 0.75,
-          isScrollControlled: true,
-          centerInFullViewport: true,
-          child: Builder(
-            builder: (ctx) => SafeArea(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    bottom:
-                        MediaQuery.of(ctx).padding.bottom +
-                        ThemeConfig.spacingM,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: _onboardingThemeSchemeIds.map((schemeId) {
-                      final chipColor = primaryColorForSchemeId(schemeId);
-                      return ListTile(
-                        leading: Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            color: chipColor != Colors.transparent
-                                ? chipColor
-                                : Theme.of(
-                                    ctx,
-                                  ).colorScheme.surfaceContainerHighest,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Theme.of(ctx).colorScheme.outline,
-                            ),
-                          ),
+          selected: themeScheme,
+          options: [
+            for (final schemeId in _onboardingThemeSchemeIds)
+              SheetPickerOption(
+                value: schemeId,
+                label: 'theme_scheme_$schemeId'.tr(),
+                leading: Builder(
+                  builder: (ctx) {
+                    final chipColor = primaryColorForSchemeId(schemeId);
+                    return Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: chipColor != Colors.transparent
+                            ? chipColor
+                            : Theme.of(ctx)
+                                .colorScheme
+                                .surfaceContainerHighest,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Theme.of(ctx).colorScheme.outline,
                         ),
-                        title: Text('theme_scheme_$schemeId'.tr()),
-                        onTap: () => Navigator.of(ctx).pop(schemeId),
-                      );
-                    }).toList(),
-                  ),
+                      ),
+                    );
+                  },
                 ),
               ),
-            ),
-          ),
+          ],
         ).then((chosen) {
           if (chosen != null && context.mounted) {
             ref
