@@ -6,6 +6,7 @@ import '../../expenses/widgets/breakdown_pie_chart.dart';
 import '../../expenses/widgets/filtered_expenses_sheet.dart';
 import '../../groups/providers/group_analytics_provider.dart';
 import '../providers/profile_activity_provider.dart';
+import 'profile_expense_tile.dart';
 
 const _kMaxSlices = 6;
 const _kOtherId = '__other__';
@@ -104,14 +105,9 @@ class ProfileCategoryPieChart extends StatelessWidget {
 
     final rows = filtered
         .map(
-          (item) => FilteredExpenseRow(
-            expense: item.expense,
-            payerName: item.payerName,
-            groupId: item.group.id,
-            groupCurrencyCode: item.group.currencyCode,
-            amountCentsOverride: item.myShareCents,
-            detailLine:
-                '${item.group.name} · ${'profile_your_share'.tr()} · ${item.iPaid ? 'profile_expense_you_paid'.tr() : 'paid_by'.tr(namedArgs: {'name': item.payerName})}',
+          (item) => ProfileExpenseTile.toFilteredRow(
+            context,
+            item,
             showManageMenu: true,
           ),
         )

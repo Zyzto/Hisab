@@ -118,7 +118,7 @@ Expense form **photos**: add up to 5 images (camera or gallery on all platforms,
 
 - Router: `lib/core/navigation/app_router.dart`
   - onboarding redirect guard
-  - shell route for home/settings tabs; `/profile` is a shell child (like `/archived`) opened from sidenav avatar or mobile home avatar opposite the FAB
+  - shell route for home/settings tabs; `/profile` is a shell child (like `/archived`) opened from the sidenav avatar
   - group/invite/expense routes
   - **Navigation trace** (`navigation_trace.dart`): `GoRouter`’s `routerDelegate` listener records recent locations (UTC + URI) for **Share / Report issue** payloads (`error_report_helper.dart`). Decorative-only URL updates that do not change the delegate may not appear in the trace.
 - **Group / personal create wizard:** Canonical routes are `/groups/create` and `/groups/create-personal` (each mounts one `GroupCreatePage` so `PageView` state is not disposed between steps). Legacy paths such as `/groups/create/details` **redirect** to the canonical URL (bookmarks still work; refresh on a legacy step URL restarts the wizard at step 0). In-wizard step labels in the address bar use `SystemNavigator.routeInformationUpdated` (decorative), not `context.go`, so state and animations stay intact.
@@ -185,7 +185,7 @@ Push notifications are sent when expenses are added/edited or members join a gro
 
 ## Feature Modules
 
-- `features/home`: groups list (Personal and Groups sections) via **home_list_provider** (ordered list, pinned/custom order), **routes**, create FAB + modal (Create group / Create personal), mobile profile avatar opposite FAB, manual refresh trigger
+- `features/home`: groups list (Personal and Groups sections) via **home_list_provider** (ordered list, pinned/custom order), **routes**, create FAB + modal (Create group / Create personal), manual refresh trigger
 - `features/profile`: `/profile` dashboard (account header moved from Settings, global display-currency net, KPIs, balances, personal budgets, grouped `user_notifications` feed); SyncEngine fetches notifications by user
 - `features/groups`: create/detail/settings (including personal vs group branches and convert flows), invite management, invite acceptance; group settings include permission toggles (e.g. Members can add expenses, Members can record settlements for others). **Group create** uses a single shell route per flow plus decorative step URLs (see Navigation). `invite_redirect_proxy` (and `invite_redirect_proxy_web`, `invite_redirect_proxy_stub`, `invite_redirect_proxy_page`) for web/invite redirect; **create_invite_sheet** (invite creation UI)
 - `features/expenses`: create/edit/detail expenses (**expense_detail_shell**), split logic UI, image input hooks; **expense_navigation_direction** (provider), **expense_form_constants**, **category_icons**

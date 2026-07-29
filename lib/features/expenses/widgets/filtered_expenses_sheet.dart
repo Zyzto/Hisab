@@ -17,6 +17,8 @@ class FilteredExpenseRow {
     this.groupCurrencyCode,
     this.amountCentsOverride,
     this.detailLine,
+    this.detail,
+    this.amountCaption,
     this.customTags,
     this.showPaidBy = true,
     this.showManageMenu = false,
@@ -29,6 +31,8 @@ class FilteredExpenseRow {
   final String? groupCurrencyCode;
   final int? amountCentsOverride;
   final String? detailLine;
+  final Widget? detail;
+  final String? amountCaption;
   final List<ExpenseTag>? customTags;
   final bool showPaidBy;
   final bool showManageMenu;
@@ -54,6 +58,8 @@ Future<void> showFilteredExpensesSheet({
         groupCurrencyCode: row.groupCurrencyCode,
         amountCentsOverride: row.amountCentsOverride,
         detailLine: row.detailLine,
+        detail: row.detail,
+        amountCaption: row.amountCaption,
         customTags: row.customTags,
         showPaidBy: row.showPaidBy,
         showManageMenu: row.showManageMenu,
@@ -140,7 +146,10 @@ class AppExpenseTile extends StatelessWidget {
       groupCurrencyCode: row.groupCurrencyCode,
       amountCentsOverride: row.amountCentsOverride,
       detailLine: row.detailLine,
-      showPaidBy: row.showPaidBy && row.detailLine == null,
+      detail: row.detail,
+      amountCaption: row.amountCaption,
+      showPaidBy:
+          row.showPaidBy && row.detailLine == null && row.detail == null,
       showDisclosure: !row.showManageMenu,
       onTap: () => _openPath(
         context,

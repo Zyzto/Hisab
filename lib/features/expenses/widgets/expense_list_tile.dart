@@ -29,10 +29,17 @@ class ExpenseListTile extends StatelessWidget {
   final int? amountCentsOverride;
 
   /// Optional second line; when null and [showPaidBy], shows paid_by.
+  /// Ignored when [detail] is non-null.
   final String? detailLine;
+
+  /// Custom second-line content (e.g. visual chips). Takes precedence over [detailLine].
+  final Widget? detail;
 
   /// Extra trailing controls inside the card (e.g. edit / open-group icons).
   final Widget? trailing;
+
+  /// Optional caption under the primary amount (e.g. "Your share").
+  final String? amountCaption;
 
   const ExpenseListTile({
     super.key,
@@ -45,7 +52,9 @@ class ExpenseListTile extends StatelessWidget {
     this.showDisclosure = false,
     this.amountCentsOverride,
     this.detailLine,
+    this.detail,
     this.trailing,
+    this.amountCaption,
   });
 
   /// Primary amount for display: group currency when [groupCurrencyCode] is set and differs from expense currency, else expense amount.
@@ -107,7 +116,10 @@ class ExpenseListTile extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              if (detailLine != null || showPaidBy) ...[
+              if (detail != null) ...[
+                const SizedBox(height: 6),
+                detail!,
+              ] else if (detailLine != null || showPaidBy) ...[
                 const SizedBox(height: 3),
                 Text(
                   detailLine ??
@@ -122,12 +134,28 @@ class ExpenseListTile extends StatelessWidget {
             ],
           ),
         ),
-        Text(
-          CurrencyFormatter.formatCents(cents, currencyCode),
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: colorScheme.onSurface,
-          ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              CurrencyFormatter.formatCents(cents, currencyCode),
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: colorScheme.onSurface,
+              ),
+            ),
+            if (amountCaption != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                amountCaption!,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ],
         ),
         // Gap between amount and trailing actions / chevron.
         if (trailing != null || showDisclosure) const SizedBox(width: 10),
