@@ -15,11 +15,12 @@ import '../../../core/widgets/page_section_index.dart';
 import '../../../domain/domain.dart';
 import '../../groups/providers/groups_provider.dart';
 import '../../groups/widgets/group_card.dart';
+import '../../settings/account_mode_actions.dart';
 import '../../settings/providers/settings_framework_providers.dart';
+import '../../transaction_scanner/providers/scanner_providers.dart';
 import '../providers/notification_providers.dart';
 import '../providers/profile_activity_provider.dart';
 import '../providers/profile_dashboard_provider.dart';
-import '../providers/profile_my_expenses_provider.dart';
 import '../utils/notification_grouping.dart';
 import '../widgets/personal_budget_card.dart';
 import '../widgets/profile_account_section.dart';
@@ -205,6 +206,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     final dashboardAsync = ref.watch(profileDashboardProvider);
+    final activityAsync = ref.watch(profileActivityProvider);
     final data = dashboardAsync.asData?.value;
     final entries = _entriesFor(data);
     final entryIds = {for (final e in entries) e.id};
@@ -212,6 +214,16 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             entryIds.contains(_activeSectionId))
         ? _activeSectionId
         : entries.firstOrNull?.id;
+
+    // Gate first paint on dashboard + analytics so sections don't drip in.
+    // Keep prior content during refresh (RefreshIndicator handles that UX).
+    final contentLoading =
+        (!dashboardAsync.hasValue && !dashboardAsync.hasError) ||
+        (!activityAsync.hasValue && !activityAsync.hasError);
+    final contentError = (!dashboardAsync.hasValue
+            ? dashboardAsync.asError
+            : null) ??
+        (!activityAsync.hasValue ? activityAsync.asError : null);
 
     return LayoutBuilder(
       builder: (context, layoutConstraints) {
@@ -235,11 +247,17 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               },
             ),
             actions: [
-              IconButton(
-                tooltip: 'settings'.tr(),
-                icon: const Icon(Icons.settings_outlined),
-                onPressed: () => context.push(RoutePaths.settings),
-              ),
+              if (ref.watch(hisabSettingsProvidersProvider)
+                  case final settings?)
+                IconButton(
+                  tooltip: 'sign_out'.tr(),
+                  icon: const Icon(Icons.logout),
+                  onPressed: () => AccountModeActions.handleSignOut(
+                    context,
+                    ref,
+                    settings,
+                  ),
+                ),
             ],
           ),
           body: ConstrainedContent(
@@ -255,9 +273,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 RefreshIndicator(
                   onRefresh: () async {
                     await ref.read(dataSyncServiceProvider.notifier).syncNow();
-                    ref.invalidate(profileDashboardProvider);
-                    ref.invalidate(profileActivityProvider);
-                    ref.invalidate(profileMyExpensesProvider);
+                    // Batch watches update from PowerSync; only refresh
+                    // one-shot counts so the body doesn't flash skeleton.
+                    ref.invalidate(pendingDraftCountProvider);
+                    ref.invalidate(unreadNotificationCountProvider);
                     ref.invalidate(userNotificationsProvider);
                   },
                   child: NotificationListener<ScrollNotification>(
@@ -275,16 +294,15 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                           child: const ProfileAccountSection(),
                         ),
                         const Divider(height: 24),
-                        dashboardAsync.when(
-                          loading: () => const Padding(
-                            padding: EdgeInsets.all(32),
-                            child: Center(child: CircularProgressIndicator()),
-                          ),
-                          error: (e, _) => Padding(
+                        if (contentLoading)
+                          const _ProfileContentSkeleton()
+                        else if (contentError != null)
+                          Padding(
                             padding: const EdgeInsets.all(16),
-                            child: Text('$e'),
-                          ),
-                          data: (data) => Column(
+                            child: Text('${contentError.error}'),
+                          )
+                        else if (data != null)
+                          Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               KeyedSubtree(
@@ -424,7 +442,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                               ],
                             ],
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -456,6 +473,76 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       double.infinity,
     );
     return rightFree >= 176 + 8;
+  }
+}
+
+/// Placeholder layout shown until dashboard + analytics are ready together.
+class _ProfileContentSkeleton extends StatelessWidget {
+  const _ProfileContentSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final fill = cs.surfaceContainerHighest.withValues(alpha: 0.55);
+
+    Widget block({double height = 16, double? width, BorderRadius? radius}) {
+      return Container(
+        height: height,
+        width: width,
+        decoration: BoxDecoration(
+          color: fill,
+          borderRadius: radius ?? BorderRadius.circular(8),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          block(height: 120, radius: BorderRadius.circular(16)),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 88,
+            child: Row(
+              children: [
+                for (var i = 0; i < 3; i++) ...[
+                  if (i > 0) const SizedBox(width: 8),
+                  Expanded(child: block(height: 88, radius: BorderRadius.circular(12))),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          block(height: 14, width: 120),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              for (var i = 0; i < 3; i++) ...[
+                if (i > 0) const SizedBox(width: 8),
+                Expanded(child: block(height: 72, radius: BorderRadius.circular(12))),
+              ],
+            ],
+          ),
+          const SizedBox(height: 20),
+          block(height: 14, width: 140),
+          const SizedBox(height: 12),
+          for (var i = 0; i < 4; i++) ...[
+            if (i > 0) const SizedBox(height: 8),
+            block(height: 56, radius: BorderRadius.circular(12)),
+          ],
+          const SizedBox(height: 24),
+          const Center(
+            child: SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

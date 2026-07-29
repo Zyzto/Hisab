@@ -1,5 +1,3 @@
-import 'dart:ui' as ui;
-
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../../domain/domain.dart';
@@ -161,9 +159,7 @@ class ExpenseListTile extends StatelessWidget {
         if (trailing != null || showDisclosure) const SizedBox(width: 10),
         if (showDisclosure && trailing == null)
           Icon(
-            Directionality.of(context) == ui.TextDirection.rtl
-                ? Icons.chevron_left_rounded
-                : Icons.chevron_right_rounded,
+            Icons.chevron_right_rounded,
             size: 20,
             color: colorScheme.onSurfaceVariant,
           ),
@@ -200,7 +196,12 @@ class ExpenseListTile extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Padding(
-                            padding: const EdgeInsets.fromLTRB(12, 12, 0, 12),
+                            padding: const EdgeInsetsDirectional.fromSTEB(
+                              12,
+                              12,
+                              0,
+                              12,
+                            ),
                             child: content,
                           ),
                         ),

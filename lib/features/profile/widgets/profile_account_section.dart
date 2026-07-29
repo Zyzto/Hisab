@@ -144,12 +144,6 @@ class ProfileAccountSection extends ConsumerWidget {
                 title: Text('change_password'.tr()),
                 onTap: () => showChangePasswordSheet(context, ref),
               ),
-            ActionSettingsTile(
-              leading: const Icon(Icons.logout),
-              title: Text('sign_out'.tr()),
-              onTap: () =>
-                  AccountModeActions.handleSignOut(context, ref, settings),
-            ),
           ],
         );
       },

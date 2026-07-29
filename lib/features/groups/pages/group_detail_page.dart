@@ -1912,7 +1912,7 @@ class _PeoplePersonCard extends StatelessWidget {
     final mutedColor = colorScheme.onSurfaceVariant;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+      padding: const EdgeInsetsDirectional.fromSTEB(14, 12, 8, 12),
       decoration: BoxDecoration(
         color: muted
             ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.55)

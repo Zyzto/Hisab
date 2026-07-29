@@ -1,19 +1,25 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:easy_localization/easy_localization.dart';
-import 'package:pwa_install/pwa_install.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// A dismissible banner prompting mobile web users to install the app as a PWA.
+import '../pwa/pwa_capabilities.dart';
+import 'pwa_install_guide_sheet.dart';
+
+/// Dismissible banner prompting mobile web users to install the app as a PWA.
 ///
-/// Only visible when:
+/// Visible when:
 /// - Running on web (`kIsWeb`)
-/// - The browser supports PWA install (`installPromptEnabled`)
-/// - The user hasn't previously dismissed the banner
+/// - Device looks mobile
+/// - App is not already standalone
+/// - User has not dismissed the banner
+///
+/// Uses the native install prompt when available (Chromium Android); otherwise
+/// opens step-by-step Add to Home Screen instructions (iOS + other browsers).
 class PwaInstallBanner extends StatefulWidget {
   const PwaInstallBanner({super.key});
 
-  static const _dismissedKey = 'pwa_install_dismissed';
+  static const dismissedKey = 'pwa_install_dismissed';
 
   @override
   State<PwaInstallBanner> createState() => _PwaInstallBannerState();
@@ -23,6 +29,7 @@ class _PwaInstallBannerState extends State<PwaInstallBanner>
     with SingleTickerProviderStateMixin {
   bool _visible = false;
   bool _dismissed = false;
+  PwaInstallMode _mode = PwaInstallMode.unsupported;
 
   late final AnimationController _animController;
   late final Animation<double> _fadeAnimation;
@@ -45,22 +52,68 @@ class _PwaInstallBannerState extends State<PwaInstallBanner>
     ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
 
     if (kIsWeb) {
+      addPwaCapabilityListener(_onCapabilityChanged);
       _checkShouldShow();
     }
   }
 
+  void _onCapabilityChanged() {
+    if (!mounted) return;
+    final mode = pwaInstallMode;
+    if (mode == PwaInstallMode.alreadyInstalled ||
+        mode == PwaInstallMode.unsupported) {
+      if (_visible) {
+        _animController.reverse().then((_) {
+          if (mounted) {
+            setState(() {
+              _visible = false;
+              _mode = mode;
+            });
+          }
+        });
+      } else {
+        setState(() => _mode = mode);
+      }
+      return;
+    }
+    if (_dismissed) return;
+    setState(() {
+      _mode = mode;
+      if (!_visible) {
+        _visible = true;
+        _animController.forward();
+      }
+    });
+  }
+
   Future<void> _checkShouldShow() async {
     final prefs = await SharedPreferences.getInstance();
-    final wasDismissed = prefs.getBool(PwaInstallBanner._dismissedKey) ?? false;
+    final wasDismissed =
+        prefs.getBool(PwaInstallBanner.dismissedKey) ?? false;
 
-    if (wasDismissed || !mounted) return;
+    if (!mounted) return;
 
-    // Check if browser supports PWA install prompt
-    final installEnabled = PWAInstall().installPromptEnabled;
+    if (wasDismissed) {
+      setState(() {
+        _dismissed = true;
+        _visible = false;
+      });
+      return;
+    }
 
-    if (installEnabled && mounted) {
-      setState(() => _visible = true);
+    final mode = pwaInstallMode;
+    final shouldShow = mode == PwaInstallMode.nativePrompt ||
+        mode == PwaInstallMode.manualIos ||
+        mode == PwaInstallMode.manualAndroid;
+
+    if (shouldShow && mounted) {
+      setState(() {
+        _mode = mode;
+        _visible = true;
+      });
       _animController.forward();
+    } else if (mounted) {
+      setState(() => _mode = mode);
     }
   }
 
@@ -72,15 +125,26 @@ class _PwaInstallBannerState extends State<PwaInstallBanner>
       _visible = false;
     });
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(PwaInstallBanner._dismissedKey, true);
+    await prefs.setBool(PwaInstallBanner.dismissedKey, true);
   }
 
-  void _install() {
-    PWAInstall().promptInstall_();
+  Future<void> _primaryAction() async {
+    if (_mode == PwaInstallMode.nativePrompt) {
+      final accepted = await promptPwaInstall();
+      if (accepted && mounted) {
+        await _dismiss();
+      }
+      return;
+    }
+    if (!mounted) return;
+    await showPwaInstallGuide(context);
   }
 
   @override
   void dispose() {
+    if (kIsWeb) {
+      removePwaCapabilityListener(_onCapabilityChanged);
+    }
     _animController.dispose();
     super.dispose();
   }
@@ -92,6 +156,14 @@ class _PwaInstallBannerState extends State<PwaInstallBanner>
     }
 
     final colorScheme = Theme.of(context).colorScheme;
+    final useNative = _mode == PwaInstallMode.nativePrompt;
+    final actionLabel =
+        useNative ? 'install_app'.tr() : 'install_app_how_to'.tr();
+    final description = useNative
+        ? 'install_app_description'.tr()
+        : (_mode == PwaInstallMode.manualIos
+              ? 'install_app_description_ios'.tr()
+              : 'install_app_description_android'.tr());
 
     return SlideTransition(
       position: _slideAnimation,
@@ -137,7 +209,7 @@ class _PwaInstallBannerState extends State<PwaInstallBanner>
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'install_app_description'.tr(),
+                        description,
                         style: TextStyle(
                           color: colorScheme.onPrimaryContainer.withValues(
                             alpha: 0.7,
@@ -150,7 +222,7 @@ class _PwaInstallBannerState extends State<PwaInstallBanner>
                 ),
                 const SizedBox(width: 8),
                 FilledButton.tonal(
-                  onPressed: _install,
+                  onPressed: _primaryAction,
                   style: FilledButton.styleFrom(
                     backgroundColor: colorScheme.primary,
                     foregroundColor: colorScheme.onPrimary,
@@ -162,7 +234,7 @@ class _PwaInstallBannerState extends State<PwaInstallBanner>
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                   child: Text(
-                    'install_app'.tr(),
+                    actionLabel,
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,

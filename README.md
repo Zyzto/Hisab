@@ -73,7 +73,7 @@ Temporarily offline in online mode: expense writes queue and sync later. Invites
 ### Web / PWA
 
 Live at **[hisab.shenepoy.com](https://hisab.shenepoy.com)** (Firebase Hosting).  
-Add to Home Screen in Chrome, Edge, or Safari — works offline after install.
+Install from the in-app banner when offered (Chromium Android uses the native install prompt; iPhone/iPad and other mobile browsers get Add-to-Home-Screen steps). On iOS, open the Home Screen app for web push. Works offline after install.
 
 ### Android
 

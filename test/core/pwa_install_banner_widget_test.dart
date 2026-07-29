@@ -20,6 +20,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.byType(PwaInstallBanner), findsOneWidget);
-    // On non-web or when not visible, banner returns SizedBox.shrink
+    // On non-web the banner returns SizedBox.shrink (no install chrome).
+    expect(find.text('Install App'), findsNothing);
   });
 }

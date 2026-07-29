@@ -276,7 +276,7 @@ class _ServiceRow extends StatelessWidget {
               // Always show recent section (Kuma-style): list incidents or "None"
               const SizedBox(height: 10),
               Padding(
-                padding: const EdgeInsets.only(left: 24),
+                padding: const EdgeInsetsDirectional.only(start: 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -452,7 +452,7 @@ class _FirebaseServiceRow extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Padding(
-                padding: const EdgeInsets.only(left: 24),
+                padding: const EdgeInsetsDirectional.only(start: 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -591,7 +591,7 @@ class _ProjectHealthRow extends StatelessWidget {
             if (hint != null) ...[
               const SizedBox(height: 8),
               Padding(
-                padding: const EdgeInsets.only(left: 24),
+                padding: const EdgeInsetsDirectional.only(start: 24),
                 child: Text(
                   hint,
                   style: theme.textTheme.bodySmall?.copyWith(

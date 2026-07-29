@@ -2,6 +2,9 @@ import '../../domain/domain.dart';
 
 abstract class IExpenseRepository {
   Future<List<Expense>> getAll();
+
+  /// Live updates for every expense (one query instead of per-group watches).
+  Stream<List<Expense>> watchAll();
   Future<List<Expense>> getByGroupId(String groupId);
   Stream<List<Expense>> watchByGroupId(String groupId);
   Future<Expense?> getById(String id);

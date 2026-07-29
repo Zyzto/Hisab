@@ -7,7 +7,10 @@ import 'package:permission_handler/permission_handler.dart';
 import '../constants/supabase_config.dart';
 import '../layout/layout_breakpoints.dart';
 import '../layout/responsive_sheet.dart';
+import '../pwa/pwa_capabilities.dart';
+import '../widgets/pwa_install_guide_sheet.dart';
 import '../widgets/sheet_helpers.dart';
+import '../widgets/toast.dart';
 import 'request_notification_permission_stub.dart'
     if (dart.library.html) 'request_notification_permission_web.dart'
     as browser_notification;
@@ -17,7 +20,7 @@ import 'request_notification_permission_stub.dart'
 /// All methods are static and take [BuildContext] so they can show a
 /// non-blocking dialog when a permission is permanently denied.
 /// On web, camera/photos are skipped; notification permission is requested via
-/// Firebase Messaging when Firebase is initialized.
+/// the browser Notification API (and FCM when Firebase is initialized).
 class PermissionService {
   PermissionService._();
 
@@ -51,28 +54,13 @@ class PermissionService {
   ///
   /// Shows an explanatory dialog with "Open Settings" when permanently denied.
   /// On web, triggers the browser's native notification permission prompt
-  /// so the user always sees a dialog when tapping Allow.
+  /// so the user always sees a dialog when tapping Allow. On iOS Safari /
+  /// WebKit in the browser tab, guides the user to install the PWA first.
   static Future<bool> requestNotificationPermission(
     BuildContext context,
   ) async {
     if (kIsWeb) {
-      final granted = await browser_notification
-          .requestBrowserNotificationPermission();
-      if (!granted) return false;
-      if (!firebaseInitialized) return true;
-      try {
-        final messaging = FirebaseMessaging.instance;
-        final settings = await messaging.requestPermission(
-          alert: true,
-          badge: true,
-          sound: true,
-          provisional: false,
-        );
-        return settings.authorizationStatus == AuthorizationStatus.authorized ||
-            settings.authorizationStatus == AuthorizationStatus.provisional;
-      } catch (_) {
-        return true;
-      }
+      return _requestWebNotificationPermission(context);
     }
     return _requestPermission(
       context,
@@ -84,6 +72,9 @@ class PermissionService {
   /// Whether notification permission is currently granted (no request).
   static Future<bool> isNotificationPermissionGranted() async {
     if (kIsWeb) {
+      if (pwaNotificationSupport == PwaNotificationSupport.needsInstall) {
+        return false;
+      }
       return browser_notification.isBrowserNotificationPermissionGranted();
     }
     final status = await Permission.notification.status;
@@ -100,7 +91,19 @@ class PermissionService {
   /// Show the "notifications are disabled" dialog without requesting again.
   /// Useful when the Firebase permission check already ran and was denied.
   static void showNotificationDeniedInfo(BuildContext context) {
-    if (kIsWeb || !context.mounted) return;
+    if (!context.mounted) return;
+    if (kIsWeb) {
+      if (pwaNotificationSupport == PwaNotificationSupport.needsInstall) {
+        _showWebNeedsInstallSheet(context);
+        return;
+      }
+      _showPermissionDeniedDialog(
+        context,
+        'permission_notification_message_web'.tr(),
+        showOpenSettings: false,
+      );
+      return;
+    }
     _showPermissionDeniedDialog(
       context,
       'permission_notification_message'.tr(),
@@ -108,6 +111,90 @@ class PermissionService {
   }
 
   // ───────────────────── Private helpers ─────────────────────
+
+  static Future<bool> _requestWebNotificationPermission(
+    BuildContext context,
+  ) async {
+    final support = pwaNotificationSupport;
+    if (support == PwaNotificationSupport.unsupported ||
+        !browser_notification.isBrowserNotificationApiSupported()) {
+      if (context.mounted) {
+        context.showToast('notifications_unsupported_browser'.tr());
+      }
+      return false;
+    }
+    if (support == PwaNotificationSupport.needsInstall) {
+      if (context.mounted) {
+        await _showWebNeedsInstallSheet(context);
+      }
+      return false;
+    }
+
+    final granted =
+        await browser_notification.requestBrowserNotificationPermission();
+    if (!granted) {
+      if (context.mounted) {
+        showNotificationDeniedInfo(context);
+      }
+      return false;
+    }
+    if (!firebaseInitialized) return true;
+    try {
+      final messaging = FirebaseMessaging.instance;
+      final settings = await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+        provisional: false,
+      );
+      return settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  static Future<void> _showWebNeedsInstallSheet(BuildContext context) async {
+    if (!context.mounted) return;
+    final isTablet = LayoutBreakpoints.isTabletOrWider(context);
+    final title = 'permission_notification_needs_install_title'.tr();
+    await showResponsiveSheet<void>(
+      context: context,
+      title: title,
+      maxHeight: MediaQuery.of(context).size.height * 0.55,
+      isScrollControlled: true,
+      centerInFullViewport: true,
+      child: Builder(
+        builder: (ctx) => buildSheetShell(
+          ctx,
+          title: title,
+          showTitleInBody: !isTablet,
+          body: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              'permission_notification_needs_install'.tr(),
+              style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(height: 1.4),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text('permission_cancel'.tr()),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                if (context.mounted) {
+                  showPwaInstallGuide(context);
+                }
+              },
+              child: Text('install_app_how_to'.tr()),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   /// Core flow: check → request → show dialog if permanently denied.
   static Future<bool> _requestPermission(
@@ -133,12 +220,13 @@ class PermissionService {
     return false;
   }
 
-  /// Non-blocking sheet explaining the denied permission with an
-  /// "Open Settings" button. Never blocks app usage.
+  /// Non-blocking sheet explaining the denied permission.
+  /// Never blocks app usage.
   static void _showPermissionDeniedDialog(
     BuildContext context,
-    String message,
-  ) {
+    String message, {
+    bool showOpenSettings = true,
+  }) {
     if (!context.mounted) return;
     showResponsiveSheet<void>(
       context: context,
@@ -156,18 +244,23 @@ class PermissionService {
             child: Text(message),
           ),
           actions: [
-            if (!LayoutBreakpoints.isTabletOrWider(context))
+            if (!LayoutBreakpoints.isTabletOrWider(context) || !showOpenSettings)
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: Text('permission_cancel'.tr()),
+                child: Text(
+                  showOpenSettings
+                      ? 'permission_cancel'.tr()
+                      : 'install_app_got_it'.tr(),
+                ),
               ),
-            FilledButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                openAppSettings();
-              },
-              child: Text('permission_open_settings'.tr()),
-            ),
+            if (showOpenSettings)
+              FilledButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  openAppSettings();
+                },
+                child: Text('permission_open_settings'.tr()),
+              ),
           ],
         ),
       ),

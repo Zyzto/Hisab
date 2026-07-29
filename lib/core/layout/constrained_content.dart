@@ -5,8 +5,9 @@ import 'layout_breakpoints.dart';
 /// constrained to [LayoutBreakpoints.contentMaxWidth]. On narrow screens
 /// [child] is returned unchanged.
 ///
-/// When [aside] is provided and the right gutter is wide enough, [aside] is
+/// When [aside] is provided and the **end** gutter is wide enough, [aside] is
 /// placed outside the main content band (does not shrink the reading column).
+/// End = right in LTR, left in RTL.
 class ConstrainedContent extends StatelessWidget {
   const ConstrainedContent({
     super.key,
@@ -19,7 +20,7 @@ class ConstrainedContent extends StatelessWidget {
   final Widget child;
 
   /// Optional trailing rail (e.g. "On this page") shown beside content when
-  /// there is enough unused space to the right of the content band.
+  /// there is enough unused space on the end side of the content band.
   final Widget? aside;
 
   /// Minimum free width (after the content band) required to show [aside].
@@ -44,8 +45,12 @@ class ConstrainedContent extends StatelessWidget {
           0.0,
           double.infinity,
         );
-        final showAside =
-            aside != null && rightFree >= asideMinGutter + 8;
+        final isRtl = Directionality.of(context) == TextDirection.rtl;
+        final endFree = isRtl ? leftOffset : rightFree;
+        final showAside = aside != null && endFree >= asideMinGutter + 8;
+        final asideW = showAside
+            ? asideWidth.clamp(0.0, endFree)
+            : 0.0;
 
         // Force LTR so [leftOffset] stays a physical-left inset and matches
         // [ContentAlignedAppBar] (which uses Positioned.left). A plain Row
@@ -54,14 +59,26 @@ class ConstrainedContent extends StatelessWidget {
           textDirection: TextDirection.ltr,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SizedBox(width: leftOffset),
+            if (isRtl && showAside)
+              SizedBox(
+                width: asideW,
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: aside,
+                ),
+              ),
+            SizedBox(
+              width: isRtl && showAside
+                  ? (leftOffset - asideW).clamp(0.0, double.infinity)
+                  : leftOffset,
+            ),
             ConstrainedBox(
               constraints: BoxConstraints(maxWidth: bandWidth),
               child: child,
             ),
-            if (showAside)
+            if (!isRtl && showAside)
               SizedBox(
-                width: asideWidth.clamp(0.0, rightFree),
+                width: asideW,
                 child: Align(
                   alignment: Alignment.topCenter,
                   child: aside,

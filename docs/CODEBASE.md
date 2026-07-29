@@ -23,7 +23,7 @@ Product and install overview: [../README.md](../README.md). Doc index: [README.m
 | Path | Purpose |
 |---|---|
 | `lib/` | Main Flutter application code |
-| `lib/core/` | Cross-cutting: auth, constants, database, debug, navigation, receipt, repository, services, telemetry, theme, update, utils, widgets |
+| `lib/core/` | Cross-cutting: auth, constants, database, debug, layout, motion, navigation, pwa, receipt, repository, services, telemetry, theme, update, utils, widgets |
 | `lib/features/` | Feature modules (`home`, `profile`, `groups`, `expenses`, `balance`, `settings`, `onboarding`, `transaction_scanner`) |
 | `lib/domain/` | Domain entities and value types; barrel export in `domain.dart` |
 | `assets/translations/` | Localization JSON files |
@@ -44,13 +44,13 @@ Product and install overview: [../README.md](../README.md). Doc index: [README.m
 
 `lib/main.dart` boot sequence:
 
-1. Flutter bindings, (web) PWA install callback, global error handlers, logging service, Easy Localization, image picker setup.
+1. Flutter bindings, global error handlers, logging service, Easy Localization, image picker setup. On web, `web/index.html` exposes `window.hisabPwa` (install + capability detection) and shows a boot splash until Flutter mounts.
 2. Settings framework (`flutter_settings_framework`) and reads persisted settings.
 3. Initializes local SQLite (`PowerSyncDatabase`) unconditionally.
-4. Initializes Supabase only when `SUPABASE_URL` and `SUPABASE_ANON_KEY` are provided.
+4. Initializes Supabase only when `SUPABASE_URL` and `SUPABASE_ANON_KEY` are provided. On web, `_finalizeWebOAuthReturn` cleans auth callback URL params and retries session recovery once if the stock path left no session.
 5. Resolves pending OAuth flags from settings (onboarding/settings web redirect flows).
 6. Initializes Firebase (for FCM) when Supabase is configured.
-7. Mounts `EasyLocalization` + `ProviderScope` and injects initialized singletons.
+7. Mounts `EasyLocalization` + `ProviderScope` and injects initialized singletons. `App` surfaces any pending web OAuth error toast after the navigator is ready.
 8. Uses `_LocaleSync` as the only bridge from settings language provider to `context.setLocale`.
 
 ## Core Architecture
@@ -102,12 +102,13 @@ Key services: `lib/core/services/` — **notification_service** (FCM token, fore
 
 ### Core widgets
 
-Shared widgets in `lib/core/widgets/`: **AsyncValueBuilder**, **BackButtonKeyboardDismiss**, **ConnectionBanner**, **CurrencyPickerList**, **ErrorContentWidget** (Share / Report issue; optional `summaryEnglish` for GitHub title), **ExpandableSection**, **FloatingNavBar**, **AppSidenav**, **ShellMenuButton**, **SheetOptionTile** / **SheetOptionList**, **PwaInstallBanner**, **ServicesStatusSheet**, **SyncStatusChip** (`sync_status_icon.dart`), **Toast** (`toast.dart`: `showErrorWithActions` dismisses the toastification overlay before awaiting share / external browser on Android to avoid a stuck hit target at the bottom of the screen).
+Shared widgets in `lib/core/widgets/`: **AsyncValueBuilder**, **BackButtonKeyboardDismiss**, **ConnectionBanner**, **CurrencyPickerList**, **ErrorContentWidget** (Share / Report issue; optional `summaryEnglish` for GitHub title), **ExpandableSection**, **FloatingNavBar**, **AppSidenav**, **ShellMenuButton**, **SheetOptionTile** / **SheetOptionList**, **PwaInstallBanner** / install guide sheet, **ServicesStatusSheet**, **SyncStatusChip** (`sync_status_icon.dart`), **Toast** (`toast.dart`: `showErrorWithActions` dismisses the toastification overlay before awaiting share / external browser on Android to avoid a stuck hit target at the bottom of the screen).
 
 ### Layout (core/layout)
 
 - **LayoutBreakpoints** (`layout_breakpoints.dart`) — width breakpoints (tablet ≥600px, desktop ≥840px), content max widths (600/720), permanent shell sidenav width (240; mid band 0), and **`contentBandMetrics(context, contentAreaWidth)`** returning `(leftOffset, contentMaxWidth)` so the app bar title and body share the same horizontal band. Shell nav: `FloatingNavBar` (phone), temporary drawer + `ShellMenuButton` (mid), `AppSidenav` (desktop).
-- **ConstrainedContent** (`constrained_content.dart`) — on tablet+ wraps [child] in a centered band using `contentBandMetrics`; on narrow screens returns [child] unchanged. Body content is wrapped in this so it does not span full width on large screens.
+- **ConstrainedContent** (`constrained_content.dart`) — on tablet+ wraps [child] in a centered band using `contentBandMetrics`; on narrow screens returns [child] unchanged. Body content is wrapped in this so it does not span full width on large screens. Optional [aside] (e.g. page section index) sits in the **end** gutter (right in LTR, left in RTL) when that gutter is wide enough.
+- **ContentAlignedFabLocation** (`content_aligned_fab_location.dart`) — positions the scaffold FAB at the end of the content band on wide layouts (RTL-aware); falls back to `endFloat` when the end gutter is tight.
 - **ContentAlignedAppBar** (`content_aligned_app_bar.dart`) — a `PreferredSizeWidget` that places the title in the same horizontal band as the body (via `contentBandMetrics`). The title is absolutely positioned so it is not affected by leading/actions width. Titles use the normal app bar text size (no `FittedBox` shrink-to-fit); long titles should use `maxLines` / `TextOverflow.ellipsis` (or elide in the parent), e.g. group detail’s app bar name (`group_detail_page.dart`: grapheme cap + ellipsis). Use with a **LayoutBuilder** around the scaffold and pass `layoutConstraints.maxWidth` as `contentAreaWidth`. Used on all pages that have an app bar and `ConstrainedContent` body (home, settings, group detail/settings/create, invite management/scan/accept, archived groups, expense form, privacy policy).
 
 ### Images + Receipt AI (core/receipt)
@@ -147,6 +148,7 @@ Expense form **photos**: add up to 5 images (camera or gallery on all platforms,
 - Supported locales: English (`en`), Arabic (`ar`).
 - Strings live in `assets/translations/en.json` and `ar.json` (same key set). Production UI uses `.tr()`; keep both locale files in lockstep when adding keys.
 - Special cases (FCM background isolate English fallbacks, debug menu, bug-report English markdown, stored default participant names): see [I18N.md](I18N.md).
+- Directional Material icons (`Icons.arrow_back`, `Icons.chevron_right`, etc.) already set `IconData.matchTextDirection`; do **not** pass `matchTextDirection` on the `Icon` widget (that named arg is not on `Icon` in current Flutter). Layout helpers (`ConstrainedContent.aside`, `ContentAlignedFabLocation`) place trailing chrome on the **end** side so Arabic mirrors correctly.
 
 ## Authentication
 
@@ -160,8 +162,14 @@ Expense form **photos**: add up to 5 images (camera or gallery on all platforms,
 
 Redirect behavior:
 
-- Web uses `SITE_URL` if provided.
+- Web uses `SITE_URL` if provided (`authRedirectUrl`). If `SITE_URL` is mistakenly `http://` while the page origin is `https://` on the same host, the app upgrades the redirect to the current origin so OAuth does not bounce through an http→https 301.
 - Native uses deep link callback `io.supabase.hisab://callback`.
+
+**Web OAuth return path** (`lib/main.dart` + `lib/core/auth/oauth_*.dart`):
+
+- Stock `Supabase.initialize` still runs with default `detectSessionInUri: true` (Safari/production happy path).
+- `_finalizeWebOAuthReturn` then: if auth params remain and there is still no session, retries `getSessionFromUrl` once (20s timeout); sets `pendingWebOAuthCallbackError` for toast keys `auth_oauth_callback_failed` / `auth_oauth_timeout`; always clears auth query/hash params via `clearWebAuthCallbackParams` so a refresh cannot reuse a spent code.
+- `App` shows the pending toast from the navigator context after first frame.
 
 ## Notifications (FCM + in-app history)
 
@@ -177,7 +185,7 @@ Push notifications are sent when expenses are added/edited or members join a gro
 
 **Backend:** Database trigger `notify_on_expense_change` (and `notify_on_member_join`) calls `notify_group_activity()`, which POSTs to the `send-notification` Edge Function with `group_id`, `actor_user_id`, `action`, and optional expense fields (including `expense_id` when present). **Personal groups** (groups with `is_personal = true`; see [PERSONAL_FEATURE.md](PERSONAL_FEATURE.md)) do not trigger notifications—the trigger function skips the HTTP call for them. The Edge Function (`supabase/functions/send-notification/index.ts`) loads other group members’ tokens and `locale` from `device_tokens`, inserts history rows, then sends FCM v1 messages (one per token) when FCM secrets are configured. For **expense_created** and **expense_updated**, the actor is the user who created or last updated the expense; the Edge Function excludes that actor so only **other** group members receive the push/history. For `member_joined`, the actor is the new member; the Edge Function excludes the actor so the joinee does not receive a notification. Title and body are localized per recipient using stored `locale` (en/ar; fallback en).
 
-**Web:** `web/index.html` initializes Firebase web SDK; `web/firebase-messaging-sw.js` handles background push and clicks. Web token registration requires `FCM_VAPID_KEY` at build time.
+**Web:** `web/index.html` initializes Firebase web SDK; `web/firebase-messaging-sw.js` handles background push and clicks. Web token registration requires `FCM_VAPID_KEY` at build time. On iPhone/iPad (all browsers use WebKit), push is gated until the user installs the Home Screen PWA and opens it from there (`pwaNotificationSupport`).
 
 **Settings:** `notifications_enabled` controls FCM initialization and token registration; the toggle is shown only in online mode. In-app history still syncs when present on the server.
 
@@ -186,7 +194,7 @@ Push notifications are sent when expenses are added/edited or members join a gro
 ## Feature Modules
 
 - `features/home`: groups list (Personal and Groups sections) via **home_list_provider** (ordered list, pinned/custom order), **routes**, create FAB + modal (Create group / Create personal), manual refresh trigger
-- `features/profile`: `/profile` dashboard (account header moved from Settings, global display-currency net, KPIs, balances, personal budgets, grouped `user_notifications` feed); SyncEngine fetches notifications by user
+- `features/profile`: `/profile` dashboard (account header moved from Settings, global display-currency net, KPIs, balances, personal budgets, grouped `user_notifications` feed). Data loads through **`profile_data_providers`** (`allExpensesProvider` / `allParticipantsProvider` / `myMembershipsProvider` → `profileDataSnapshotProvider`) so the dashboard and “my expenses” share one snapshot instead of N per-group streams. Repositories expose `watchAll` / `watchMyMembers` (web uses fingerprint-gated polling). SyncEngine fetches notifications by user.
 - `features/groups`: create/detail/settings (including personal vs group branches and convert flows), invite management, invite acceptance; group settings include permission toggles (e.g. Members can add expenses, Members can record settlements for others). **Group create** uses a single shell route per flow plus decorative step URLs (see Navigation). `invite_redirect_proxy` (and `invite_redirect_proxy_web`, `invite_redirect_proxy_stub`, `invite_redirect_proxy_page`) for web/invite redirect; **create_invite_sheet** (invite creation UI)
 - `features/expenses`: create/edit/detail expenses (**expense_detail_shell**), split logic UI, image input hooks; **expense_navigation_direction** (provider), **expense_form_constants**, **category_icons**
 - `features/balance`: you-centric balance list (Your balance hero → everyone else → Settle Up) and record settlement flow. By default only the group owner or the debtor (participant who owes) can record a settlement; group setting **Members can record settlements for others** (Group.allowMemberSettleForOthers) allows any member to record. Balance list (`balance_list.dart`) uses `myMemberInGroupProvider` and `myRoleInGroupProvider` for the hero (when linked) and to enable or disable the record button per row.
@@ -218,7 +226,13 @@ Major persisted keys include:
 - PWA manifest: `web/manifest.json`
 - Web bootstrap: `web/flutter_bootstrap.js` (custom bootstrap; loads Flutter without default service-worker settings)
 - PowerSync web assets: `web/sqlite3.wasm`, `web/powersync_db.worker.js` (single worker for DB + sync; refresh with `flutter pub run powersync:setup_web`)
-- Install prompt integration: `pwa_install` package + `PwaInstallBanner` widget
+- Boot splash: `#hisab-boot-splash` in `web/index.html` (avoids a blank screen while Flutter / OAuth return loads); removed when the app mounts.
+- PWA install UX (replaces the old `pwa_install` package):
+  - `lib/core/pwa/` — `PwaInstallMode` / `PwaNotificationSupport`, stub vs web capability APIs (`isPwaStandalone`, `canPromptPwaInstall`, `promptPwaInstall`, listeners)
+  - `window.hisabPwa` in `web/index.html` — captures `beforeinstallprompt`, reports standalone/iOS/Android/mobile, prompts install
+  - `PwaInstallBanner` + `PwaInstallGuideSheet` — native Chromium prompt on Android when available; otherwise platform-specific Add-to-Home-Screen steps (iOS Share menu / Android browser menu)
+  - Web push on iPhone/iPad is gated until the Home Screen PWA is opened (`pwaNotificationSupport == needsInstall`); `PermissionService` then shows an install sheet instead of a no-op browser prompt
+  - Unit coverage: `test/core/pwa_capabilities_test.dart`, `test/core/pwa_install_banner_widget_test.dart`
 - Invite links use the web app domain (e.g. hisab.shenepoy.com) when `INVITE_BASE_URL` is set. On deploy, the route `/functions/v1/invite-redirect` is served by **Firebase Hosting** via a rewrite to static `invite-redirect.html` (built from `web/invite-redirect-template.html`); that page redirects to the Supabase Edge Function, which validates the token and redirects the user to `redirect.html`. This works on the Firebase free (Spark) plan with no Cloud Function. When the user is already inside the web app, the same path is handled by the Flutter app (GoRouter), which redirects to the Supabase Edge Function.
 - Invite redirect static page: `web/redirect.html`
   - desktop -> web invite route
@@ -410,7 +424,7 @@ The `test-online` job requires no additional secrets — it uses the local Supab
 - **Run all tests:** `flutter test`
 - **Coverage:**
   - **Unit:** domain, settle-up, sync error classification, backup parse, translations.
-  - **Widget:** Public custom widgets under `test/` mirroring `lib/`: `test/core/` (async_value_builder, back_button_keyboard_dismiss, connection_banner, currency_picker_list, expandable_section, floating_nav_bar, invite_link_handler, pwa_install_banner, sync_status_chip), `test/groups/` (group_card, create_invite_sheet), `test/expenses/` (expense_list_tile, expense_title_section, expense_amount_section, expense_split_section, expense_bill_breakdown_section, expense_detail_body, expense_detail_body_header), `test/settings/` (logs_viewer_dialog, privacy_policy_page), `test/pages/` (main_scaffold, home_page, archived_groups_page), `test/balance/` (balance_list: settlement permission — owner vs member/debtor), `test/onboarding/` (onboarding_page), plus error_content and app. Widget tests use EasyLocalization + MaterialApp; Riverpod widgets use ProviderScope with overrides when needed. See [test/widget_test_helpers.dart](../test/widget_test_helpers.dart) and [test/README.md](../test/README.md).
+  - **Widget:** Public custom widgets under `test/` mirroring `lib/`: `test/core/` (async_value_builder, back_button_keyboard_dismiss, connection_banner, currency_picker_list, expandable_section, floating_nav_bar, invite_link_handler, pwa_install_banner, pwa_capabilities, sync_status_chip), `test/groups/` (group_card, create_invite_sheet), `test/expenses/` (expense_list_tile, expense_title_section, expense_amount_section, expense_split_section, expense_bill_breakdown_section, expense_detail_body, expense_detail_body_header), `test/settings/` (logs_viewer_dialog, privacy_policy_page), `test/pages/` (main_scaffold, home_page, archived_groups_page), `test/balance/` (balance_list: settlement permission — owner vs member/debtor), `test/onboarding/` (onboarding_page), plus error_content and app. Widget tests use EasyLocalization + MaterialApp; Riverpod widgets use ProviderScope with overrides when needed. See [test/widget_test_helpers.dart](../test/widget_test_helpers.dart) and [test/README.md](../test/README.md).
   - **Locale:** Key widgets are tested in both English and Arabic via `test/widget_test_helpers.dart`: `pumpApp(tester, child: ..., locale: Locale('ar'))` and `testSupportedLocales`. Edge cases (empty/zero/long content, optional params) are covered where relevant. Translation file parity: `test/translations_test.dart` (see [I18N.md](I18N.md)).
   - **Integration-style:** Local PowerSync DB, sync engine with fake backend. See [test/README.md](../test/README.md) for PowerSync native binary requirements and coverage (`flutter test --coverage`).
   - **Integration (local-only):** Full-app flows in `integration_test/` — smoke, onboarding, group, personal, expense (tags, photos, currencies, bill breakdown), balance (settlements, freeze), settings. Run with `flutter drive` on web or `flutter test integration_test/ -d <device>`. See [test/README.md](../test/README.md).

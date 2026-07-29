@@ -64,12 +64,6 @@ final profileActivityProvider = Provider<AsyncValue<ProfileActivityData>>((
     loading: () => const AsyncValue.loading(),
     error: AsyncValue.error,
     data: (items) {
-      var anyMissingRate = false;
-      var convertedSpend = 0;
-      var daySpan = 1;
-      final tagTotals = <String, int>{};
-      String? fallbackSpendCurrency;
-
       DateTime? earliest;
       DateTime? latest;
       for (final item in items) {
@@ -93,6 +87,12 @@ final profileActivityProvider = Provider<AsyncValue<ProfileActivityData>>((
         if (rangeStart != null && localDate.isBefore(rangeStart)) return false;
         return true;
       }).toList();
+
+      var anyMissingRate = false;
+      var convertedSpend = 0;
+      var daySpan = 1;
+      final tagTotals = <String, int>{};
+      String? fallbackSpendCurrency;
 
       for (final item in inRange) {
         final signed = item.expense.transactionType == TransactionType.income

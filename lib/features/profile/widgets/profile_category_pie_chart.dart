@@ -40,7 +40,6 @@ class ProfileCategoryPieChart extends StatelessWidget {
         title: 'analytics_category_title'.tr(),
         slices: slices,
         currencyCode: displayCurrencyCode,
-        centerIdleLabel: 'analytics_kpi_my_spend'.tr(),
         emptyLabel: 'analytics_empty_chart'.tr(),
         onOpenSlice: (slice) => _openSliceExpenses(context, slice),
       ),

@@ -1257,7 +1257,7 @@ class _TrendChartCard extends StatelessWidget {
 
   Widget _emptyChart(BuildContext context) {
     return Align(
-      alignment: Alignment.centerLeft,
+      alignment: AlignmentDirectional.centerStart,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: ThemeConfig.spacingM),
         child: Text(
@@ -1633,7 +1633,7 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
                     ? () => widget.onToggleExcluded!.call(row.id)
                     : null,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 10, 6, 10),
+                  padding: const EdgeInsetsDirectional.fromSTEB(10, 10, 6, 10),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1982,7 +1982,6 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
         BreakdownPieChart(
           slices: pieSlices,
           currencyCode: widget.currencyCode,
-          centerIdleLabel: 'analytics_kpi_total'.tr(),
           height: widget.compact ? 168 : 220,
           showLegend: false,
           selectedId: pieHighlightId,

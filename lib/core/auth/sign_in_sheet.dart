@@ -340,11 +340,11 @@ class _SignInSheetState extends State<_SignInSheet> {
     return PopScope(
       canPop: !_loading,
       child: Padding(
-        padding: EdgeInsets.only(
-          left: 24,
-          right: 24,
-          top: 16,
-          bottom: MediaQuery.of(context).padding.bottom + 24,
+        padding: EdgeInsets.fromLTRB(
+          24,
+          16,
+          24,
+          MediaQuery.of(context).padding.bottom + 24,
         ),
         child: SingleChildScrollView(
           child: Column(

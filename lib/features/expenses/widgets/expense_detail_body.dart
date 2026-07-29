@@ -524,7 +524,9 @@ class _ReceiptThumbnailStrip extends StatelessWidget {
           children: [
             for (var i = 0; i < urls.length; i++)
               Padding(
-                padding: EdgeInsets.only(right: i == urls.length - 1 ? 0 : 8),
+                padding: EdgeInsetsDirectional.only(
+                  end: i == urls.length - 1 ? 0 : 8,
+                ),
                 child: GestureDetector(
                   onTap: () => showExpenseImageFullScreen(context, urls[i]),
                   child: Container(

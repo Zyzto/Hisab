@@ -13,6 +13,7 @@ import '../constants/firebase_config.dart';
 import '../constants/supabase_config.dart';
 import '../navigation/app_router.dart';
 import '../navigation/route_paths.dart';
+import '../pwa/pwa_capabilities.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
 import 'permission_service.dart';
 import 'notification_service_web_stub.dart'
@@ -212,6 +213,23 @@ class NotificationService extends _$NotificationService {
 
       final messaging = FirebaseMessaging.instance;
 
+      // iOS WebKit: web push only works for Home Screen PWAs.
+      if (kIsWeb &&
+          pwaNotificationSupport == PwaNotificationSupport.needsInstall) {
+        Log.warning(
+          'NotificationService: web push requires installed PWA on iOS',
+        );
+        if (context != null && context.mounted) {
+          PermissionService.showNotificationDeniedInfo(context);
+        }
+        return false;
+      }
+      if (kIsWeb &&
+          pwaNotificationSupport == PwaNotificationSupport.unsupported) {
+        Log.warning('NotificationService: notifications unsupported in browser');
+        return false;
+      }
+
       // Request permission (shows system dialog on iOS / Android 13+ / web)
       final settings = await messaging.requestPermission(
         alert: true,
@@ -326,9 +344,15 @@ class NotificationService extends _$NotificationService {
     try {
       final messaging = FirebaseMessaging.instance;
 
-      // On web, VAPID key is required
+      // On web, VAPID key is required; iOS also requires standalone PWA.
       final String? token;
       if (kIsWeb) {
+        if (pwaNotificationSupport != PwaNotificationSupport.supported) {
+          Log.warning(
+            'NotificationService: skip web token (support=${pwaNotificationSupport.name})',
+          );
+          return;
+        }
         if (fcmVapidKey.isEmpty) {
           Log.warning(
             'NotificationService: FCM_VAPID_KEY not set, skipping web token',

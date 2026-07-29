@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import 'package:upgrader/upgrader.dart';
 import 'package:version/version.dart';
 import 'core/auth/auth_providers.dart';
+import 'core/auth/oauth_callback_state.dart';
 import 'core/database/database_providers.dart';
 import 'core/services/notification_service.dart';
 import 'core/debug/debug_menu.dart';
@@ -76,11 +77,35 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
           },
     );
     _registerAuthListener();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showPendingWebOAuthErrorIfAny();
+    });
     if (!kDebugMode) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _showUpgradeAlert = true);
       });
     }
+  }
+
+  void _showPendingWebOAuthErrorIfAny([int attempt = 0]) {
+    final key = pendingWebOAuthCallbackError;
+    if (key == null || !mounted) return;
+    // App's own context sits above ToastificationWrapper; use the navigator.
+    final navContext = ref
+        .read(routerProvider)
+        .routerDelegate
+        .navigatorKey
+        .currentContext;
+    if (navContext == null || !navContext.mounted) {
+      if (attempt < 10) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showPendingWebOAuthErrorIfAny(attempt + 1);
+        });
+      }
+      return;
+    }
+    pendingWebOAuthCallbackError = null;
+    navContext.showToast(key.tr());
   }
 
   void _scheduleStartupKeyboardDismiss() {
