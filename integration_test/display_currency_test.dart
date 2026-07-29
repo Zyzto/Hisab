@@ -53,11 +53,8 @@ void main() {
         await tapAndSettle(tester, usdRowFinder.first);
         await pumpAndSettleWithTimeout(tester);
 
-        // Picker closes; wait for sheet to be gone so nav bar is tappable
-        for (var i = 0; i < 50; i++) {
-          await tester.pump(const Duration(milliseconds: 100));
-          if (find.byType(BottomSheet).evaluate().isEmpty) break;
-        }
+        // Picker closes; wait for adaptive sheet to be gone so nav is tappable
+        await waitForResponsiveSheetClosed(tester);
         await pumpAndSettleWithTimeout(tester);
 
         // Picker closes; we're back on Settings

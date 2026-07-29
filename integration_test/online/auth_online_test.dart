@@ -40,26 +40,45 @@ void main() {
         expect(client.auth.currentUser!.email, equals(testUserAEmail));
       });
 
-      // ── Stage: navigate to settings ──
-      await stage('navigate to settings', () async {
+      // ── Stage: open Profile (account UI + Sign out live there) ──
+      await stage('navigate to profile', () async {
         await tapAndSettle(tester, find.text('Settings'));
         await waitForWidget(tester, find.text('Account'));
+        // Settings Account section links to Profile; Sign out is on Profile.
+        await scrollUntilVisible(tester, find.text('Profile'));
+        await tapAndSettle(tester, find.text('Profile').first);
+        await waitForWidget(
+          tester,
+          find.text('Sign out'),
+          timeout: const Duration(seconds: 15),
+        );
       });
 
-      // ── Stage: sign out from settings ──
+      // ── Stage: sign out from profile ──
       await stage('sign out', () async {
-        // Account section is expanded by default; scroll to the Sign out tile
         await scrollUntilVisible(tester, find.text('Sign out'));
         await tapAndSettle(tester, find.text('Sign out'));
         await pumpAndSettleWithTimeout(tester);
 
-        // Confirm sign-out in the confirmation dialog
+        // Confirm sign-out in the confirmation sheet
         await tester.pump(const Duration(seconds: 1));
+        await waitForCondition(
+          tester,
+          condition: () =>
+              isResponsiveSheetVisible() ||
+              find.text('Sign out').evaluate().length >= 2,
+          timeout: const Duration(seconds: 10),
+          reason: 'Sign-out confirmation sheet should appear',
+        );
         final confirmButton = find.text('Sign out');
-        if (confirmButton.evaluate().isNotEmpty) {
-          await tapAndSettle(tester, confirmButton.last);
-          await pumpAndSettleWithTimeout(tester);
-        }
+        expect(
+          confirmButton,
+          findsWidgets,
+          reason: 'Sign out confirm action should be visible',
+        );
+        await tapAndSettle(tester, confirmButton.last);
+        await pumpAndSettleWithTimeout(tester);
+        await waitForResponsiveSheetClosed(tester);
 
         await tester.pump(const Duration(seconds: 2));
 

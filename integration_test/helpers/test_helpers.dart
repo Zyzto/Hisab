@@ -320,6 +320,29 @@ Future<void> ensureFormClosed(WidgetTester tester) async {
   }
 }
 
+/// True when [showResponsiveSheet] / [showConfirmSheet] chrome is on screen.
+///
+/// Sheets use [showGeneralDialog], not [BottomSheet] / [Dialog], so type
+/// finders alone miss them.
+bool isResponsiveSheetVisible() {
+  return find
+      .byKey(const ValueKey('responsive_sheet_panel'))
+      .evaluate()
+      .isNotEmpty;
+}
+
+/// Waits until the adaptive sheet/dialog is gone (or [timeout] elapses).
+Future<void> waitForResponsiveSheetClosed(
+  WidgetTester tester, {
+  Duration timeout = const Duration(seconds: 10),
+}) async {
+  final end = DateTime.now().add(timeout);
+  while (DateTime.now().isBefore(end)) {
+    if (!isResponsiveSheetVisible()) return;
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+}
+
 /// Wraps a logical test stage so failures include the stage name.
 /// On web, also records progress in the binding's reportData for diagnostics.
 Future<void> stage(String name, Future<void> Function() body) async {

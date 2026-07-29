@@ -127,33 +127,42 @@ void main() {
           );
           await pumpAndSettleWithTimeout(tester);
 
-          // Confirmation sheet/dialog should appear.
+          // Confirmation uses showResponsiveSheet (showGeneralDialog), not
+          // BottomSheet / Dialog widget types.
           await waitForCondition(
             tester,
             condition: () =>
-                find.byType(BottomSheet).evaluate().isNotEmpty ||
-                find.byType(Dialog).evaluate().isNotEmpty ||
-                find.byType(AlertDialog).evaluate().isNotEmpty,
+                isResponsiveSheetVisible() ||
+                find
+                    .text(
+                      'This may overwrite or duplicate data. Continue?',
+                    )
+                    .evaluate()
+                    .isNotEmpty ||
+                find
+                    .text('ممكن يستبدل البيانات الحالية أو يكررها. تبغى تكمل؟')
+                    .evaluate()
+                    .isNotEmpty,
             timeout: const Duration(seconds: 10),
             reason: 'Import confirmation sheet/dialog should appear',
           );
 
-          // Dismiss the import confirmation bottom sheet by tapping the
-          // scrim barrier above it. The Cancel button is rendered inside
-          // the bottom sheet overlay and is not reliably hit-testable.
+          // Dismiss via barrier tap; fall back to Cancel / navigator pop.
           await tester.tapAt(const Offset(200, 100));
           await pumpAndSettleWithTimeout(tester);
-          // If the dialog is still open, try Navigator pop as fallback.
-          final confirmStillOpen =
-              find.byType(BottomSheet).evaluate().isNotEmpty ||
-              find.byType(Dialog).evaluate().isNotEmpty ||
-              find.byType(AlertDialog).evaluate().isNotEmpty;
-          if (confirmStillOpen) {
-            final nav = tester.state<NavigatorState>(
-              find.byType(Navigator).last,
-            );
-            nav.pop(false);
-            await pumpAndSettleWithTimeout(tester);
+          await waitForResponsiveSheetClosed(tester);
+          if (isResponsiveSheetVisible()) {
+            final cancel = textAnyOf(tester, ['Cancel', 'إلغاء']);
+            if (cancel.evaluate().isNotEmpty) {
+              await tapAndSettle(tester, cancel);
+            } else {
+              final nav = tester.state<NavigatorState>(
+                find.byType(Navigator).last,
+              );
+              nav.pop(false);
+              await pumpAndSettleWithTimeout(tester);
+            }
+            await waitForResponsiveSheetClosed(tester);
           }
 
           // Verify we're still on settings

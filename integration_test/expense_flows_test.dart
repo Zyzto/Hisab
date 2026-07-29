@@ -561,6 +561,11 @@ void main() {
         }
 
         // (delete expense stage moved earlier — runs right after chevrons)
+
+        // Drain shell/sheet motion timers so the suite does not fail after
+        // stages with a pending animation (empty failureDetails on web).
+        await tester.pump(const Duration(milliseconds: 500));
+        await tester.pump(const Duration(milliseconds: 500));
       },
     );
   });

@@ -251,6 +251,25 @@ void main() {
               'accepted_at': now,
             },
           ],
+          userNotifications: [
+            {
+              'id': 'n-full',
+              'user_id': uid,
+              'group_id': gid,
+              'actor_user_id': 'actor-full',
+              'action': 'expense_created',
+              'title': 'New expense',
+              'body': 'Lunch was added',
+              'expense_id': eid,
+              'payload': {
+                'expense_title': 'Lunch',
+                'amount_cents': 500,
+                'currency_code': 'EUR',
+              },
+              'read_at': null,
+              'created_at': now,
+            },
+          ],
         );
         await SyncEngine().fetchAllWithBackend(db!, backend);
 
@@ -292,8 +311,98 @@ void main() {
           [invId],
         );
         expect(usages.length, 1);
+        final notifications = await db!.getAll(
+          'SELECT * FROM user_notifications WHERE user_id = ?',
+          [uid],
+        );
+        expect(notifications.length, 1);
+        expect(notifications.first['action'], 'expense_created');
+        expect(notifications.first['title'], 'New expense');
+        expect(notifications.first['expense_id'], eid);
+        expect(notifications.first['payload_json'], isNotNull);
       },
     );
+
+    test('writes user_notifications for the signed-in user', () async {
+      if (!_powerSyncAvailable || db == null) return;
+      const uid = 'u-notif';
+      const gid = 'g-notif';
+      const now = '2025-01-03T12:00:00Z';
+      final backend = _FakeSyncBackend(
+        userId: uid,
+        groupIds: [gid],
+        groups: [
+          {
+            'id': gid,
+            'name': 'Notif Group',
+            'currency_code': 'USD',
+            'owner_id': uid,
+            'settlement_method': 'greedy',
+            'treasurer_participant_id': null,
+            'settlement_freeze_at': null,
+            'settlement_snapshot_json': null,
+            'allow_member_add_expense': true,
+            'allow_member_add_participant': true,
+            'allow_member_change_settings': true,
+            'require_participant_assignment': false,
+            'allow_expense_as_other_participant': true,
+            'allow_member_settle_for_others': false,
+            'icon': null,
+            'color': null,
+            'archived_at': null,
+            'is_personal': false,
+            'budget_amount_cents': null,
+            'created_at': now,
+            'updated_at': now,
+          },
+        ],
+        members: [
+          {
+            'id': 'm-notif',
+            'group_id': gid,
+            'user_id': uid,
+            'role': 'owner',
+            'participant_id': null,
+            'joined_at': now,
+          },
+        ],
+        userNotifications: [
+          {
+            'id': 'n1',
+            'user_id': uid,
+            'group_id': gid,
+            'actor_user_id': 'other',
+            'action': 'member_joined',
+            'title': 'Joined',
+            'body': 'Someone joined',
+            'expense_id': null,
+            'payload': null,
+            'read_at': null,
+            'created_at': now,
+          },
+          {
+            'id': 'n-other-user',
+            'user_id': 'someone-else',
+            'group_id': gid,
+            'actor_user_id': uid,
+            'action': 'expense_created',
+            'title': 'Other',
+            'body': 'Should not sync',
+            'expense_id': null,
+            'payload': null,
+            'read_at': null,
+            'created_at': now,
+          },
+        ],
+      );
+      await SyncEngine().fetchAllWithBackend(db!, backend);
+
+      final rows = await db!.getAll('SELECT * FROM user_notifications');
+      expect(rows.length, 1);
+      expect(rows.first['id'], 'n1');
+      expect(rows.first['user_id'], uid);
+      expect(rows.first['action'], 'member_joined');
+    });
 
     test('throws when pending writes exist before fetch', () async {
       if (!_powerSyncAvailable || db == null) return;
