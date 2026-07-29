@@ -139,13 +139,13 @@ class _DraftCard extends ConsumerWidget {
         }
       },
       background: Container(
-        alignment: Alignment.centerLeft,
+        alignment: AlignmentDirectional.centerStart,
         padding: const EdgeInsets.symmetric(horizontal: 24),
         color: Colors.green,
         child: const Icon(Icons.check, color: Colors.white, size: 28),
       ),
       secondaryBackground: Container(
-        alignment: Alignment.centerRight,
+        alignment: AlignmentDirectional.centerEnd,
         padding: const EdgeInsets.symmetric(horizontal: 24),
         color: colorScheme.error,
         child: const Icon(Icons.close, color: Colors.white, size: 28),

@@ -13,9 +13,10 @@ import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:powersync/powersync.dart' show PowerSyncDatabase, Schema;
-import 'package:pwa_install/pwa_install.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'core/auth/oauth_callback_state.dart';
+import 'core/auth/oauth_web_url.dart';
 import 'core/constants/firebase_config.dart';
 import 'core/constants/supabase_config.dart';
 import 'core/database/database_providers.dart';
@@ -172,11 +173,18 @@ void main() {
         // --------------------------------------------------------------------------
         if (supabaseConfigAvailable) {
           Log.info('main: Initializing Supabase...');
+          // Keep default detectSessionInUri: true — same path Safari already
+          // uses successfully in production. Web-only post-step below is a
+          // no-op when that path already established a session.
           await Supabase.initialize(
             url: effectiveSupabaseUrl,
             publishableKey: supabaseAnonKey,
           );
           Log.info('main: Supabase client initialized');
+
+          if (kIsWeb) {
+            await _finalizeWebOAuthReturn();
+          }
 
           if (settingsProviders != null) {
             final session = supabaseClientIfConfigured?.auth.currentSession;
@@ -373,11 +381,6 @@ void main() {
         await runZoned(
           () async {
             WidgetsFlutterBinding.ensureInitialized();
-            PWAInstall().setup(
-              installCallback: () {
-                debugPrint('PWA installed!');
-              },
-            );
             initWebLogCapture();
             setupErrorHandlers();
             await runRestOfMain();
@@ -415,6 +418,83 @@ void main() {
       PlatformDispatcher.instance.onError?.call(error, stack);
     },
   );
+}
+
+/// Web-only follow-up after stock [Supabase.initialize] auth-url recovery.
+///
+/// Safari/production happy path: initialize already exchanged `?code=` and set
+/// a session — this only cleans the URL (idempotent) and returns.
+///
+/// Failure path (e.g. flaky iOS Firefox): if auth params remain and there is
+/// still no session, retry once with a timeout, surface a toast, then clear
+/// the URL so a refresh does not reuse a spent code.
+Future<void> _finalizeWebOAuthReturn() async {
+  final uri = currentWebLocationUri();
+  if (uri == null) return;
+
+  final fragmentParams = uri.fragment.isNotEmpty
+      ? Uri.splitQueryString(uri.fragment)
+      : const <String, String>{};
+  bool hasParam(String key) =>
+      uri.queryParameters.containsKey(key) || fragmentParams.containsKey(key);
+  final isAuthCallback =
+      hasParam('code') ||
+      hasParam('access_token') ||
+      hasParam('error') ||
+      hasParam('error_code') ||
+      hasParam('error_description');
+  if (!isAuthCallback) return;
+
+  final client = supabaseClientIfConfigured;
+  if (client == null) return;
+
+  if (client.auth.currentSession != null) {
+    clearWebAuthCallbackParams();
+    return;
+  }
+
+  Log.info('main: Stock OAuth recovery left no session; retrying once (web)');
+  try {
+    await client.auth
+        .getSessionFromUrl(uri)
+        .timeout(const Duration(seconds: 20));
+    if (client.auth.currentSession != null) {
+      Log.info('main: OAuth session recovered on retry');
+    } else {
+      Log.warning('main: OAuth retry finished without a session');
+      pendingWebOAuthCallbackError = 'auth_oauth_callback_failed';
+    }
+  } on TimeoutException catch (e, st) {
+    // .timeout does not cancel the request; only toast if still signed out.
+    if (client.auth.currentSession != null) {
+      Log.info('main: OAuth session arrived after retry timeout');
+    } else {
+      Log.warning(
+        'main: OAuth session retry timed out',
+        error: e,
+        stackTrace: st,
+      );
+      pendingWebOAuthCallbackError = 'auth_oauth_timeout';
+    }
+  } on AuthException catch (e, st) {
+    if (client.auth.currentSession != null) return;
+    Log.warning(
+      'main: OAuth session retry auth error: ${e.message}',
+      error: e,
+      stackTrace: st,
+    );
+    pendingWebOAuthCallbackError = 'auth_oauth_callback_failed';
+  } catch (e, st) {
+    if (client.auth.currentSession != null) return;
+    Log.warning(
+      'main: OAuth session retry failed',
+      error: e,
+      stackTrace: st,
+    );
+    pendingWebOAuthCallbackError = 'auth_oauth_callback_failed';
+  } finally {
+    clearWebAuthCallbackParams();
+  }
 }
 
 /// Initialize PowerSync DB. On failure (e.g. schema mismatch from upgrade),

@@ -38,7 +38,7 @@ class PageSectionIndex extends StatelessWidget {
     return Align(
       alignment: Alignment.topCenter,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(12, 20, 16, 16),
+        padding: const EdgeInsetsDirectional.fromSTEB(12, 20, 16, 16),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 220),
           child: Column(

@@ -59,14 +59,14 @@ The app works fully offline with no configuration. Authentication, sync, invites
 | `SUPABASE_URL` | For online mode | Your Supabase project URL (e.g. `https://xxxxx.supabase.co`) |
 | `SUPABASE_ANON_KEY` | For online mode | Your Supabase anon/public key (starts with `eyJ...`) |
 | `INVITE_BASE_URL` | Optional | Custom base URL for invite links (e.g. `https://yourdomain.com`). When set, share links and QR codes use this instead of the Supabase URL. The web app proxies `/functions/v1/invite-redirect` to Supabase. See [Invite links with a custom domain](#invite-links-with-a-custom-domain). |
-| `SITE_URL` | Optional | Redirect URL for auth emails (magic link, sign-up confirmation). When set (e.g. `https://yourdomain.com`), verification and magic links in emails point here instead of the Supabase default (e.g. localhost). Must be in Supabase **Redirect URLs**. |
+| `SITE_URL` | Optional | Redirect URL for auth emails (magic link, sign-up confirmation) and web OAuth (`authRedirectUrl`). Prefer `https://` in production (e.g. `https://yourdomain.com`). When set, verification and magic links point here instead of the Supabase default (e.g. localhost). Must be in Supabase **Redirect URLs**. If production is served over HTTPS but `SITE_URL` is mistakenly `http://` on the same host, the web app upgrades the OAuth redirect to the current HTTPS origin. |
 | `FCM_VAPID_KEY` | Optional | VAPID key for Firebase Cloud Messaging on web (Web Push certificates in Firebase Console). Required for web push token. |
 | `FIREBASE_*` | Web only | Firebase web SDK options (`FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_PROJECT_ID`, `FIREBASE_STORAGE_BUCKET`, `FIREBASE_MESSAGING_SENDER_ID`, `FIREBASE_APP_ID`). No defaults are committed. **Debug:** provide via launch options using `--dart-define-from-file=dart_defines_online.json` (see example file). **CI:** GitHub Actions secrets are passed as `--dart-define` and injected into `web/index.html` and `web/firebase-messaging-sw.js` at build time. |
 | `ENABLE_WEB_SEMANTICS` | Web only, optional | Enables `SemanticsBinding.instance.ensureSemantics()` at startup. Default is `false` because iOS Safari may show severe scroll/input jank when semantics is always enabled. Turn on only for accessibility-focused builds. |
 
 **VSCode / development:** Copy `dart_defines_online.example.json` to `dart_defines_online.json` (gitignored). Put your real values only in `dart_defines_online.json`; the example file contains placeholders only. Fill in `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and optionally `FCM_VAPID_KEY` and all `FIREBASE_*` keys. For local dev, `INVITE_BASE_URL` and `SITE_URL` are set to `http://localhost:8080` so magic links and invite links open your dev app; the launch configs use `--web-port=8080` so the app always runs on that port. Add **http://localhost:8080** to **Supabase Dashboard → Authentication → URL Configuration → Redirect URLs**. Use the **Hisab (Online)** or **Hisab (Chrome Web)** launch configuration. The Dart app reads Firebase config from these dart-defines; for **web** runs, `web/index.html` and `web/firebase-messaging-sw.js` contain placeholders—replace them (e.g. with a local script that injects from `dart_defines_online.json`) before running web if you need FCM in debug, or rely on CI for production builds.
 
-**Push notifications (FCM):** The app receives push notifications when other group members add/edit expenses or join a group. Backend setup (Supabase trigger, Vault, Edge Function `send-notification`, FCM secrets) is in [SUPABASE_SETUP.md](SUPABASE_SETUP.md) (Section 5 and “Push notifications: end-to-end flow and verification”). In the app, notifications are enabled in Settings (online mode only); on web, `FCM_VAPID_KEY` must be set at build time for token registration.
+**Push notifications (FCM):** The app receives push notifications when other group members add/edit expenses or join a group. Backend setup (Supabase trigger, Vault, Edge Function `send-notification`, FCM secrets) is in [SUPABASE_SETUP.md](SUPABASE_SETUP.md) (Section 5 and “Push notifications: end-to-end flow and verification”). In the app, notifications are enabled in Settings (online mode only); on web, `FCM_VAPID_KEY` must be set at build time for token registration. On iPhone/iPad (WebKit), push requires the installed Home Screen PWA — see [CODEBASE.md](CODEBASE.md) (Web and PWA).
 
 Find these values in:
 - **Supabase**: Dashboard → Settings → API
@@ -283,8 +283,9 @@ After the first deploy, get your live URL from the Firebase console (e.g. `https
 ### OAuth redirect issues
 
 - **Mobile**: Ensure the app scheme (`io.supabase.hisab`) is registered in Android/iOS config.
-- **Web**: Verify the redirect URL is in Supabase Authentication → URL Configuration → Redirect URLs.
-- Add `http://localhost:*` to Supabase redirect URLs for local development.
+- **Web**: Verify the redirect URL is in Supabase Authentication → URL Configuration → Redirect URLs. Prefer HTTPS `SITE_URL` matching the live origin.
+- After return, if the stock Supabase URI recovery leaves no session, the app retries once and may toast `auth_oauth_callback_failed` / `auth_oauth_timeout`, then clears `?code=` / fragment auth params so a refresh cannot reuse a spent code.
+- Add `http://localhost:*` (or your fixed port, e.g. `http://localhost:8080`) to Supabase redirect URLs for local development.
 
 ### "RLS policy violation" errors
 

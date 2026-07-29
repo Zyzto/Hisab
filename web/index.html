@@ -20,8 +20,9 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="Group expense splitting and settle-up app.">
 
-  <!-- iOS meta tags & icons -->
+  <!-- iOS / PWA meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="Hisab">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
@@ -35,10 +36,68 @@
     html, body {
       min-width: 320px;
       min-height: 500px;
+      margin: 0;
+      background: #f7f4ef;
+      color: #1c1917;
+    }
+    #hisab-boot-splash {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+      z-index: 9999;
+      pointer-events: none;
+    }
+    #hisab-boot-splash .title {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    #hisab-boot-splash .subtitle {
+      font-size: 14px;
+      opacity: 0.7;
+    }
+    @media (prefers-color-scheme: dark) {
+      html, body {
+        background: #121212;
+        color: #f5f5f4;
+      }
     }
   </style>
 </head>
 <body>
+  <!-- Visible while Flutter boots / OAuth returns — avoids a blank black screen on iOS. -->
+  <div id="hisab-boot-splash" aria-live="polite">
+    <div class="title">Hisab</div>
+    <div class="subtitle" id="hisab-boot-splash-status">Loading…</div>
+  </div>
+  <script>
+    (function () {
+      try {
+        var params = new URLSearchParams(window.location.search);
+        var hash = window.location.hash || "";
+        if (params.has("code") || hash.indexOf("access_token") !== -1) {
+          var el = document.getElementById("hisab-boot-splash-status");
+          if (el) el.textContent = "Signing you in…";
+        } else if (params.has("error") || hash.indexOf("error") !== -1) {
+          var errEl = document.getElementById("hisab-boot-splash-status");
+          if (errEl) errEl.textContent = "Sign-in issue — finishing…";
+        }
+      } catch (_) {}
+      function removeBootSplash() {
+        var splash = document.getElementById("hisab-boot-splash");
+        if (splash && splash.parentNode) splash.parentNode.removeChild(splash);
+      }
+      // Flutter dispatches this after the first frame; also time out so a stuck
+      // boot cannot leave the splash covering the page forever.
+      window.addEventListener("flutter-first-frame", removeBootSplash);
+      setTimeout(removeBootSplash, 15000);
+    })();
+  </script>
   <!-- Firebase SDK (required for FCM web push notifications) -->
   <script src="https://www.gstatic.com/firebasejs/11.4.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/11.4.0/firebase-messaging-compat.js"></script>
@@ -69,7 +128,7 @@
     }
   </script>
 
-  <!-- PWA install prompt capture (used by pwa_install package) -->
+  <!-- PWA capability bridge (used by lib/core/pwa) + notification click routing -->
   <script>
     function handleNotificationClickUrl(targetUrl) {
       if (typeof targetUrl !== "string" || targetUrl.length === 0) return;
@@ -92,28 +151,76 @@
       });
     }
 
-    let deferredPrompt;
-    window.addEventListener('beforeinstallprompt', (e) => {
-      deferredPrompt = e;
-    });
-    function promptInstall() {
-      deferredPrompt.prompt();
-    }
-    window.addEventListener('appinstalled', () => {
-      deferredPrompt = null;
-      appInstalled();
-    });
-    function getLaunchMode() {
-      const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-      if (deferredPrompt) hasPrompt();
-      if (document.referrer.startsWith('android-app://')) {
-        appLaunchedAsTWA();
-      } else if (navigator.standalone || isStandalone) {
-        appLaunchedAsPWA();
-      } else {
-        window.appLaunchedInBrowser();
+    (function () {
+      let deferredPrompt = null;
+
+      function isStandaloneDisplay() {
+        try {
+          if (window.matchMedia("(display-mode: standalone)").matches) return true;
+          if (window.matchMedia("(display-mode: fullscreen)").matches) return true;
+          if (window.matchMedia("(display-mode: minimal-ui)").matches) return true;
+        } catch (_) {}
+        return !!(navigator.standalone) ||
+          (typeof document.referrer === "string" &&
+            document.referrer.indexOf("android-app://") === 0);
       }
-    }
+
+      function notifyChanged() {
+        if (typeof window.hisabPwa.onChanged === "function") {
+          try {
+            window.hisabPwa.onChanged();
+          } catch (_) {}
+        }
+      }
+
+      window.hisabPwa = {
+        canPrompt: false,
+        isStandalone: isStandaloneDisplay(),
+        onChanged: null,
+        promptInstall: function () {
+          if (!deferredPrompt) return Promise.resolve(false);
+          var promptEvent = deferredPrompt;
+          deferredPrompt = null;
+          window.hisabPwa.canPrompt = false;
+          notifyChanged();
+          return promptEvent.prompt().then(function () {
+            return promptEvent.userChoice;
+          }).then(function (choice) {
+            return !!(choice && choice.outcome === "accepted");
+          }).catch(function () {
+            return false;
+          });
+        },
+      };
+
+      window.addEventListener("beforeinstallprompt", function (e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        window.hisabPwa.canPrompt = true;
+        window.hisabPwa.isStandalone = isStandaloneDisplay();
+        notifyChanged();
+      });
+
+      window.addEventListener("appinstalled", function () {
+        deferredPrompt = null;
+        window.hisabPwa.canPrompt = false;
+        window.hisabPwa.isStandalone = true;
+        notifyChanged();
+      });
+
+      try {
+        var standaloneMq = window.matchMedia("(display-mode: standalone)");
+        var onDisplayMode = function () {
+          window.hisabPwa.isStandalone = isStandaloneDisplay();
+          notifyChanged();
+        };
+        if (typeof standaloneMq.addEventListener === "function") {
+          standaloneMq.addEventListener("change", onDisplayMode);
+        } else if (typeof standaloneMq.addListener === "function") {
+          standaloneMq.addListener(onDisplayMode);
+        }
+      } catch (_) {}
+    })();
   </script>
 
   <script src="flutter_bootstrap.js" async></script>

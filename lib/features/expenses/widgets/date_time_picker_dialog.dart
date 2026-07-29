@@ -148,7 +148,7 @@ class _DateTimePickerSheetContentState
         children: [
           if (!isTabletOrWider)
             Align(
-              alignment: Alignment.centerLeft,
+              alignment: AlignmentDirectional.centerStart,
               child: OutlinedButton.icon(
                 onPressed: () {
                   HapticFeedback.lightImpact();

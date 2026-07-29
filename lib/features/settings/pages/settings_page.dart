@@ -876,7 +876,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         children: [
           if (stored.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsetsDirectional.only(end: 8),
               child: Text(
                 label,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -1625,7 +1625,7 @@ class _FavoriteCurrenciesSheetState extends State<_FavoriteCurrenciesSheet> {
           // Header
           if (!LayoutBreakpoints.isTabletOrWider(context))
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+              padding: const EdgeInsetsDirectional.fromSTEB(16, 8, 8, 8),
               child: Row(
                 children: [
                   Expanded(

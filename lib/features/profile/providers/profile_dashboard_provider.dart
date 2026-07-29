@@ -1,15 +1,13 @@
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/services/settle_up_service.dart';
 import '../../../core/utils/expense_totals.dart';
 import '../../../core/widgets/amount_with_secondary_display.dart';
 import '../../../domain/domain.dart';
-import '../../balance/providers/balance_provider.dart';
-import '../../groups/providers/group_member_provider.dart';
-import '../../groups/providers/groups_provider.dart';
 import '../../settings/providers/display_currency_rate_provider.dart';
 import '../../settings/providers/settings_framework_providers.dart';
-import '../../transaction_scanner/providers/scanner_providers.dart';
-import 'notification_providers.dart';
+import 'profile_data_providers.dart';
 
 class ProfileBalanceRow {
   const ProfileBalanceRow({
@@ -93,128 +91,159 @@ class ProfileDashboardData {
   final ProfileGlobalNet? globalNet;
 }
 
+List<ParticipantBalance> _balancesForGroup(
+  Group group,
+  List<Participant> participants,
+  List<Expense> expenses,
+) {
+  if (group.isSettlementFrozen &&
+      group.settlementSnapshotJson != null &&
+      group.settlementSnapshotJson!.isNotEmpty) {
+    try {
+      return SettlementSnapshot.fromJsonString(
+        group.settlementSnapshotJson!,
+      ).balances;
+    } catch (e) {
+      Log.warning(
+        'Profile dashboard: snapshot parse failed, using live computation',
+        error: e,
+      );
+    }
+  }
+  return computeBalances(participants, expenses, group.currencyCode);
+}
+
+ProfileDashboardData _buildDashboard(
+  ProfileDataSnapshot snap, {
+  required String displayCurrency,
+  required Map<String, double?> ratesByPair,
+}) {
+  final shared = snap.groups.where((g) => !g.isPersonal).toList();
+  final personal = snap.groups.where((g) => g.isPersonal).toList();
+
+  final balanceRows = <ProfileBalanceRow>[];
+  for (final group in shared) {
+    final participantId = snap.myParticipantIdByGroupId[group.id];
+    if (participantId == null) continue;
+    final participants =
+        snap.activeParticipantsByGroupId[group.id] ?? const <Participant>[];
+    final expenses = snap.expensesByGroupId[group.id] ?? const <Expense>[];
+    final balances = _balancesForGroup(group, participants, expenses);
+    ParticipantBalance? mine;
+    for (final b in balances) {
+      if (b.participantId == participantId) {
+        mine = b;
+        break;
+      }
+    }
+    if (mine == null || mine.balanceCents == 0) continue;
+    balanceRows.add(
+      ProfileBalanceRow(
+        group: group,
+        balanceCents: mine.balanceCents,
+        currencyCode: mine.currencyCode,
+      ),
+    );
+  }
+
+  final personalBudgets = <ProfilePersonalBudgetRow>[];
+  for (final group in personal) {
+    final expenses = snap.expensesByGroupId[group.id] ?? const <Expense>[];
+    final spent = expenses.fold<int>(
+      0,
+      (s, e) => s + contributionToExpenseTotal(e),
+    );
+    personalBudgets.add(
+      ProfilePersonalBudgetRow(
+        group: group,
+        spentCents: spent,
+        budgetCents: group.budgetAmountCents,
+      ),
+    );
+  }
+
+  ProfileGlobalNet? globalNet;
+  if (displayCurrency.isNotEmpty && balanceRows.isNotEmpty) {
+    var net = 0;
+    var converted = 0;
+    var skipped = 0;
+    for (final row in balanceRows) {
+      if (row.currencyCode == displayCurrency) {
+        net += row.balanceCents;
+        converted++;
+        continue;
+      }
+      final rate = ratesByPair['${row.currencyCode}|$displayCurrency'];
+      if (rate == null || rate == 0) {
+        skipped++;
+        continue;
+      }
+      net += AmountWithSecondaryDisplay.toDisplayCents(
+        row.balanceCents,
+        row.currencyCode,
+        displayCurrency,
+        rate,
+      );
+      converted++;
+    }
+    globalNet = ProfileGlobalNet(
+      displayCurrencyCode: displayCurrency,
+      netDisplayCents: net,
+      convertedGroupCount: converted,
+      skippedGroupCount: skipped,
+      isPartial: skipped > 0,
+    );
+  }
+
+  return ProfileDashboardData(
+    kpis: ProfileKpis(
+      sharedGroups: shared.length,
+      personalLists: personal.length,
+      archived: snap.archived.length,
+      pendingDrafts: snap.pendingDrafts,
+      unreadNotifications: snap.unreadNotifications,
+    ),
+    balanceRows: balanceRows,
+    personalBudgets: personalBudgets,
+    groups: snap.groups,
+    globalNet: globalNet,
+  );
+}
+
 final profileDashboardProvider = Provider<AsyncValue<ProfileDashboardData>>((
   ref,
 ) {
-  final groupsAsync = ref.watch(groupsProvider);
-  final archivedAsync = ref.watch(archivedGroupsProvider);
-  final drafts = ref.watch(pendingDraftCountProvider).asData?.value ?? 0;
-  final unread =
-      ref.watch(unreadNotificationCountProvider).asData?.value ?? 0;
+  final snapAsync = ref.watch(profileDataSnapshotProvider);
   final displayCurrency = ref.watch(displayCurrencyProvider);
 
-  return groupsAsync.when(
+  return snapAsync.when(
     loading: () => const AsyncValue.loading(),
     error: AsyncValue.error,
-    data: (groups) {
-      return archivedAsync.when(
-        loading: () => const AsyncValue.loading(),
-        error: AsyncValue.error,
-        data: (archived) {
-          final shared = groups.where((g) => !g.isPersonal).toList();
-          final personal = groups.where((g) => g.isPersonal).toList();
-
-          final balanceRows = <ProfileBalanceRow>[];
-          for (final group in shared) {
-            final member = ref
-                .watch(myMemberInGroupProvider(group.id))
-                .asData
-                ?.value;
-            final participantId = member?.participantId;
-            if (participantId == null) continue;
-            final balanceResult = ref
-                .watch(groupBalanceProvider(group.id))
-                .asData
-                ?.value;
-            if (balanceResult == null) continue;
-            ParticipantBalance? mine;
-            for (final b in balanceResult.balances) {
-              if (b.participantId == participantId) {
-                mine = b;
-                break;
-              }
-            }
-            if (mine == null || mine.balanceCents == 0) continue;
-            balanceRows.add(
-              ProfileBalanceRow(
-                group: group,
-                balanceCents: mine.balanceCents,
-                currencyCode: mine.currencyCode,
+    data: (snap) {
+      final withoutRates = _buildDashboard(
+        snap,
+        displayCurrency: displayCurrency,
+        ratesByPair: const {},
+      );
+      final rates = <String, double?>{};
+      if (displayCurrency.isNotEmpty) {
+        for (final row in withoutRates.balanceRows) {
+          if (row.currencyCode == displayCurrency) continue;
+          final key = '${row.currencyCode}|$displayCurrency';
+          rates[key] = ref
+              .watch(displayCurrencyRateProvider(key))
+              .asData
+              ?.value;
+        }
+      }
+      return AsyncValue.data(
+        rates.isEmpty
+            ? withoutRates
+            : _buildDashboard(
+                snap,
+                displayCurrency: displayCurrency,
+                ratesByPair: rates,
               ),
-            );
-          }
-
-          final personalBudgets = <ProfilePersonalBudgetRow>[];
-          for (final group in personal) {
-            final expenses =
-                ref.watch(expensesByGroupProvider(group.id)).asData?.value;
-            if (expenses == null) continue;
-            final spent = expenses.fold<int>(
-              0,
-              (s, e) => s + contributionToExpenseTotal(e),
-            );
-            personalBudgets.add(
-              ProfilePersonalBudgetRow(
-                group: group,
-                spentCents: spent,
-                budgetCents: group.budgetAmountCents,
-              ),
-            );
-          }
-
-          ProfileGlobalNet? globalNet;
-          if (displayCurrency.isNotEmpty && balanceRows.isNotEmpty) {
-            var net = 0;
-            var converted = 0;
-            var skipped = 0;
-            for (final row in balanceRows) {
-              if (row.currencyCode == displayCurrency) {
-                net += row.balanceCents;
-                converted++;
-                continue;
-              }
-              final rateKey = '${row.currencyCode}|$displayCurrency';
-              final rate = ref
-                  .watch(displayCurrencyRateProvider(rateKey))
-                  .asData
-                  ?.value;
-              if (rate == null || rate == 0) {
-                skipped++;
-                continue;
-              }
-              net += AmountWithSecondaryDisplay.toDisplayCents(
-                row.balanceCents,
-                row.currencyCode,
-                displayCurrency,
-                rate,
-              );
-              converted++;
-            }
-            globalNet = ProfileGlobalNet(
-              displayCurrencyCode: displayCurrency,
-              netDisplayCents: net,
-              convertedGroupCount: converted,
-              skippedGroupCount: skipped,
-              isPartial: skipped > 0,
-            );
-          }
-
-          return AsyncValue.data(
-            ProfileDashboardData(
-              kpis: ProfileKpis(
-                sharedGroups: shared.length,
-                personalLists: personal.length,
-                archived: archived.length,
-                pendingDrafts: drafts,
-                unreadNotifications: unread,
-              ),
-              balanceRows: balanceRows,
-              personalBudgets: personalBudgets,
-              groups: groups,
-              globalNet: globalNet,
-            ),
-          );
-        },
       );
     },
   );

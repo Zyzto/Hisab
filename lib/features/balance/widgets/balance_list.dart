@@ -331,7 +331,7 @@ class _FrozenBanner extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
+      padding: const EdgeInsetsDirectional.fromSTEB(14, 14, 12, 14),
       decoration: AccentSurfaces.panel(
         colorScheme,
         subtle: context.subtleAccents,
@@ -756,7 +756,7 @@ class _SettlementCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         onTap: canTap ? onRecord : null,
         child: Container(
-          padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+          padding: const EdgeInsetsDirectional.fromSTEB(12, 10, 4, 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             border: Border.all(

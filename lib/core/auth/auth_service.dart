@@ -18,9 +18,24 @@ class AuthService {
       (throw StateError('Supabase not configured'));
 
   /// Redirect URL for OAuth: on web use [authRedirectUrl] (SITE_URL); on native use deep link so the app reopens.
+  ///
+  /// If [authRedirectUrl] is mistakenly set to `http://` while the app is on
+  /// `https://` for the same host, upgrade to the current origin so OAuth does
+  /// not bounce through Firebase Hosting's http→https 301. When unset, keep
+  /// the previous behavior (`null` → Supabase Site URL).
   String? get _oauthRedirectUrl {
     if (kIsWeb) {
-      return authRedirectUrl.trim().isNotEmpty ? authRedirectUrl.trim() : null;
+      final configured = authRedirectUrl.trim();
+      if (configured.isEmpty) return null;
+
+      final configuredUri = Uri.tryParse(configured);
+      if (configuredUri != null &&
+          configuredUri.scheme == 'http' &&
+          Uri.base.origin.startsWith('https://') &&
+          configuredUri.host == Uri.base.host) {
+        return Uri.base.origin;
+      }
+      return configured;
     }
     return authOAuthCallbackDeepLink;
   }

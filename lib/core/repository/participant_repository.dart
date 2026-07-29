@@ -2,6 +2,9 @@ import '../../domain/domain.dart';
 
 abstract class IParticipantRepository {
   Future<List<Participant>> getAll();
+
+  /// Live updates for every participant (one query instead of per-group watches).
+  Stream<List<Participant>> watchAll();
   Future<List<Participant>> getByGroupId(String groupId);
   Stream<List<Participant>> watchByGroupId(String groupId);
   Future<Participant?> getById(String id);

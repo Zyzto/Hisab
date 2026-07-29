@@ -1106,6 +1106,16 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
   }
 
   @override
+  Stream<List<Participant>> watchAll() {
+    if (kIsWeb) {
+      return _pollStream(getAll, fingerprint: _participantsListFp);
+    }
+    return _db
+        .watch('SELECT * FROM participants ORDER BY sort_order ASC')
+        .map((rows) => rows.map(_participantFromRow).toList());
+  }
+
+  @override
   Future<List<Participant>> getByGroupId(String groupId) async {
     final rows = await _db.getAll(
       'SELECT * FROM participants WHERE group_id = ? ORDER BY sort_order ASC',
@@ -1368,6 +1378,16 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
   Future<List<Expense>> getAll() async {
     final rows = await _db.getAll('SELECT * FROM expenses ORDER BY date DESC');
     return rows.map(_expenseFromRow).toList();
+  }
+
+  @override
+  Stream<List<Expense>> watchAll() {
+    if (kIsWeb) {
+      return _pollStream(getAll, fingerprint: _expensesListFp);
+    }
+    return _db
+        .watch('SELECT * FROM expenses ORDER BY date DESC')
+        .map((rows) => rows.map(_expenseFromRow).toList());
   }
 
   @override
@@ -1879,6 +1899,34 @@ class PowerSyncGroupMemberRepository implements IGroupMemberRepository {
           parameters: [groupId, userId],
         )
         .map((rows) => rows.isEmpty ? null : _memberFromRow(rows.first));
+  }
+
+  @override
+  Future<List<GroupMember>> listMyMembers() async {
+    final userId = _currentUserId;
+    if (userId == null) return const [];
+    final rows = await _db.getAll(
+      'SELECT * FROM group_members WHERE user_id = ? ORDER BY joined_at ASC',
+      [userId],
+    );
+    return rows.map(_memberFromRow).toList();
+  }
+
+  @override
+  Stream<List<GroupMember>> watchMyMembers() {
+    if (kIsWeb) {
+      return _pollStream(listMyMembers, fingerprint: _membersListFp);
+    }
+    final userId = _currentUserId;
+    if (userId == null) {
+      return Stream<List<GroupMember>>.value(const []);
+    }
+    return _db
+        .watch(
+          'SELECT * FROM group_members WHERE user_id = ? ORDER BY joined_at ASC',
+          parameters: [userId],
+        )
+        .map((rows) => rows.map(_memberFromRow).toList());
   }
 
   @override

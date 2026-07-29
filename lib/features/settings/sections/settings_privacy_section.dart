@@ -1,4 +1,5 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
@@ -6,6 +7,7 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/pwa/pwa_capabilities.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/widgets/toast.dart';
 import '../settings_definitions.dart';
@@ -38,12 +40,17 @@ List<Widget> buildPrivacySectionTiles(
         settings,
         notificationsEnabledSettingDef,
         titleKey: 'notifications_enabled',
-        subtitleKey: 'notifications_enabled_description',
+        subtitleKey: kIsWeb &&
+                pwaNotificationSupport == PwaNotificationSupport.needsInstall
+            ? 'onboarding_permission_notifications_needs_install'
+            : 'notifications_enabled_description',
         onChanged: (v) async {
           final notifier = ref.read(
             settings.provider(notificationsEnabledSettingDef).notifier,
           );
           if (v) {
+            final needsInstall = kIsWeb &&
+                pwaNotificationSupport == PwaNotificationSupport.needsInstall;
             final ok = await ref
                 .read(notificationServiceProvider.notifier)
                 .initialize(context);
@@ -51,7 +58,8 @@ List<Widget> buildPrivacySectionTiles(
             Log.info(
               'Setting changed: ${notificationsEnabledSettingDef.key}=$ok',
             );
-            if (!ok && context.mounted) {
+            // needsInstall already shows an install guidance sheet.
+            if (!ok && context.mounted && !needsInstall) {
               context.showToast('notifications_unavailable'.tr());
             }
           } else {

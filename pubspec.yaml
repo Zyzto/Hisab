@@ -1,7 +1,7 @@
 name: hisab
 description: "Group expense splitting and settle-up app."
 publish_to: 'none'
-version: 0.6.11+60
+version: 0.6.12+61
 
 environment:
   sdk: ^3.10.0
@@ -97,7 +97,6 @@ dependencies:
   firebase_core: ^4.6.0
   firebase_messaging: ^16.1.3
   flutter_local_notifications: ^22.2.0
-  pwa_install: ^0.0.6
 
   # Permissions
   permission_handler: ^12.0.1

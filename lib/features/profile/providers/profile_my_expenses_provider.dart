@@ -4,8 +4,7 @@ import 'package:flutter_riverpod/legacy.dart' show StateProvider;
 import '../../../core/services/settle_up_service.dart';
 import '../../../domain/domain.dart';
 import '../../groups/providers/group_analytics_provider.dart';
-import '../../groups/providers/group_member_provider.dart';
-import '../../groups/providers/groups_provider.dart';
+import 'profile_data_providers.dart';
 
 /// One expense involving the current user, with their split share only.
 class ProfileExpenseItem {
@@ -88,56 +87,49 @@ class ProfileExpensesFilter {
 final profileExpensesFilterProvider =
     StateProvider<ProfileExpensesFilter>((ref) => const ProfileExpensesFilter());
 
+List<ProfileExpenseItem> _buildExpenseItems(ProfileDataSnapshot snap) {
+  final items = <ProfileExpenseItem>[];
+  for (final group in snap.groups) {
+    final myParticipantId = snap.myParticipantIdByGroupId[group.id];
+    if (myParticipantId == null) continue;
+
+    final expenses = snap.expensesByGroupId[group.id] ?? const <Expense>[];
+    final participants =
+        snap.activeParticipantsByGroupId[group.id] ?? const <Participant>[];
+    final nameById = <String, String>{
+      for (final p in participants) p.id: p.name,
+    };
+
+    for (final expense in expenses) {
+      if (expense.transactionType == TransactionType.transfer) continue;
+      if (!expenseInvolvesParticipant(expense, myParticipantId)) continue;
+      final share = participantSplitShareCents(expense, myParticipantId);
+      if (share == null) continue;
+
+      items.add(
+        ProfileExpenseItem(
+          expense: expense,
+          group: group,
+          myShareCents: share,
+          payerName: nameById[expense.payerParticipantId] ?? '…',
+          iPaid: expense.payerParticipantId == myParticipantId,
+        ),
+      );
+    }
+  }
+  items.sort((a, b) => b.expense.date.compareTo(a.expense.date));
+  return items;
+}
+
 /// All expenses across groups where the current user is in the split (my share).
+/// Waits for the batched profile snapshot — never emits partial per-group data.
 final profileMyExpensesProvider =
     Provider<AsyncValue<List<ProfileExpenseItem>>>((ref) {
-  final groupsAsync = ref.watch(groupsProvider);
-
-  return groupsAsync.when(
+  final snapAsync = ref.watch(profileDataSnapshotProvider);
+  return snapAsync.when(
     loading: () => const AsyncValue.loading(),
     error: AsyncValue.error,
-    data: (groups) {
-      final items = <ProfileExpenseItem>[];
-
-      for (final group in groups) {
-        final member =
-            ref.watch(myMemberInGroupProvider(group.id)).asData?.value;
-        final myParticipantId = member?.participantId;
-        if (myParticipantId == null) continue;
-
-        final expenses =
-            ref.watch(expensesByGroupProvider(group.id)).asData?.value;
-        if (expenses == null) continue;
-
-        final participants = ref
-            .watch(activeParticipantsByGroupProvider(group.id))
-            .asData
-            ?.value;
-        final nameById = <String, String>{
-          for (final p in participants ?? const <Participant>[]) p.id: p.name,
-        };
-
-        for (final expense in expenses) {
-          if (expense.transactionType == TransactionType.transfer) continue;
-          if (!expenseInvolvesParticipant(expense, myParticipantId)) continue;
-          final share = participantSplitShareCents(expense, myParticipantId);
-          if (share == null) continue;
-
-          items.add(
-            ProfileExpenseItem(
-              expense: expense,
-              group: group,
-              myShareCents: share,
-              payerName: nameById[expense.payerParticipantId] ?? '…',
-              iPaid: expense.payerParticipantId == myParticipantId,
-            ),
-          );
-        }
-      }
-
-      items.sort((a, b) => b.expense.date.compareTo(a.expense.date));
-      return AsyncValue.data(items);
-    },
+    data: (snap) => AsyncValue.data(_buildExpenseItems(snap)),
   );
 });
 

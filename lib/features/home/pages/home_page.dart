@@ -594,7 +594,7 @@ class HomePage extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Padding(
-                            padding: const EdgeInsets.only(left: 16),
+                            padding: const EdgeInsetsDirectional.only(start: 16),
                             child: ReorderableDragStartListener(
                               index: index,
                               child: Semantics(

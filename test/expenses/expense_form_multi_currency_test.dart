@@ -250,6 +250,9 @@ class FakeParticipantRepository implements IParticipantRepository {
   Future<List<Participant>> getAll() async => participants;
 
   @override
+  Stream<List<Participant>> watchAll() => Stream.value(participants);
+
+  @override
   Future<List<Participant>> getByGroupId(String groupId) async =>
       participants;
 
@@ -296,6 +299,9 @@ class FakeExpenseRepository implements IExpenseRepository {
   Future<List<Expense>> getAll() async => const <Expense>[];
 
   @override
+  Stream<List<Expense>> watchAll() => Stream.value(const <Expense>[]);
+
+  @override
   Future<List<Expense>> getByGroupId(String groupId) async =>
       const <Expense>[];
 
@@ -326,6 +332,9 @@ class FakeExpenseRepositoryWithGetById implements IExpenseRepository {
 
   @override
   Future<List<Expense>> getAll() async => [expense];
+
+  @override
+  Stream<List<Expense>> watchAll() => Stream.value([expense]);
 
   @override
   Future<List<Expense>> getByGroupId(String groupId) async =>

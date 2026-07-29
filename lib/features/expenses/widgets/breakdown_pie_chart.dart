@@ -30,27 +30,25 @@ class BreakdownPieSlice {
 /// Shared donut chart used by profile + group analytics.
 ///
 /// Interaction:
-/// - 1st tap on a slice → select (center shows amount / %)
+/// - 1st tap on a slice → select (center shows amount)
 /// - 2nd tap on the **same** selected slice → [onOpenSlice] (if [canOpen])
 /// - tap the center (hole) while a slice is selected → [onOpenSlice] (if [canOpen])
 /// - tap another slice → select that slice
 /// - tap empty pie area / outside chart → deselect
 /// - tap center with nothing selected, or a non-openable slice → deselect
 ///
-/// [centerOverride] lets a parent show a legend row’s details in the hole while
+/// [centerOverride] lets a parent show a legend row’s amount in the hole while
 /// [selectedId] highlights a different slice (e.g. aggregated "Other").
 class BreakdownPieChart extends StatefulWidget {
   const BreakdownPieChart({
     super.key,
     required this.slices,
     required this.currencyCode,
-    required this.centerIdleLabel,
     this.title,
     this.emptyLabel,
     this.onOpenSlice,
     this.showLegend = true,
     this.legend,
-    this.selectedHint,
     this.height = 210,
     this.selectedId,
     this.onSelectionChanged,
@@ -59,7 +57,6 @@ class BreakdownPieChart extends StatefulWidget {
 
   final List<BreakdownPieSlice> slices;
   final String currencyCode;
-  final String centerIdleLabel;
   final String? title;
   final String? emptyLabel;
 
@@ -72,17 +69,13 @@ class BreakdownPieChart extends StatefulWidget {
   /// Fully custom legend (e.g. analytics exclude toggles).
   final Widget? legend;
 
-  /// Subtitle under center amount when a slice is selected.
-  /// Defaults to "Tap again to view expenses" when [onOpenSlice] is set.
-  final String? selectedHint;
-
   final double height;
 
   /// When [onSelectionChanged] is set, selection is controlled by the parent.
   final String? selectedId;
   final ValueChanged<String?>? onSelectionChanged;
 
-  /// Center label/amount when it should differ from the highlighted [selectedId].
+  /// Center amount when it should differ from the highlighted [selectedId].
   final BreakdownPieSlice? centerOverride;
 
   bool get _isControlled => onSelectionChanged != null;
@@ -188,12 +181,6 @@ class BreakdownPieChartState extends State<BreakdownPieChart> {
       });
     }
 
-    // Prefer count/% in the hole — short, always localized, and avoids the
-    // flaky "tap again" line crowding compact side-by-side pies.
-    final hint = center == null
-        ? 'analytics_pie_tap_hint'.tr()
-        : (widget.selectedHint ?? _countPctLabel(center, total));
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -280,47 +267,22 @@ class BreakdownPieChartState extends State<BreakdownPieChart> {
                           _deselect();
                         },
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                center?.label ?? widget.centerIdleLabel,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.center,
-                                style: theme.textTheme.labelMedium?.copyWith(
-                                  color:
-                                      center?.color ?? cs.onSurfaceVariant,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: Center(
+                            child: Text(
+                              CurrencyFormatter.formatCents(
+                                (center?.amountCents ?? total).abs(),
+                                widget.currencyCode,
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                CurrencyFormatter.formatCents(
-                                  (center?.amountCents ?? total).abs(),
-                                  widget.currencyCode,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.center,
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: chartSize < 180 ? 14 : null,
-                                ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                fontSize: chartSize < 180 ? 14 : null,
+                                color: center?.color,
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                hint,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.center,
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: cs.onSurfaceVariant,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
                         ),
                       ),
@@ -358,23 +320,6 @@ class BreakdownPieChartState extends State<BreakdownPieChart> {
         ],
       ],
     );
-  }
-
-  String _countPctLabel(BreakdownPieSlice selected, int total) {
-    final pct = total <= 0
-        ? 0
-        : ((selected.amountCents.abs() / total) * 100).round();
-    if (selected.count != null) {
-      final countLabel = selected.count == 1
-          ? 'analytics_expense_count_one'.tr(
-              namedArgs: {'count': '${selected.count}'},
-            )
-          : 'analytics_expense_count'.tr(
-              namedArgs: {'count': '${selected.count}'},
-            );
-      return '$countLabel · $pct%';
-    }
-    return '$pct%';
   }
 
   PieChartSectionData _section(

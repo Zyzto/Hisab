@@ -59,7 +59,7 @@ class _LogsViewerDialogState extends State<LogsViewerDialog> {
       children: [
         if (showTitleInBody) ...[
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
+            padding: const EdgeInsetsDirectional.fromSTEB(20, 16, 12, 0),
             child: Row(
               children: [
                 Icon(

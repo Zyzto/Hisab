@@ -1,7 +1,10 @@
-// Stub for non-web: no browser Notification API.
+// Non-web stub: browser Notification API is not used.
 
-/// No-op on non-web. Returns true so callers do not block.
-Future<bool> requestBrowserNotificationPermission() async => true;
-
-/// On non-web this is not used; return true.
+/// Whether the browser has already granted notification permission.
 bool isBrowserNotificationPermissionGranted() => true;
+
+/// Whether the browser Notification API exists.
+bool isBrowserNotificationApiSupported() => true;
+
+/// Requests the browser's notification permission.
+Future<bool> requestBrowserNotificationPermission() async => true;

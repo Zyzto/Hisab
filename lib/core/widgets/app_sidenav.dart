@@ -205,7 +205,7 @@ class _Header extends StatelessWidget {
 
     if (asDrawer || onToggleCompact == null) {
       return Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
+        padding: const EdgeInsetsDirectional.fromSTEB(20, 16, 12, 8),
         child: title,
       );
     }
