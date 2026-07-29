@@ -485,13 +485,8 @@ void main() {
           await drainAppTimers(tester);
         });
 
-        // Surface async exceptions that would otherwise become empty
-        // failureDetails on web --release.
         final pending = tester.takeException();
-        if (pending != null) {
-          recordStage('takeException', '$pending');
-          fail('Pending exception after expense suite: $pending');
-        }
+        expect(pending, isNull, reason: 'No pending exception after suite');
       },
     );
   });
