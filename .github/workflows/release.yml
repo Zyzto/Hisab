@@ -34,7 +34,33 @@ env:
 
 jobs:
   # ──────────────────────────────────────────────
-  # 0. Unit, widget, and integration tests (web Chrome)
+  # 0a. Static security check (secrets / tracked files)
+  # ──────────────────────────────────────────────
+  security-check:
+    name: Security Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Run security check
+        run: bash ./scripts/verify_security.sh
+
+  # ──────────────────────────────────────────────
+  # 0b. Static infra / release-readiness check
+  # ──────────────────────────────────────────────
+  infra-check:
+    name: Infra Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Run infra check
+        run: bash ./scripts/verify_infra.sh
+
+  # ──────────────────────────────────────────────
+  # 0c. Unit, widget, and integration tests (web Chrome)
   # ──────────────────────────────────────────────
   test:
     name: Test
@@ -87,7 +113,7 @@ jobs:
             --web-browser-flag=--disable-dev-shm-usage
 
   # ──────────────────────────────────────────────
-  # 0b. Online integration tests (local Supabase + web Chrome)
+  # 0d. Online integration tests (local Supabase + web Chrome)
   # ──────────────────────────────────────────────
   test-online:
     name: Online Tests
@@ -204,7 +230,7 @@ jobs:
   # ──────────────────────────────────────────────
   build-android:
     name: Build Android
-    needs: [test, test-online]
+    needs: [security-check, infra-check, test, test-online]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -327,7 +353,7 @@ jobs:
   # ──────────────────────────────────────────────
   deploy-web:
     name: Deploy Web
-    needs: [test, test-online]
+    needs: [security-check, infra-check, test, test-online]
     if: >-
       (startsWith(github.ref, 'refs/tags/v')) ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_web == 'true')

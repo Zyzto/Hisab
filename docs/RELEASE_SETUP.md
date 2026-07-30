@@ -252,10 +252,27 @@ Once all secrets are in place:
 
 ### What happens
 
-- **build-android**: Builds a signed APK and AAB, uploads them as artifacts.
+- **security-check**: Static secret / tracked-file scan (`scripts/verify_security.sh`).
+- **infra-check**: Config-as-code, Edge Functions, Hosting, web shell, version pins (`scripts/verify_infra.sh`).
+- **test** / **test-online**: Unit, widget, and web integration tests (local + local Supabase).
+- **build-android**: Builds a signed APK and AAB, uploads them as artifacts (needs security + infra + tests).
 - **github-release** (tag pushes only): Creates a GitHub Release with the APK attached.
 - **deploy-play-store**: Uploads the AAB to the Google Play internal testing track.
-- **deploy-web**: Builds the Flutter web app and deploys to Firebase Hosting.
+- **deploy-web**: Builds the Flutter web app and deploys to Firebase Hosting (needs security + infra + tests).
+
+Local preflight (same as CI security/infra jobs):
+
+```bash
+bash ./scripts/run_release_checks.sh
+```
+
+Install push secret-scan once per clone (blocks `git push` if secrets are in the commit tree):
+
+```bash
+bash ./scripts/install_git_hooks.sh
+```
+
+Cursor agent skill for the full gate (scripts + Supabase advisors + security-review): [`.cursor/skills/hisab-release-checks/SKILL.md`](../.cursor/skills/hisab-release-checks/SKILL.md).
 
 ---
 

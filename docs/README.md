@@ -21,6 +21,7 @@ Guides for running, shipping, and extending **Hisab**. Start with the root [READ
 | Doc | Topic |
 |-----|--------|
 | [RELEASE_SETUP.md](RELEASE_SETUP.md) | Keystore, Play, Firebase Hosting, one-time release checklist |
+| [../.cursor/skills/hisab-release-checks/SKILL.md](../.cursor/skills/hisab-release-checks/SKILL.md) | Agent skill: security + infra checks, advisors, release gate |
 | [GITHUB_ACTIONS_SECRETS.md](GITHUB_ACTIONS_SECRETS.md) | CI secret names and where each value comes from |
 | [SUPABASE_BACKUP.md](SUPABASE_BACKUP.md) | Database backup and restore |
 

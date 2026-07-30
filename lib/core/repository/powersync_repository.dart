@@ -520,6 +520,11 @@ class PowerSyncGroupRepository implements IGroupRepository {
     List<String> initialParticipants = const [],
     bool isPersonal = false,
     int? budgetAmountCents,
+    SettlementMethod settlementMethod = SettlementMethod.greedy,
+    bool allowMemberAddExpense = true,
+    bool allowMemberChangeSettings = true,
+    bool allowExpenseAsOtherParticipant = true,
+    bool allowMemberSettleForOthers = false,
   }) async {
     final trimmedName = name.trim();
     if (trimmedName.isEmpty || trimmedName.length > 200) {
@@ -551,6 +556,11 @@ class PowerSyncGroupRepository implements IGroupRepository {
       'name': trimmedName,
       'currency_code': currencyCode,
       'owner_id': ownerId,
+      'settlement_method': settlementMethod.name,
+      'allow_member_add_expense': allowMemberAddExpense,
+      'allow_member_change_settings': allowMemberChangeSettings,
+      'allow_expense_as_other_participant': allowExpenseAsOtherParticipant,
+      'allow_member_settle_for_others': allowMemberSettleForOthers,
       'icon': icon,
       'color': _colorToSigned(color),
       'is_personal': isPersonal,
@@ -696,12 +706,23 @@ class PowerSyncGroupRepository implements IGroupRepository {
     // Always write to local DB (use signed color for consistency with Supabase and reader)
     final colorStored = _colorToSigned(color);
     await _db.execute(
-      'INSERT INTO groups (id, name, currency_code, owner_id, icon, color, archived_at, is_personal, budget_amount_cents, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      '''INSERT INTO groups (
+        id, name, currency_code, owner_id, settlement_method,
+        allow_member_add_expense, allow_member_change_settings,
+        allow_expense_as_other_participant, allow_member_settle_for_others,
+        icon, color, archived_at, is_personal, budget_amount_cents,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
       [
         id,
-        name,
+        trimmedName,
         currencyCode,
         ownerId,
+        settlementMethod.name,
+        allowMemberAddExpense ? 1 : 0,
+        allowMemberChangeSettings ? 1 : 0,
+        allowExpenseAsOtherParticipant ? 1 : 0,
+        allowMemberSettleForOthers ? 1 : 0,
         icon,
         colorStored,
         null,

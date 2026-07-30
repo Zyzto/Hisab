@@ -123,7 +123,7 @@ Expense form **photos**: add up to 5 images (camera or gallery on all platforms,
   - shell route for home/settings tabs; `/profile` is a shell child (like `/archived`) opened from the sidenav avatar
   - group/invite/expense routes
   - **Navigation trace** (`navigation_trace.dart`): `GoRouter`’s `routerDelegate` listener records recent locations (UTC + URI) for **Share / Report issue** payloads (`error_report_helper.dart`). Decorative-only URL updates that do not change the delegate may not appear in the trace.
-- **Group / personal create wizard:** Canonical routes are `/groups/create` and `/groups/create-personal` (each mounts one `GroupCreatePage` so `PageView` state is not disposed between steps). Legacy paths such as `/groups/create/details` **redirect** to the canonical URL (bookmarks still work; refresh on a legacy step URL restarts the wizard at step 0). In-wizard step labels in the address bar use `SystemNavigator.routeInformationUpdated` (decorative), not `context.go`, so state and animations stay intact.
+- **Group / personal create wizard:** Canonical routes are `/groups/create` and `/groups/create-personal` (each mounts one `GroupCreatePage` so `PageView` state is not disposed between steps). Legacy paths such as `/groups/create/details` **redirect** to the canonical URL (bookmarks still work; refresh on a legacy step URL restarts the wizard at step 0). In-wizard step labels in the address bar use `SystemNavigator.routeInformationUpdated` (decorative), not `context.go`, so state and animations stay intact. Step UI uses 0.6.x flat-panel surfaces (`AccentSurfaces`), `GroupSectionHeader`, living progress dots, `AppMotion` / `UiPerf` chrome, and `WizardStepEnter` (shared with onboarding).
 - **Onboarding wizard:** Per-step routes (`/onboarding/welcome`, …) remain for deep links and cold starts; swiping between steps updates the browser URL the same way (**decorative** `routeInformationUpdated`) so `OnboardingPage` state is not recreated by `go()` on every page.
 - **Group detail tabs:** Tab changes still use `SystemNavigator.routeInformationUpdated` in `group_detail_page.dart` (same pattern: URL reflects tab without replacing the route).
 - **Modals/sheets:** `lib/core/layout/responsive_sheet.dart` — `showResponsiveSheet` (bottom sheet on narrow, centered dialog on tablet+) and `showAppDialog`; both support `centerInFullViewport` and **click-outside-to-close** (barrier dismiss on all platforms, including desktop web via an explicit barrier gesture). See [MODAL_CENTERING_AND_RESPONSIVE_SHEET.md](MODAL_CENTERING_AND_RESPONSIVE_SHEET.md).
@@ -196,7 +196,7 @@ Push notifications are sent when expenses are added/content-edited/deleted or me
 
 - `features/home`: groups list (Personal and Groups sections) via **home_list_provider** (ordered list, pinned/custom order), **`HomeReorderableGroupsSliver`** (long-press reorder with pin-cohort clamping in `home_list_reorder.dart`; optimistic order via `homeListPendingOrderIdsProvider` until settings persist), **routes**, create FAB + modal (Create group / Create personal), manual refresh trigger
 - `features/profile`: `/profile` dashboard (account header moved from Settings, global display-currency net, KPIs, balances, personal budgets, grouped `user_notifications` feed). Data loads through **`profile_data_providers`** (`allExpensesProvider` / `allParticipantsProvider` / `myMembershipsProvider` → `profileDataSnapshotProvider`) so the dashboard and “my expenses” share one snapshot instead of N per-group streams. Repositories expose `watchAll` / `watchMyMembers` (web uses fingerprint-gated polling). SyncEngine fetches notifications by user.
-- `features/groups`: create/detail/settings (including personal vs group branches and convert flows), invite management, invite acceptance; group settings include permission toggles (e.g. Members can add expenses, Members can record settlements for others). **Group create** uses a single shell route per flow plus decorative step URLs (see Navigation). `invite_redirect_proxy` (and `invite_redirect_proxy_web`, `invite_redirect_proxy_stub`, `invite_redirect_proxy_page`) for web/invite redirect; **create_invite_sheet** (invite creation UI)
+- `features/groups`: create/detail/settings (including personal vs group branches and convert flows), invite management, invite acceptance; group settings include permission toggles (e.g. Members can add expenses, Members can record settlements for others). **Group create** uses a single shell route per flow plus decorative step URLs (see Navigation); create wizard chrome matches 0.6.x onboarding (`AccentSurfaces`, `WizardStepEnter`, `AppMotion` / `UiPerf`). `invite_redirect_proxy` (and `invite_redirect_proxy_web`, `invite_redirect_proxy_stub`, `invite_redirect_proxy_page`) for web/invite redirect; **create_invite_sheet** (invite creation UI)
 - `features/expenses`: create/edit/detail expenses (**expense_detail_shell**), split logic UI, image input hooks; **expense_navigation_direction** (provider), **expense_form_constants**, **category_icons**
 - `features/balance`: you-centric balance list (Your balance hero → everyone else → Settle Up) and record settlement flow. By default only the group owner or the debtor (participant who owes) can record a settlement; group setting **Members can record settlements for others** (Group.allowMemberSettleForOthers) allows any member to record. Balance list (`balance_list.dart`) uses `myMemberInGroupProvider` and `myRoleInGroupProvider` for the hero (when linked) and to enable or disable the record button per row.
 - `features/settings`:
@@ -208,7 +208,7 @@ Push notifications are sent when expenses are added/content-edited/deleted or me
   - logs viewer/clear/report flow
   - feedback capture (**feedback_upload**, feedback_clipboard with io/stub)
   - About: version row tappable to check for updates manually; About me shows developer info from GitHub (avatar, name, bio, profile link)
-- `features/onboarding`: multi-step onboarding (welcome, preferences, permissions, connect) with mode selection and auth gate for online mode; step UI uses 0.6.x flat-panel surfaces (`AccentSurfaces`), brand hero + staggered welcome rows, and `OnboardingStepEnter` motion (UiPerf-gated); URL sync for steps is decorative (see Navigation) so wizard state is preserved while swiping
+- `features/onboarding`: multi-step onboarding (welcome, preferences, permissions, connect) with mode selection and auth gate for online mode; step UI uses 0.6.x flat-panel surfaces (`AccentSurfaces`), brand hero + staggered welcome rows, and `WizardStepEnter` motion (UiPerf-gated; `lib/core/widgets/wizard_step_enter.dart`, aliased as `OnboardingStepEnter` in onboarding shared); URL sync for steps is decorative (see Navigation) so wizard state is preserved while swiping
 - `features/transaction_scanner`: Android notification → draft → personal expense (Settings hub; local-only tables). See [TRANSACTION_SCANNER.md](TRANSACTION_SCANNER.md).
 
 ## Settings Framework
@@ -396,12 +396,15 @@ iOS declarations are present in `ios/Runner/Info.plist`, including:
 `.github/workflows/release.yml`:
 
 - triggers on tags `v*` or manual dispatch
+- **security-check** / **infra-check**: static gates (`scripts/verify_security.sh`, `scripts/verify_infra.sh`); required before Android/web deploy
 - **test** job: unit + widget tests, local-only integration tests on web (Chrome)
 - **test-online** job: online integration tests against a local Supabase Docker instance (auth, sync, invite flows)
 - builds Android APK + AAB
 - creates GitHub release (tag flow)
 - optional Play Store internal deploy
 - builds/deploys Flutter web to Firebase Hosting (copies privacy page to build output)
+
+Agent pre-release gate (scripts + Supabase advisors + security-review): [`.cursor/skills/hisab-release-checks/SKILL.md`](../.cursor/skills/hisab-release-checks/SKILL.md). Local: `bash ./scripts/run_release_checks.sh`.
 
 The `test-online` job requires no additional secrets — it uses the local Supabase instance's auto-generated credentials. It sets up the Supabase CLI, starts Docker containers, resets the database (migrations + seed), and runs `flutter drive` with the online test barrel.
 

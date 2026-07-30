@@ -162,9 +162,10 @@ class _AdaptiveSheetHost extends StatelessWidget {
         maxHeight ?? size.height * (isWide ? 0.85 : 0.92);
 
     final showTitle = title != null && title!.isNotEmpty;
-    const topBarHeight = 56.0;
+    // Wide dialog header: padded title row (was a flush 56px bar).
+    const wideHeaderChromeHeight = 72.0;
     final chromeHeight = isWide
-        ? topBarHeight + 12
+        ? wideHeaderChromeHeight
         : (showDragHandle ? 24.0 : 8.0);
     final bodyMaxHeight = math.max(
       0.0,
@@ -178,16 +179,16 @@ class _AdaptiveSheetHost extends StatelessWidget {
           );
 
     final Widget header = isWide
-        ? SizedBox(
-            height: topBarHeight,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(
-                    color: cs.outlineVariant.withValues(alpha: 0.45),
-                  ),
+        ? DecoratedBox(
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: cs.outlineVariant.withValues(alpha: 0.45),
                 ),
               ),
+            ),
+            child: Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(12, 16, 8, 12),
               child: Row(
                 children: [
                   if (showTitle)
@@ -195,7 +196,7 @@ class _AdaptiveSheetHost extends StatelessWidget {
                       child: Align(
                         alignment: AlignmentDirectional.centerStart,
                         child: Padding(
-                          padding: const EdgeInsetsDirectional.only(start: 20),
+                          padding: const EdgeInsetsDirectional.only(start: 8),
                           child: UserText(
                             title!,
                             style: theme.textTheme.titleMedium?.copyWith(
@@ -218,32 +219,29 @@ class _AdaptiveSheetHost extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                   ],
-                  Padding(
-                    padding: const EdgeInsetsDirectional.only(end: 8),
-                    child: Tooltip(
-                      message: MaterialLocalizations.of(
-                        context,
-                      ).closeButtonTooltip,
-                      child: Material(
-                        type: MaterialType.button,
-                        color: Colors.transparent,
-                        child: InkWell(
-                          canRequestFocus: false,
-                          onTap: () {
-                            final navigator = Navigator.of(
-                              context,
-                              rootNavigator: true,
-                            );
-                            if (navigator.canPop()) navigator.pop(null);
-                          },
-                          customBorder: const CircleBorder(),
-                          child: Padding(
-                            padding: const EdgeInsets.all(10),
-                            child: Icon(
-                              Icons.close,
-                              size: 22,
-                              color: cs.onSurfaceVariant,
-                            ),
+                  Tooltip(
+                    message: MaterialLocalizations.of(
+                      context,
+                    ).closeButtonTooltip,
+                    child: Material(
+                      type: MaterialType.button,
+                      color: Colors.transparent,
+                      child: InkWell(
+                        canRequestFocus: false,
+                        onTap: () {
+                          final navigator = Navigator.of(
+                            context,
+                            rootNavigator: true,
+                          );
+                          if (navigator.canPop()) navigator.pop(null);
+                        },
+                        customBorder: const CircleBorder(),
+                        child: Padding(
+                          padding: const EdgeInsets.all(10),
+                          child: Icon(
+                            Icons.close,
+                            size: 22,
+                            color: cs.onSurfaceVariant,
                           ),
                         ),
                       ),

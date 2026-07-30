@@ -57,7 +57,6 @@ Future<T?> showOptionPickerSheet<T>(
                     ),
                   ),
                 SheetOptionList(
-                  padding: EdgeInsets.fromLTRB(16, isTablet ? 16 : 8, 16, 8),
                   children: [
                     for (final opt in options)
                       SheetOptionTile(

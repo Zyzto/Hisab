@@ -34,9 +34,9 @@ One composition language; **two layouts**, not two brands:
 |--------|------|
 | Radius | **16** for dialog and phone bottom sheet (matches `AccentSurfaces.flatPanel`) |
 | Fill / border | `surfaceContainerLow` + `outlineVariant` @ 0.45 |
-| Tablet title bar | Flat, hairline bottom, close icon — not elevated card chrome |
+| Tablet title bar | Flat, hairline bottom, close icon; **padding inside** `showResponsiveSheet` (16 top / 12 bottom) — do not pad the title bar from call sites |
 | Phone drag handle | **One** affordance from `showResponsiveSheet`; sheet bodies must not draw a second pill |
-| Option rows | `SheetOptionTile` / `SheetOptionList` or `showOptionPickerSheet` |
+| Option rows | `SheetOptionTile` / `SheetOptionList` (default list padding `16,8,16,8`) or `showOptionPickerSheet` |
 | Confirm / text input | `showConfirmSheet` / `showTextInputSheet` with body in `AccentSurfaces.flatPanel` |
 | Actions | Primary filled + secondary text; destructive = error-toned; phone Cancel; tablet close/barrier |
 

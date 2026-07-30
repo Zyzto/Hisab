@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/motion/app_motion.dart';
-import '../../../core/platform/ui_perf.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/theme/theme_config.dart';
+import '../../../core/widgets/wizard_step_enter.dart';
+
+/// Alias for call sites that still import [OnboardingStepEnter] from this file.
+typedef OnboardingStepEnter = WizardStepEnter;
 
 /// Shared scroll + padding wrapper for all onboarding page bodies.
 /// Keeps title at top and content vertically balanced in the viewport.
@@ -70,73 +72,6 @@ Widget onboardingPageBodyWithFixedTitle(
       );
     },
   );
-}
-
-/// One-shot fade (+ optional slide-up) when a step body first mounts.
-///
-/// On iOS web (`UiPerf.preferFadeOnlyPageTransitions`), uses fade only.
-class OnboardingStepEnter extends StatefulWidget {
-  const OnboardingStepEnter({
-    super.key,
-    required this.child,
-    this.slidePx = 20,
-  });
-
-  final Widget child;
-  final double slidePx;
-
-  @override
-  State<OnboardingStepEnter> createState() => _OnboardingStepEnterState();
-}
-
-class _OnboardingStepEnterState extends State<OnboardingStepEnter>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final CurvedAnimation _t;
-
-  @override
-  void initState() {
-    super.initState();
-    // iOS web: skip enter motion entirely (Opacity + slide is expensive).
-    if (UiPerf.preferFadeOnlyPageTransitions) {
-      _controller = AnimationController(vsync: this, value: 1);
-      _t = CurvedAnimation(parent: _controller, curve: AppMotion.enterCurve);
-      return;
-    }
-    _controller = AnimationController(vsync: this, duration: AppMotion.page);
-    _t = CurvedAnimation(parent: _controller, curve: AppMotion.enterCurve);
-    _controller.forward();
-  }
-
-  @override
-  void dispose() {
-    _t.dispose();
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (UiPerf.preferFadeOnlyPageTransitions || _controller.isCompleted) {
-      return widget.child;
-    }
-    final fadeOnly = UiPerf.preferFadeOnlyPageTransitions;
-    return AnimatedBuilder(
-      animation: _t,
-      builder: (context, child) {
-        final v = _t.value;
-        Widget result = child!;
-        if (!fadeOnly) {
-          result = Transform.translate(
-            offset: Offset(0, (1 - v) * widget.slidePx),
-            child: result,
-          );
-        }
-        return Opacity(opacity: v, child: result);
-      },
-      child: widget.child,
-    );
-  }
 }
 
 /// Icon container used in onboarding list cards.

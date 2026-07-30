@@ -68,6 +68,7 @@ class HomePage extends ConsumerWidget {
             children: [
               SheetOptionTile(
                 title: 'create_group'.tr(),
+                subtitle: 'create_group_desc'.tr(),
                 leading: Icon(
                   Icons.group_outlined,
                   color: colorScheme.onSurfaceVariant,
@@ -80,6 +81,7 @@ class HomePage extends ConsumerWidget {
               ),
               SheetOptionTile(
                 title: 'create_personal'.tr(),
+                subtitle: 'create_personal_desc'.tr(),
                 leading: Icon(
                   Icons.person_outline,
                   color: colorScheme.onSurfaceVariant,
@@ -195,7 +197,6 @@ class HomePage extends ConsumerWidget {
                       ),
                     sectionLabel('home_list_display'.tr()),
                     SheetOptionList(
-                      padding: EdgeInsets.fromLTRB(16, isTablet ? 8 : 0, 16, 8),
                       children: [
                         SheetOptionTile(
                           title: 'home_list_display_list_separate'.tr(),
