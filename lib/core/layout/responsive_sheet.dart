@@ -7,6 +7,7 @@ import 'layout_breakpoints.dart';
 import '../motion/app_motion.dart';
 import '../navigation/route_paths.dart';
 import '../navigation/shell_nav_layout.dart';
+import '../widgets/user_text.dart';
 
 /// Corner radius for sheet chrome (matches AccentSurfaces.flatPanel).
 const double _kSheetDialogRadius = 16.0;
@@ -29,6 +30,7 @@ double _railWidthForDialog({
   if (isOutsideShell) return 0.0;
   final isShellRoute =
       path == RoutePaths.home ||
+      path.startsWith('${RoutePaths.homeModeBase}/') ||
       path == RoutePaths.archivedGroups ||
       path == RoutePaths.settings ||
       path.startsWith('${RoutePaths.settings}/');
@@ -193,12 +195,13 @@ class _AdaptiveSheetHost extends StatelessWidget {
                       child: Align(
                         alignment: AlignmentDirectional.centerStart,
                         child: Padding(
-                          padding: const EdgeInsetsDirectional.only(start: 16),
-                          child: Text(
+                          padding: const EdgeInsetsDirectional.only(start: 20),
+                          child: UserText(
                             title!,
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w700,
                             ),
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -213,31 +216,34 @@ class _AdaptiveSheetHost extends StatelessWidget {
                       descendantsAreFocusable: false,
                       child: tabletTopBarAction!,
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 4),
                   ],
-                  Tooltip(
-                    message: MaterialLocalizations.of(
-                      context,
-                    ).closeButtonTooltip,
-                    child: Material(
-                      type: MaterialType.button,
-                      color: Colors.transparent,
-                      child: InkWell(
-                        canRequestFocus: false,
-                        onTap: () {
-                          final navigator = Navigator.of(
-                            context,
-                            rootNavigator: true,
-                          );
-                          if (navigator.canPop()) navigator.pop(null);
-                        },
-                        customBorder: const CircleBorder(),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Icon(
-                            Icons.close,
-                            size: 22,
-                            color: cs.onSurfaceVariant,
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 8),
+                    child: Tooltip(
+                      message: MaterialLocalizations.of(
+                        context,
+                      ).closeButtonTooltip,
+                      child: Material(
+                        type: MaterialType.button,
+                        color: Colors.transparent,
+                        child: InkWell(
+                          canRequestFocus: false,
+                          onTap: () {
+                            final navigator = Navigator.of(
+                              context,
+                              rootNavigator: true,
+                            );
+                            if (navigator.canPop()) navigator.pop(null);
+                          },
+                          customBorder: const CircleBorder(),
+                          child: Padding(
+                            padding: const EdgeInsets.all(10),
+                            child: Icon(
+                              Icons.close,
+                              size: 22,
+                              color: cs.onSurfaceVariant,
+                            ),
                           ),
                         ),
                       ),

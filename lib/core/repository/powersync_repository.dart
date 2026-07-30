@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../constants/supabase_config.dart';
+import '../utils/user_text.dart';
 import '../../domain/domain.dart';
 import 'group_repository.dart';
 import 'participant_repository.dart';
@@ -585,9 +586,7 @@ class PowerSyncGroupRepository implements IGroupRepository {
     final rawOwnerName = (ownerDisplayName ?? fallbackOwnerName).trim();
     final participantName = rawOwnerName.isEmpty
         ? fallbackOwnerName
-        : (rawOwnerName.length > 100
-              ? rawOwnerName.substring(0, 100)
-              : rawOwnerName);
+        : clampCodePoints(rawOwnerName, maxCodePoints: 100);
 
     if (!_isLocalOnly && _isOnline && _client != null) {
       // Online: write to Supabase first

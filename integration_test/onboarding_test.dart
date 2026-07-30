@@ -16,6 +16,7 @@ void main() {
       recordStage('onboarding: Welcome page', 'STARTED');
       await waitForWidget(tester, find.text('Welcome to Hisab'));
       expect(find.text('Welcome to Hisab'), findsOneWidget);
+      expect(find.text('How it works'), findsOneWidget);
       recordStage('onboarding: Welcome page', 'PASSED');
 
       recordStage('onboarding: Preferences page', 'STARTED');
@@ -37,6 +38,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 500));
       await pumpAndSettleWithTimeout(tester);
       await waitForWidget(tester, find.text('Connect'));
+      // Default mode is offline; Start completes without sign-in.
+      expect(find.text('Start'), findsOneWidget);
       recordStage('onboarding: Connect page', 'PASSED');
 
       recordStage('onboarding: complete and land on home', 'STARTED');

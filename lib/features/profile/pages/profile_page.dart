@@ -9,9 +9,11 @@ import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/user_text.dart';
 import '../../../core/widgets/amount_with_secondary_display.dart';
 import '../../../core/widgets/group_section_header.dart';
 import '../../../core/widgets/page_section_index.dart';
+import '../../../core/widgets/user_text.dart';
 import '../../../domain/domain.dart';
 import '../../groups/providers/groups_provider.dart';
 import '../../groups/widgets/group_card.dart';
@@ -281,167 +283,37 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   },
                   child: NotificationListener<ScrollNotification>(
                     onNotification: _onScroll,
-                    child: ListView(
+                    child: CustomScrollView(
                       key: _scrollViewKey,
                       controller: _scrollController,
                       physics: const AlwaysScrollableScrollPhysics(),
-                      padding: EdgeInsets.only(
-                        bottom: showSideIndex ? 32 : 88,
-                      ),
-                      children: [
-                        KeyedSubtree(
-                          key: _accountKey,
-                          child: const ProfileAccountSection(),
-                        ),
-                        const Divider(height: 24),
-                        if (contentLoading)
-                          const _ProfileContentSkeleton()
-                        else if (contentError != null)
-                          Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Text('${contentError.error}'),
-                          )
-                        else if (data != null)
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              KeyedSubtree(
-                                key: _overviewKey,
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    _GlobalNetHero(net: data.globalNet),
-                                    const SizedBox(height: 8),
-                                    _KpiStrip(kpis: data.kpis),
-                                  ],
-                                ),
-                              ),
-                              ProfileActivitySection(
-                                analyticsSectionKey: _analyticsKey,
-                                expensesSectionKey: _expensesKey,
-                              ),
-                              if (data.balanceRows.isNotEmpty) ...[
-                                KeyedSubtree(
-                                  key: _balancesKey,
-                                  child: Padding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      16,
-                                      12,
-                                      16,
-                                      8,
-                                    ),
-                                    child: GroupSectionHeader(
-                                      label: 'profile_balances'.tr(),
-                                    ),
-                                  ),
-                                ),
-                                ...data.balanceRows.map(
-                                  (row) => ListTile(
-                                    title: Text(row.group.name),
-                                    subtitle: Text(
-                                      row.youOwe
-                                          ? 'you_owe'.tr()
-                                          : 'owes_you'.tr(),
-                                    ),
-                                    trailing: AmountWithSecondaryDisplay(
-                                      amountCents: row.balanceCents.abs(),
-                                      groupCurrencyCode: row.currencyCode,
-                                      isNegative: row.youOwe,
-                                    ),
-                                    onTap: () => context.push(
-                                      RoutePaths.groupDetail(row.group.id),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                              if (data.personalBudgets.isNotEmpty) ...[
-                                KeyedSubtree(
-                                  key: _budgetsKey,
-                                  child: Padding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      16,
-                                      12,
-                                      16,
-                                      8,
-                                    ),
-                                    child: GroupSectionHeader(
-                                      label: 'profile_personal_budgets'.tr(),
-                                    ),
-                                  ),
-                                ),
-                                ...data.personalBudgets.map(
-                                  (row) => Padding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      16,
-                                      8,
-                                      16,
-                                      4,
-                                    ),
-                                    child: PersonalBudgetCard.fromRow(
-                                      row,
-                                      onTap: () => context.push(
-                                        RoutePaths.groupDetail(row.group.id),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                              KeyedSubtree(
-                                key: _activityKey,
-                                child: Padding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    16,
-                                    12,
-                                    16,
-                                    0,
-                                  ),
-                                  child: GroupSectionHeader(
-                                    label: 'profile_recent_activity'.tr(),
-                                    trailing: TextButton(
-                                      onPressed: () => setState(
-                                        () => _chronologicalFeed =
-                                            !_chronologicalFeed,
-                                      ),
-                                      child: Text(
-                                        _chronologicalFeed
-                                            ? 'profile_feed_grouped'.tr()
-                                            : 'profile_feed_show_all'.tr(),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              _ActivityFeed(
-                                chronological: _chronologicalFeed,
-                                groups: data.groups,
-                              ),
-                              if (data.groups.isNotEmpty) ...[
-                                KeyedSubtree(
-                                  key: _groupsKey,
-                                  child: Padding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                      16,
-                                      12,
-                                      16,
-                                      8,
-                                    ),
-                                    child: GroupSectionHeader(
-                                      label: 'profile_your_groups'.tr(),
-                                    ),
-                                  ),
-                                ),
-                                ...data.groups.map(
-                                  (g) => GroupCard(
-                                    group: g,
-                                    onTap: () => context.push(
-                                      RoutePaths.groupDetail(g.id),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
+                      slivers: [
+                        SliverToBoxAdapter(
+                          child: KeyedSubtree(
+                            key: _accountKey,
+                            child: const ProfileAccountSection(),
                           ),
+                        ),
+                        const SliverToBoxAdapter(child: Divider(height: 24)),
+                        if (contentLoading)
+                          const SliverToBoxAdapter(
+                            child: _ProfileContentSkeleton(),
+                          )
+                        else if (contentError != null)
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Text('${contentError.error}'),
+                            ),
+                          )
+                        else if (data != null) ...[
+                          ..._profileDataSlivers(context, data),
+                        ],
+                        SliverPadding(
+                          padding: EdgeInsets.only(
+                            bottom: showSideIndex ? 32 : 88,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -458,6 +330,149 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         );
       },
     );
+  }
+
+  List<Widget> _profileDataSlivers(
+    BuildContext context,
+    ProfileDashboardData data,
+  ) {
+    return [
+      SliverToBoxAdapter(
+        child: KeyedSubtree(
+          key: _overviewKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _GlobalNetHero(net: data.globalNet),
+              const SizedBox(height: 8),
+              _KpiStrip(kpis: data.kpis),
+            ],
+          ),
+        ),
+      ),
+      SliverToBoxAdapter(
+        child: ProfileActivitySection(
+          analyticsSectionKey: _analyticsKey,
+          expensesSectionKey: _expensesKey,
+        ),
+      ),
+      if (data.balanceRows.isNotEmpty) ...[
+        SliverToBoxAdapter(
+          child: KeyedSubtree(
+            key: _balancesKey,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: GroupSectionHeader(label: 'profile_balances'.tr()),
+            ),
+          ),
+        ),
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
+              final row = data.balanceRows[index];
+              return ListTile(
+                title: UserText(
+                  row.group.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Text(row.youOwe ? 'you_owe'.tr() : 'owes_you'.tr()),
+                trailing: AmountWithSecondaryDisplay(
+                  amountCents: row.balanceCents.abs(),
+                  groupCurrencyCode: row.currencyCode,
+                  isNegative: row.youOwe,
+                ),
+                onTap: () =>
+                    context.push(RoutePaths.groupDetail(row.group.id)),
+              );
+            },
+            childCount: data.balanceRows.length,
+            addAutomaticKeepAlives: false,
+          ),
+        ),
+      ],
+      if (data.personalBudgets.isNotEmpty) ...[
+        SliverToBoxAdapter(
+          child: KeyedSubtree(
+            key: _budgetsKey,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: GroupSectionHeader(
+                label: 'profile_personal_budgets'.tr(),
+              ),
+            ),
+          ),
+        ),
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
+              final row = data.personalBudgets[index];
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                child: PersonalBudgetCard.fromRow(
+                  row,
+                  onTap: () =>
+                      context.push(RoutePaths.groupDetail(row.group.id)),
+                ),
+              );
+            },
+            childCount: data.personalBudgets.length,
+            addAutomaticKeepAlives: false,
+          ),
+        ),
+      ],
+      SliverToBoxAdapter(
+        child: KeyedSubtree(
+          key: _activityKey,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: GroupSectionHeader(
+              label: 'profile_recent_activity'.tr(),
+              trailing: TextButton(
+                onPressed: () => setState(
+                  () => _chronologicalFeed = !_chronologicalFeed,
+                ),
+                child: Text(
+                  _chronologicalFeed
+                      ? 'profile_feed_grouped'.tr()
+                      : 'profile_feed_show_all'.tr(),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      _ActivityFeed(
+        chronological: _chronologicalFeed,
+        groups: data.groups,
+      ),
+      if (data.groups.isNotEmpty) ...[
+        SliverToBoxAdapter(
+          child: KeyedSubtree(
+            key: _groupsKey,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: GroupSectionHeader(label: 'profile_your_groups'.tr()),
+            ),
+          ),
+        ),
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
+              final g = data.groups[index];
+              return RepaintBoundary(
+                child: GroupCard(
+                  group: g,
+                  onTap: () => context.push(RoutePaths.groupDetail(g.id)),
+                ),
+              );
+            },
+            childCount: data.groups.length,
+            addAutomaticKeepAlives: false,
+          ),
+        ),
+      ],
+    ];
   }
 
   /// Matches [ConstrainedContent] aside visibility so mobile TOC appears when
@@ -711,6 +726,7 @@ class _KpiStrip extends StatelessWidget {
   }
 }
 
+/// Builds activity feed as slivers for the profile [CustomScrollView].
 class _ActivityFeed extends ConsumerWidget {
   const _ActivityFeed({required this.chronological, required this.groups});
 
@@ -727,7 +743,7 @@ class _ActivityFeed extends ConsumerWidget {
 
   String _groupedTitle(NotificationFeedItem item) {
     final count = '${item.items.length}';
-    final group = _groupName(item.groupId);
+    final group = isolateBidi(_groupName(item.groupId));
     final args = {'count': count, 'group': group};
     return switch (item.actionFamily) {
       'expense' => 'profile_feed_grouped_expenses'.tr(namedArgs: args),
@@ -764,22 +780,28 @@ class _ActivityFeed extends ConsumerWidget {
     ref.watch(groupsProvider);
 
     return notificationsAsync.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.all(16),
-        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      loading: () => const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        ),
       ),
-      error: (_, _) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: Text('profile_activity_empty'.tr()),
+      error: (_, _) => SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text('profile_activity_empty'.tr()),
+        ),
       ),
       data: (notifications) {
         if (notifications.isEmpty) {
-          return Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(
-              'profile_activity_empty'.tr(),
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+          return SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'profile_activity_empty'.tr(),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
           );
@@ -791,91 +813,120 @@ class _ActivityFeed extends ConsumerWidget {
                   .toList(growable: false)
             : groupNotifications(notifications);
 
-        return Column(
-          children: [
-            Align(
-              alignment: AlignmentDirectional.centerEnd,
-              child: TextButton(
-                onPressed: () =>
-                    ref.read(userNotificationRepositoryProvider).markAllRead(),
-                child: Text('profile_mark_all_read'.tr()),
+        return SliverMainAxisGroup(
+          slivers: [
+            const SliverToBoxAdapter(
+              child: Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: _MarkAllReadButton(),
               ),
             ),
-            ...items.map((item) {
-              final n = item.items.first;
-              final unread = item.hasUnread;
-              final title = item.isGroup ? _groupedTitle(item) : n.title;
-              final leading = CircleAvatar(
-                backgroundColor: unread
-                    ? Theme.of(context).colorScheme.primaryContainer
-                    : Theme.of(context).colorScheme.surfaceContainerHighest,
-                child: Icon(
-                  item.actionFamily == 'member'
-                      ? Icons.person_add_alt_1_outlined
-                      : Icons.receipt_long_outlined,
-                  size: 18,
-                ),
-              );
-
-              if (item.isGroup) {
-                return ExpansionTile(
-                  leading: leading,
-                  title: Text(
-                    title,
-                    style: TextStyle(
-                      fontWeight: unread ? FontWeight.w700 : FontWeight.w500,
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final item = items[index];
+                  final n = item.items.first;
+                  final unread = item.hasUnread;
+                  final title = item.isGroup ? _groupedTitle(item) : n.title;
+                  final leading = CircleAvatar(
+                    backgroundColor: unread
+                        ? Theme.of(context).colorScheme.primaryContainer
+                        : Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
+                    child: Icon(
+                      item.actionFamily == 'member'
+                          ? Icons.person_add_alt_1_outlined
+                          : Icons.receipt_long_outlined,
+                      size: 18,
                     ),
-                  ),
-                  subtitle: Text(
-                    _groupName(item.groupId),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  children: [
-                    for (final child in item.items)
-                      ListTile(
-                        dense: true,
-                        title: Text(child.title),
-                        subtitle: Text(
-                          child.body,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        onTap: () => _openItem(
-                          context,
-                          ref,
-                          NotificationFeedItem.single(child),
+                  );
+
+                  if (item.isGroup) {
+                    return ExpansionTile(
+                      leading: leading,
+                      title: UserText(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight:
+                              unread ? FontWeight.w700 : FontWeight.w500,
                         ),
                       ),
-                    ListTile(
-                      dense: true,
-                      leading: const Icon(Icons.open_in_new, size: 18),
-                      title: Text('profile_your_groups'.tr()),
-                      onTap: () => _openItem(context, ref, item),
-                    ),
-                  ],
-                );
-              }
+                      subtitle: UserText(
+                        _groupName(item.groupId),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      children: [
+                        for (final child in item.items)
+                          ListTile(
+                            dense: true,
+                            title: UserText(
+                              child.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: UserText(
+                              child.body,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            onTap: () => _openItem(
+                              context,
+                              ref,
+                              NotificationFeedItem.single(child),
+                            ),
+                          ),
+                        ListTile(
+                          dense: true,
+                          leading: const Icon(Icons.open_in_new, size: 18),
+                          title: Text('profile_your_groups'.tr()),
+                          onTap: () => _openItem(context, ref, item),
+                        ),
+                      ],
+                    );
+                  }
 
-              return ListTile(
-                leading: leading,
-                title: Text(
-                  title,
-                  style: TextStyle(
-                    fontWeight: unread ? FontWeight.w700 : FontWeight.w500,
-                  ),
-                ),
-                subtitle: Text(
-                  n.body,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                onTap: () => _openItem(context, ref, item),
-              );
-            }),
+                  return ListTile(
+                    leading: leading,
+                    title: UserText(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: unread ? FontWeight.w700 : FontWeight.w500,
+                      ),
+                    ),
+                    subtitle: UserText(
+                      n.body,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onTap: () => _openItem(context, ref, item),
+                  );
+                },
+                childCount: items.length,
+                addAutomaticKeepAlives: false,
+              ),
+            ),
           ],
         );
       },
+    );
+  }
+}
+
+class _MarkAllReadButton extends ConsumerWidget {
+  const _MarkAllReadButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return TextButton(
+      onPressed: () =>
+          ref.read(userNotificationRepositoryProvider).markAllRead(),
+      child: Text('profile_mark_all_read'.tr()),
     );
   }
 }

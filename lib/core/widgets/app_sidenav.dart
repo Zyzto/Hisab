@@ -15,6 +15,7 @@ import '../navigation/route_paths.dart';
 import '../theme/accent_style.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
 import 'participant_avatar.dart';
+import 'user_text.dart';
 
 /// Shell navigation body hosted inside a [Drawer] (temporary mid or permanent
 /// desktop). Desktop layout is always full width with a fixed 72px icon column
@@ -402,7 +403,7 @@ class _UserBlock extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
+        UserText(
           displayName,
           maxLines: 1,
           softWrap: false,
@@ -412,7 +413,7 @@ class _UserBlock extends StatelessWidget {
           ),
         ),
         if (signedIn && email != null && email != displayName)
-          Text(
+          UserText(
             email!,
             maxLines: 1,
             softWrap: false,

@@ -79,14 +79,16 @@ final selectedGroupIdsProvider = StateProvider<Set<String>>(
   (ref) => <String>{},
 );
 
-/// After a reorder, the new order (list of group ids) is set here so the list can update immediately
-/// without waiting for settings. Cleared after one frame so the next build uses persisted settings.
+/// Optimistic custom order after a drag-reorder.
+///
+/// Kept until the home page clears it after settings persist succeeds.
+/// Clearing after one frame raced async `.set()` and snapped the list back.
 final homeListPendingOrderIdsProvider = StateProvider<List<String>?>(
   (ref) => null,
 );
 
 /// Provider that yields the ordered list for the home page. Combines [groupsProvider] with home list settings.
-/// When [homeListPendingOrderIdsProvider] is set (optimistic reorder), uses that order for one build.
+/// When [homeListPendingOrderIdsProvider] is set (optimistic reorder), uses that order until cleared.
 final orderedGroupsForHomeProvider = Provider<AsyncValue<List<Group>>>((ref) {
   final groupsAsync = ref.watch(groupsProvider);
   final sort = ref.watch(homeListSortProvider);

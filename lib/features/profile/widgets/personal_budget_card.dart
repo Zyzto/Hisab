@@ -6,6 +6,7 @@ import '../../../core/theme/accent_style.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/widgets/amount_with_secondary_display.dart';
+import '../../../core/widgets/user_text.dart';
 import '../../../domain/domain.dart';
 import '../providers/profile_dashboard_provider.dart';
 
@@ -96,7 +97,7 @@ class PersonalBudgetCard extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (showTitle) ...[
-            Text(
+            UserText(
               group.name,
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w700,

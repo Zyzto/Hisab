@@ -15,6 +15,7 @@ import '../../../core/receipt/receipt_image_cache.dart';
 import '../../../core/receipt/receipt_image_view.dart';
 import '../../../core/receipt/receipt_scan_service.dart';
 import '../../../core/receipt/receipt_storage_upload.dart';
+import '../../../core/platform/network_image_decode.dart';
 import '../../../core/platform_utils.dart';
 import '../../../core/services/connectivity_service.dart';
 import '../../../core/services/permission_service.dart';
@@ -36,6 +37,7 @@ import '../../../core/widgets/expandable_section.dart';
 import '../../../core/widgets/participant_avatar.dart';
 import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/toast.dart';
+import '../../../core/widgets/user_text.dart';
 import '../../../features/settings/providers/settings_framework_providers.dart';
 import '../../balance/providers/balance_provider.dart';
 import '../../groups/providers/group_member_provider.dart';
@@ -1363,11 +1365,10 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                       .trim();
                                   return ExpandableSection(
                                     title: 'expense_description'.tr(),
-                                    trailingSummary: desc.isNotEmpty
-                                        ? (desc.length > 40
-                                              ? '${desc.substring(0, 40)}…'
-                                              : desc)
-                                        : null,
+                                    // Pixel ellipsis in ExpandableSection; no
+                                    // code-unit cut (breaks emoji / RTL).
+                                    trailingSummary:
+                                        desc.isNotEmpty ? desc : null,
                                     initiallyExpanded: expandDescription,
                                     child: _buildDescriptionSection(
                                       context,
@@ -1899,7 +1900,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                       : chrome.onSurface,
                                 ),
                                 const SizedBox(width: 8),
-                                Text(
+                                UserText(
                                   tag.label,
                                   style: theme.textTheme.labelLarge?.copyWith(
                                     color: selected
@@ -2151,12 +2152,19 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   ) {
     final theme = Theme.of(context);
     Widget image;
+    final thumbDecode = NetworkImageDecode.cacheSize(
+      context,
+      logicalWidth: 80,
+      logicalHeight: 80,
+    );
     if (item.bytes != null) {
       image = Image.memory(
         item.bytes!,
         fit: BoxFit.cover,
         width: 80,
         height: 80,
+        cacheWidth: thumbDecode.width,
+        cacheHeight: thumbDecode.height,
       );
     } else if (item.url != null && item.url!.isNotEmpty) {
       image = Image.network(
@@ -2164,6 +2172,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         fit: BoxFit.cover,
         width: 80,
         height: 80,
+        cacheWidth: thumbDecode.width,
+        cacheHeight: thumbDecode.height,
         loadingBuilder: (_, child, progress) {
           if (progress == null) return child;
           return const SizedBox(
@@ -2353,8 +2363,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                           ),
                           const SizedBox(width: 10),
                           Expanded(
-                            child: Text(
+                            child: UserText(
                               payerName,
+                              maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.bodyLarge,
                             ),
@@ -2382,8 +2393,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                             ),
                             const SizedBox(width: 10),
                             Expanded(
-                              child: Text(
+                              child: UserText(
                                 payerName,
+                                maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: theme.textTheme.bodyLarge,
                               ),
@@ -2455,8 +2467,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                           ),
                           const SizedBox(width: 10),
                           Expanded(
-                            child: Text(
+                            child: UserText(
                               payer.name,
+                              maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.bodyLarge,
                             ),
@@ -2484,8 +2497,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                             ),
                             const SizedBox(width: 10),
                             Expanded(
-                              child: Text(
+                              child: UserText(
                                 payer.name,
+                                maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: theme.textTheme.bodyLarge,
                               ),
@@ -2550,7 +2564,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                       avatarId: p.avatarId,
                                       radius: 18,
                                     ),
-                                    title: Text(p.name),
+                                    title: UserText(p.name),
                                     onTap: () => Navigator.of(ctx).pop(p.id),
                                   ),
                                 ),
@@ -2581,8 +2595,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: Text(
+                        child: UserText(
                           toParticipant.name,
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodyLarge,
                         ),
@@ -2707,7 +2722,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                         avatarId: p.avatarId,
                         radius: 18,
                       ),
-                      title: Text(p.name),
+                      title: UserText(p.name),
                       onTap: () => Navigator.of(ctx).pop(p.id),
                     ),
                   ),

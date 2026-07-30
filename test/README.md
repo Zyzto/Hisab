@@ -48,7 +48,7 @@ Optional wrappers: `./scripts/run_all_tests.sh` (Linux/macOS) or `scripts\run_al
 
 ## Widget tests
 
-- **Layout:** Test directories mirror `lib/`: `test/core/`, `test/groups/`, `test/expenses/`, `test/settings/`, `test/pages/`, plus `test/balance/`, `test/` (app, error content, etc.).
+- **Layout:** Test directories mirror `lib/`: `test/core/`, `test/groups/`, `test/expenses/`, `test/settings/`, `test/pages/`, `test/onboarding/`, plus `test/balance/`, `test/` (app, error content, etc.). Onboarding widget tests use **bounded pumps** (not `pumpAndSettle`) because language/theme demo timers and welcome stagger animations never idle.
 - **Helper:** `test/widget_test_helpers.dart` provides:
   - `pumpApp(tester, child: widget, locale: Locale('en')|Locale('ar'), pumpAndSettle: true)` — wraps the widget in EasyLocalization + MaterialApp + Scaffold, then pumps. Use for presentational widgets that do not need Riverpod.
   - `testSupportedLocales` — `[Locale('en'), Locale('ar')]` for use when building EasyLocalization manually (e.g. with ProviderScope overrides).

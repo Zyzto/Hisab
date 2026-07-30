@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/theme/theme_providers.dart';
+import '../../../core/widgets/user_text.dart';
 import '../../../domain/domain.dart';
 import '../utils/group_icon_utils.dart';
 
@@ -30,6 +31,10 @@ class GroupCard extends ConsumerWidget {
   /// When > 0, show a badge count (e.g. pending scanner drafts).
   final int badgeCount;
 
+  /// When set by a parent that already watches experiment style, avoids N card
+  /// subscriptions during home/profile list scroll.
+  final int? experimentStyleIndex;
+
   const GroupCard({
     super.key,
     required this.group,
@@ -40,24 +45,30 @@ class GroupCard extends ConsumerWidget {
     this.onLongPress,
     this.isSelected = false,
     this.badgeCount = 0,
+    this.experimentStyleIndex,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final styleIndex = ref.watch(experimentStyleIndexProvider);
+    final int styleIndex =
+        experimentStyleIndex ?? ref.watch(experimentStyleIndexProvider);
     final groupColor = group.color != null
         ? Color(group.color!)
         : theme.colorScheme.primary;
     final iconData = groupIconFromKey(group.icon);
 
-    final leadingWidget = _buildLeadingForStyle(
-      context: context,
-      styleIndex: styleIndex,
-      theme: theme,
-      groupColor: groupColor,
-      iconData: iconData,
-      groupName: group.name,
+    final leadingWidget = _wrapLeadingWithPinBadge(
+      leading: _buildLeadingForStyle(
+        context: context,
+        styleIndex: styleIndex,
+        theme: theme,
+        groupColor: groupColor,
+        iconData: iconData,
+        groupName: group.name,
+      ),
+      isPinned: isPinned,
+      colorScheme: theme.colorScheme,
     );
 
     final colorScheme = theme.colorScheme;
@@ -142,75 +153,31 @@ class GroupCard extends ConsumerWidget {
           leadingWidget,
           const SizedBox(width: 14),
           Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final hasBoundedHeight = constraints.maxHeight.isFinite;
-                if (hasBoundedHeight) {
-                  return ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight: constraints.maxHeight,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.max,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            group.name,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              fontSize:
-                                  (theme.textTheme.titleMedium?.fontSize ??
-                                      16) *
-                                  (18 / 16),
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Flexible(
-                          child: Text(
-                            group.currencyCode,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      group.name,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        fontSize:
-                            (theme.textTheme.titleMedium?.fontSize ?? 16) *
-                            (18 / 16),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      group.currencyCode,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                );
-              },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                UserText(
+                  group.name,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize:
+                        (theme.textTheme.titleMedium?.fontSize ?? 16) *
+                        (18 / 16),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  group.currencyCode,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
           ),
           if (badgeCount > 0)
@@ -230,22 +197,48 @@ class GroupCard extends ConsumerWidget {
               ),
             ),
           if (onPinToggle != null)
-            IconButton(
-              icon: Icon(
-                isPinned ? Icons.push_pin : Icons.push_pin_outlined,
-                color: isPinned
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurfaceVariant,
-                size: 22,
-              ),
+            _PinToggle(
+              isPinned: isPinned,
               onPressed: () {
                 HapticFeedback.lightImpact();
                 onPinToggle!();
               },
-              tooltip: isPinned ? 'unpin'.tr() : 'pin'.tr(),
             ),
         ],
       ),
+    );
+  }
+
+  /// Small pin mark on the leading avatar when the group is pinned.
+  static Widget _wrapLeadingWithPinBadge({
+    required Widget leading,
+    required bool isPinned,
+    required ColorScheme colorScheme,
+  }) {
+    if (!isPinned) return leading;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        leading,
+        PositionedDirectional(
+          end: -3,
+          top: -3,
+          child: Container(
+            width: 18,
+            height: 18,
+            decoration: BoxDecoration(
+              color: colorScheme.primary,
+              shape: BoxShape.circle,
+              border: Border.all(color: colorScheme.surface, width: 1.5),
+            ),
+            child: Icon(
+              Icons.push_pin_rounded,
+              size: 10,
+              color: colorScheme.onPrimary,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -344,5 +337,48 @@ class GroupCard extends ConsumerWidget {
       default:
         return defaultAvatar;
     }
+  }
+}
+
+/// Compact pin control — avoids IconButton's 48dp touch target stretching rows.
+class _PinToggle extends StatelessWidget {
+  const _PinToggle({required this.isPinned, required this.onPressed});
+
+  final bool isPinned;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Tooltip(
+      message: (isPinned ? 'unpin' : 'pin').tr(),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          customBorder: const CircleBorder(),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.easeOutCubic,
+            width: 32,
+            height: 32,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isPinned
+                  ? cs.primary.withValues(alpha: 0.14)
+                  : Colors.transparent,
+            ),
+            child: Icon(
+              isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+              size: 18,
+              color: isPinned ? cs.primary : cs.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

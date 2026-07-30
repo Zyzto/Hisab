@@ -8,6 +8,7 @@ import '../../../core/navigation/route_paths.dart';
 import '../../../core/widgets/amount_with_secondary_display.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/participant_avatar.dart';
+import '../../../core/widgets/user_text.dart';
 import '../../../domain/domain.dart';
 import '../../groups/providers/group_member_provider.dart';
 import '../../groups/widgets/group_section_header.dart';
@@ -281,11 +282,12 @@ class _YourBalanceHero extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    UserText(
                       name,
                       style: theme.textTheme.bodyLarge?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
@@ -469,11 +471,12 @@ class _BalancePersonCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                UserText(
                   name,
                   style: theme.textTheme.bodyLarge?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
@@ -845,8 +848,8 @@ class _SettlementNameChip extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: Text(
-            '\u2068$name\u2069',
+          child: UserText(
+            name,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodyMedium?.copyWith(

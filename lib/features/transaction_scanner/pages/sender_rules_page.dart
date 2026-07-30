@@ -9,6 +9,7 @@ import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/widgets/sheet_helpers.dart';
+import '../../../core/widgets/user_text.dart';
 import '../domain/sender_rule.dart';
 import '../providers/scanner_providers.dart';
 
@@ -217,7 +218,7 @@ class _SenderRuleTile extends ConsumerWidget {
               : theme.colorScheme.onSurfaceVariant,
         ),
       ),
-      title: Text(rule.displayName),
+      title: UserText(rule.displayName),
       subtitle: Text(
         '${rule.packageName}  •  ${rule.matchCount} ${'scanner_matches'.tr()}',
         style: theme.textTheme.bodySmall?.copyWith(

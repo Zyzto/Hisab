@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/widgets/user_text.dart';
 import '../../expenses/widgets/filtered_expenses_sheet.dart';
 import '../providers/profile_my_expenses_provider.dart';
 
@@ -112,7 +113,7 @@ class _MetaChip extends StatelessWidget {
           const SizedBox(width: 5),
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 120),
-            child: Text(
+            child: UserText(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

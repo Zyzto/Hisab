@@ -8,6 +8,7 @@ import '../../../core/widgets/amount_with_secondary_display.dart';
 import '../../../core/widgets/participant_avatar.dart';
 import '../../../features/settings/providers/settings_framework_providers.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/widgets/user_text.dart';
 import '../../../domain/domain.dart';
 import '../../groups/providers/groups_provider.dart';
 import '../category_icons.dart';
@@ -103,7 +104,7 @@ class ExpenseDetailBody extends ConsumerWidget {
                 const SizedBox(height: 20),
                 _DetailSection(
                   label: 'expense_description'.tr(),
-                  child: Text(
+                  child: UserText(
                     expense.description!.trim(),
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       height: 1.45,
@@ -665,7 +666,7 @@ class _MetaChip extends StatelessWidget {
             Icon(icon, size: 15, color: foreground),
             const SizedBox(width: 6),
           ],
-          Text(
+          UserText(
             label,
             style: theme.textTheme.labelLarge?.copyWith(
               color: foreground,
@@ -728,7 +729,7 @@ class _LineItemRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: Text(description, style: theme.textTheme.bodyMedium),
+          child: UserText(description, style: theme.textTheme.bodyMedium),
         ),
         const SizedBox(width: 12),
         Text(
@@ -846,11 +847,12 @@ class _PersonCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                UserText(
                   name,
                   style: theme.textTheme.bodyLarge?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 if (subtitle != null && subtitle!.isNotEmpty) ...[

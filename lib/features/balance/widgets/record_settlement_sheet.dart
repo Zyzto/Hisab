@@ -9,8 +9,10 @@ import '../../../core/repository/repository_providers.dart';
 import '../../../core/services/settle_up_service.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/user_text.dart';
 import '../../../core/widgets/participant_avatar.dart';
 import '../../../core/widgets/toast.dart';
+import '../../../core/widgets/user_text.dart';
 import '../../../domain/domain.dart';
 import '../providers/balance_provider.dart';
 import '../../groups/providers/groups_provider.dart';
@@ -66,6 +68,7 @@ Future<bool> showRecordSettlementSheet(
         payerParticipantId: settlement.fromParticipantId,
         amountCents: settlement.amountCents,
         currencyCode: currencyCode,
+        // Do not wrap names in bidi isolates here — this title is persisted.
         title: 'settlement_expense_title'.tr(
           namedArgs: {'from': fromName, 'to': toName},
         ),
@@ -214,11 +217,11 @@ class _RecordSettlementSheet extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  Text(
+                  UserText(
                     'record_settlement_confirm'.tr(
                       namedArgs: {
-                        'from': fromName,
-                        'to': toName,
+                        'from': isolateBidi(fromName),
+                        'to': isolateBidi(toName),
                         'amount': formattedAmount,
                       },
                     ),
@@ -275,7 +278,7 @@ class _RecordSettlementSheet extends ConsumerWidget {
                           if (fromOwesItems.isNotEmpty) ...[
                             _BreakdownSectionHeader(
                               label: 'settlement_paid_by'.tr(
-                                namedArgs: {'name': toName},
+                                namedArgs: {'name': isolateBidi(toName)},
                               ),
                             ),
                             ...fromOwesItems.map(
@@ -292,7 +295,7 @@ class _RecordSettlementSheet extends ConsumerWidget {
                               const SizedBox(height: 8),
                             _BreakdownSectionHeader(
                               label: 'settlement_paid_by'.tr(
-                                namedArgs: {'name': fromName},
+                                namedArgs: {'name': isolateBidi(fromName)},
                               ),
                             ),
                             ...toOwesItems.map(
@@ -396,8 +399,8 @@ class _SheetPerson extends StatelessWidget {
       foregroundColor: cs.primary,
       textStyle: theme.textTheme.labelMedium,
     );
-    final label = Text(
-      '\u2068$name\u2069',
+    final label = UserText(
+      name,
       maxLines: 2,
       overflow: TextOverflow.ellipsis,
       textAlign: alignEnd ? TextAlign.end : TextAlign.start,
@@ -432,7 +435,7 @@ class _BreakdownSectionHeader extends StatelessWidget {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
-      child: Text(
+      child: UserText(
         label,
         style: theme.textTheme.labelMedium?.copyWith(
           color: theme.colorScheme.onSurfaceVariant,
@@ -467,8 +470,8 @@ class _BreakdownLine extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              '\u2068$title\u2069',
+            child: UserText(
+              title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodyMedium,

@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/utils/user_text.dart';
 import '../../expenses/category_icons.dart';
 import '../../expenses/widgets/breakdown_pie_chart.dart';
 import '../../expenses/widgets/filtered_expenses_sheet.dart';
@@ -115,7 +116,7 @@ class ProfileCategoryPieChart extends StatelessWidget {
     await showFilteredExpensesSheet(
       context: context,
       title: 'analytics_category_expenses_title'.tr(
-        namedArgs: {'category': slice.label},
+        namedArgs: {'category': isolateBidi(slice.label)},
       ),
       emptyLabel: 'analytics_category_expenses_empty'.tr(),
       rows: rows,

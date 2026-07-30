@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
@@ -16,13 +15,17 @@ import '../../../core/widgets/async_value_builder.dart';
 import '../../../core/widgets/sheet_option_tile.dart';
 import '../../../core/widgets/shell_menu_button.dart';
 import '../../../core/widgets/sync_status_icon.dart';
+import '../../../core/widgets/user_text.dart';
 import '../../groups/providers/groups_provider.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 import '../../settings/settings_definitions.dart';
+import '../../settings/widgets/apply_setting.dart';
 import '../../groups/widgets/group_card.dart';
 import '../../groups/widgets/group_section_header.dart';
 import '../../transaction_scanner/providers/scanner_providers.dart';
 import '../providers/home_list_provider.dart';
+import '../utils/home_list_reorder.dart';
+import '../widgets/home_reorderable_groups_sliver.dart';
 import '../../../domain/domain.dart';
 
 class HomePage extends ConsumerWidget {
@@ -118,16 +121,27 @@ class HomePage extends ConsumerWidget {
           final showCreatedAt = ref.watch(homeListShowCreatedAtProvider);
 
           void setDisplay(String value) {
+            final router = GoRouter.of(context);
+            final path = RoutePaths.homeMode(_modePathForDisplay(value));
             ref
                 .read(settings.provider(homeListDisplaySettingDef).notifier)
                 .set(value);
             Log.info(
               'Setting changed: ${homeListDisplaySettingDef.key}=$value',
             );
-            context.go(RoutePaths.homeMode(_modePathForDisplay(value)));
+            // Pop the sheet before navigating — go() under an open root dialog
+            // replaces HomePage and leaves the options sheet stuck/unresponsive.
+            final nav = Navigator.of(context, rootNavigator: true);
+            if (nav.canPop()) {
+              nav.pop();
+            }
+            router.go(path);
           }
 
           void setSort(String value) {
+            if (value != 'custom') {
+              ref.read(homeListPendingOrderIdsProvider.notifier).state = null;
+            }
             ref
                 .read(settings.provider(homeListSortSettingDef).notifier)
                 .set(value);
@@ -227,8 +241,9 @@ class HomePage extends ConsumerWidget {
                         ),
                         SheetOptionTile(
                           title: 'home_list_sort_custom'.tr(),
+                          subtitle: 'home_list_hold_to_reorder'.tr(),
                           leading: Icon(
-                            Icons.drag_handle_rounded,
+                            Icons.swap_vert_rounded,
                             color: cs.onSurfaceVariant,
                           ),
                           selected: sort == 'custom',
@@ -298,6 +313,7 @@ class HomePage extends ConsumerWidget {
     final selectionAllPinned =
         selectedIds.isNotEmpty &&
         selectedIds.every((id) => pinnedSet.contains(id));
+    final experimentStyleIndex = ref.watch(experimentStyleIndexProvider);
     final settings = ref.read(hisabSettingsProvidersProvider);
     String? formatCreatedDateLabel(DateTime date) {
       if (!showCreatedAt) return null;
@@ -382,16 +398,20 @@ class HomePage extends ConsumerWidget {
                     )
                   : const ShellAppBarLeading(fallback: SyncStatusChip()),
               title: inSelectionMode
-                  ? Text(
-                      selectedGroups.length == 1
-                          ? selectedGroups.first.name
-                          : 'selected_count'.tr(
+                  ? (selectedGroups.length == 1
+                        ? UserText(
+                            selectedGroups.first.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          )
+                        : Text(
+                            'selected_count'.tr(
                               namedArgs: {
                                 'count': selectedGroups.length.toString(),
                               },
                             ),
-                      overflow: TextOverflow.ellipsis,
-                    )
+                            overflow: TextOverflow.ellipsis,
+                          ))
                   : _ExperimentTitle(),
               actions: inSelectionMode
                   ? [
@@ -525,217 +545,210 @@ class HomePage extends ConsumerWidget {
                       ? ref.watch(pendingDraftCountProvider).asData?.value ?? 0
                       : 0;
 
-                  Widget buildCard(Group group) {
-                    return GroupCard(
-                      key: ValueKey(group.id),
-                      group: group,
-                      isSelected: selectedIds.contains(group.id),
-                      badgeCount: group.isPersonal ? scannerBadge : 0,
-                      onTap: () {
-                        final cur = ref.read(selectedGroupIdsProvider);
-                        if (cur.isNotEmpty) {
-                          toggleSelection(group.id);
-                        } else {
-                          context.push(RoutePaths.groupDetail(group.id));
-                        }
-                      },
-                      createdDateLabel: formatCreatedDateLabel(group.createdAt),
-                      isPinned: pinnedSet.contains(group.id),
-                      onPinToggle: null,
-                      onLongPress: () {
-                        final cur = ref.read(selectedGroupIdsProvider);
-                        if (cur.isEmpty) {
-                          ref.read(selectedGroupIdsProvider.notifier).state = {
-                            group.id,
-                          };
-                        } else {
-                          toggleSelection(group.id);
-                        }
-                      },
+                  Widget buildCard(Group group, {bool keyed = true}) {
+                    // Custom sort: hold-to-drag only.
+                    // Other sorts: hold to select, then pin from the app bar.
+                    final holdToReorder = sortCustom && !inSelectionMode;
+                    return RepaintBoundary(
+                      key: keyed ? ValueKey(group.id) : null,
+                      child: GroupCard(
+                        group: group,
+                        experimentStyleIndex: experimentStyleIndex,
+                        isSelected: selectedIds.contains(group.id),
+                        badgeCount: group.isPersonal ? scannerBadge : 0,
+                        onTap: () {
+                          final cur = ref.read(selectedGroupIdsProvider);
+                          if (cur.isNotEmpty) {
+                            toggleSelection(group.id);
+                          } else {
+                            context.push(RoutePaths.groupDetail(group.id));
+                          }
+                        },
+                        createdDateLabel:
+                            formatCreatedDateLabel(group.createdAt),
+                        isPinned: pinnedSet.contains(group.id),
+                        onPinToggle: null,
+                        onLongPress: holdToReorder
+                            ? null
+                            : () {
+                                final cur = ref.read(selectedGroupIdsProvider);
+                                if (cur.isEmpty) {
+                                  ref
+                                      .read(selectedGroupIdsProvider.notifier)
+                                      .state = {group.id};
+                                } else {
+                                  toggleSelection(group.id);
+                                }
+                              },
+                      ),
                     );
                   }
 
-                  void persistOrder(List<Group> newOrder) {
+                  Future<void> persistOrder(List<Group> newOrder) async {
                     if (settings == null) return;
                     final newOrderIds = newOrder.map((g) => g.id).toList();
                     ref.read(homeListPendingOrderIdsProvider.notifier).state =
                         newOrderIds;
-                    ref
-                        .read(
-                          settings
-                              .provider(homeListCustomOrderSettingDef)
-                              .notifier,
-                        )
-                        .set(newOrderIds.join(','));
-                    ref
-                        .read(
-                          settings.provider(homeListSortSettingDef).notifier,
-                        )
-                        .set('custom');
-                    Log.info(
-                      'Setting changed: ${homeListCustomOrderSettingDef.key}=${newOrderIds.length} items, '
-                      '${homeListSortSettingDef.key}=custom',
+                    final orderOk = await applySetting(
+                      ref,
+                      settings,
+                      homeListCustomOrderSettingDef,
+                      newOrderIds.join(','),
                     );
-                    SchedulerBinding.instance.addPostFrameCallback((_) {
+                    final sortOk = await applySetting(
+                      ref,
+                      settings,
+                      homeListSortSettingDef,
+                      'custom',
+                    );
+                    final pending = ref.read(homeListPendingOrderIdsProvider);
+                    if (orderOk &&
+                        sortOk &&
+                        pending != null &&
+                        pending.join(',') == newOrderIds.join(',')) {
                       ref.read(homeListPendingOrderIdsProvider.notifier).state =
                           null;
-                    });
+                    }
                   }
 
-                  List<Widget> buildListItems(List<Group> list) {
-                    return list.map((g) => buildCard(g)).toList();
-                  }
-
-                  Widget buildReorderableItem(Group group, int index) {
-                    final theme = Theme.of(context);
-                    return IntrinsicHeight(
-                      key: ValueKey(group.id),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsetsDirectional.only(start: 16),
-                            child: ReorderableDragStartListener(
-                              index: index,
-                              child: Semantics(
-                                label: 'reorder'.tr(),
-                                child: SizedBox(
-                                  width: 32,
-                                  child: Center(
-                                    child: Icon(
-                                      Icons.drag_handle,
-                                      color: theme.colorScheme.onSurfaceVariant,
-                                      size: 24,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          Expanded(child: buildCard(group)),
-                        ],
+                  Widget buildGroupSliver(List<Group> list) {
+                    return SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) => buildCard(list[index]),
+                        childCount: list.length,
+                        addAutomaticKeepAlives: false,
+                        addRepaintBoundaries: false,
                       ),
+                    );
+                  }
+
+                  // Custom sort: hold a card to drag; list stays put until drop.
+                  final canReorder = sortCustom && !inSelectionMode;
+
+                  Widget buildReorderSliver(
+                    List<Group> list, {
+                    required void Function(List<Group> sectionOrder) onSectionReorder,
+                  }) {
+                    return HomeReorderableGroupsSliver(
+                      groups: list,
+                      pinnedIds: pinnedSet,
+                      itemBuilder: (context, group) =>
+                          buildCard(group, keyed: false),
+                      onReorderComplete: onSectionReorder,
                     );
                   }
 
                   if (displaySeparate) {
                     return wrapRefresh(
-                      ListView(
+                      CustomScrollView(
                         key: const PageStorageKey<String>('home_list_separate'),
                         physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        children: [
+                        slivers: [
+                          const SliverPadding(
+                            padding: EdgeInsets.only(top: 8),
+                          ),
                           if (personal.isNotEmpty) ...[
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                              child: GroupSectionHeader(
-                                label: 'personal'.tr(),
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  12,
+                                  16,
+                                  8,
+                                ),
+                                child: GroupSectionHeader(
+                                  label: 'personal'.tr(),
+                                ),
                               ),
                             ),
-                            if (sortCustom && inSelectionMode)
-                              ReorderableListView(
-                                shrinkWrap: true,
-                                buildDefaultDragHandles: false,
-                                onReorder: (oldIndex, newIndex) {
-                                  if (newIndex > oldIndex) newIndex--;
-                                  final newPersonal = List<Group>.from(
-                                    personal,
+                            if (canReorder)
+                              buildReorderSliver(
+                                personal,
+                                onSectionReorder: (newPersonal) {
+                                  persistOrder(
+                                    replaceSectionOrder(
+                                      fullOrder: ordered,
+                                      sectionNewOrder: newPersonal,
+                                      inSection: (g) => g.isPersonal,
+                                    ),
                                   );
-                                  final item = newPersonal.removeAt(oldIndex);
-                                  newPersonal.insert(newIndex, item);
-                                  persistOrder([...newPersonal, ...shared]);
                                 },
-                                children: personal
-                                    .asMap()
-                                    .entries
-                                    .map(
-                                      (e) =>
-                                          buildReorderableItem(e.value, e.key),
-                                    )
-                                    .toList(),
                               )
                             else
-                              ...buildListItems(personal),
-                            const SizedBox(height: 16),
+                              buildGroupSliver(personal),
+                            const SliverToBoxAdapter(
+                              child: SizedBox(height: 16),
+                            ),
                           ],
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                            child: GroupSectionHeader(label: 'groups'.tr()),
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(
+                                16,
+                                12,
+                                16,
+                                8,
+                              ),
+                              child: GroupSectionHeader(label: 'groups'.tr()),
+                            ),
                           ),
                           if (shared.isEmpty)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 24,
-                                vertical: 12,
-                              ),
-                              child: Text(
-                                'no_groups'.tr(),
-                                style: Theme.of(context).textTheme.bodyMedium
-                                    ?.copyWith(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant,
-                                    ),
-                                textAlign: TextAlign.center,
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                  vertical: 12,
+                                ),
+                                child: Text(
+                                  'no_groups'.tr(),
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
+                                      ),
+                                  textAlign: TextAlign.center,
+                                ),
                               ),
                             )
-                          else if (sortCustom && inSelectionMode)
-                            ReorderableListView(
-                              shrinkWrap: true,
-                              buildDefaultDragHandles: false,
-                              onReorder: (oldIndex, newIndex) {
-                                if (newIndex > oldIndex) newIndex--;
-                                final newShared = List<Group>.from(shared);
-                                final item = newShared.removeAt(oldIndex);
-                                newShared.insert(newIndex, item);
-                                persistOrder([...personal, ...newShared]);
+                          else if (canReorder)
+                            buildReorderSliver(
+                              shared,
+                              onSectionReorder: (newShared) {
+                                persistOrder(
+                                  replaceSectionOrder(
+                                    fullOrder: ordered,
+                                    sectionNewOrder: newShared,
+                                    inSection: (g) => !g.isPersonal,
+                                  ),
+                                );
                               },
-                              children: shared
-                                  .asMap()
-                                  .entries
-                                  .map(
-                                    (e) => buildReorderableItem(e.value, e.key),
-                                  )
-                                  .toList(),
                             )
                           else
-                            ...buildListItems(shared),
+                            buildGroupSliver(shared),
+                          const SliverPadding(
+                            padding: EdgeInsets.only(bottom: 8),
+                          ),
                         ],
                       ),
                     );
                   }
 
                   return wrapRefresh(
-                    sortCustom && inSelectionMode
-                        ? ReorderableListView(
-                            key: const PageStorageKey<String>(
-                              'home_list_combined',
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            buildDefaultDragHandles: false,
-                            onReorder: (oldIndex, newIndex) {
-                              if (newIndex > oldIndex) newIndex--;
-                              final newOrder = List<Group>.from(ordered);
-                              final item = newOrder.removeAt(oldIndex);
-                              newOrder.insert(newIndex, item);
-                              persistOrder(newOrder);
-                            },
-                            children: ordered
-                                .asMap()
-                                .entries
-                                .map(
-                                  (e) => buildReorderableItem(e.value, e.key),
-                                )
-                                .toList(),
+                    CustomScrollView(
+                      key: const PageStorageKey<String>('home_list_combined'),
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      slivers: [
+                        const SliverPadding(padding: EdgeInsets.only(top: 8)),
+                        if (canReorder)
+                          buildReorderSliver(
+                            ordered,
+                            onSectionReorder: persistOrder,
                           )
-                        : ListView(
-                            key: const PageStorageKey<String>(
-                              'home_list_combined',
-                            ),
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            children: buildListItems(ordered),
-                          ),
+                        else
+                          buildGroupSliver(ordered),
+                        const SliverPadding(padding: EdgeInsets.only(bottom: 8)),
+                      ],
+                    ),
                   );
                 },
               ),

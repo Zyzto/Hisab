@@ -1,6 +1,7 @@
+import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:easy_localization/easy_localization.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../layout/layout_breakpoints.dart';
@@ -58,7 +59,7 @@ class _ServicesStatusSheetState extends ConsumerState<_ServicesStatusSheet> {
   @override
   Widget build(BuildContext context) {
     final syncStatus = ref.watch(syncStatusForDisplayProvider);
-    final aiEnabled = ref.watch(receiptAiEnabledProvider);
+    final aiEnabled = !kIsWeb && ref.watch(receiptAiEnabledProvider);
     final aiProvider = ref.watch(receiptAiProviderProvider);
     final theme = Theme.of(context);
     final cs = theme.colorScheme;

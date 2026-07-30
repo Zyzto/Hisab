@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
 
 import '../layout/responsive_sheet.dart';
+import '../platform/network_image_decode.dart';
 
 /// Shows a full-screen dialog with [Image.network] for an image URL.
 /// Shared by [receipt_image_view_io.dart] and [receipt_image_view_stub.dart].
 ///
 /// Tap the dimmed area or the close button to dismiss; pinch to zoom.
 void showImageDialogForUrl(BuildContext context, String url) {
+  final size = MediaQuery.sizeOf(context);
+  final decode = NetworkImageDecode.cacheSize(
+    context,
+    logicalWidth: size.width,
+    logicalHeight: size.height,
+  );
   showAppDialog<void>(
     context: context,
     barrierColor: Theme.of(context).colorScheme.scrim,
@@ -17,6 +24,8 @@ void showImageDialogForUrl(BuildContext context, String url) {
       image: Image.network(
         url,
         fit: BoxFit.contain,
+        cacheWidth: decode.width,
+        cacheHeight: decode.height,
         loadingBuilder: (_, child, loadingProgress) {
           if (loadingProgress == null) return child;
           return const SizedBox(

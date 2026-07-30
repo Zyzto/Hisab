@@ -10,6 +10,7 @@ import '../../../core/layout/content_aligned_fab_location.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
+import '../../../core/platform/ui_perf.dart';
 import '../providers/groups_provider.dart';
 import '../providers/group_member_provider.dart';
 import '../widgets/create_invite_sheet.dart';
@@ -23,6 +24,7 @@ import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/error_report_helper.dart';
 import '../../../core/utils/expense_totals.dart';
 import '../../../core/utils/form_validators.dart';
+import '../../../core/utils/user_text.dart';
 import '../../../core/widgets/amount_with_secondary_display.dart';
 import '../../../core/widgets/async_value_builder.dart';
 import '../../../core/widgets/error_content.dart';
@@ -30,6 +32,7 @@ import '../../../core/widgets/participant_avatar.dart';
 import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/sheet_option_tile.dart';
 import '../../../core/widgets/toast.dart';
+import '../../../core/widgets/user_text.dart';
 import '../../expenses/widgets/expense_list_tile.dart';
 import '../../expenses/category_icons.dart';
 import '../../balance/widgets/balance_list.dart';
@@ -41,20 +44,34 @@ import '../utils/group_icon_utils.dart';
 
 const double _kTabFabBottomClearance = 96.0;
 
-/// Grapheme-safe cap before adding an ellipsis; pixel overflow still handled by [Text].
+/// Grapheme-safe cap before adding an ellipsis; pixel overflow still handled by [UserText].
 const int _kGroupDetailAppBarTitleMaxGraphemes = 40;
-
-String _elideGroupNameForAppBar(String name) {
-  final trimmed = name.trim();
-  if (trimmed.isEmpty) return trimmed;
-  final ch = Characters(trimmed);
-  if (ch.length <= _kGroupDetailAppBarTitleMaxGraphemes) return trimmed;
-  return '${ch.take(_kGroupDetailAppBarTitleMaxGraphemes).string}…';
-}
 
 const double _kTabListBottomSpacing = 16.0;
 
 enum GroupDetailTab { expenses, balance, people }
+
+/// Keeps a [PageView.builder] child alive after first visit (scroll position).
+class _KeepAliveTab extends StatefulWidget {
+  const _KeepAliveTab({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_KeepAliveTab> createState() => _KeepAliveTabState();
+}
+
+class _KeepAliveTabState extends State<_KeepAliveTab>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
+}
 
 class GroupDetailPage extends ConsumerStatefulWidget {
   final String groupId;
@@ -245,7 +262,10 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
   Widget _buildAppBarTitle(BuildContext context) {
     final theme = Theme.of(context);
     final fullName = widget.group.name;
-    final displayName = _elideGroupNameForAppBar(fullName);
+    final displayName = elideGraphemes(
+      fullName,
+      maxGraphemes: _kGroupDetailAppBarTitleMaxGraphemes,
+    );
     final wasElided = displayName != fullName.trim();
     final groupColor = widget.group.color != null
         ? Color(widget.group.color!)
@@ -257,7 +277,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
         ? ThemeConfig.foregroundOnBackground(groupColor)
         : theme.colorScheme.onSurface;
     final letter = fullName.trim().isNotEmpty
-        ? Characters(fullName.trim()).first.toUpperCase()
+        ? fullName.trim().characters.first.toUpperCase()
         : '?';
     final titleRow = Row(
       mainAxisSize: MainAxisSize.min,
@@ -277,7 +297,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
         ),
         const SizedBox(width: 10),
         Flexible(
-          child: Text(
+          child: UserText(
             displayName,
             key: const Key('group_detail_title'),
             style: theme.textTheme.titleLarge?.copyWith(
@@ -285,6 +305,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
+            semanticsLabel: fullName,
           ),
         ),
       ],
@@ -593,18 +614,22 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
                               thumbDecoration: BoxDecoration(
                                 color: colorScheme.surface,
                                 borderRadius: BorderRadius.circular(10),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: colorScheme.shadow.withValues(
-                                      alpha: 0.1,
-                                    ),
-                                    blurRadius: 3,
-                                    offset: const Offset(0, 1),
-                                  ),
-                                ],
+                                boxShadow: UiPerf.preferCheapShadows
+                                    ? null
+                                    : [
+                                        BoxShadow(
+                                          color: colorScheme.shadow.withValues(
+                                            alpha: 0.1,
+                                          ),
+                                          blurRadius: 3,
+                                          offset: const Offset(0, 1),
+                                        ),
+                                      ],
                               ),
                               isStretch: true,
-                              duration: const Duration(milliseconds: 200),
+                              duration: UiPerf.preferInstantShellTabs
+                                  ? Duration.zero
+                                  : const Duration(milliseconds: 200),
                               curve: Curves.easeInOut,
                               onValueChanged: (v) {
                                 _syncUrlToTab(v);
@@ -613,21 +638,33 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
                                   _programmaticTargetPage = v;
                                 });
                                 _tabIndexNotifier.value = v;
-                                _pageController
-                                    .animateToPage(
-                                      v,
-                                      duration: const Duration(
-                                        milliseconds: 300,
-                                      ),
-                                      curve: Curves.easeInOut,
-                                    )
-                                    .whenComplete(() {
-                                      if (mounted) {
-                                        setState(
-                                          () => _programmaticTargetPage = null,
-                                        );
-                                      }
-                                    });
+                                final pageDuration =
+                                    UiPerf.preferInstantShellTabs
+                                    ? Duration.zero
+                                    : const Duration(milliseconds: 300);
+                                if (pageDuration == Duration.zero) {
+                                  _pageController.jumpToPage(v);
+                                  if (mounted) {
+                                    setState(
+                                      () => _programmaticTargetPage = null,
+                                    );
+                                  }
+                                } else {
+                                  _pageController
+                                      .animateToPage(
+                                        v,
+                                        duration: pageDuration,
+                                        curve: Curves.easeInOut,
+                                      )
+                                      .whenComplete(() {
+                                        if (mounted) {
+                                          setState(
+                                            () =>
+                                                _programmaticTargetPage = null,
+                                          );
+                                        }
+                                      });
+                                }
                               },
                             );
                           },
@@ -636,8 +673,9 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
                     ),
                   ),
                   Expanded(
-                    child: PageView(
+                    child: PageView.builder(
                       controller: _pageController,
+                      itemCount: 3,
                       onPageChanged: (i) {
                         if (_programmaticTargetPage != null &&
                             i != _programmaticTargetPage) {
@@ -651,26 +689,31 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
                         _segmentController.value = i;
                         _syncUrlToTab(i);
                       },
-                      children: [
-                        _ExpensesTab(
-                          groupId: widget.group.id,
-                          group: widget.group,
-                          onRefresh: _onRefresh,
-                          readOnlyPreview: widget.readOnlyPreview,
-                          previewToken: widget.previewToken,
-                        ),
-                        _BalanceTab(
-                          groupId: widget.group.id,
-                          onRefresh: _onRefresh,
-                          readOnlyPreview: widget.readOnlyPreview,
-                        ),
-                        _PeopleTab(
-                          groupId: widget.group.id,
-                          group: widget.group,
-                          onRefresh: _onRefresh,
-                          readOnlyPreview: widget.readOnlyPreview,
-                        ),
-                      ],
+                      itemBuilder: (context, i) {
+                        // Lazy: only visited pages mount; keepAlive preserves scroll.
+                        return _KeepAliveTab(
+                          child: switch (i) {
+                            0 => _ExpensesTab(
+                              groupId: widget.group.id,
+                              group: widget.group,
+                              onRefresh: _onRefresh,
+                              readOnlyPreview: widget.readOnlyPreview,
+                              previewToken: widget.previewToken,
+                            ),
+                            1 => _BalanceTab(
+                              groupId: widget.group.id,
+                              onRefresh: _onRefresh,
+                              readOnlyPreview: widget.readOnlyPreview,
+                            ),
+                            _ => _PeopleTab(
+                              groupId: widget.group.id,
+                              group: widget.group,
+                              onRefresh: _onRefresh,
+                              readOnlyPreview: widget.readOnlyPreview,
+                            ),
+                          },
+                        );
+                      },
                     ),
                   ),
                 ],
@@ -1307,7 +1350,7 @@ class _PeopleTab extends ConsumerWidget {
                 if (!LayoutBreakpoints.isTabletOrWider(context))
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    child: Text(
+                    child: UserText(
                       participant.name,
                       style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
@@ -1381,7 +1424,7 @@ class _PeopleTab extends ConsumerWidget {
                 if (!LayoutBreakpoints.isTabletOrWider(context))
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    child: Text(
+                    child: UserText(
                       participant.name,
                       style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
@@ -1433,7 +1476,7 @@ class _PeopleTab extends ConsumerWidget {
                 if (!LayoutBreakpoints.isTabletOrWider(context))
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    child: Text(
+                    child: UserText(
                       participant.name,
                       style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
@@ -1502,7 +1545,7 @@ class _PeopleTab extends ConsumerWidget {
       title: 'archive_participant'.tr(),
       content: 'archive_participant_confirm'.tr().replaceAll(
         '{name}',
-        participant.name,
+        isolateBidi(participant.name),
       ),
       confirmLabel: 'archive_participant'.tr(),
       centerInFullViewport: true,
@@ -1574,7 +1617,7 @@ class _PeopleTab extends ConsumerWidget {
       title: 'delete_participant'.tr(),
       content: 'delete_participant_confirm'.tr().replaceAll(
         '{name}',
-        participant.name,
+        isolateBidi(participant.name),
       ),
       confirmLabel: 'delete'.tr(),
       isDestructive: true,
@@ -1698,7 +1741,9 @@ class _PeopleTab extends ConsumerWidget {
                         avatarId: linked?.avatarId,
                         radius: 18,
                       ),
-                      title: Text(label),
+                      title: linked != null
+                          ? UserText(linked.name)
+                          : Text(label),
                       subtitle: Text(_roleLabel(m.role)),
                       onTap: () => Navigator.pop(ctx, m),
                     );
@@ -1716,7 +1761,7 @@ class _PeopleTab extends ConsumerWidget {
       title: 'merge_with_user'.tr(),
       content: 'merge_with_user_confirm'.tr().replaceAll(
         '{name}',
-        participant.name,
+        isolateBidi(participant.name),
       ),
       confirmLabel: 'merge_with_user'.tr(),
       centerInFullViewport: true,
@@ -1939,12 +1984,13 @@ class _PeoplePersonCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                UserText(
                   name,
                   style: theme.textTheme.bodyLarge?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: muted ? mutedColor : null,
                   ),
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 if (subtitle != null && subtitle!.isNotEmpty) ...[

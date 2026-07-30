@@ -663,12 +663,9 @@ void main() {
     await tester.tap(find.text('settle_filter_all'));
     await tester.pumpAndSettle();
 
-    // Names are wrapped in bidi isolates in settle rows.
-    String unwrap(String? value) =>
-        (value ?? '').replaceAll('\u2068', '').replaceAll('\u2069', '');
     final texts = tester
         .widgetList<Text>(find.byType(Text))
-        .map((t) => unwrap(t.data))
+        .map((t) => t.data ?? '')
         .where((t) => t.isNotEmpty)
         .toList();
     final daveAsPayee = texts.indexOf('Dave');

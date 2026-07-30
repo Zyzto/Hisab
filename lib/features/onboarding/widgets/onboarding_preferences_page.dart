@@ -57,10 +57,12 @@ class OnboardingPreferencesPage extends ConsumerWidget {
           ),
         ],
       ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: _buildPreferencesTiles(context, ref, settings),
+      content: OnboardingStepEnter(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: _buildPreferencesTiles(context, ref, settings),
+        ),
       ),
     );
   }
@@ -85,6 +87,7 @@ List<Widget> _buildPreferencesTiles(
   final use24h = ref.watch(settings.provider(use24HourFormatSettingDef));
   final fontSize = ref.watch(settings.provider(fontSizeScaleSettingDef));
   final themeScheme = ref.watch(settings.provider(themeSchemeSettingDef));
+  final subtleAccents = ref.watch(settings.provider(subtleAccentsSettingDef));
 
   return [
     OnboardingListCard(
@@ -288,6 +291,28 @@ List<Widget> _buildPreferencesTiles(
           }
         });
       },
+    ),
+    OnboardingListCard(
+      leading: OnboardingListCardIcon(
+        icon: subtleAccentsSettingDef.icon ?? Icons.tonality,
+      ),
+      title: 'subtle_accents'.tr(),
+      subtitle: Text(
+        'subtle_accents_description'.tr(),
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: colorScheme.onSurfaceVariant,
+          height: 1.3,
+        ),
+      ),
+      trailing: Switch(
+        value: subtleAccents,
+        onChanged: (v) {
+          ref
+              .read(settings.provider(subtleAccentsSettingDef).notifier)
+              .set(v);
+          Log.info('Setting changed: ${subtleAccentsSettingDef.key}=$v');
+        },
+      ),
     ),
   ];
 }

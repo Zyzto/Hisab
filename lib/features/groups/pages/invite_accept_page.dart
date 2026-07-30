@@ -18,6 +18,7 @@ import '../../../core/navigation/route_paths.dart';
 import '../../../core/utils/error_report_helper.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/toast.dart';
+import '../../../core/widgets/user_text.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/telemetry/telemetry_service.dart';
 import '../../../core/services/connectivity_service.dart';
@@ -723,7 +724,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                         'invite_to_group_prefix'.tr(),
                         style: theme.textTheme.titleLarge,
                       ),
-                      Text(
+                      UserText(
                         group.name,
                         style: theme.textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,

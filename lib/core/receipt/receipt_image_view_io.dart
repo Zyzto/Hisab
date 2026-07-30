@@ -4,6 +4,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 import '../layout/responsive_sheet.dart';
+import '../platform/network_image_decode.dart';
 import 'receipt_image_cache.dart';
 import 'receipt_image_view_url.dart';
 import 'receipt_utils.dart';
@@ -171,9 +172,17 @@ class _ReceiptCachedOrNetworkImageState extends State<_ReceiptCachedOrNetworkIma
   }
 
   Widget _fallbackNetworkImage() {
+    final size = MediaQuery.sizeOf(context);
+    final decode = NetworkImageDecode.cacheSize(
+      context,
+      logicalWidth: size.width,
+      logicalHeight: size.height,
+    );
     return Image.network(
       widget.imageUrl,
       fit: widget.fit,
+      cacheWidth: decode.width,
+      cacheHeight: decode.height,
       loadingBuilder: (context, child, loadingProgress) {
         if (loadingProgress == null) return child;
         return _buildImageLoadingSkeleton(context);

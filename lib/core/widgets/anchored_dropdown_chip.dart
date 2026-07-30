@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'user_text.dart';
+
 /// One row in an [AnchoredDropdownChip] menu.
 class AnchoredDropdownOption<T> {
   const AnchoredDropdownOption({
@@ -104,7 +106,7 @@ class AnchoredDropdownChip<T> extends StatelessWidget {
                   const SizedBox(width: 8),
                   ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 140),
-                    child: Text(
+                    child: UserText(
                       label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -156,7 +158,7 @@ class AnchoredDropdownChip<T> extends StatelessWidget {
               ),
             ),
             onPressed: () => onSelected(options[i].value),
-            child: Text(
+            child: UserText(
               options[i].label,
               style: theme.textTheme.bodyMedium?.copyWith(
                 fontWeight: options[i].value == selected
@@ -166,6 +168,8 @@ class AnchoredDropdownChip<T> extends StatelessWidget {
                     ? cs.onPrimaryContainer
                     : null,
               ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

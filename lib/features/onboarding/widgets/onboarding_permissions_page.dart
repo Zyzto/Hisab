@@ -58,47 +58,49 @@ class OnboardingPermissionsPage extends ConsumerWidget {
           ),
         ],
       ),
-      content: FutureBuilder<({bool camera, bool notification})>(
-        future: permissionStatusFuture,
-        builder: (context, snapshot) {
-          final cameraGrantedValue =
-              cameraGranted ?? snapshot.data?.camera ?? false;
-          final notificationGrantedValue =
-              notificationGranted ?? snapshot.data?.notification ?? false;
-          return Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (!kIsWeb)
+      content: OnboardingStepEnter(
+        child: FutureBuilder<({bool camera, bool notification})>(
+          future: permissionStatusFuture,
+          builder: (context, snapshot) {
+            final cameraGrantedValue =
+                cameraGranted ?? snapshot.data?.camera ?? false;
+            final notificationGrantedValue =
+                notificationGranted ?? snapshot.data?.notification ?? false;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (!kIsWeb)
+                  _buildPermissionRow(
+                    context,
+                    icon: Icons.camera_alt_outlined,
+                    title: 'onboarding_permission_camera'.tr(),
+                    subtitle: 'onboarding_permission_camera_desc'.tr(),
+                    granted: cameraGrantedValue,
+                    onAllow: onRequestCamera,
+                  ),
                 _buildPermissionRow(
                   context,
-                  icon: Icons.camera_alt_outlined,
-                  title: 'onboarding_permission_camera'.tr(),
-                  subtitle: 'onboarding_permission_camera_desc'.tr(),
-                  granted: cameraGrantedValue,
-                  onAllow: onRequestCamera,
+                  icon: Icons.notifications_outlined,
+                  title: 'onboarding_permission_notifications'.tr(),
+                  subtitle: kIsWeb &&
+                          pwaNotificationSupport ==
+                              PwaNotificationSupport.needsInstall
+                      ? 'onboarding_permission_notifications_needs_install'.tr()
+                      : 'onboarding_permission_notifications_desc'.tr(),
+                  granted: notificationGrantedValue,
+                  onAllow: onRequestNotification,
                 ),
-              _buildPermissionRow(
-                context,
-                icon: Icons.notifications_outlined,
-                title: 'onboarding_permission_notifications'.tr(),
-                subtitle: kIsWeb &&
-                        pwaNotificationSupport ==
-                            PwaNotificationSupport.needsInstall
-                    ? 'onboarding_permission_notifications_needs_install'.tr()
-                    : 'onboarding_permission_notifications_desc'.tr(),
-                granted: notificationGrantedValue,
-                onAllow: onRequestNotification,
-              ),
-              if (onlineAvailable)
-                _NotificationsAppToggle(
-                  settings: settings,
-                  notificationPermissionGranted: notificationGrantedValue,
-                ),
-              _TelemetryToggle(settings: settings),
-            ],
-          );
-        },
+                if (onlineAvailable)
+                  _NotificationsAppToggle(
+                    settings: settings,
+                    notificationPermissionGranted: notificationGrantedValue,
+                  ),
+                _TelemetryToggle(settings: settings),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -123,32 +125,44 @@ Widget _buildPermissionRow(
         height: 1.3,
       ),
     ),
-    trailing: granted
-        ? Semantics(
-            label: '$title ${'onboarding_permission_allowed'.tr()}',
-            child: FilledButton.tonal(
-              onPressed: null,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.check_circle,
-                    size: 18,
-                    color: colorScheme.primary,
-                  ),
-                  const SizedBox(width: 6),
-                  Text('onboarding_permission_allowed'.tr()),
-                ],
+    trailing: FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: AlignmentDirectional.centerEnd,
+      child: granted
+          ? Semantics(
+              label: '$title ${'onboarding_permission_allowed'.tr()}',
+              child: FilledButton.tonal(
+                onPressed: null,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 40),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.check_circle,
+                      size: 18,
+                      color: colorScheme.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text('onboarding_permission_allowed'.tr()),
+                  ],
+                ),
+              ),
+            )
+          : Semantics(
+              label: '$title ${'onboarding_permission_allow'.tr()}',
+              child: FilledButton.tonal(
+                onPressed: () async => await onAllow(),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 40),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+                child: Text('onboarding_permission_allow'.tr()),
               ),
             ),
-          )
-        : Semantics(
-            label: '$title ${'onboarding_permission_allow'.tr()}',
-            child: FilledButton.tonal(
-              onPressed: () async => await onAllow(),
-              child: Text('onboarding_permission_allow'.tr()),
-            ),
-          ),
+    ),
   );
 }
 

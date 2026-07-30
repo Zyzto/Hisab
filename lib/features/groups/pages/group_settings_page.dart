@@ -32,6 +32,7 @@ import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/sheet_option_tile.dart';
 import '../../../core/widgets/toast.dart';
+import '../../../core/widgets/user_text.dart';
 import '../../../domain/domain.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 
@@ -456,7 +457,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                   child: Row(
                     children: [
                       Flexible(
-                        child: Text(
+                        child: UserText(
                           group.name,
                           style: theme.textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
@@ -913,7 +914,10 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
               ),
               items: participants
                   .map(
-                    (p) => DropdownMenuItem(value: p.id, child: Text(p.name)),
+                    (p) => DropdownMenuItem(
+                      value: p.id,
+                      child: UserText(p.name),
+                    ),
                   )
                   .toList(),
               onChanged: _saving || !canEditSettings
@@ -2102,12 +2106,19 @@ class _InvitePreviewTile extends StatelessWidget {
           Icon(Icons.link, size: 16, color: theme.colorScheme.onSurfaceVariant),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              displayLabel,
-              style: theme.textTheme.bodyMedium,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+            child: invite.label?.isNotEmpty == true
+                ? UserText(
+                    invite.label!,
+                    style: theme.textTheme.bodyMedium,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  )
+                : Text(
+                    displayLabel,
+                    style: theme.textTheme.bodyMedium,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),

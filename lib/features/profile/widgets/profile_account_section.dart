@@ -1,12 +1,16 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 
 import '../../../core/auth/auth_providers.dart';
+import '../../../core/auth/auth_user_profile.dart';
+import '../../../core/auth/predefined_avatars.dart';
 import '../../../core/constants/supabase_config.dart';
 import '../../../core/services/connectivity_service.dart';
 import '../../../core/widgets/participant_avatar.dart';
+import '../../../core/widgets/user_text.dart';
 import '../../settings/account_mode_actions.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 import '../../settings/widgets/change_password_sheet.dart';
@@ -23,6 +27,12 @@ class ProfileAccountSection extends ConsumerWidget {
 
     final onlineAvailable = supabaseConfigAvailable;
     final localOnly = ref.watch(effectiveLocalOnlyProvider);
+
+    // Warm avatar emoji glyphs while the profile is visible so the edit
+    // sheet does not wait (or flash empty boxes) on first open.
+    if (onlineAvailable && !localOnly) {
+      unawaited(preloadPredefinedAvatarEmojis());
+    }
 
     if (!onlineAvailable) {
       return ListTile(
@@ -79,7 +89,6 @@ class ProfileAccountSection extends ConsumerWidget {
     final user = ref.watch(currentUserProvider);
     final syncStatus = ref.watch(syncStatusForDisplayProvider);
     final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
 
     return profileAsync.when(
       data: (profile) {
@@ -107,43 +116,18 @@ class ProfileAccountSection extends ConsumerWidget {
         }
 
         final provider = AccountModeActions.providerLabel(user);
-        final displayName = profile.name ?? profile.email ?? profile.sub;
-        final initials = AccountModeActions.initials(
-          profile.name,
-          profile.email,
-        );
+        final canChangePassword = user != null &&
+            (user.appMetadata['provider'] as String?) == 'email';
 
         return Column(
           children: [
-            ListTile(
-              leading: ParticipantAvatar(
-                name: displayName,
-                avatarId: profile.avatarId,
-                initials: initials,
-                backgroundColor: colorScheme.primaryContainer,
-                foregroundColor: colorScheme.onPrimaryContainer,
-                textStyle: textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              title: Text(
-                displayName,
-                style: textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              subtitle: profile.email != null ? Text(profile.email!) : null,
-              trailing: const Icon(Icons.edit_outlined),
-              onTap: () => showEditProfileSheet(context, ref, profile),
+            _AccountProfileTile(
+              profile: profile,
+              canChangePassword: canChangePassword,
+              onEdit: () => showEditProfileSheet(context, ref, profile),
+              onChangePassword: () => showChangePasswordSheet(context, ref),
             ),
             _SyncTile(status: syncStatus, provider: provider),
-            if (user != null &&
-                (user.appMetadata['provider'] as String?) == 'email')
-              ActionSettingsTile(
-                leading: const Icon(Icons.lock_outline),
-                title: Text('change_password'.tr()),
-                onTap: () => showChangePasswordSheet(context, ref),
-              ),
           ],
         );
       },
@@ -173,6 +157,158 @@ class ProfileAccountSection extends ConsumerWidget {
             false,
           ),
           child: Text('sign_in'.tr()),
+        ),
+      ),
+    );
+  }
+}
+
+/// Account row with flush trailing actions (same pattern as profile expenses).
+class _AccountProfileTile extends StatelessWidget {
+  const _AccountProfileTile({
+    required this.profile,
+    required this.canChangePassword,
+    required this.onEdit,
+    required this.onChangePassword,
+  });
+
+  final AuthUserProfile profile;
+  final bool canChangePassword;
+  final VoidCallback onEdit;
+  final VoidCallback onChangePassword;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final displayName = profile.name ?? profile.email ?? profile.sub;
+    final initials = AccountModeActions.initials(profile.name, profile.email);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Material(
+        color: cs.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+        clipBehavior: Clip.antiAlias,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: cs.outlineVariant.withValues(alpha: 0.45),
+            ),
+          ),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: onEdit,
+                    child: Padding(
+                      padding: const EdgeInsetsDirectional.fromSTEB(
+                        12,
+                        12,
+                        10,
+                        12,
+                      ),
+                      child: Row(
+                        children: [
+                          ParticipantAvatar(
+                            name: displayName,
+                            avatarId: profile.avatarId,
+                            initials: initials,
+                            backgroundColor: cs.primaryContainer,
+                            foregroundColor: cs.onPrimaryContainer,
+                            textStyle: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                UserText(
+                                  displayName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                if (profile.email != null) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    profile.email!,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: cs.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                _AccountActionButton(
+                  tooltip: 'edit'.tr(),
+                  icon: Icons.edit_outlined,
+                  colorScheme: cs,
+                  onPressed: onEdit,
+                ),
+                if (canChangePassword)
+                  _AccountActionButton(
+                    tooltip: 'change_password'.tr(),
+                    icon: Icons.lock_outline,
+                    colorScheme: cs,
+                    onPressed: onChangePassword,
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AccountActionButton extends StatelessWidget {
+  const _AccountActionButton({
+    required this.tooltip,
+    required this.icon,
+    required this.colorScheme,
+    required this.onPressed,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final ColorScheme colorScheme;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        child: InkWell(
+          onTap: onPressed,
+          child: SizedBox(
+            width: 44,
+            child: Center(
+              child: Icon(
+                icon,
+                size: 20,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
         ),
       ),
     );

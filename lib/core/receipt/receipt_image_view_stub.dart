@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../layout/layout_breakpoints.dart';
 import '../layout/responsive_sheet.dart';
+import '../platform/network_image_decode.dart';
 import '../widgets/sheet_helpers.dart';
 import 'receipt_image_view_url.dart';
 import 'receipt_utils.dart';
@@ -57,6 +58,11 @@ Widget buildExpenseImageView(
   final radius = borderRadius ?? BorderRadius.circular(12);
   if (isImageUrl(imagePath)) {
     final effectiveMaxHeight = maxHeight ?? 200;
+    final decode = NetworkImageDecode.cacheSize(
+      context,
+      logicalWidth: width ?? effectiveMaxHeight,
+      logicalHeight: effectiveMaxHeight,
+    );
     return Padding(
       padding: padding,
       child: ClipRRect(
@@ -69,6 +75,8 @@ Widget buildExpenseImageView(
             fit: fit,
             width: width,
             height: effectiveMaxHeight,
+            cacheWidth: decode.width,
+            cacheHeight: decode.height,
             loadingBuilder: (context, child, loadingProgress) {
               if (loadingProgress == null) return child;
               return _buildImageLoadingSkeleton(context);

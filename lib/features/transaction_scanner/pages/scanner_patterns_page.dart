@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/layout/content_aligned_fab_location.dart';
 import '../../../core/widgets/sheet_helpers.dart';
+import '../../../core/widgets/user_text.dart';
 import '../domain/scanner_pattern.dart';
 import '../providers/scanner_providers.dart';
 import '../utils/scanner_pattern_labels.dart';
@@ -136,7 +137,7 @@ class _PatternTile extends ConsumerWidget {
               : theme.colorScheme.onPrimaryContainer,
         ),
       ),
-      title: Text(scannerPatternDisplayName(pattern.name)),
+      title: UserText(scannerPatternDisplayName(pattern.name)),
       subtitle: Text(
         '${pattern.senderMatch}  •  ${pattern.successCount} ${'scanner_matches'.tr()}',
         style: theme.textTheme.bodySmall?.copyWith(
