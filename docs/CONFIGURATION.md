@@ -59,7 +59,7 @@ The app works fully offline with no configuration. Authentication, sync, invites
 | `SUPABASE_URL` | For online mode | Your Supabase project URL (e.g. `https://xxxxx.supabase.co`) |
 | `SUPABASE_ANON_KEY` | For online mode | Your Supabase anon/public key (starts with `eyJ...`) |
 | `INVITE_BASE_URL` | Optional | Custom base URL for invite links (e.g. `https://yourdomain.com`). When set, share links and QR codes use this instead of the Supabase URL. The web app proxies `/functions/v1/invite-redirect` to Supabase. See [Invite links with a custom domain](#invite-links-with-a-custom-domain). |
-| `SITE_URL` | Optional | Redirect URL for auth emails (magic link, sign-up confirmation) and web OAuth (`authRedirectUrl`). Prefer `https://` in production (e.g. `https://yourdomain.com`). When set, verification and magic links point here instead of the Supabase default (e.g. localhost). Must be in Supabase **Redirect URLs**. If production is served over HTTPS but `SITE_URL` is mistakenly `http://` on the same host, the web app upgrades the OAuth redirect to the current HTTPS origin. |
+| `SITE_URL` | Optional | Redirect URL for auth emails (magic link, sign-up confirmation) and web OAuth (`authRedirectUrl`). Production Firebase Hosting: `https://hisab.shenepoy.com`. When set, verification and magic links point here instead of the Supabase default (e.g. localhost). Must be in Supabase **Redirect URLs**. If `SITE_URL` is mistakenly `http://` while the page origin is `https://` on the same host, the web app upgrades the OAuth redirect to the current HTTPS origin (Hosting’s http→https 301 breaks PKCE otherwise). |
 | `FCM_VAPID_KEY` | Optional | VAPID key for Firebase Cloud Messaging on web (Web Push certificates in Firebase Console). Required for web push token. |
 | `FIREBASE_*` | Web only | Firebase web SDK options (`FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_PROJECT_ID`, `FIREBASE_STORAGE_BUCKET`, `FIREBASE_MESSAGING_SENDER_ID`, `FIREBASE_APP_ID`). No defaults are committed. **Debug:** provide via launch options using `--dart-define-from-file=dart_defines_online.json` (see example file). **CI:** GitHub Actions secrets are passed as `--dart-define` and injected into `web/index.html` and `web/firebase-messaging-sw.js` at build time. |
 | `ENABLE_WEB_SEMANTICS` | Web only, optional | Enables `SemanticsBinding.instance.ensureSemantics()` at startup. Default is `false` because iOS Safari may show severe scroll/input jank when semantics is always enabled. Turn on only for accessibility-focused builds. |
@@ -228,25 +228,23 @@ Firebase Hosting serves **static files** only. It does not run your app or provi
 
 ### 1. Build the web app with your config
 
-Set `SITE_URL` to your Firebase Hosting URL so auth redirects (magic link, email confirmation) land on your live site. Add that same URL in **Supabase Dashboard → Authentication → URL Configuration → Redirect URLs**.
+Production web is on **Firebase Hosting** (`hisab-c8eb1`), custom domain **https://hisab.shenepoy.com** (also `https://hisab-c8eb1.web.app`). Set `SITE_URL` / `INVITE_BASE_URL` to that HTTPS origin so auth redirects (magic link, email confirmation, OAuth) and invite links land on the live site. Add the same URL in **Supabase Dashboard → Authentication → URL Configuration → Redirect URLs**. Prefer `https://` — Hosting redirects bare `http://` with a 301, which can break OAuth code exchange.
 
 ```bash
 flutter build web \
   --dart-define=SUPABASE_URL=https://xxxxx.supabase.co \
   --dart-define=SUPABASE_ANON_KEY=eyJhbGci... \
-  --dart-define=INVITE_BASE_URL=https://yourdomain.com \
-  --dart-define=SITE_URL=https://yourdomain.com \
+  --dart-define=INVITE_BASE_URL=https://hisab.shenepoy.com \
+  --dart-define=SITE_URL=https://hisab.shenepoy.com \
   --dart-define=ENABLE_WEB_SEMANTICS=false \
   --dart-define=FIREBASE_API_KEY=... \
-  --dart-define=FIREBASE_PROJECT_ID=... \
+  --dart-define=FIREBASE_PROJECT_ID=hisab-c8eb1 \
   # ... other FIREBASE_* as in dart_defines_online.example.json
 ```
 
-If you use the default Firebase Hosting URL instead of a custom domain, use that for `SITE_URL` (e.g. `https://your-project-id.web.app`) and add it to Supabase redirect URLs.
-
 ### 2. Deploy
 
-Include the static privacy and account-deletion pages in the Firebase Hosting deploy so `https://yourdomain.com/privacy` and `https://yourdomain.com/delete-account` are available (e.g. for Play Console):
+Include the static privacy and account-deletion pages in the Firebase Hosting deploy so `https://hisab.shenepoy.com/privacy` and `https://hisab.shenepoy.com/delete-account` are available (e.g. for Play Console):
 
 ```bash
 cp -r web/privacy build/web/
@@ -256,7 +254,7 @@ firebase deploy --only hosting
 
 Your `firebase.json` already points `hosting.public` to `build/web`, so the built output (including `privacy/index.html` and `delete-account/index.html`) is deployed as-is.
 
-The checked-in [`firebase.json`](../firebase.json) also sets `Cache-Control: public, max-age=0, must-revalidate` for web entry files (`index.html`, `flutter_bootstrap.js`, `flutter.js`, `main.dart.js`, `manifest.json`, `version.json`) so redeploys pick up reliably without depending on Flutter's deprecated default service worker cache flow.
+**Cache headers:** Firebase Hosting matches `headers[].source` against the **original request path before rewrites**. A rule for `/index.html` alone does **not** apply to `/` or SPA routes that rewrite to `index.html` (default HTML cache is `max-age=3600`). The checked-in [`firebase.json`](../firebase.json) sets `Cache-Control: public, max-age=0, must-revalidate` on `/`, entry scripts (`flutter_bootstrap.js`, `flutter.js`, `main.dart.js`), `manifest.json`, `version.json`, `firebase-messaging-sw.js`, invite redirect pages, and app route prefixes (`/home`, `/settings`, `/profile`, `/groups/**`, …) so PWA/OAuth shell updates pick up without waiting on CDN HTML cache.
 
 ### 3. Keeping secrets out of your shell history
 

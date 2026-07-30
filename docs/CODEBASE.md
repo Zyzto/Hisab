@@ -240,7 +240,7 @@ Major persisted keys include:
 - Invite/OG assets: `web/invite-redirect-template.html`, `web/og-invite.png` (used in invite link and OG image flow; see [EDGE_FUNCTIONS.md](EDGE_FUNCTIONS.md)).
 - Public privacy page: `web/privacy/index.html`
 - Account deletion is described in `docs/DELETE_ACCOUNT.md`; the in-app options are Delete local data and Delete cloud data under Settings > Advanced (and a public page at `web/delete-account/index.html` when deployed).
-- Deployment cache control for web entry files is configured in `firebase.json` headers (`max-age=0, must-revalidate`) to keep web updates predictable as Flutter phases out the default `flutter_service_worker.js` flow.
+- Deployment cache control is configured in `firebase.json` headers (`max-age=0, must-revalidate`) for `/`, entry scripts, and SPA route prefixes. Firebase matches header `source` on the **request path before rewrites**, so `/index.html` alone would not cover `/` (Hosting’s default HTML cache is one hour).
 
 ## Supabase Backend Contract
 

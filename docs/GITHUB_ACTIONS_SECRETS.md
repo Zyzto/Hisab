@@ -28,13 +28,13 @@ Add these in **GitHub → Your repo → Settings → Secrets and variables → A
 |--------|-------------|-----------------|
 | `SUPABASE_URL` | Same as above | Same as above |
 | `SUPABASE_ANON_KEY` | Same as above | Same as above |
-| `INVITE_BASE_URL` | Base URL for invite links (share/QR) | Your web app domain, e.g. `https://yourdomain.com` |
-| `SITE_URL` | Production web app URL (auth redirects) | Same as your live domain, e.g. `https://yourdomain.com` |
+| `INVITE_BASE_URL` | Base URL for invite links (share/QR) | Firebase Hosting custom domain, e.g. `https://hisab.shenepoy.com` |
+| `SITE_URL` | Production web app URL (auth redirects) | Same HTTPS origin, e.g. `https://hisab.shenepoy.com` (not `http://`) |
 | `FCM_VAPID_KEY` | Web push VAPID key for FCM on web | Firebase Console → Project Settings → Cloud Messaging → Web Push certificates |
 | `FIREBASE_API_KEY` | Firebase web API key | Firebase Console → Project Settings → General → Your apps → Web app → API Key |
-| `FIREBASE_AUTH_DOMAIN` | Firebase auth domain | e.g. `your-project-id.firebaseapp.com` |
-| `FIREBASE_PROJECT_ID` | Firebase project ID | Firebase Console → Project Settings → General → Project ID |
-| `FIREBASE_STORAGE_BUCKET` | Firebase storage bucket | e.g. `your-project-id.firebasestorage.app` |
+| `FIREBASE_AUTH_DOMAIN` | Firebase auth domain | e.g. `hisab-c8eb1.firebaseapp.com` |
+| `FIREBASE_PROJECT_ID` | Firebase project ID | e.g. `hisab-c8eb1` |
+| `FIREBASE_STORAGE_BUCKET` | Firebase storage bucket | e.g. `hisab-c8eb1.firebasestorage.app` |
 | `FIREBASE_MESSAGING_SENDER_ID` | Firebase messaging sender ID | In your web app config in Firebase Console |
 | `FIREBASE_APP_ID` | Firebase web app ID | e.g. `1:123456789:web:abcdef` |
 | `FIREBASE_SERVICE_ACCOUNT` | Firebase Admin SDK service account JSON (for Hosting deploy) | Firebase Console → Project Settings → Service accounts → Generate new private key. Paste the **entire** JSON string as the secret value. |
@@ -64,8 +64,8 @@ Docker is available by default on GitHub Actions `ubuntu-latest` runners.
 
 - [ ] `SUPABASE_URL`
 - [ ] `SUPABASE_ANON_KEY`
-- [ ] `INVITE_BASE_URL` (e.g. `https://yourdomain.com`)
-- [ ] `SITE_URL` (e.g. `https://yourdomain.com`)
+- [ ] `INVITE_BASE_URL` (e.g. `https://hisab.shenepoy.com`)
+- [ ] `SITE_URL` (e.g. `https://hisab.shenepoy.com`)
 - [ ] `FCM_VAPID_KEY`
 - [ ] `FIREBASE_API_KEY`
 - [ ] `FIREBASE_AUTH_DOMAIN`
