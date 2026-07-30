@@ -66,9 +66,9 @@ const inviteBaseUrl = String.fromEnvironment(
 String get inviteLinkBaseUrl =>
     inviteBaseUrl.trim().isNotEmpty ? inviteBaseUrl.trim() : supabaseUrl;
 
-/// Optional redirect URL for auth emails (magic link, sign-up confirmation, resend).
-/// When set via `--dart-define=SITE_URL=https://yourdomain.com`, email verification
-/// and magic links will redirect here instead of the Supabase default (e.g. localhost).
+/// Optional redirect URL for auth emails (magic link, sign-up confirmation, resend)
+/// and web OAuth. Production: Firebase Hosting HTTPS origin
+/// (e.g. `--dart-define=SITE_URL=https://hisab.shenepoy.com`).
 /// Must be listed in Supabase Dashboard → Authentication → URL Configuration → Redirect URLs.
 const authRedirectUrl = String.fromEnvironment('SITE_URL', defaultValue: '');
 
