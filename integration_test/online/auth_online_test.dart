@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -40,33 +41,32 @@ void main() {
         expect(client.auth.currentUser!.email, equals(testUserAEmail));
       });
 
-      // ── Stage: open Profile (account UI + Sign out live there) ──
+      // ── Stage: open Profile (account UI + AppBar logout live there) ──
       await stage('navigate to profile', () async {
         await tapAndSettle(tester, find.text('Settings'));
         await waitForWidget(tester, find.text('Account'));
-        // Settings Account section links to Profile; Sign out is on Profile.
+        // Settings Account section links to Profile; logout is an AppBar action.
         await scrollUntilVisible(tester, find.text('Profile'));
         await tapAndSettle(tester, find.text('Profile').first);
         await waitForWidget(
           tester,
-          find.text('Sign out'),
+          find.byIcon(Icons.logout),
           timeout: const Duration(seconds: 15),
         );
       });
 
       // ── Stage: sign out from profile ──
       await stage('sign out', () async {
-        await scrollUntilVisible(tester, find.text('Sign out'));
-        await tapAndSettle(tester, find.text('Sign out'));
+        await tapAndSettle(tester, find.byIcon(Icons.logout));
         await pumpAndSettleWithTimeout(tester);
 
-        // Confirm sign-out in the confirmation sheet
+        // Confirm sign-out in the confirmation sheet (label is still "Sign out").
         await tester.pump(const Duration(seconds: 1));
         await waitForCondition(
           tester,
           condition: () =>
               isResponsiveSheetVisible() ||
-              find.text('Sign out').evaluate().length >= 2,
+              find.text('Sign out').evaluate().isNotEmpty,
           timeout: const Duration(seconds: 10),
           reason: 'Sign-out confirmation sheet should appear',
         );
