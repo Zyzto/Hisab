@@ -197,7 +197,7 @@ Add each secret listed below:
 |-------------|-------|
 | `SUPABASE_URL` | Your Supabase project URL, e.g. `https://xxxxx.supabase.co` |
 | `SUPABASE_ANON_KEY` | Your Supabase anon/public key (starts with `eyJ...`) |
-| `INVITE_BASE_URL` | Your web app base URL for invite links, e.g. `https://yourdomain.com` |
+| `INVITE_BASE_URL` | Firebase Hosting HTTPS URL for invite links, e.g. `https://hisab.shenepoy.com` |
 | `SITE_URL` | Firebase Hosting HTTPS URL, e.g. `https://hisab.shenepoy.com` |
 | `FCM_VAPID_KEY` | Web Push certificate VAPID key from Firebase Console → Project Settings → Cloud Messaging → Web Push certificates (needed for web and optionally for Android FCM) |
 | `FIREBASE_API_KEY` | Firebase web API key (Project Settings → Your apps → Web app) |

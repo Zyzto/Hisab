@@ -21,14 +21,14 @@ flutter run \
   --dart-define=SUPABASE_ANON_KEY=eyJhbGci...
 ```
 
-With a custom domain for invite links and/or correct email verification redirect (optional). Use the same domain as your web app (e.g. Firebase custom domain) so invite links look like `https://yourdomain.com/functions/v1/invite-redirect?token=...`:
+With a custom domain for invite links and/or correct email verification redirect (optional). Use the same domain as your web app (Firebase Hosting) so invite links look like `https://hisab.shenepoy.com/functions/v1/invite-redirect?token=...`:
 
 ```bash
 flutter run \
   --dart-define=SUPABASE_URL=https://xxxxx.supabase.co \
   --dart-define=SUPABASE_ANON_KEY=eyJhbGci... \
-  --dart-define=INVITE_BASE_URL=https://yourdomain.com \
-  --dart-define=SITE_URL=https://yourdomain.com
+  --dart-define=INVITE_BASE_URL=https://hisab.shenepoy.com \
+  --dart-define=SITE_URL=https://hisab.shenepoy.com
 ```
 
 `SITE_URL` is used as the redirect URL in magic links and sign-up confirmation emails. If unset, Supabase uses the project **Site URL** from the dashboard (often localhost in dev). Add the same URL to **Supabase Dashboard → Authentication → URL Configuration → Redirect URLs**.
@@ -58,7 +58,7 @@ The app works fully offline with no configuration. Authentication, sync, invites
 |-----------|----------|-------------|
 | `SUPABASE_URL` | For online mode | Your Supabase project URL (e.g. `https://xxxxx.supabase.co`) |
 | `SUPABASE_ANON_KEY` | For online mode | Your Supabase anon/public key (starts with `eyJ...`) |
-| `INVITE_BASE_URL` | Optional | Custom base URL for invite links (e.g. `https://yourdomain.com`). When set, share links and QR codes use this instead of the Supabase URL. The web app proxies `/functions/v1/invite-redirect` to Supabase. See [Invite links with a custom domain](#invite-links-with-a-custom-domain). |
+| `INVITE_BASE_URL` | Optional | Custom base URL for invite links (production: `https://hisab.shenepoy.com`). When set, share links and QR codes use this instead of the Supabase URL. The web app proxies `/functions/v1/invite-redirect` to Supabase. See [Invite links with a custom domain](#invite-links-with-a-custom-domain). |
 | `SITE_URL` | Optional | Redirect URL for auth emails (magic link, sign-up confirmation) and web OAuth (`authRedirectUrl`). Production Firebase Hosting: `https://hisab.shenepoy.com`. When set, verification and magic links point here instead of the Supabase default (e.g. localhost). Must be in Supabase **Redirect URLs**. If `SITE_URL` is mistakenly `http://` while the page origin is `https://` on the same host, the web app upgrades the OAuth redirect to the current HTTPS origin (Hosting’s http→https 301 breaks PKCE otherwise). |
 | `FCM_VAPID_KEY` | Optional | VAPID key for Firebase Cloud Messaging on web (Web Push certificates in Firebase Console). Required for web push token. |
 | `FIREBASE_*` | Web only | Firebase web SDK options (`FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_PROJECT_ID`, `FIREBASE_STORAGE_BUCKET`, `FIREBASE_MESSAGING_SENDER_ID`, `FIREBASE_APP_ID`). No defaults are committed. **Debug:** provide via launch options using `--dart-define-from-file=dart_defines_online.json` (see example file). **CI:** GitHub Actions secrets are passed as `--dart-define` and injected into `web/index.html` and `web/firebase-messaging-sw.js` at build time. |
@@ -79,20 +79,20 @@ Receipt scanning can use **Gemini** or **OpenAI** for parsing receipt images (ve
 
 ## Invite links with a custom domain
 
-Invite links normally use your Supabase project URL (e.g. `https://xxxxx.supabase.co/functions/v1/invite-redirect?token=...`). To use your **web app’s domain** (e.g. `https://yourdomain.com/functions/v1/invite-redirect?token=...`) so shared links match your brand:
+Invite links normally use your Supabase project URL (e.g. `https://xxxxx.supabase.co/functions/v1/invite-redirect?token=...`). To use your **Firebase Hosting domain** (`https://hisab.shenepoy.com/functions/v1/invite-redirect?token=...`) so shared links match your brand:
 
-1. **Web app (Firebase Hosting or similar)**  
-   The Flutter web app is served from your custom domain (e.g. yourdomain.com). It handles the path `/functions/v1/invite-redirect` by immediately redirecting the browser to the Supabase Edge Function. No Supabase Custom Domain is required.
+1. **Web app (Firebase Hosting)**  
+   The Flutter web app is served from the Hosting custom domain. It handles the path `/functions/v1/invite-redirect` by immediately redirecting the browser to the Supabase Edge Function. No Supabase Custom Domain is required.
 
 2. **App**  
-   Build/run with the same URL as your web app for the invite base:
+   Build/run with the same HTTPS origin (CI already passes the GitHub secret):
    ```bash
-   --dart-define=INVITE_BASE_URL=https://yourdomain.com
+   --dart-define=INVITE_BASE_URL=https://hisab.shenepoy.com
    ```
-   Share links and QR codes will use this URL. When a user opens the link, they hit your domain first, then the app redirects to Supabase for token validation; Supabase then redirects back to your domain’s `redirect.html` (set `SITE_URL` in Supabase Edge Function secrets to the same domain).
+   Share links and QR codes will use this URL. When a user opens the link, they hit Hosting first, then the app redirects to Supabase for token validation; Supabase then redirects back to the domain’s `redirect.html` (set `SITE_URL` in Supabase Edge Function secrets to the same HTTPS origin).
 
 **Alternative: Supabase Custom Domain**  
-If you prefer a separate subdomain for invite links (e.g. `https://invite.yourdomain.com`) without the web app proxy, use [Supabase Custom Domains](https://supabase.com/docs/guides/platform/custom-domains) (paid plan) and set `INVITE_BASE_URL` to that subdomain.
+If you prefer a separate subdomain for invite links without the web app proxy, use [Supabase Custom Domains](https://supabase.com/docs/guides/platform/custom-domains) (paid plan) and set `INVITE_BASE_URL` to that subdomain.
 
 ---
 
@@ -254,7 +254,7 @@ firebase deploy --only hosting
 
 Your `firebase.json` already points `hosting.public` to `build/web`, so the built output (including `privacy/index.html` and `delete-account/index.html`) is deployed as-is.
 
-**Cache headers:** Firebase Hosting matches `headers[].source` against the **original request path before rewrites**. A rule for `/index.html` alone does **not** apply to `/` or SPA routes that rewrite to `index.html` (default HTML cache is `max-age=3600`). The checked-in [`firebase.json`](../firebase.json) sets `Cache-Control: public, max-age=0, must-revalidate` on `/`, entry scripts (`flutter_bootstrap.js`, `flutter.js`, `main.dart.js`), `manifest.json`, `version.json`, `firebase-messaging-sw.js`, invite redirect pages, and app route prefixes (`/home`, `/settings`, `/profile`, `/groups/**`, …) so PWA/OAuth shell updates pick up without waiting on CDN HTML cache.
+**Cache headers:** Firebase Hosting matches `headers[].source` against the **original request path before rewrites** (first match wins). Default HTML cache is `max-age=3600`, so `/index.html` rules alone miss `/` and SPA deep links. The checked-in [`firebase.json`](../firebase.json) sets `must-revalidate` on entry scripts / manifest / messaging SW / invite HTML, then a catch-all `**` `must-revalidate` for `/` and all SPA routes (including `/invite/**`), while allowing long cache for static images/fonts. Deploy is via GitHub Actions (`deploy-web` on `v*` tags), not a local `firebase deploy`.
 
 ### 3. Keeping secrets out of your shell history
 
@@ -267,7 +267,7 @@ Your `firebase.json` already points `hosting.public` to `build/web`, so the buil
 - **Option C – One-off**  
   Run the `flutter build web --dart-define=...` command once locally and then deploy. Keys will be in your shell history unless your shell is configured not to persist it.
 
-After the first deploy, get your live URL from the Firebase console (e.g. `https://yourdomain.com` or `https://your-project-id.web.app`) and add it to Supabase redirect URLs if you didn't use `SITE_URL` in the initial build.
+After the first deploy, confirm the live URL (`https://hisab.shenepoy.com` or `https://hisab-c8eb1.web.app`) is in Supabase redirect URLs if you didn't use `SITE_URL` in the initial build.
 
 ---
 
