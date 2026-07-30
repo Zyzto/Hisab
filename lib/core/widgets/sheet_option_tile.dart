@@ -111,11 +111,14 @@ class SheetOptionTile extends StatelessWidget {
 }
 
 /// Vertical list of [SheetOptionTile]s with consistent gaps.
+///
+/// Default padding includes vertical inset so lists sit correctly under the
+/// shared [showResponsiveSheet] title bar / drag handle without call-site hacks.
 class SheetOptionList extends StatelessWidget {
   const SheetOptionList({
     super.key,
     required this.children,
-    this.padding = const EdgeInsets.symmetric(horizontal: 16),
+    this.padding = const EdgeInsets.fromLTRB(16, 8, 16, 8),
     this.spacing = 8,
   });
 

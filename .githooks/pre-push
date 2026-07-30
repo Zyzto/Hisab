@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Block pushes that contain sensitive information.
+# Install once: bash ./scripts/install_git_hooks.sh
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+ZERO="0000000000000000000000000000000000000000"
+FAILED=0
+
+echo "==> pre-push: scanning for sensitive information"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  # Branch / tag delete — nothing to scan.
+  if [[ "$local_sha" == "$ZERO" ]]; then
+    continue
+  fi
+
+  echo "    scanning ${local_ref} (${local_sha:0:8})"
+  if ! HISAB_SCAN_TREE="$local_sha" bash "$ROOT/scripts/verify_security.sh"; then
+    FAILED=1
+  fi
+done
+
+if [[ "$FAILED" -ne 0 ]]; then
+  echo "" >&2
+  echo "❌ Push blocked: sensitive information detected." >&2
+  echo "   Remove secrets from the commit history, or move them to gitignored local files." >&2
+  echo "   See SECURITY.md. Re-run: bash ./scripts/verify_security.sh" >&2
+  exit 1
+fi
+
+echo "✅ pre-push security check passed"
+exit 0

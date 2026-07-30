@@ -7,8 +7,12 @@ import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/constrained_content.dart';
+import '../../../core/layout/layout_breakpoints.dart';
+import '../../../core/layout/responsive_sheet.dart';
+import '../../../core/motion/app_motion.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/platform/ui_perf.dart';
 import '../../../core/telemetry/telemetry_service.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -16,8 +20,12 @@ import '../../../core/utils/currency_helpers.dart';
 import '../../../core/utils/form_validators.dart';
 import '../../../core/utils/run_guarded_async.dart';
 import '../../../core/theme/accent_style.dart';
+import '../../../core/widgets/group_section_header.dart';
 import '../../../core/widgets/participant_avatar.dart';
+import '../../../core/widgets/sheet_option_tile.dart';
 import '../../../core/widgets/user_text.dart';
+import '../../../core/widgets/wizard_step_enter.dart';
+import '../../../domain/domain.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 import '../utils/group_icon_utils.dart';
 import '../widgets/group_color_picker.dart';
@@ -41,13 +49,13 @@ class GroupCreatePage extends ConsumerStatefulWidget {
 }
 
 class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
-  static const _kPageAnimationDuration = Duration(milliseconds: 300);
-  static const _kPageAnimationCurve = Curves.easeInOut;
-  static const _kIndicatorActiveWidth = 24.0;
+  static const _kIndicatorActiveWidth = 28.0;
   static const _kIndicatorInactiveWidth = 8.0;
-  static const _kIndicatorMargin = 4.0;
 
   int get _pageCount => widget.isPersonal ? 3 : 4;
+
+  Duration get _pageAnimDuration =>
+      UiPerf.preferInstantShellTabs ? Duration.zero : AppMotion.page;
 
   late final PageController _pageController;
   int _currentPage = 0;
@@ -63,11 +71,20 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
   // ── Step 2 state ──
   final _participantController = TextEditingController();
   final _participantFocusNode = FocusNode();
+  /// Prevents the Add button from stealing focus from the name field.
+  late final FocusNode _addParticipantButtonFocusNode;
   final List<String> _participants = [];
 
   // ── Step 3 state ──
   String? _selectedIcon;
   Color _selectedColor = groupColors.first;
+
+  // ── Group settings (group create only; not personal) ──
+  SettlementMethod _settlementMethod = SettlementMethod.greedy;
+  bool _allowMemberAddExpense = true;
+  bool _allowMemberChangeSettings = true;
+  bool _allowExpenseAsOtherParticipant = true;
+  bool _allowMemberSettleForOthers = false;
 
   // ── Step 4 state ──
   bool _saving = false;
@@ -119,6 +136,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
     _currentPage = widget.initialStep.clamp(0, _pageCount - 1);
     _pageController = PageController(initialPage: _currentPage);
     _selectedCurrency = CurrencyHelpers.defaultCurrency();
+    _addParticipantButtonFocusNode = FocusNode(canRequestFocus: false);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _syncDecorativeUrlToPage(_currentPage);
@@ -144,10 +162,23 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
     _budgetFocusNode.dispose();
     _participantController.dispose();
     _participantFocusNode.dispose();
+    _addParticipantButtonFocusNode.dispose();
     super.dispose();
   }
 
   // ── Navigation ──────────────────────────────────────────────────────────
+
+  void _animateToPage(int page) {
+    if (_pageAnimDuration == Duration.zero) {
+      _pageController.jumpToPage(page);
+    } else {
+      _pageController.animateToPage(
+        page,
+        duration: _pageAnimDuration,
+        curve: AppMotion.enterCurve,
+      );
+    }
+  }
 
   void _goNext() {
     if (_currentPage == 0) {
@@ -162,10 +193,14 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
       return;
     }
     if (_currentPage < _pageCount - 1) {
-      _pageController.nextPage(
-        duration: _kPageAnimationDuration,
-        curve: _kPageAnimationCurve,
-      );
+      if (_pageAnimDuration == Duration.zero) {
+        _pageController.jumpToPage(_currentPage + 1);
+      } else {
+        _pageController.nextPage(
+          duration: _pageAnimDuration,
+          curve: AppMotion.enterCurve,
+        );
+      }
     }
   }
 
@@ -175,10 +210,14 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
       _nameFocusNode.unfocus();
       _budgetFocusNode.unfocus();
       _participantFocusNode.unfocus();
-      _pageController.previousPage(
-        duration: _kPageAnimationDuration,
-        curve: _kPageAnimationCurve,
-      );
+      if (_pageAnimDuration == Duration.zero) {
+        _pageController.jumpToPage(_currentPage - 1);
+      } else {
+        _pageController.previousPage(
+          duration: _pageAnimDuration,
+          curve: AppMotion.enterCurve,
+        );
+      }
     } else {
       context.pop();
     }
@@ -193,7 +232,11 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
       _participants.add(name);
       _participantController.clear();
     });
-    _participantFocusNode.requestFocus();
+    // Re-focus after rebuild so Add / Done does not leave the field unfocused.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _participantFocusNode.requestFocus();
+    });
   }
 
   void _removeParticipant(int index) {
@@ -241,6 +284,21 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
           initialParticipants: widget.isPersonal ? [] : _participants,
           isPersonal: widget.isPersonal,
           budgetAmountCents: budgetAmountCents,
+          settlementMethod: widget.isPersonal
+              ? SettlementMethod.greedy
+              : _settlementMethod,
+          allowMemberAddExpense: widget.isPersonal
+              ? true
+              : _allowMemberAddExpense,
+          allowMemberChangeSettings: widget.isPersonal
+              ? true
+              : _allowMemberChangeSettings,
+          allowExpenseAsOtherParticipant: widget.isPersonal
+              ? true
+              : _allowExpenseAsOtherParticipant,
+          allowMemberSettleForOthers: widget.isPersonal
+              ? false
+              : _allowMemberSettleForOthers,
         ),
         'Group create failed',
         context: context,
@@ -265,6 +323,41 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
     }
   }
 
+  Widget _formPanel({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: AccentSurfaces.flatPanel(Theme.of(context).colorScheme),
+      child: child,
+    );
+  }
+
+  Widget _stepTitleBlock({
+    required String titleKey,
+    required String subtitleKey,
+  }) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          titleKey.tr(),
+          style: theme.textTheme.headlineMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: ThemeConfig.spacingS),
+        Text(
+          subtitleKey.tr(),
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            height: 1.4,
+          ),
+        ),
+      ],
+    );
+  }
+
   // ── Build ───────────────────────────────────────────────────────────────
 
   @override
@@ -279,6 +372,8 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
             if (!didPop && _currentPage > 0) _goBack();
           },
           child: Scaffold(
+            // Keep fields above the keyboard on mobile / mobile web.
+            resizeToAvoidBottomInset: true,
             appBar: ContentAlignedAppBar(
               contentAreaWidth: layoutConstraints.maxWidth,
               leading: IconButton(
@@ -351,15 +446,20 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
         children: List.generate(_pageCount, (index) {
           final isActive = index == _currentPage;
           return AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            margin: const EdgeInsets.symmetric(horizontal: _kIndicatorMargin),
+            duration: UiPerf.preferInstantShellTabs
+                ? Duration.zero
+                : ThemeConfig.animationShort,
+            curve: AppMotion.enterCurve,
+            margin: const EdgeInsets.symmetric(
+              horizontal: ThemeConfig.spacingXS,
+            ),
             width: isActive ? _kIndicatorActiveWidth : _kIndicatorInactiveWidth,
-            height: _kIndicatorInactiveWidth,
+            height: isActive ? 8 : 7,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(ThemeConfig.radiusS),
               color: isActive
                   ? colorScheme.primary
-                  : colorScheme.outline.withValues(alpha: 0.4),
+                  : colorScheme.outlineVariant.withValues(alpha: 0.55),
             ),
           );
         }),
@@ -371,21 +471,39 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
 
   Widget _buildBottomBar(BuildContext context, ColorScheme colorScheme) {
     final isLastPage = _currentPage == _pageCount - 1;
+    final scaffoldBg = Theme.of(context).scaffoldBackgroundColor;
+    final decoration = UiPerf.preferCheapShadows
+        ? BoxDecoration(
+            color: scaffoldBg,
+            border: Border(
+              top: BorderSide(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.55),
+              ),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: colorScheme.shadow.withValues(alpha: 0.08),
+                blurRadius: 2,
+                offset: const Offset(0, -1),
+              ),
+            ],
+          )
+        : BoxDecoration(
+            color: scaffoldBg,
+            boxShadow: [
+              BoxShadow(
+                color: colorScheme.shadow.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          );
+
     return Container(
       padding: const EdgeInsets.all(ThemeConfig.spacingM),
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.08),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
+      decoration: decoration,
       child: Row(
         children: [
-          // Back button
           Expanded(
             child: Align(
               alignment: AlignmentDirectional.centerStart,
@@ -401,14 +519,12 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
               ),
             ),
           ),
-          // Step label
           Text(
             '${_currentPage + 1} / $_pageCount',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
           ),
-          // Next / Create button
           Expanded(
             child: Align(
               alignment: AlignmentDirectional.centerEnd,
@@ -464,64 +580,59 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
 
   Widget _buildStep1NameCurrency(BuildContext context) {
     final theme = Theme.of(context);
-    return Form(
-      key: _nameFormKey,
-      child: FocusTraversalGroup(
-        child: ListView(
-          padding: const EdgeInsets.all(ThemeConfig.spacingM),
-          children: [
-            const SizedBox(height: ThemeConfig.spacingM),
-            Text(
-              'wizard_step1_title'.tr(),
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: ThemeConfig.spacingS),
-            Text(
-              'wizard_step1_subtitle'.tr(),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: ThemeConfig.spacingXL),
-            TextFormField(
-              key: const Key('wizard_name_field'),
-              controller: _nameController,
-              focusNode: _nameFocusNode,
-              decoration: InputDecoration(
-                labelText: (widget.isPersonal ? 'list_name' : 'group_name')
-                    .tr(),
-                hintText: 'wizard_name_hint'.tr(),
-                border: const OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.group_outlined),
-                counterText: '',
-              ),
-              validator: FormValidators.groupName,
-              maxLength: FormValidators.groupNameMax,
-              textInputAction: TextInputAction.next,
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: ThemeConfig.spacingL),
-            Text(
-              'currency'.tr(),
-              style: theme.textTheme.titleSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: ThemeConfig.spacingS),
-            InkWell(
-              onTap: _openCurrencyPicker,
-              borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
+    final colorScheme = theme.colorScheme;
+    final titleKey = widget.isPersonal
+        ? 'wizard_step1_title_personal'
+        : 'wizard_step1_title';
+    final subtitleKey = widget.isPersonal
+        ? 'wizard_step1_subtitle_personal'
+        : 'wizard_step1_subtitle';
+
+    // Dense permission rows on mobile web — shorter scroll, same hit targets
+    // via SwitchListTile; full density on desktop/native.
+    final denseSettings = UiPerf.isWebMobile;
+
+    return WizardStepEnter(
+      child: Form(
+        key: _nameFormKey,
+        child: FocusTraversalGroup(
+          child: ListView(
+            padding: const EdgeInsets.all(ThemeConfig.spacingM),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            children: [
+              const SizedBox(height: ThemeConfig.spacingM),
+              _stepTitleBlock(titleKey: titleKey, subtitleKey: subtitleKey),
+              const SizedBox(height: ThemeConfig.spacingXL),
+              _formPanel(
+                child: TextFormField(
+                  key: const Key('wizard_name_field'),
+                  controller: _nameController,
+                  focusNode: _nameFocusNode,
+                  decoration: InputDecoration(
+                    labelText: (widget.isPersonal ? 'list_name' : 'group_name')
+                        .tr(),
+                    hintText: 'wizard_name_hint'.tr(),
+                    border: const OutlineInputBorder(),
+                    prefixIcon: Icon(
+                      widget.isPersonal
+                          ? Icons.person_outline
+                          : Icons.group_outlined,
+                    ),
+                    counterText: '',
+                  ),
+                  validator: FormValidators.groupName,
+                  maxLength: FormValidators.groupNameMax,
+                  textInputAction: TextInputAction.next,
+                  // Avoid setState-on-keystroke: step body includes heavy
+                  // settings chrome (permissions) that must not rebuild per char.
                 ),
-                decoration: BoxDecoration(
-                  border: Border.all(color: theme.colorScheme.outline),
-                  borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
-                ),
+              ),
+              const SizedBox(height: ThemeConfig.spacingL),
+              GroupSectionHeader(label: 'currency'.tr()),
+              const SizedBox(height: ThemeConfig.spacingM),
+              _buildSelectableFlatRow(
+                context,
+                onTap: _openCurrencyPicker,
                 child: Row(
                   children: [
                     Text(
@@ -533,45 +644,97 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                       child: Text(
                         CurrencyHelpers.displayLabel(_selectedCurrency),
                         style: theme.textTheme.bodyLarge,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     Icon(
                       Icons.arrow_drop_down,
-                      color: theme.colorScheme.onSurfaceVariant,
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ],
                 ),
               ),
-            ),
-            if (widget.isPersonal) ...[
-              const SizedBox(height: ThemeConfig.spacingL),
-              Text(
-                'my_budget'.tr(),
-                style: theme.textTheme.titleSmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+              if (widget.isPersonal) ...[
+                const SizedBox(height: ThemeConfig.spacingL),
+                GroupSectionHeader(label: 'my_budget'.tr()),
+                const SizedBox(height: ThemeConfig.spacingM),
+                _formPanel(
+                  child: TextFormField(
+                    key: const Key('wizard_budget_field'),
+                    controller: _budgetController,
+                    focusNode: _budgetFocusNode,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'budget_amount'.tr(),
+                      hintText:
+                          CurrencyHelpers.fromCode(
+                            _selectedCurrency.code,
+                          )?.symbol ??
+                          _selectedCurrency.code,
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(
+                        Icons.account_balance_wallet_outlined,
+                      ),
+                    ),
+                    textInputAction: TextInputAction.done,
+                  ),
                 ),
-              ),
-              const SizedBox(height: ThemeConfig.spacingS),
-              TextFormField(
-                key: const Key('wizard_budget_field'),
-                controller: _budgetController,
-                focusNode: _budgetFocusNode,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: 'budget_amount'.tr(),
-                  hintText:
-                      CurrencyHelpers.fromCode(
-                        _selectedCurrency.code,
-                      )?.symbol ??
-                      _selectedCurrency.code,
-                  border: const OutlineInputBorder(),
-                  prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
+              ] else ...[
+                // Isolate settings chrome so name/currency edits do not repaint it.
+                RepaintBoundary(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: ThemeConfig.spacingL),
+                      GroupSectionHeader(label: 'settlement_method'.tr()),
+                      const SizedBox(height: ThemeConfig.spacingM),
+                      _buildSettlementMethodPicker(context),
+                      const SizedBox(height: ThemeConfig.spacingL),
+                      GroupSectionHeader(label: 'group_permissions'.tr()),
+                      const SizedBox(height: ThemeConfig.spacingM),
+                      _buildPermissionsPanel(context, dense: denseSettings),
+                    ],
+                  ),
                 ),
-                textInputAction: TextInputAction.next,
-                onChanged: (_) => setState(() {}),
-              ),
+              ],
             ],
-          ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Shared flat/emphasized tappable row (currency, settlement).
+  Widget _buildSelectableFlatRow(
+    BuildContext context, {
+    required VoidCallback onTap,
+    required Widget child,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Material(
+      color: AccentSurfaces.emphasizedFill(
+        colorScheme,
+        subtle: context.subtleAccents,
+      ),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: AccentSurfaces.emphasizedBorder(
+                colorScheme,
+                subtle: context.subtleAccents,
+              ),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: child,
+          ),
         ),
       ),
     );
@@ -598,128 +761,129 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return ListView(
-      padding: const EdgeInsets.all(ThemeConfig.spacingM),
-      children: [
-        const SizedBox(height: ThemeConfig.spacingM),
-        Text(
-          'wizard_step2_title'.tr(),
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
+    return WizardStepEnter(
+      child: ListView(
+        padding: const EdgeInsets.all(ThemeConfig.spacingM),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        children: [
+          const SizedBox(height: ThemeConfig.spacingM),
+          _stepTitleBlock(
+            titleKey: 'wizard_step2_title',
+            subtitleKey: 'wizard_step2_subtitle',
           ),
-        ),
-        const SizedBox(height: ThemeConfig.spacingS),
-        Text(
-          'wizard_step2_subtitle'.tr(),
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: ThemeConfig.spacingL),
+          const SizedBox(height: ThemeConfig.spacingL),
 
-        // Owner card (non-removable)
-        Builder(
-          builder: (context) {
-            final profile = ref.watch(authUserProfileProvider).value;
-            final profileName = profile?.name?.trim();
-            final displayName = (profileName != null && profileName.isNotEmpty)
-                ? profileName
-                : 'wizard_you'.tr();
-            return Container(
-              decoration: BoxDecoration(
-                color: AccentSurfaces.emphasizedFill(
-                  colorScheme,
-                  subtle: context.subtleAccents,
-                ),
-                borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
-                border: Border.all(
-                  color: AccentSurfaces.emphasizedBorder(
+          // Owner card (non-removable)
+          Builder(
+            builder: (context) {
+              final profile = ref.watch(authUserProfileProvider).value;
+              final profileName = profile?.name?.trim();
+              final displayName = (profileName != null && profileName.isNotEmpty)
+                  ? profileName
+                  : 'wizard_you'.tr();
+              return Container(
+                decoration: BoxDecoration(
+                  color: AccentSurfaces.emphasizedFill(
                     colorScheme,
                     subtle: context.subtleAccents,
                   ),
-                ),
-              ),
-              child: ListTile(
-                leading: ParticipantAvatar(
-                  name: displayName,
-                  avatarId: profile?.avatarId,
-                  backgroundColor: colorScheme.primary.withValues(alpha: 0.16),
-                  foregroundColor: colorScheme.primary,
-                ),
-                title: Text(
-                  'wizard_you'.tr(),
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
+                  borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
+                  border: Border.all(
+                    color: AccentSurfaces.emphasizedBorder(
+                      colorScheme,
+                      subtle: context.subtleAccents,
+                    ),
                   ),
                 ),
-                subtitle: Text('wizard_owner'.tr()),
+                child: ListTile(
+                  leading: ParticipantAvatar(
+                    name: displayName,
+                    avatarId: profile?.avatarId,
+                    backgroundColor: colorScheme.primary.withValues(alpha: 0.16),
+                    foregroundColor: colorScheme.primary,
+                  ),
+                  title: Text(
+                    'wizard_you'.tr(),
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: Text('wizard_owner'.tr()),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: ThemeConfig.spacingS),
+
+          // Added participants
+          ...List.generate(_participants.length, (i) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: ThemeConfig.spacingS),
+              child: Container(
+                decoration: AccentSurfaces.flatPanel(
+                  colorScheme,
+                  radius: ThemeConfig.radiusL,
+                ),
+                child: ListTile(
+                  leading: ParticipantAvatar(
+                    name: _participants[i],
+                    backgroundColor: colorScheme.surfaceContainerHighest,
+                    foregroundColor: colorScheme.onSurface,
+                  ),
+                  title: UserText(_participants[i]),
+                  trailing: IconButton(
+                    icon: Icon(Icons.close, color: colorScheme.error),
+                    onPressed: () => _removeParticipant(i),
+                    tooltip: 'remove'.tr(),
+                  ),
+                ),
               ),
             );
-          },
-        ),
-        const SizedBox(height: ThemeConfig.spacingS),
+          }),
 
-        // Added participants
-        ...List.generate(_participants.length, (i) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Container(
-              decoration: AccentSurfaces.flatPanel(
-                colorScheme,
-                radius: ThemeConfig.radiusL,
-              ),
-              child: ListTile(
-                leading: ParticipantAvatar(
-                  name: _participants[i],
-                  backgroundColor: colorScheme.surfaceContainerHighest,
-                  foregroundColor: colorScheme.onSurface,
-                ),
-                title: UserText(_participants[i]),
-                trailing: IconButton(
-                  icon: Icon(Icons.close, color: colorScheme.error),
-                  onPressed: () => _removeParticipant(i),
-                  tooltip: 'remove'.tr(),
-                ),
-              ),
-            ),
-          );
-        }),
+          const SizedBox(height: ThemeConfig.spacingM),
 
-        const SizedBox(height: ThemeConfig.spacingM),
-
-        // Add participant input
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _participantController,
-                focusNode: _participantFocusNode,
-                decoration: InputDecoration(
-                  hintText: 'wizard_participant_hint'.tr(),
-                  border: const OutlineInputBorder(),
-                  prefixIcon: const Icon(Icons.person_add_outlined),
-                  counterText: '',
+          _formPanel(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _participantController,
+                        focusNode: _participantFocusNode,
+                        decoration: InputDecoration(
+                          hintText: 'wizard_participant_hint'.tr(),
+                          border: const OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.person_add_outlined),
+                          counterText: '',
+                        ),
+                        maxLength: FormValidators.participantNameMax,
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) => _addParticipant(),
+                      ),
+                    ),
+                    const SizedBox(width: ThemeConfig.spacingS),
+                    FilledButton.tonal(
+                      focusNode: _addParticipantButtonFocusNode,
+                      onPressed: _addParticipant,
+                      child: Text('wizard_add'.tr()),
+                    ),
+                  ],
                 ),
-                maxLength: FormValidators.participantNameMax,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => _addParticipant(),
-              ),
+                const SizedBox(height: ThemeConfig.spacingS),
+                Text(
+                  'wizard_participants_hint'.tr(),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: ThemeConfig.spacingS),
-            FilledButton.tonal(
-              onPressed: _addParticipant,
-              child: Text('wizard_add'.tr()),
-            ),
-          ],
-        ),
-        const SizedBox(height: ThemeConfig.spacingS),
-        Text(
-          'wizard_participants_hint'.tr(),
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: colorScheme.onSurfaceVariant,
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -730,114 +894,101 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
   Widget _buildStep3IconColor(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final subtitleKey = widget.isPersonal
+        ? 'wizard_step3_subtitle_personal'
+        : 'wizard_step3_subtitle';
+    final tileAnim = UiPerf.preferInstantShellTabs
+        ? Duration.zero
+        : ThemeConfig.animationShort;
 
-    return ListView(
-      padding: const EdgeInsets.all(ThemeConfig.spacingM),
-      children: [
-        const SizedBox(height: ThemeConfig.spacingM),
-        Text(
-          'wizard_step3_title'.tr(),
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
+    return WizardStepEnter(
+      child: ListView(
+        padding: const EdgeInsets.all(ThemeConfig.spacingM),
+        children: [
+          const SizedBox(height: ThemeConfig.spacingM),
+          _stepTitleBlock(
+            titleKey: 'wizard_step3_title',
+            subtitleKey: subtitleKey,
           ),
-        ),
-        const SizedBox(height: ThemeConfig.spacingS),
-        Text(
-          'wizard_step3_subtitle'.tr(),
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: ThemeConfig.spacingL),
+          const SizedBox(height: ThemeConfig.spacingL),
 
-        // Icon grid
-        Text(
-          'wizard_icon_label'.tr(),
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: ThemeConfig.spacingM),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 4,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 1,
-          ),
-          itemCount: groupIcons.length,
-          itemBuilder: (context, index) {
-            final opt = groupIcons[index];
-            final isSelected = _selectedIcon == opt.key;
-            return Material(
-              color: isSelected
-                  ? _selectedColor.withValues(alpha: 0.15)
-                  : colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
-              child: InkWell(
+          GroupSectionHeader(label: 'wizard_icon_label'.tr()),
+          const SizedBox(height: ThemeConfig.spacingM),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 4,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 1,
+            ),
+            itemCount: groupIcons.length,
+            itemBuilder: (context, index) {
+              final opt = groupIcons[index];
+              final isSelected = _selectedIcon == opt.key;
+              return Material(
+                color: isSelected
+                    ? _selectedColor.withValues(alpha: 0.15)
+                    : colorScheme.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
-                onTap: () => setState(() => _selectedIcon = opt.key),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
-                    border: Border.all(
-                      color: isSelected
-                          ? _selectedColor
-                          : colorScheme.outline.withValues(alpha: 0.2),
-                      width: isSelected ? 2 : 1,
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        opt.icon,
-                        size: 28,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
+                  onTap: () => setState(() => _selectedIcon = opt.key),
+                  child: AnimatedContainer(
+                    duration: tileAnim,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
+                      border: Border.all(
                         color: isSelected
                             ? _selectedColor
-                            : colorScheme.onSurfaceVariant,
+                            : colorScheme.outlineVariant.withValues(alpha: 0.45),
+                        width: isSelected ? 2 : 1,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        opt.labelKey.tr(),
-                        style: theme.textTheme.labelSmall?.copyWith(
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          opt.icon,
+                          size: 28,
                           color: isSelected
                               ? _selectedColor
                               : colorScheme.onSurfaceVariant,
-                          fontWeight: isSelected
-                              ? FontWeight.w600
-                              : FontWeight.normal,
                         ),
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                        const SizedBox(height: 4),
+                        Text(
+                          opt.labelKey.tr(),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: isSelected
+                                ? _selectedColor
+                                : colorScheme.onSurfaceVariant,
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            );
-          },
-        ),
-
-        const SizedBox(height: ThemeConfig.spacingXL),
-
-        // Color palette
-        Text(
-          'wizard_color_label'.tr(),
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w600,
+              );
+            },
           ),
-        ),
-        const SizedBox(height: ThemeConfig.spacingM),
-        GroupColorPicker(
-          selectedColor: _selectedColor,
-          onColorSelected: (color) => setState(() => _selectedColor = color),
-        ),
-      ],
+
+          const SizedBox(height: ThemeConfig.spacingXL),
+
+          GroupSectionHeader(label: 'wizard_color_label'.tr()),
+          const SizedBox(height: ThemeConfig.spacingM),
+          GroupColorPicker(
+            selectedColor: _selectedColor,
+            onColorSelected: (color) => setState(() => _selectedColor = color),
+          ),
+        ],
+      ),
     );
   }
 
@@ -851,75 +1002,63 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
     final iconDef = groupIcons.where((g) => g.key == _selectedIcon).firstOrNull;
     final totalParticipants = 1 + _participants.length; // owner + added
 
-    return ListView(
-      padding: const EdgeInsets.all(ThemeConfig.spacingM),
-      children: [
-        const SizedBox(height: ThemeConfig.spacingM),
-        Text(
-          'wizard_step4_title'.tr(),
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
+    return WizardStepEnter(
+      child: ListView(
+        padding: const EdgeInsets.all(ThemeConfig.spacingM),
+        children: [
+          const SizedBox(height: ThemeConfig.spacingM),
+          _stepTitleBlock(
+            titleKey: 'wizard_step4_title',
+            subtitleKey: 'wizard_step4_subtitle',
           ),
-        ),
-        const SizedBox(height: ThemeConfig.spacingS),
-        Text(
-          'wizard_step4_subtitle'.tr(),
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: ThemeConfig.spacingL),
+          const SizedBox(height: ThemeConfig.spacingL),
 
-        // Summary card
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(ThemeConfig.spacingL),
-          decoration: AccentSurfaces.panel(
-            colorScheme,
-            subtle: context.subtleAccents,
-            accentContainer: _selectedColor.withValues(alpha: 0.35),
-            accentBorder: _selectedColor,
-            radius: ThemeConfig.radiusXL,
-          ),
-          child: Column(
-            children: [
-              // Group avatar
-              Builder(
-                builder: (_) {
-                  final fgOnColor = ThemeConfig.foregroundOnBackground(
-                    _selectedColor,
-                  );
-                  return CircleAvatar(
-                    radius: 36,
-                    backgroundColor: _selectedColor,
-                    child: iconDef != null && iconDef.key != groupIconLetterKey
-                        ? Icon(iconDef.icon, size: 36, color: fgOnColor)
-                        : Text(
-                            _nameController.text.trim().isNotEmpty
-                                ? _nameController.text.trim()[0].toUpperCase()
-                                : '?',
-                            style: theme.textTheme.headlineMedium?.copyWith(
-                              color: fgOnColor,
-                              fontWeight: FontWeight.bold,
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(ThemeConfig.spacingL),
+            decoration: AccentSurfaces.panel(
+              colorScheme,
+              subtle: context.subtleAccents,
+              accentContainer: _selectedColor.withValues(alpha: 0.35),
+              accentBorder: _selectedColor,
+              radius: ThemeConfig.radiusXL,
+            ),
+            child: Column(
+              children: [
+                Builder(
+                  builder: (_) {
+                    final fgOnColor = ThemeConfig.foregroundOnBackground(
+                      _selectedColor,
+                    );
+                    return CircleAvatar(
+                      radius: 40,
+                      backgroundColor: _selectedColor,
+                      child: iconDef != null && iconDef.key != groupIconLetterKey
+                          ? Icon(iconDef.icon, size: 40, color: fgOnColor)
+                          : Text(
+                              _nameController.text.trim().isNotEmpty
+                                  ? _nameController.text.trim()[0].toUpperCase()
+                                  : '?',
+                              style: theme.textTheme.headlineMedium?.copyWith(
+                                color: fgOnColor,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
-                  );
-                },
-              ),
-              const SizedBox(height: ThemeConfig.spacingM),
-              // Group name
-              UserText(
-                _nameController.text.trim(),
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
+                    );
+                  },
                 ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: ThemeConfig.spacingL),
-              const Divider(),
-              const SizedBox(height: ThemeConfig.spacingS),
+                const SizedBox(height: ThemeConfig.spacingM),
+                UserText(
+                  _nameController.text.trim(),
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: ThemeConfig.spacingL),
+                const Divider(),
+                const SizedBox(height: ThemeConfig.spacingS),
 
-                // Currency row
                 _SummaryRow(
                   icon: Icons.attach_money,
                   label: 'currency'.tr(),
@@ -947,7 +1086,6 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                 ],
                 const SizedBox(height: ThemeConfig.spacingM),
 
-                // Participants row (when personal, only "1"; edit goes to step 0)
                 _SummaryRow(
                   icon: Icons.people_outline,
                   label: 'participants'.tr(),
@@ -971,7 +1109,6 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                 ],
                 const SizedBox(height: ThemeConfig.spacingM),
 
-                // Icon row (when personal, icon step is page 1)
                 if (_selectedIcon != null) ...[
                   _SummaryRow(
                     icon: iconDef?.icon ?? Icons.grid_view_rounded,
@@ -982,7 +1119,6 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                   const SizedBox(height: ThemeConfig.spacingM),
                 ],
 
-                // Color row (when personal, icon step is page 1)
                 Row(
                   children: [
                     Container(
@@ -1006,19 +1142,197 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                     ),
                   ],
                 ),
+                if (!widget.isPersonal) ...[
+                  const SizedBox(height: ThemeConfig.spacingM),
+                  _SummaryRow(
+                    icon: Icons.account_balance_outlined,
+                    label: 'settlement_method'.tr(),
+                    value: _settlementMethodLabel(_settlementMethod),
+                    onEdit: () => _goToPage(0),
+                  ),
+                ],
               ],
             ),
-        ),
-      ],
+          ),
+        ],
+      ),
     );
   }
 
-  void _goToPage(int page) {
-    _pageController.animateToPage(
-      page,
-      duration: _kPageAnimationDuration,
-      curve: _kPageAnimationCurve,
+  Widget _buildSettlementMethodPicker(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final label = _settlementMethodLabel(_settlementMethod);
+    final description = _settlementMethodDescription(_settlementMethod);
+    return Semantics(
+      button: true,
+      label: '${'settlement_method'.tr()}: $label',
+      child: _buildSelectableFlatRow(
+        context,
+        onTap: _showSettlementMethodPicker,
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 2),
+                  Text(
+                    description,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_drop_down,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
     );
+  }
+
+  Widget _buildPermissionsPanel(BuildContext context, {required bool dense}) {
+    return _formPanel(
+      child: Column(
+        children: [
+          _permissionSwitch(
+            titleKey: 'allow_add_expense',
+            value: _allowMemberAddExpense,
+            dense: dense,
+            onChanged: (v) => setState(() => _allowMemberAddExpense = v),
+          ),
+          _permissionSwitch(
+            titleKey: 'allow_change_settings',
+            value: _allowMemberChangeSettings,
+            dense: dense,
+            onChanged: (v) => setState(() => _allowMemberChangeSettings = v),
+          ),
+          _permissionSwitch(
+            titleKey: 'allow_expense_as_other',
+            value: _allowExpenseAsOtherParticipant,
+            dense: dense,
+            onChanged: (v) =>
+                setState(() => _allowExpenseAsOtherParticipant = v),
+          ),
+          _permissionSwitch(
+            titleKey: 'allow_settle_for_others',
+            value: _allowMemberSettleForOthers,
+            dense: dense,
+            onChanged: (v) => setState(() => _allowMemberSettleForOthers = v),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _permissionSwitch({
+    required String titleKey,
+    required bool value,
+    required bool dense,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      dense: dense,
+      visualDensity: dense ? VisualDensity.compact : VisualDensity.standard,
+      title: Text(titleKey.tr(), maxLines: 3, overflow: TextOverflow.ellipsis),
+      value: value,
+      onChanged: onChanged,
+    );
+  }
+
+  Future<void> _showSettlementMethodPicker() async {
+    // Dismiss keyboard before sheet (same as currency) — critical on mobile web.
+    FocusManager.instance.primaryFocus?.unfocus();
+    final theme = Theme.of(context);
+    final chosen = await showResponsiveSheet<SettlementMethod>(
+      context: context,
+      title: 'settlement_method'.tr(),
+      maxHeight: MediaQuery.of(context).size.height * 0.75,
+      isScrollControlled: true,
+      centerInFullViewport: true,
+      child: Builder(
+        builder: (ctx) => SafeArea(
+          child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom:
+                    MediaQuery.of(ctx).padding.bottom + ThemeConfig.spacingM,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (!LayoutBreakpoints.isTabletOrWider(context))
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      child: Text(
+                        'settlement_method'.tr(),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  SheetOptionList(
+                    children: [
+                      for (final method in SettlementMethod.values)
+                        SheetOptionTile(
+                          title: _settlementMethodLabel(method),
+                          subtitle: _settlementMethodDescription(method),
+                          selected: method == _settlementMethod,
+                          onTap: () => Navigator.pop(ctx, method),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: ThemeConfig.spacingM),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    if (chosen != null && chosen != _settlementMethod && mounted) {
+      setState(() => _settlementMethod = chosen);
+    }
+  }
+
+  String _settlementMethodLabel(SettlementMethod m) {
+    switch (m) {
+      case SettlementMethod.pairwise:
+        return 'settlement_method_pairwise'.tr();
+      case SettlementMethod.greedy:
+        return 'settlement_method_greedy'.tr();
+      case SettlementMethod.consolidated:
+        return 'settlement_method_consolidated'.tr();
+      case SettlementMethod.treasurer:
+        return 'settlement_method_treasurer'.tr();
+    }
+  }
+
+  String _settlementMethodDescription(SettlementMethod m) {
+    switch (m) {
+      case SettlementMethod.pairwise:
+        return 'settlement_method_pairwise_desc'.tr();
+      case SettlementMethod.greedy:
+        return 'settlement_method_greedy_desc'.tr();
+      case SettlementMethod.consolidated:
+        return 'settlement_method_consolidated_desc'.tr();
+      case SettlementMethod.treasurer:
+        return 'settlement_method_treasurer_desc'.tr();
+    }
+  }
+
+  void _goToPage(int page) {
+    _animateToPage(page);
   }
 }
 
@@ -1048,10 +1362,14 @@ class _SummaryRow extends StatelessWidget {
         const SizedBox(width: ThemeConfig.spacingS),
         Text(label, style: theme.textTheme.bodyMedium),
         const Spacer(),
-        Text(
-          value,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
+        Flexible(
+          child: Text(
+            value,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.end,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
         const SizedBox(width: 4),

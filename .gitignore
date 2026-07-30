@@ -22,7 +22,13 @@ migrate_working_dir/
 *.iws
 .idea/
 #.vscode/  # Uncomment to ignore; launch configs are often shared
-.cursor/
+# Local Cursor state — keep skills + hooks versioned for the team
+.cursor/*
+!.cursor/skills/
+!.cursor/skills/**
+!.cursor/hooks.json
+!.cursor/hooks/
+!.cursor/hooks/**
 
 # Pub dependency overrides (local dev paths)
 pubspec_overrides.yaml

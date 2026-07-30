@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/platform/ui_perf.dart';
 import '../../../core/theme/theme_config.dart';
 import '../utils/group_icon_utils.dart';
 
@@ -19,6 +20,10 @@ class GroupColorPicker extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final animDuration = UiPerf.preferInstantShellTabs
+        ? Duration.zero
+        : ThemeConfig.animationShort;
+    final cheapShadows = UiPerf.preferCheapShadows;
 
     return Wrap(
       spacing: 12,
@@ -28,7 +33,7 @@ class GroupColorPicker extends StatelessWidget {
         return GestureDetector(
           onTap: () => onColorSelected(color),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
+            duration: animDuration,
             width: 44,
             height: 44,
             decoration: BoxDecoration(
@@ -38,7 +43,7 @@ class GroupColorPicker extends StatelessWidget {
                 color: isSelected ? colorScheme.onSurface : Colors.transparent,
                 width: 3,
               ),
-              boxShadow: isSelected
+              boxShadow: isSelected && !cheapShadows
                   ? [
                       BoxShadow(
                         color: color.withValues(alpha: 0.4),
