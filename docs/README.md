@@ -51,7 +51,7 @@ Guides for running, shipping, and extending **Hisab**. Start with the root [READ
 | Doc | Topic |
 |-----|--------|
 | [WEB_DEBUGGING.md](WEB_DEBUGGING.md) | Meaningful Chrome console / DevTools for Flutter web |
-| [WEB_IOS_SAFARI_PERFORMANCE.md](WEB_IOS_SAFARI_PERFORMANCE.md) | iOS Safari performance, semantics, renderer checklist |
+| [WEB_IOS_SAFARI_PERFORMANCE.md](WEB_IOS_SAFARI_PERFORMANCE.md) | Per-platform web/native UI perf (`UiPerf`), iOS Safari checklist |
 | [ADAPTIVE_RESPONSIVE_PLAN.md](ADAPTIVE_RESPONSIVE_PLAN.md) | Breakpoints, SafeArea, large-screen direction |
 | [MODAL_CENTERING_AND_RESPONSIVE_SHEET.md](MODAL_CENTERING_AND_RESPONSIVE_SHEET.md) | Modal centering, dismiss-outside, sheet behavior |
 

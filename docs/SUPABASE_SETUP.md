@@ -20,6 +20,8 @@ This guide walks you through setting up the Supabase backend for Hisab from scra
    - [Migration 5: Device Tokens (Push Notifications)](#migration-5-device-tokens-push-notifications)
    - [Migration 6: Notification Triggers](#migration-6-notification-triggers)
    - [Migration 6b: device_tokens locale (language-aware notifications)](#migration-6b-device_tokens-locale-language-aware-notifications)
+   - [Migration 6c: Skip notifications for personal groups](#migration-6c-skip-notifications-for-personal-groups)
+   - [Migration 6d: notify_group_activity revamp](#migration-6d-notify_group_activity-revamp)
    - [Migration 7: Schema Additions (drift fix)](#migration-7-schema-additions-drift-fix)
    - [Migration 8: RPC updates (invites)](#migration-8-rpc-updates-invites)
    - [Migration 9: Security hardening (search_path, revoke/toggle RPCs)](#migration-9-security-hardening-search_path-revoketoggle-rpcs)
@@ -1065,6 +1067,20 @@ END;
 $$;
 ```
 
+### Migration 6d: notify_group_activity revamp
+
+Canonical SQL: [`supabase/migrations/20260730013835_notify_group_activity_revamp.sql`](../supabase/migrations/20260730013835_notify_group_activity_revamp.sql). Apply with the Supabase CLI (`supabase db push` / `supabase migration up`) or by running that file in the SQL Editor. **Redeploy `send-notification` in the same release** so payload (`group_name`) and copy stay in sync.
+
+Behavior vs Migrations 6–6c:
+
+- Trigger `notify_on_expense_change` is **`AFTER INSERT OR UPDATE OR DELETE`** on `expenses`.
+- Actions: `expense_created`, `expense_updated`, `expense_deleted`, `member_joined`.
+- **Skips** expense `UPDATE`s where only non-content fields changed (e.g. receipt image paths / `updated_at`) — avoids a second notification when creating an expense with photos.
+- Payload includes **`group_name`**; skips when the group is missing (CASCADE delete) or personal.
+- Edge Function title = group name; body = `{expense title} - {amount}` with localized Edit/Deleted prefixes.
+
+Replace `v_supabase_url` in the migration with your project URL if forking (the checked-in file uses the Hisab production project URL).
+
 ### Migration 7: Schema Additions (drift fix)
 
 Run this migration after Migrations 1–6 to add columns and the `invite_usages` table so the schema matches what the app expects. Safe for existing projects (uses `ALTER TABLE` / `CREATE TABLE`); new projects run 1–6 then 7 for a full schema.
@@ -2085,7 +2101,7 @@ supabase functions deploy telemetry --no-verify-jwt
 
 ### send-notification
 
-Persists in-app notification history and sends FCM push notifications to group members when expenses are created/updated or new members join. Called by the database trigger (Migration 6) via `pg_net`. The function queries `group_members` and `device_tokens` for the group (excluding the actor), inserts one `user_notifications` row per recipient (Migration 22), then — when FCM secrets are set — sends FCM HTTP v1 messages with `notification` (title/body) and `data.group_id` so the Flutter app can display and navigate to the group on tap. Dry-run (no FCM secrets) still persists history and returns `{ dry_run: true, persisted: N }`.
+Persists in-app notification history and sends FCM push notifications to group members when expenses are created/content-updated/deleted or new members join. Called by the database trigger (Migration 6d) via `pg_net`. Copy: title = group name; body = `{expense title} - {amount}` with localized Edit/Deleted prefixes. The function queries `group_members` and `device_tokens` for the group (excluding the actor), inserts one `user_notifications` row per recipient (Migration 22), then — when FCM secrets are set — sends FCM HTTP v1 messages with `notification` (title/body) and `data.group_id` so the Flutter app can display and navigate to the group on tap. Dry-run (no FCM secrets) still persists history and returns `{ dry_run: true, persisted: N }`.
 
 **Prerequisites:**
 1. Create a Firebase project and add apps for Android, iOS, and Web.
@@ -2119,26 +2135,27 @@ supabase functions deploy send-notification --no-verify-jwt
 
 The following describes the full pipeline so you can verify or debug each step.
 
-**Flow (expense add/edit):**
+**Flow (expense add/edit/delete):**
 
-1. **Flutter app** (online): User adds or edits an expense → [PowerSyncRepository](lib/core/repository/powersync_repository.dart) writes to Supabase `expenses` via `Supabase.instance.client` (authenticated). Offline writes are queued in `pending_writes` and pushed later by [DataSyncService](lib/core/database/database_providers.dart) using the same client, so the trigger runs with `auth.uid()` set.
-2. **Supabase Postgres**: `AFTER INSERT OR UPDATE ON expenses` fires trigger `notify_on_expense_change` → function `notify_group_activity()` runs. It reads `v_supabase_url` (must be your project URL, not `YOUR_SUPABASE_URL`) and the service role key from **Vault** (`service_role_key`). If either is missing, it logs and returns without calling the edge function.
-3. **pg_net**: `net.http_post` sends a POST to `{v_supabase_url}/functions/v1/send-notification` with JSON body `group_id`, `actor_user_id`, `action`, `expense_title`, `amount_cents`, `currency_code` (and optional `expense_id`) and header `Authorization: Bearer <service_role_key>`.
-4. **Edge function `send-notification`**: Validates the Bearer token against `SUPABASE_SERVICE_ROLE_KEY`, inserts `user_notifications` for all other group members, then (when FCM secrets are set) uses `FCM_PROJECT_ID` and `FCM_SERVICE_ACCOUNT_KEY` to obtain a Google OAuth2 access token and send FCM HTTP v1 messages to those members’ device tokens. Each push includes `notification: { title, body }` and `data: { group_id }` (string).
+1. **Flutter app** (online): User adds, edits, or deletes an expense → [PowerSyncRepository](lib/core/repository/powersync_repository.dart) writes to Supabase `expenses` via `Supabase.instance.client` (authenticated). Offline writes are queued in `pending_writes` and pushed later by [DataSyncService](lib/core/database/database_providers.dart) using the same client, so the trigger runs with `auth.uid()` set.
+2. **Supabase Postgres**: `AFTER INSERT OR UPDATE OR DELETE ON expenses` fires trigger `notify_on_expense_change` → function `notify_group_activity()` runs (Migration 6d). It skips image-only / metadata-only updates, loads `group_name`, and skips personal or missing groups. It reads `v_supabase_url` (must be your project URL) and the service role key from **Vault** (`service_role_key`). If either is missing, it logs and returns without calling the edge function.
+3. **pg_net**: `net.http_post` sends a POST to `{v_supabase_url}/functions/v1/send-notification` with JSON body `group_id`, `actor_user_id`, `action`, `group_name`, `expense_title`, `amount_cents`, `currency_code` (and optional `expense_id`) and header `Authorization: Bearer <service_role_key>`.
+4. **Edge function `send-notification`**: Validates the Bearer token against `SUPABASE_SERVICE_ROLE_KEY`, inserts `user_notifications` for all other group members, then (when FCM secrets are set) uses `FCM_PROJECT_ID` and `FCM_SERVICE_ACCOUNT_KEY` to obtain a Google OAuth2 access token and send FCM HTTP v1 messages to those members’ device tokens. Each push includes `notification: { title, body }` (title = group name; body = expense line with Edit/Deleted prefixes) and `data: { group_id }` (string).
 5. **Flutter app** (on other devices): Receives the push via Firebase; [NotificationService](lib/core/services/notification_service.dart) displays it and, on tap, navigates to the group using `message.data['group_id']`. SyncEngine also pulls `user_notifications` into the Profile activity feed.
 
 **Verification checklist:**
 
 | Step | Where to check | What to verify |
 |------|----------------|----------------|
-| 1. Edge function deployed | Dashboard → Edge Functions | `send-notification` is listed and ACTIVE. |
+| 1. Edge function deployed | Dashboard → Edge Functions | `send-notification` is listed and ACTIVE (redeployed with Migration 6d). |
 | 2. Edge function secrets | Dashboard → Project Settings → Edge Functions → Secrets | `FCM_PROJECT_ID` and `FCM_SERVICE_ACCOUNT_KEY` are set. Use the same Firebase project as your Flutter app (e.g. `google-services.json` / web config). |
 | 3. Vault secret | SQL Editor: `SELECT name FROM vault.decrypted_secrets WHERE name = 'service_role_key';` | One row returned. If not, run `SELECT vault.create_secret('<your-service-role-key>', 'service_role_key');` (key from Settings → API). |
-| 4. Trigger URL | Database → Functions → `notify_group_activity` → view source | `v_supabase_url` is your project URL (e.g. `https://xxxxxxxxxxxxx.supabase.co`), not `YOUR_SUPABASE_URL`. If wrong, re-run the Migration 6 function with the correct URL. |
+| 4. Trigger URL | Database → Functions → `notify_group_activity` → view source | `v_supabase_url` is your project URL (e.g. `https://xxxxxxxxxxxxx.supabase.co`), not `YOUR_SUPABASE_URL`. If wrong, re-apply Migration 6d with the correct URL. |
 | 5. pg_net enabled | Database → Extensions | `pg_net` (schema `extensions`) is installed. |
-| 6. Triggers exist | Database → Tables → `expenses` → Triggers | `notify_on_expense_change` (AFTER INSERT OR UPDATE). Similarly `group_members` has `notify_on_member_join`. |
+| 6. Triggers exist | Database → Tables → `expenses` → Triggers | `notify_on_expense_change` (AFTER INSERT OR UPDATE OR DELETE). Similarly `group_members` has `notify_on_member_join`. |
 | 7. Device tokens | Table Editor → `device_tokens` | Rows exist for users who should receive notifications. The app registers tokens when the user is signed in, has notifications enabled in settings, and has granted permission. On web, `FCM_VAPID_KEY` must be set at build time. |
 | 8. Flutter | App Settings | Notifications toggle is on; app has requested and been granted notification permission. |
+| 9. Behaviour smoke | Create / edit / delete expense; attach receipt after create | One notify on create (title = group name); edit body prefixed “Edit”; delete body prefixed “Deleted”; adding receipt photos after create → **no** second notification; delete group → no orphan HTTP call. |
 
 **Testing delivery:** You can send a test FCM message to a registration token (e.g. from `device_tokens`) using the Firebase Console (Cloud Messaging) or an API client. If the device receives that test but not expense-triggered notifications, the issue is upstream (trigger, Vault, or edge function secrets/logs).
 

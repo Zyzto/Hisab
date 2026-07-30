@@ -66,7 +66,7 @@ The app works fully offline with no configuration. Authentication, sync, invites
 
 **VSCode / development:** Copy `dart_defines_online.example.json` to `dart_defines_online.json` (gitignored). Put your real values only in `dart_defines_online.json`; the example file contains placeholders only. Fill in `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and optionally `FCM_VAPID_KEY` and all `FIREBASE_*` keys. For local dev, `INVITE_BASE_URL` and `SITE_URL` are set to `http://localhost:8080` so magic links and invite links open your dev app; the launch configs use `--web-port=8080` so the app always runs on that port. Add **http://localhost:8080** to **Supabase Dashboard → Authentication → URL Configuration → Redirect URLs**. Use the **Hisab (Online)** or **Hisab (Chrome Web)** launch configuration. The Dart app reads Firebase config from these dart-defines; for **web** runs, `web/index.html` and `web/firebase-messaging-sw.js` contain placeholders—replace them (e.g. with a local script that injects from `dart_defines_online.json`) before running web if you need FCM in debug, or rely on CI for production builds.
 
-**Push notifications (FCM):** The app receives push notifications when other group members add/edit expenses or join a group. Backend setup (Supabase trigger, Vault, Edge Function `send-notification`, FCM secrets) is in [SUPABASE_SETUP.md](SUPABASE_SETUP.md) (Section 5 and “Push notifications: end-to-end flow and verification”). In the app, notifications are enabled in Settings (online mode only); on web, `FCM_VAPID_KEY` must be set at build time for token registration. On iPhone/iPad (WebKit), push requires the installed Home Screen PWA — see [CODEBASE.md](CODEBASE.md) (Web and PWA).
+**Push notifications (FCM):** The app receives push notifications when other group members add/edit/delete expenses or join a group. Push title is the **group name**; body is `{expense title} - {amount}` with localized Edit/Deleted prefixes. Backend setup (Supabase trigger, Vault, Edge Function `send-notification`, FCM secrets) is in [SUPABASE_SETUP.md](SUPABASE_SETUP.md) (Section 5 and “Push notifications: end-to-end flow and verification”). Apply migration `20260730013835_notify_group_activity_revamp.sql` and redeploy `send-notification` together. In the app, notifications are enabled in Settings (online mode only); on web, `FCM_VAPID_KEY` must be set at build time for token registration. On iPhone/iPad (WebKit), push requires the installed Home Screen PWA — see [CODEBASE.md](CODEBASE.md) (Web and PWA).
 
 Find these values in:
 - **Supabase**: Dashboard → Settings → API
@@ -152,7 +152,7 @@ Add to `.vscode/launch.json`:
 
 ### Flutter default service worker deprecation
 
-Flutter web is deprecating/removing the default `flutter_service_worker.js` behavior. This project uses a custom [`web/flutter_bootstrap.js`](../web/flutter_bootstrap.js) that calls `_flutter.loader.load()` without default service-worker settings, so web updates rely on normal browser/CDN caching behavior.
+Flutter web is deprecating/removing the default `flutter_service_worker.js` behavior. This project uses a custom [`web/flutter_bootstrap.js`](../web/flutter_bootstrap.js) that calls `_flutter.loader.load()` without default service-worker settings, so web updates rely on normal browser/CDN caching behavior. Firebase compat SDKs load asynchronously in [`web/index.html`](../web/index.html); bootstrap waits on `window.__hisabFirebaseReady` before starting Flutter.
 
 For context, see Flutter issue [#156910](https://github.com/flutter/flutter/issues/156910).
 
@@ -165,6 +165,8 @@ flutter build web --dart-define=ENABLE_WEB_SEMANTICS=true
 ```
 
 Use this only for accessibility-targeted builds because it can reduce scroll smoothness on iOS Safari.
+
+Visual/interaction cheap-paths are **per surface** (iOS web vs Android web vs native), not blanket “all web”. See [`UiPerf`](../lib/core/platform/ui_perf.dart) and [WEB_IOS_SAFARI_PERFORMANCE.md](WEB_IOS_SAFARI_PERFORMANCE.md).
 
 ### OPFS for Better Performance
 

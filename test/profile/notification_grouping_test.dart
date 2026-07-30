@@ -38,6 +38,18 @@ void main() {
     expect(items[1].single!.id, '3');
   });
 
+  test('groups expense_deleted with other expense actions', () {
+    final items = groupNotifications([
+      _n(id: '1', action: 'expense_deleted', createdAt: t0),
+      _n(id: '2', action: 'expense_created', createdAt: t1),
+    ]);
+
+    expect(items.length, 1);
+    expect(items[0].isGroup, isTrue);
+    expect(items[0].actionFamily, 'expense');
+    expect(items[0].items.map((e) => e.id), ['1', '2']);
+  });
+
   test('does not group across groups', () {
     final items = groupNotifications([
       _n(id: '1', action: 'expense_created', createdAt: t0, groupId: 'a'),

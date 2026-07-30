@@ -157,7 +157,8 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.push_pin), findsOneWidget);
+    // Leading pin badge + trailing toggle both use the filled rounded pin.
+    expect(find.byIcon(Icons.push_pin_rounded), findsNWidgets(2));
   });
 
   testWidgets('GroupCard shows name and currency', (tester) async {

@@ -6,50 +6,91 @@ import * as jose from "npm:jose@5.2.0";
 interface TriggerPayload {
   group_id: string;
   actor_user_id: string;
-  action: "expense_created" | "expense_updated" | "member_joined";
+  action: "expense_created" | "expense_updated" | "expense_deleted" | "member_joined";
   expense_title?: string | null;
   amount_cents?: number | null;
   currency_code?: string | null;
   expense_id?: string | null;
+  group_name?: string | null;
 }
 
 /** Localized strings for push notifications (must match app translations). */
 const NOTIFICATION_STRINGS: Record<string, Record<string, string>> = {
   en: {
-    new_expense: "New expense",
-    expense_updated: "Expense updated",
     group_activity: "Group activity",
     member_joined: "A new member joined the group.",
     expense: "Expense",
+    edit: "Edit",
+    deleted: "Deleted",
   },
   ar: {
-    new_expense: "مصروف جديد",
-    expense_updated: "تم تحديث المصروف",
     group_activity: "نشاط المجموعة",
     member_joined: "انضم عضو جديد إلى المجموعة.",
     expense: "مصروف",
+    edit: "تعديل",
+    deleted: "محذوف",
   },
 };
+
+/** Unicode FSI/PDI — keep UGC direction stable next to amounts / prefixes. */
+function isolateBidi(text: string): string {
+  return `\u2068${text}\u2069`;
+}
+
+/** Grapheme-safe elide for push bodies (emoji / Arabic / CJK). */
+function elideGraphemes(text: string, maxGraphemes: number): string {
+  const trimmed = text.trim();
+  if (!trimmed || maxGraphemes <= 0) return trimmed;
+  try {
+    const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+    const graphemes = [...segmenter.segment(trimmed)].map((s) => s.segment);
+    if (graphemes.length <= maxGraphemes) return trimmed;
+    return `${graphemes.slice(0, maxGraphemes).join("")}…`;
+  } catch {
+    // Deno / older runtimes without Segmenter: Array.from still splits most
+    // surrogate pairs better than string indexing.
+    const units = Array.from(trimmed);
+    if (units.length <= maxGraphemes) return trimmed;
+    return `${units.slice(0, maxGraphemes).join("")}…`;
+  }
+}
+
+const MAX_EXPENSE_TITLE_GRAPHEMES = 80;
+const MAX_GROUP_NAME_GRAPHEMES = 60;
+
+/** Format expense body: optional prefix + title + optional cost. */
+function formatExpenseBody(
+  strings: Record<string, string>,
+  p: TriggerPayload,
+  prefix?: string,
+): string {
+  const rawTitle = (p.expense_title && p.expense_title.trim()) || strings.expense;
+  const expenseTitle = isolateBidi(elideGraphemes(rawTitle, MAX_EXPENSE_TITLE_GRAPHEMES));
+  const amount =
+    p.amount_cents != null && p.currency_code
+      ? `${(p.amount_cents / 100).toFixed(2)} ${p.currency_code}`
+      : "";
+  // LRM around ASCII separator so it stays between title and amount visually.
+  const core = amount ? `${expenseTitle}\u200E - \u200E${amount}` : expenseTitle;
+  return prefix ? `${prefix} ${core}` : core;
+}
 
 /** Build notification title and body from trigger payload, localized by locale (en/ar; null => en). */
 function buildNotificationText(p: TriggerPayload, locale: string | null): { title: string; body: string } {
   const strings = NOTIFICATION_STRINGS[locale ?? "en"] ?? NOTIFICATION_STRINGS.en;
+  const rawGroup = (p.group_name && p.group_name.trim()) || strings.group_activity;
+  const title = isolateBidi(elideGraphemes(rawGroup, MAX_GROUP_NAME_GRAPHEMES));
   switch (p.action) {
     case "expense_created":
-    case "expense_updated": {
-      const actionLabel = p.action === "expense_created" ? strings.new_expense : strings.expense_updated;
-      const title = p.expense_title ?? strings.expense;
-      const amount =
-        p.amount_cents != null && p.currency_code
-          ? `${(p.amount_cents / 100).toFixed(2)} ${p.currency_code}`
-          : "";
-      const body = amount ? `${actionLabel}: ${title} (${amount})` : `${actionLabel}: ${title}`;
-      return { title, body };
-    }
+      return { title, body: formatExpenseBody(strings, p) };
+    case "expense_updated":
+      return { title, body: formatExpenseBody(strings, p, strings.edit) };
+    case "expense_deleted":
+      return { title, body: formatExpenseBody(strings, p, strings.deleted) };
     case "member_joined":
-      return { title: strings.group_activity, body: strings.member_joined };
+      return { title, body: strings.member_joined };
     default:
-      return { title: strings.group_activity, body: strings.member_joined };
+      return { title, body: strings.member_joined };
   }
 }
 
@@ -185,7 +226,7 @@ async function handleNotificationRequest(req: Request): Promise<Response> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-  // For expense_created and expense_updated, the actor is the creator/editor; they must not
+  // For expense create/update/delete, the actor is the creator/editor/deleter; they must not
   // receive a notification. Only other group members are notified (same as for member_joined).
   const { data: members } = await supabase
     .from("group_members")

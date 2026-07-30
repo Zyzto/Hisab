@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/layout/constrained_content.dart';
+import '../../../core/utils/user_text.dart';
+import '../../../core/widgets/user_text.dart';
 import '../domain/draft_transaction.dart';
 import '../providers/scanner_providers.dart';
 
@@ -270,7 +272,7 @@ class _DraftTransactionDetailPageState
             ),
           ),
           Expanded(
-            child: Text(value, style: theme.textTheme.bodyMedium),
+            child: UserText(value, style: theme.textTheme.bodyMedium),
           ),
         ],
       ),
@@ -282,6 +284,7 @@ class _DraftTransactionDetailPageState
     final theme = Theme.of(context);
     final raw = draft.rawNotificationText;
     final spans = <TextSpan>[];
+    final rawDirection = resolveUserTextDirection(raw);
 
     final highlights = <String>{};
     if (draft.merchantName != null) highlights.add(draft.merchantName!);
@@ -295,6 +298,7 @@ class _DraftTransactionDetailPageState
         style: theme.textTheme.bodySmall?.copyWith(
           fontFamily: 'monospace',
         ),
+        textDirection: rawDirection,
       );
     }
 
@@ -327,6 +331,7 @@ class _DraftTransactionDetailPageState
         style: theme.textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
         children: spans,
       ),
+      textDirection: rawDirection,
     );
   }
 

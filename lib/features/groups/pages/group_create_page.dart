@@ -17,6 +17,7 @@ import '../../../core/utils/form_validators.dart';
 import '../../../core/utils/run_guarded_async.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/widgets/participant_avatar.dart';
+import '../../../core/widgets/user_text.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 import '../utils/group_icon_utils.dart';
 import '../widgets/group_color_picker.dart';
@@ -673,7 +674,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                   backgroundColor: colorScheme.surfaceContainerHighest,
                   foregroundColor: colorScheme.onSurface,
                 ),
-                title: Text(_participants[i]),
+                title: UserText(_participants[i]),
                 trailing: IconButton(
                   icon: Icon(Icons.close, color: colorScheme.error),
                   onPressed: () => _removeParticipant(i),
@@ -907,7 +908,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
               ),
               const SizedBox(height: ThemeConfig.spacingM),
               // Group name
-              Text(
+              UserText(
                 _nameController.text.trim(),
                 style: theme.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
@@ -961,7 +962,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                     children: _participants
                         .map(
                           (p) => Chip(
-                            label: Text(p),
+                            label: UserText(p),
                             visualDensity: VisualDensity.compact,
                           ),
                         )

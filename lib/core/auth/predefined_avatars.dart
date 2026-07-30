@@ -1,4 +1,7 @@
+import 'dart:ui' as ui;
+
 import 'package:collection/collection.dart';
+import 'package:flutter/painting.dart';
 
 /// Special avatar id that means "show my initials instead of an emoji".
 const String initialsAvatarId = 'initials';
@@ -69,4 +72,38 @@ String? avatarEmoji(String? avatarId) {
       .map((e) => e.value)
       .firstOrNull;
   return found;
+}
+
+Future<void>? _preloadAvatarEmojisFuture;
+
+/// Warms emoji glyph caches for [predefinedAvatars] so the avatar picker does
+/// not flash empty/tofu boxes on first open (especially on web).
+///
+/// Safe to call multiple times; only the first call does work.
+Future<void> preloadPredefinedAvatarEmojis() {
+  return _preloadAvatarEmojisFuture ??= _preloadPredefinedAvatarEmojis();
+}
+
+Future<void> _preloadPredefinedAvatarEmojis() async {
+  const style = TextStyle(fontSize: 22);
+  final recorder = ui.PictureRecorder();
+  final canvas = Canvas(recorder);
+  var x = 0.0;
+  for (final entry in predefinedAvatars) {
+    if (entry.key == initialsAvatarId) continue;
+    final painter = TextPainter(
+      text: TextSpan(text: entry.value, style: style),
+      textDirection: TextDirection.ltr,
+      textScaler: TextScaler.noScaling,
+    )..layout();
+    painter.paint(canvas, Offset(x, 0));
+    x += painter.width + 2;
+  }
+  final picture = recorder.endRecording();
+  try {
+    final image = await picture.toImage(x.ceil().clamp(1, 4096), 32);
+    image.dispose();
+  } finally {
+    picture.dispose();
+  }
 }

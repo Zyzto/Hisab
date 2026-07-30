@@ -29,6 +29,7 @@ String _actionFamily(String action) {
   switch (action) {
     case 'expense_created':
     case 'expense_updated':
+    case 'expense_deleted':
       return 'expense';
     case 'member_joined':
       return 'member';

@@ -11,6 +11,7 @@ import '../../features/home/pages/home_page.dart';
 import '../../features/settings/pages/settings_page.dart';
 import '../layout/layout_breakpoints.dart';
 import '../motion/app_motion.dart';
+import '../platform/ui_perf.dart';
 import '../widgets/app_sidenav.dart';
 import '../widgets/connection_banner.dart';
 import '../widgets/floating_nav_bar.dart';
@@ -39,7 +40,8 @@ class MainScaffold extends ConsumerStatefulWidget {
 class _MainScaffoldState extends ConsumerState<MainScaffold> {
   int _currentIndex = 0;
   final _homePage = const HomePage();
-  final _settingsPage = const SettingsPage();
+  /// Lazily created on first visit so Home does not pay Settings build cost.
+  Widget? _settingsPage;
   DateTime? _lastBackPressAt;
   static const _doubleBackExitWindow = Duration(seconds: 2);
   final GlobalKey<ScaffoldState> _shellScaffoldKey = GlobalKey<ScaffoldState>();
@@ -52,6 +54,12 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
   /// profile/archived onto settings so home does not flash through).
   bool _snapTabIndex = false;
 
+  void _ensureSettingsMounted() {
+    _settingsPage ??= const SettingsPage(
+      key: PageStorageKey<String>('shell_settings'),
+    );
+  }
+
   bool _isHomePath(String path) {
     return path == RoutePaths.home ||
         path.startsWith('${RoutePaths.homeModeBase}/');
@@ -61,6 +69,9 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
   void initState() {
     super.initState();
     _currentIndex = widget.selectedIndex;
+    if (_currentIndex == 1 || widget.location == RoutePaths.settings) {
+      _ensureSettingsMounted();
+    }
     _restoreDesktopNavCollapsed();
   }
 
@@ -159,6 +170,12 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     }
     if (oldWidget.selectedIndex != widget.selectedIndex) {
       _currentIndex = widget.selectedIndex;
+      if (_currentIndex == 1) {
+        _ensureSettingsMounted();
+      }
+    }
+    if (widget.location == RoutePaths.settings) {
+      _ensureSettingsMounted();
     }
   }
 
@@ -220,6 +237,9 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
         context.go(RoutePaths.home);
         break;
       case 1:
+        if (_settingsPage == null) {
+          setState(_ensureSettingsMounted);
+        }
         context.go(RoutePaths.settings);
         break;
     }
@@ -419,14 +439,19 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
       });
     }
 
-    // Always keep home/settings mounted so State survives profile/archived.
+    // Home stays mounted; Settings mounts on first visit then stays alive so
+    // State survives profile/archived round-trips.
     // Tickers stay enabled under Offstage so an in-flight tab crossfade can
     // finish (disabling TickerMode when leaving main stranded _animating).
+    // iOS web: skip Opacity crossfade — painting both tabs janks on XR-class GPUs.
     final tabStack = _ShellTabCrossfade(
       index: _currentIndex,
       visible: isMainPage,
-      snap: snap,
-      children: [_homePage, _settingsPage],
+      snap: snap || UiPerf.preferInstantShellTabs,
+      children: [
+        _homePage,
+        _settingsPage ?? const SizedBox.shrink(),
+      ],
     );
 
     return Stack(

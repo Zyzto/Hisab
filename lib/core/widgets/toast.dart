@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:toastification/toastification.dart';
 
 import '../utils/error_report_helper.dart';
+import '../utils/user_text.dart';
+import 'user_text.dart';
 
-/// Max characters to show in error toast title.
-const int _errorToastMessageMaxLen = 120;
+/// Max graphemes to show in error toast title.
+const int _errorToastMessageMaxGraphemes = 120;
 
 /// Unified toast API over [toastification]. Use these extensions instead of
 /// [ScaffoldMessenger.showSnackBar] for consistent styling and behavior.
@@ -19,7 +21,7 @@ extension ToastContext on BuildContext {
     if (!mounted) return;
     toastification.show(
       context: this,
-      title: Text(message),
+      title: UserText(message),
       type: type ?? ToastificationType.info,
       style: ToastificationStyle.flat,
       autoCloseDuration: duration ?? const Duration(seconds: 4),
@@ -48,9 +50,11 @@ extension ToastContext on BuildContext {
   }) {
     if (!mounted) return;
     final uiLocaleTag = readUiLocaleTagForReport(this);
-    final displayMessage = message.length > _errorToastMessageMaxLen
-        ? '${message.substring(0, _errorToastMessageMaxLen)}…'
-        : message;
+    final displayMessage = elideGraphemes(
+      message,
+      maxGraphemes: _errorToastMessageMaxGraphemes,
+      trimInput: false,
+    );
     final surfaceContext = this;
     toastification.showCustom(
       context: this,
@@ -78,7 +82,7 @@ extension ToastContext on BuildContext {
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Text(
+                      child: UserText(
                         displayMessage,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: colorScheme.onErrorContainer,

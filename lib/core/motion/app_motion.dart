@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../layout/layout_breakpoints.dart';
+import '../platform/ui_perf.dart';
 
 /// Shared navigation / modal motion tokens and builders.
 ///
@@ -127,6 +128,13 @@ class AppFadeSlidePageTransitionsBuilder extends PageTransitionsBuilder {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
+    // iOS web only: slide + opacity compositing is costly on WebKit / older GPUs.
+    if (UiPerf.preferFadeOnlyPageTransitions) {
+      return AppMotion.buildFadeTransition(
+        animation: animation,
+        child: child,
+      );
+    }
     return AppMotion.buildFadeSlideTransition(
       animation: animation,
       child: child,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/accent_style.dart';
+import 'user_text.dart';
 
 /// Bordered ink row for sheet action/picker lists (flat-panel language).
 class SheetOptionTile extends StatelessWidget {
@@ -73,20 +74,24 @@ class SheetOptionTile extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
+                      UserText(
                         title,
                         style: theme.textTheme.bodyLarge?.copyWith(
                           color: titleColor,
                           fontWeight: FontWeight.w600,
                         ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       if (subtitle != null && subtitle!.isNotEmpty) ...[
                         const SizedBox(height: 2),
-                        Text(
+                        UserText(
                           subtitle!,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: subtitleColor,
                           ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ],

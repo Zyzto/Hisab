@@ -18,6 +18,7 @@ import '../../../core/utils/error_report_helper.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/toast.dart';
+import '../../../core/widgets/user_text.dart';
 import '../../../domain/domain.dart';
 import '../providers/group_invite_provider.dart';
 import '../providers/group_member_provider.dart';
@@ -452,14 +453,25 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
                           Row(
                             children: [
                               Flexible(
-                                child: Text(
-                                  displayLabel,
-                                  style: theme.textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                                child: invite.label?.isNotEmpty == true
+                                    ? UserText(
+                                        invite.label!,
+                                        style: theme.textTheme.titleSmall
+                                            ?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      )
+                                    : Text(
+                                        displayLabel,
+                                        style: theme.textTheme.titleSmall
+                                            ?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                               ),
                             const SizedBox(width: 8),
                             _statusChip(context),
@@ -680,8 +692,9 @@ class _UsageHistoryList extends ConsumerWidget {
             final dateStr = DateFormat.yMMMd().add_jm().format(
               usage.acceptedAt,
             );
+            final realName = userIdToName[usage.userId];
             final displayLabel =
-                userIdToName[usage.userId] ??
+                realName ??
                 (usage.userId.length > 8
                     ? '${usage.userId.substring(0, 8)}...'
                     : usage.userId);
@@ -696,7 +709,15 @@ class _UsageHistoryList extends ConsumerWidget {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(displayLabel, style: theme.textTheme.bodySmall),
+                    child: realName != null
+                        ? UserText(
+                            realName,
+                            style: theme.textTheme.bodySmall,
+                          )
+                        : Text(
+                            displayLabel,
+                            style: theme.textTheme.bodySmall,
+                          ),
                   ),
                   Text(
                     dateStr,

@@ -31,7 +31,7 @@ Product and install overview: [../README.md](../README.md). Doc index: [README.m
 | `ios/Runner/Info.plist` | iOS permissions/deep-link/background notification config |
 | `supabase/functions/invite-redirect/` | Edge Function: invite token validation and redirect |
 | `supabase/functions/og-invite-image/` | Edge Function: GET `?token=...` → 1200×630 PNG (QR, branding) for invite previews |
-| `supabase/functions/send-notification/` | Edge Function: `user_notifications` + FCM push (expenses, member_joined; excludes actor) |
+| `supabase/functions/send-notification/` | Edge Function: `user_notifications` + FCM push (expense create/update/delete, member_joined; excludes actor) |
 | `supabase/functions/telemetry/` | Edge Function: anonymous telemetry ingest |
 | `docs/` | Setup and architecture documentation; see [docs/README.md](README.md) for an index |
 | `test/` | Tests mirroring `lib/` layout; see [test/README.md](../test/README.md) |
@@ -109,7 +109,8 @@ Shared widgets in `lib/core/widgets/`: **AsyncValueBuilder**, **BackButtonKeyboa
 - **LayoutBreakpoints** (`layout_breakpoints.dart`) — width breakpoints (tablet ≥600px, desktop ≥840px), content max widths (600/720), permanent shell sidenav width (240; mid band 0), and **`contentBandMetrics(context, contentAreaWidth)`** returning `(leftOffset, contentMaxWidth)` so the app bar title and body share the same horizontal band. Shell nav: `FloatingNavBar` (phone), temporary drawer + `ShellMenuButton` (mid), `AppSidenav` (desktop).
 - **ConstrainedContent** (`constrained_content.dart`) — on tablet+ wraps [child] in a centered band using `contentBandMetrics`; on narrow screens returns [child] unchanged. Body content is wrapped in this so it does not span full width on large screens. Optional [aside] (e.g. page section index) sits in the **end** gutter (right in LTR, left in RTL) when that gutter is wide enough.
 - **ContentAlignedFabLocation** (`content_aligned_fab_location.dart`) — positions the scaffold FAB at the end of the content band on wide layouts (RTL-aware); falls back to `endFloat` when the end gutter is tight.
-- **ContentAlignedAppBar** (`content_aligned_app_bar.dart`) — a `PreferredSizeWidget` that places the title in the same horizontal band as the body (via `contentBandMetrics`). The title is absolutely positioned so it is not affected by leading/actions width. Titles use the normal app bar text size (no `FittedBox` shrink-to-fit); long titles should use `maxLines` / `TextOverflow.ellipsis` (or elide in the parent), e.g. group detail’s app bar name (`group_detail_page.dart`: grapheme cap + ellipsis). Use with a **LayoutBuilder** around the scaffold and pass `layoutConstraints.maxWidth` as `contentAreaWidth`. Used on all pages that have an app bar and `ConstrainedContent` body (home, settings, group detail/settings/create, invite management/scan/accept, archived groups, expense form, privacy policy).
+- **ContentAlignedAppBar** (`content_aligned_app_bar.dart`) — a `PreferredSizeWidget` that places the title in the same horizontal band as the body (via `contentBandMetrics`). The title is absolutely positioned so it is not affected by leading/actions width. Titles use the normal app bar text size (no `FittedBox` shrink-to-fit); long **user-generated** titles should use [`UserText`](../lib/core/widgets/user_text.dart) (`maxLines` / ellipsis + content-based direction) or grapheme elide via [`user_text.dart`](../lib/core/utils/user_text.dart) (e.g. group detail app bar). Use with a **LayoutBuilder** around the scaffold and pass `layoutConstraints.maxWidth` as `contentAreaWidth`. Used on all pages that have an app bar and `ConstrainedContent` body (home, settings, group detail/settings/create, invite management/scan/accept, archived groups, expense form, privacy policy).
+- **UserText / user_text utils** — display helpers for multilingual UGC (expense titles, group/participant names, notification copy). See [I18N.md](I18N.md) § User-generated content.
 
 ### Images + Receipt AI (core/receipt)
 
@@ -173,7 +174,7 @@ Redirect behavior:
 
 ## Notifications (FCM + in-app history)
 
-Push notifications are sent when expenses are added/edited or members join a group. The pipeline is: **Supabase (trigger) → pg_net → send-notification Edge Function → (1) insert `user_notifications` rows → (2) Firebase Cloud Messaging → Flutter**. Full setup and verification are in [SUPABASE_SETUP.md](SUPABASE_SETUP.md) (Section 5: send-notification, “Push notifications: end-to-end flow and verification”, and Section 9: “Push notifications not received”).
+Push notifications are sent when expenses are added/content-edited/deleted or members join a group. The pipeline is: **Supabase (trigger) → pg_net → send-notification Edge Function → (1) insert `user_notifications` rows → (2) Firebase Cloud Messaging → Flutter**. Full setup and verification are in [SUPABASE_SETUP.md](SUPABASE_SETUP.md) (Section 5: send-notification, “Push notifications: end-to-end flow and verification”, and Section 9: “Push notifications not received”).
 
 **Flutter** (`lib/core/services/notification_service.dart`):
 
@@ -183,9 +184,9 @@ Push notifications are sent when expenses are added/edited or members join a gro
 
 **In-app activity feed:** The same Edge Function persists one `user_notifications` row per recipient (including when FCM is dry-run or the user has no device token). SyncEngine fetches the signed-in user’s rows into local SQLite; Profile (`features/profile`) shows a grouped feed and mark-as-read. Migration: `20260729010000_user_notifications.sql`.
 
-**Backend:** Database trigger `notify_on_expense_change` (and `notify_on_member_join`) calls `notify_group_activity()`, which POSTs to the `send-notification` Edge Function with `group_id`, `actor_user_id`, `action`, and optional expense fields (including `expense_id` when present). **Personal groups** (groups with `is_personal = true`; see [PERSONAL_FEATURE.md](PERSONAL_FEATURE.md)) do not trigger notifications—the trigger function skips the HTTP call for them. The Edge Function (`supabase/functions/send-notification/index.ts`) loads other group members’ tokens and `locale` from `device_tokens`, inserts history rows, then sends FCM v1 messages (one per token) when FCM secrets are configured. For **expense_created** and **expense_updated**, the actor is the user who created or last updated the expense; the Edge Function excludes that actor so only **other** group members receive the push/history. For `member_joined`, the actor is the new member; the Edge Function excludes the actor so the joinee does not receive a notification. Title and body are localized per recipient using stored `locale` (en/ar; fallback en).
+**Backend:** Database trigger `notify_on_expense_change` (`AFTER INSERT OR UPDATE OR DELETE ON expenses`) and `notify_on_member_join` call `notify_group_activity()`, which POSTs to the `send-notification` Edge Function with `group_id`, `actor_user_id`, `action`, `group_name`, and optional expense fields (including `expense_id`). **Image-only / `updated_at`-only expense updates are skipped** (avoids a second Profile row when creating an expense with photos). **Personal groups** and **missing groups** (CASCADE delete) skip the HTTP call. Actions: `expense_created`, `expense_updated`, `expense_deleted`, `member_joined`. Copy: notification title is the group name; body is `{expense title} - {cost}` with localized `Edit` / `Deleted` prefixes. The Edge Function excludes the actor so only **other** group members receive push/history. Title/body are localized per recipient `locale` (en/ar; fallback en).
 
-**Web:** `web/index.html` initializes Firebase web SDK; `web/firebase-messaging-sw.js` handles background push and clicks. Web token registration requires `FCM_VAPID_KEY` at build time. On iPhone/iPad (all browsers use WebKit), push is gated until the user installs the Home Screen PWA and opens it from there (`pwaNotificationSupport`).
+**Web:** `web/index.html` loads Firebase compat SDKs **asynchronously** and sets `window.__hisabFirebaseReady`; `web/flutter_bootstrap.js` waits on that promise before booting Flutter (faster first paint). `web/firebase-messaging-sw.js` handles background push and clicks. Web token registration requires `FCM_VAPID_KEY` at build time. On iPhone/iPad (all browsers use WebKit), push is gated until the user installs the Home Screen PWA and opens it from there (`pwaNotificationSupport`).
 
 **Settings:** `notifications_enabled` controls FCM initialization and token registration; the toggle is shown only in online mode. In-app history still syncs when present on the server.
 
@@ -193,7 +194,7 @@ Push notifications are sent when expenses are added/edited or members join a gro
 
 ## Feature Modules
 
-- `features/home`: groups list (Personal and Groups sections) via **home_list_provider** (ordered list, pinned/custom order), **routes**, create FAB + modal (Create group / Create personal), manual refresh trigger
+- `features/home`: groups list (Personal and Groups sections) via **home_list_provider** (ordered list, pinned/custom order), **`HomeReorderableGroupsSliver`** (long-press reorder with pin-cohort clamping in `home_list_reorder.dart`; optimistic order via `homeListPendingOrderIdsProvider` until settings persist), **routes**, create FAB + modal (Create group / Create personal), manual refresh trigger
 - `features/profile`: `/profile` dashboard (account header moved from Settings, global display-currency net, KPIs, balances, personal budgets, grouped `user_notifications` feed). Data loads through **`profile_data_providers`** (`allExpensesProvider` / `allParticipantsProvider` / `myMembershipsProvider` → `profileDataSnapshotProvider`) so the dashboard and “my expenses” share one snapshot instead of N per-group streams. Repositories expose `watchAll` / `watchMyMembers` (web uses fingerprint-gated polling). SyncEngine fetches notifications by user.
 - `features/groups`: create/detail/settings (including personal vs group branches and convert flows), invite management, invite acceptance; group settings include permission toggles (e.g. Members can add expenses, Members can record settlements for others). **Group create** uses a single shell route per flow plus decorative step URLs (see Navigation). `invite_redirect_proxy` (and `invite_redirect_proxy_web`, `invite_redirect_proxy_stub`, `invite_redirect_proxy_page`) for web/invite redirect; **create_invite_sheet** (invite creation UI)
 - `features/expenses`: create/edit/detail expenses (**expense_detail_shell**), split logic UI, image input hooks; **expense_navigation_direction** (provider), **expense_form_constants**, **category_icons**
@@ -207,7 +208,7 @@ Push notifications are sent when expenses are added/edited or members join a gro
   - logs viewer/clear/report flow
   - feedback capture (**feedback_upload**, feedback_clipboard with io/stub)
   - About: version row tappable to check for updates manually; About me shows developer info from GitHub (avatar, name, bio, profile link)
-- `features/onboarding`: multi-step onboarding (welcome, preferences, permissions, connect) with mode selection and auth gate for online mode; URL sync for steps is decorative (see Navigation) so wizard state is preserved while swiping
+- `features/onboarding`: multi-step onboarding (welcome, preferences, permissions, connect) with mode selection and auth gate for online mode; step UI uses 0.6.x flat-panel surfaces (`AccentSurfaces`), brand hero + staggered welcome rows, and `OnboardingStepEnter` motion (UiPerf-gated); URL sync for steps is decorative (see Navigation) so wizard state is preserved while swiping
 - `features/transaction_scanner`: Android notification → draft → personal expense (Settings hub; local-only tables). See [TRANSACTION_SCANNER.md](TRANSACTION_SCANNER.md).
 
 ## Settings Framework
@@ -248,7 +249,7 @@ This repo is the **source of truth** for all Supabase Edge Functions. See [EDGE_
 
 - `supabase/functions/invite-redirect/index.ts` — validates invite token and redirects to `redirect.html`
 - `supabase/functions/og-invite-image/` — GET `?token=...` returns 1200×630 PNG (QR code, branding) for invite link previews; deploy with `--no-verify-jwt`
-- `supabase/functions/send-notification/index.ts` — persists `user_notifications` and sends FCM push (expenses, member_joined; excludes actor)
+- `supabase/functions/send-notification/index.ts` — persists `user_notifications` and sends FCM push (expense create/update/delete, member_joined; excludes actor)
 - `supabase/functions/telemetry/index.ts` — accepts anonymous usage telemetry events
 
 On the free plan, invite redirect uses only static Hosting files (`invite-redirect.html` + `redirect.html`). A **Firebase Cloud Function** can optionally serve the same path with dynamic OG meta for crawlers (see [EDGE_FUNCTIONS.md](EDGE_FUNCTIONS.md) for `functions/` and hosting rewrites).

@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/widgets/user_text.dart';
 
 /// One slice in a standardized breakdown donut chart.
 class BreakdownPieSlice {
@@ -203,20 +204,29 @@ class BreakdownPieChartState extends State<BreakdownPieChart> {
                   : constraints.maxHeight;
               // Scale hole to chart size so the center overlay never covers slices.
               final centerRadius = (chartSize * 0.22).clamp(36.0, 54.0);
+              // Text box stays inside the visual hole; hit target can be a bit larger.
+              final holeTextSize = (centerRadius * 1.55).clamp(56.0, 96.0);
               final holeHit = (centerRadius * 1.7).clamp(64.0, 100.0);
               final sectionRadius = (chartSize * 0.20).clamp(34.0, 46.0);
               final hasSelection =
                   selectedId != null || widget.centerOverride != null;
+              final centerAmount = CurrencyFormatter.formatCompactCents(
+                (center?.amountCents ?? total).abs(),
+                widget.currencyCode,
+              );
 
-              return Stack(
-                alignment: Alignment.center,
-                children: [
+              return RepaintBoundary(
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
                   PieChart(
                     PieChartData(
                       centerSpaceRadius: centerRadius,
                       sectionsSpace: 2.5,
                       startDegreeOffset: -90,
                       pieTouchData: PieTouchData(
+                        // Keep touch for slice selection (primary UX); bar/line
+                        // charts use UiPerf.preferCheapCharts for tooltips.
                         enabled: true,
                         // Use tap-down: fl_chart often clears touchedSection on
                         // tap-up, and a remembered index made outside taps open
@@ -266,21 +276,23 @@ class BreakdownPieChartState extends State<BreakdownPieChart> {
                           }
                           _deselect();
                         },
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
-                          child: Center(
-                            child: Text(
-                              CurrencyFormatter.formatCents(
-                                (center?.amountCents ?? total).abs(),
-                                widget.currencyCode,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                fontSize: chartSize < 180 ? 14 : null,
-                                color: center?.color,
+                        child: Center(
+                          child: SizedBox(
+                            width: holeTextSize,
+                            height: holeTextSize * 0.45,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                centerAmount,
+                                maxLines: 1,
+                                softWrap: false,
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  height: 1,
+                                  letterSpacing: -0.5,
+                                  color: center?.color ?? cs.onSurface,
+                                ),
                               ),
                             ),
                           ),
@@ -300,7 +312,8 @@ class BreakdownPieChartState extends State<BreakdownPieChart> {
                         icon: const Icon(Icons.filter_alt_off_outlined),
                       ),
                     ),
-                ],
+                  ],
+                ),
               );
             },
           ),
@@ -416,7 +429,7 @@ class _DefaultLegendRow extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
+                  child: UserText(
                     slice.label,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600,

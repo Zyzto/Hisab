@@ -21,6 +21,8 @@
   <meta name="description" content="Group expense splitting and settle-up app.">
 
   <!-- iOS / PWA meta tags & icons -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0175C2">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -98,9 +100,7 @@
       setTimeout(removeBootSplash, 15000);
     })();
   </script>
-  <!-- Firebase SDK (required for FCM web push notifications) -->
-  <script src="https://www.gstatic.com/firebasejs/11.4.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/11.4.0/firebase-messaging-compat.js"></script>
+  <!-- Firebase SDK: load async so the boot splash paints before gstatic download. -->
   <script>
     // Firebase config — placeholders replaced at build time (CI) or from dart_defines_online.json (debug).
     // Do not commit real values. See CONFIGURATION.md and dart_defines_online.example.json.
@@ -118,14 +118,36 @@
       return values.some((v) => typeof v === "string" && (v.includes("YOUR_") || v.includes("__FIREBASE_")));
     }
 
-    if (hasPlaceholderFirebaseConfig(firebaseConfig)) {
-      console.warn(
-        "[hisab] Firebase web config uses placeholders; web push notifications are disabled until real values are set."
-      );
-    } else {
-      // Must happen before Flutter loads firebase_messaging.
-      firebase.initializeApp(firebaseConfig);
+    function loadScript(src) {
+      return new Promise(function (resolve, reject) {
+        var s = document.createElement("script");
+        s.src = src;
+        s.async = true;
+        s.onload = function () { resolve(); };
+        s.onerror = function () { reject(new Error("Failed to load " + src)); };
+        document.head.appendChild(s);
+      });
     }
+
+    // Resolved before Flutter bootstrap so firebase_messaging sees an initialized app.
+    window.__hisabFirebaseReady = (function () {
+      if (hasPlaceholderFirebaseConfig(firebaseConfig)) {
+        console.warn(
+          "[hisab] Firebase web config uses placeholders; web push notifications are disabled until real values are set."
+        );
+        return Promise.resolve();
+      }
+      return loadScript("https://www.gstatic.com/firebasejs/11.4.0/firebase-app-compat.js")
+        .then(function () {
+          return loadScript("https://www.gstatic.com/firebasejs/11.4.0/firebase-messaging-compat.js");
+        })
+        .then(function () {
+          firebase.initializeApp(firebaseConfig);
+        })
+        .catch(function (err) {
+          console.warn("[hisab] Firebase web SDK failed to load; push disabled.", err);
+        });
+    })();
   </script>
 
   <!-- PWA capability bridge (used by lib/core/pwa) + notification click routing -->

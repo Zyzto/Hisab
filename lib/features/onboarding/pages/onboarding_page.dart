@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:material_symbols_icons/material_symbols_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
@@ -15,8 +14,11 @@ import '../../../core/database/database_providers.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../core/constants/supabase_config.dart';
 import '../../../core/layout/constrained_content.dart';
+import '../../../core/motion/app_motion.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/platform/ui_perf.dart';
 import '../../../core/services/permission_service.dart';
+import '../../../core/theme/accent_style.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/widgets/sheet_helpers.dart';
 import '../../settings/providers/settings_framework_providers.dart';
@@ -41,7 +43,7 @@ class OnboardingPage extends ConsumerStatefulWidget {
 }
 
 class _OnboardingPageState extends ConsumerState<OnboardingPage>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late final PageController _pageController;
   late final AnimationController _languagePulseController;
 
@@ -104,45 +106,141 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _isCompleting = widget.forceBusyForTest;
-    _currentPage = widget.initialPage;
-    _pageController = PageController(initialPage: widget.initialPage);
-    _languagePulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2000),
-    )..repeat();
-    _languagePulseStopTimer = Timer(const Duration(milliseconds: 6000), () {
-      if (mounted) {
-        _languagePulseController.stop();
-        setState(() => _languagePulseStopped = true);
-      }
-    });
-    _languageTapController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 150),
-    );
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _syncDecorativeUrlToPage(_currentPage);
-    });
-    _hintTimer = Timer.periodic(const Duration(seconds: 4), (_) {
-      if (mounted) {
+  void _ensurePermissionStatusLoaded() {
+    if (_currentPage == 2 && _permissionStatusFuture == null) {
+      _permissionStatusFuture = _loadPermissionStatus();
+    }
+  }
+
+  Duration get _pageAnimDuration => UiPerf.preferInstantShellTabs
+      ? Duration.zero
+      : AppMotion.page;
+
+  void _goToPage(int page) {
+    if (_pageAnimDuration == Duration.zero) {
+      _pageController.jumpToPage(page);
+    } else {
+      _pageController.animateToPage(
+        page,
+        duration: _pageAnimDuration,
+        curve: AppMotion.enterCurve,
+      );
+    }
+  }
+
+  void _stopChromeDemos() {
+    _hintTimer?.cancel();
+    _hintTimer = null;
+    _themeDemoTimer?.cancel();
+    _themeDemoTimer = null;
+    _languagePulseStopTimer?.cancel();
+    _languagePulseStopTimer = null;
+    if (_languagePulseController.isAnimating) {
+      _languagePulseController.stop();
+    }
+    _languagePulseStopped = true;
+    _themeDemoRunning = false;
+  }
+
+  void _pauseChromeTimers() {
+    _hintTimer?.cancel();
+    _hintTimer = null;
+    _themeDemoTimer?.cancel();
+    _themeDemoTimer = null;
+    if (_languagePulseController.isAnimating) {
+      _languagePulseController.stop();
+    }
+  }
+
+  void _resumeChromeTimersIfNeeded() {
+    if (_isCompleting || UiPerf.preferReducedChromeMotion) return;
+    if (!_languagePulseStopped && !_languagePulseController.isAnimating) {
+      _languagePulseController.repeat();
+    }
+    _hintTimer ??= Timer.periodic(const Duration(seconds: 4), (_) {
+      if (mounted && !_isCompleting) {
         setState(() {
           _hintLocaleIndex =
               (_hintLocaleIndex + 1) % _hintLanguageKeys.length;
         });
       }
     });
-    _themeDemoTimer = Timer.periodic(const Duration(milliseconds: 2500), (_) {
-      if (mounted && _themeDemoRunning) {
-        setState(() {
-          _themeDemoIndex = (_themeDemoIndex + 1) % _themeDemoOrder.length;
-        });
-      }
+    if (_themeDemoRunning) {
+      _themeDemoTimer ??= Timer.periodic(
+        const Duration(milliseconds: 2500),
+        (_) {
+          if (mounted && _themeDemoRunning && !_isCompleting) {
+            setState(() {
+              _themeDemoIndex = (_themeDemoIndex + 1) % _themeDemoOrder.length;
+            });
+          }
+        },
+      );
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _isCompleting = widget.forceBusyForTest;
+    _currentPage = widget.initialPage;
+    _pageController = PageController(initialPage: widget.initialPage);
+    // Deep-link / cold start on Permissions never fires [onPageChanged].
+    _ensurePermissionStatusLoaded();
+    _languagePulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+    _languageTapController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 150),
+    );
+
+    final reduceChrome = UiPerf.preferReducedChromeMotion;
+    if (reduceChrome) {
+      _languagePulseStopped = true;
+      _themeDemoRunning = false;
+    } else {
+      _languagePulseController.repeat();
+      _languagePulseStopTimer = Timer(const Duration(milliseconds: 6000), () {
+        if (mounted) {
+          _languagePulseController.stop();
+          setState(() => _languagePulseStopped = true);
+        }
+      });
+      _hintTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+        if (mounted && !_isCompleting) {
+          setState(() {
+            _hintLocaleIndex =
+                (_hintLocaleIndex + 1) % _hintLanguageKeys.length;
+          });
+        }
+      });
+      _themeDemoTimer = Timer.periodic(const Duration(milliseconds: 2500), (_) {
+        if (mounted && _themeDemoRunning && !_isCompleting) {
+          setState(() {
+            _themeDemoIndex = (_themeDemoIndex + 1) % _themeDemoOrder.length;
+          });
+        }
+      });
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _syncDecorativeUrlToPage(_currentPage);
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _resumeChromeTimersIfNeeded();
+    } else if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _pauseChromeTimers();
+    }
   }
 
   @override
@@ -151,12 +249,14 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
     if (oldWidget.initialPage != widget.initialPage &&
         widget.initialPage != _currentPage) {
       _currentPage = widget.initialPage;
+      _ensurePermissionStatusLoaded();
       _pageController.jumpToPage(widget.initialPage);
     }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _languagePulseStopTimer?.cancel();
     _languagePulseController.dispose();
     _languageTapController.dispose();
@@ -204,59 +304,59 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                 child: Column(
                   children: [
                     Expanded(
-                      child: PageView(
+                      child: PageView.builder(
                         controller: _pageController,
+                        itemCount: 4,
                         physics: _isCompleting
                             ? const NeverScrollableScrollPhysics()
                             : null,
                         onPageChanged: (i) {
                           setState(() {
                             _currentPage = i;
-                            if (i == 2 && _permissionStatusFuture == null) {
-                              _permissionStatusFuture = _loadPermissionStatus();
-                            }
+                            _ensurePermissionStatusLoaded();
                           });
                           _syncDecorativeUrlToPage(i);
                         },
-                        children: [
-                          const RepaintBoundary(child: OnboardingWelcomePage()),
-                          const RepaintBoundary(
-                            child: OnboardingPreferencesPage(),
-                          ),
-                          RepaintBoundary(
-                            child: OnboardingPermissionsPage(
-                              settings: settings,
-                              onlineAvailable: onlineAvailable,
-                              cameraGranted: _cameraGranted,
-                              notificationGranted: _notificationGranted,
-                              permissionStatusFuture: _permissionStatusFuture,
-                              onRequestCamera: () async {
-                                final result =
-                                    await PermissionService.requestCameraPermission(
-                                      context,
-                                    );
-                                if (mounted) {
-                                  setState(() => _cameraGranted = result);
-                                }
-                              },
-                              onRequestNotification: () async {
-                                final result =
-                                    await PermissionService.requestNotificationPermission(
-                                      context,
-                                    );
-                                if (mounted) {
-                                  setState(() => _notificationGranted = result);
-                                }
+                        itemBuilder: (context, index) {
+                          return _KeepAliveOnboardingStep(
+                            child: RepaintBoundary(
+                              child: switch (index) {
+                                0 => const OnboardingWelcomePage(),
+                                1 => const OnboardingPreferencesPage(),
+                                2 => OnboardingPermissionsPage(
+                                  settings: settings,
+                                  onlineAvailable: onlineAvailable,
+                                  cameraGranted: _cameraGranted,
+                                  notificationGranted: _notificationGranted,
+                                  permissionStatusFuture:
+                                      _permissionStatusFuture,
+                                  onRequestCamera: () async {
+                                    final result = await PermissionService
+                                        .requestCameraPermission(context);
+                                    if (mounted) {
+                                      setState(() => _cameraGranted = result);
+                                    }
+                                  },
+                                  onRequestNotification: () async {
+                                    final result = await PermissionService
+                                        .requestNotificationPermission(
+                                          context,
+                                        );
+                                    if (mounted) {
+                                      setState(
+                                        () => _notificationGranted = result,
+                                      );
+                                    }
+                                  },
+                                ),
+                                _ => OnboardingConnectPage(
+                                  settings: settings,
+                                  onlineAvailable: onlineAvailable,
+                                ),
                               },
                             ),
-                          ),
-                          RepaintBoundary(
-                            child: OnboardingConnectPage(
-                              settings: settings,
-                              onlineAvailable: onlineAvailable,
-                            ),
-                          ),
-                        ],
+                          );
+                        },
                       ),
                     ),
                     _buildPageIndicator(context),
@@ -276,10 +376,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                       horizontal: ThemeConfig.spacingL,
                       vertical: ThemeConfig.spacingM,
                     ),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surface,
-                      borderRadius: BorderRadius.circular(ThemeConfig.radiusM),
-                    ),
+                    decoration: AccentSurfaces.flatPanel(colorScheme),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -313,17 +410,20 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
         children: List.generate(4, (index) {
           final isActive = index == _currentPage;
           return AnimatedContainer(
-            duration: ThemeConfig.animationShort,
+            duration: UiPerf.preferInstantShellTabs
+                ? Duration.zero
+                : ThemeConfig.animationShort,
+            curve: AppMotion.enterCurve,
             margin: const EdgeInsets.symmetric(
               horizontal: ThemeConfig.spacingXS,
             ),
-            width: isActive ? 24 : 8,
-            height: 8,
+            width: isActive ? 28 : 8,
+            height: isActive ? 8 : 7,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(ThemeConfig.radiusS),
               color: isActive
                   ? colorScheme.primary
-                  : colorScheme.outline.withValues(alpha: 0.4),
+                  : colorScheme.outlineVariant.withValues(alpha: 0.55),
             ),
           );
         }),
@@ -435,7 +535,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
       case 'dark':
         return Icons.dark_mode;
       case 'amoled':
-        return Symbols.ev_shadow;
+        return Icons.contrast;
       default:
         return Icons.brightness_auto;
     }
@@ -486,7 +586,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                     },
               customBorder: const CircleBorder(),
               child: AnimatedContainer(
-                duration: ThemeConfig.animationLong,
+                duration: UiPerf.preferReducedChromeMotion
+                    ? Duration.zero
+                    : ThemeConfig.animationLong,
                 curve: Curves.easeInOut,
                 padding: const EdgeInsets.all(ThemeConfig.spacingS),
                 decoration: BoxDecoration(
@@ -500,11 +602,19 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                             : _themeDarkBg),
                 ),
                 child: AnimatedSwitcher(
-                  duration: ThemeConfig.animationLong,
+                  duration: UiPerf.preferReducedChromeMotion
+                      ? Duration.zero
+                      : ThemeConfig.animationLong,
                   switchInCurve: Curves.easeOut,
                   switchOutCurve: Curves.easeIn,
                   transitionBuilder:
                       (Widget child, Animation<double> animation) {
+                        if (UiPerf.preferFadeOnlyPageTransitions) {
+                          return FadeTransition(
+                            opacity: animation,
+                            child: child,
+                          );
+                        }
                         return FadeTransition(
                           opacity: animation,
                           child: ScaleTransition(
@@ -538,18 +648,37 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
     ColorScheme colorScheme,
     SettingsProviders settings,
   ) {
+    final scaffoldBg = Theme.of(context).scaffoldBackgroundColor;
+    final decoration = UiPerf.preferCheapShadows
+        ? BoxDecoration(
+            color: scaffoldBg,
+            border: Border(
+              top: BorderSide(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.55),
+              ),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: colorScheme.shadow.withValues(alpha: 0.08),
+                blurRadius: 2,
+                offset: const Offset(0, -1),
+              ),
+            ],
+          )
+        : BoxDecoration(
+            color: scaffoldBg,
+            boxShadow: [
+              BoxShadow(
+                color: colorScheme.shadow.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          );
+
     return Container(
       padding: const EdgeInsets.all(ThemeConfig.spacingM),
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.08),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
+      decoration: decoration,
       child: Semantics(
         container: true,
         explicitChildNodes: true,
@@ -568,12 +697,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                             child: TextButton.icon(
                               onPressed: _isCompleting
                                   ? null
-                                  : () {
-                                      _pageController.previousPage(
-                                        duration: ThemeConfig.animationMedium,
-                                        curve: Curves.easeInOut,
-                                      );
-                                    },
+                                  : () => _goToPage(_currentPage - 1),
                               icon: const Icon(Icons.arrow_back),
                               label: Text('onboarding_back'.tr()),
                             ),
@@ -599,12 +723,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                             child: FilledButton.icon(
                               onPressed: _isCompleting
                                   ? null
-                                  : () {
-                                      _pageController.nextPage(
-                                        duration: ThemeConfig.animationMedium,
-                                        curve: Curves.easeInOut,
-                                      );
-                                    },
+                                  : () => _goToPage(_currentPage + 1),
                               icon: const Icon(Icons.arrow_forward),
                               label: Text('onboarding_next'.tr()),
                             ),
@@ -629,7 +748,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
             ),
             const SizedBox(height: ThemeConfig.spacingS),
             AnimatedSwitcher(
-              duration: ThemeConfig.animationMedium,
+              duration: UiPerf.preferReducedChromeMotion
+                  ? Duration.zero
+                  : ThemeConfig.animationMedium,
               child: Text(
                 _hintLanguageKeys[_hintLocaleIndex].tr(),
                 key: ValueKey<int>(_hintLocaleIndex),
@@ -651,10 +772,17 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
     SettingsProviders settings,
   ) async {
     if (_isCompleting) return;
+    _stopChromeDemos();
     setState(() => _isCompleting = true);
 
-    final isLocalOnly = ref.read(settings.provider(localOnlySettingDef));
     final onlineAvailable = supabaseConfigAvailable;
+    var isLocalOnly = ref.read(settings.provider(localOnlySettingDef));
+    // Online unavailable: never leave the user in a "online" local_only=false state.
+    if (!onlineAvailable && !isLocalOnly) {
+      ref.read(settings.provider(localOnlySettingDef).notifier).set(true);
+      isLocalOnly = true;
+      Log.info('Setting changed: ${localOnlySettingDef.key}=true');
+    }
 
     try {
       if (!isLocalOnly && onlineAvailable) {
@@ -710,7 +838,31 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
     } finally {
       if (mounted) {
         setState(() => _isCompleting = false);
+        _resumeChromeTimersIfNeeded();
       }
     }
+  }
+}
+
+/// Keeps a visited onboarding step alive after first build (scroll/form state).
+class _KeepAliveOnboardingStep extends StatefulWidget {
+  const _KeepAliveOnboardingStep({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_KeepAliveOnboardingStep> createState() =>
+      _KeepAliveOnboardingStepState();
+}
+
+class _KeepAliveOnboardingStepState extends State<_KeepAliveOnboardingStep>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }

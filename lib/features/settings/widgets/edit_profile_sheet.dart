@@ -21,6 +21,9 @@ Future<void> showEditProfileSheet(
   WidgetRef ref,
   AuthUserProfile profile,
 ) async {
+  // Finish warming emoji glyphs before the picker is on screen.
+  await preloadPredefinedAvatarEmojis();
+  if (!context.mounted) return;
   await showResponsiveSheet<void>(
     context: context,
     title: 'edit_profile'.tr(),

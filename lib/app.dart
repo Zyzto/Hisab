@@ -77,6 +77,11 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
           },
     );
     _registerAuthListener();
+    // Keep long-lived services alive without rebuilding the whole App tree.
+    ref.listenManual(dataSyncServiceProvider, (_, _) {});
+    if (scannerAvailable) {
+      ref.listenManual(scannerControllerProvider, (_, _) {});
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _showPendingWebOAuthErrorIfAny();
     });
@@ -363,12 +368,6 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
     final router = ref.watch(routerProvider);
     final themes = ref.watch(appThemesProvider);
     final themeMode = ref.watch(appThemeModeProvider);
-
-    // Watch DataSyncService to reactively fetch/push data
-    ref.watch(dataSyncServiceProvider);
-
-    // Initialize transaction scanner controller (Android only, no-op elsewhere)
-    if (scannerAvailable) ref.watch(scannerControllerProvider);
 
     // Locale is read exclusively from EasyLocalization (context.locale) so that
     // locale: and localizationsDelegates always come from the same frame.

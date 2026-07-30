@@ -11,10 +11,13 @@ import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/platform/ui_perf.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/user_text.dart';
 import '../../../core/widgets/error_content.dart';
+import '../../../core/widgets/user_text.dart';
 import '../../../domain/domain.dart';
 import '../../expenses/category_icons.dart';
 import '../../expenses/widgets/breakdown_pie_chart.dart';
@@ -70,7 +73,7 @@ Future<T?> _showModalSelectSheet<T>({
                 ...options.map((option) {
                   final isSelected = option.value == selectedValue;
                   return ListTile(
-                    title: Text(option.label),
+                    title: UserText(option.label),
                     subtitle: option.subtitle == null
                         ? null
                         : Text(option.subtitle!),
@@ -524,14 +527,16 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
       context,
       data,
       title: 'analytics_category_expenses_title'.tr(
-        namedArgs: {'category': _translateCategoryLike(categoryLabel)},
+        namedArgs: {
+          'category': isolateBidi(_translateCategoryLike(categoryLabel)),
+        },
       ),
       emptyLabel: 'analytics_category_expenses_empty'.tr(),
       expenses: expenses,
       subtitleFor: (expense, names) {
         final payerName =
             names[expense.payerParticipantId] ?? expense.payerParticipantId;
-        return '$payerName • ${DateFormat.yMMMd().format(expense.date)}';
+        return '${isolateBidi(payerName)} • ${DateFormat.yMMMd().format(expense.date)}';
       },
     );
   }
@@ -551,7 +556,7 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
       context,
       data,
       title: 'analytics_payer_expenses_title'.tr(
-        namedArgs: {'payer': payerLabel},
+        namedArgs: {'payer': isolateBidi(payerLabel)},
       ),
       emptyLabel: 'analytics_payer_expenses_empty'.tr(),
       expenses: expenses,
@@ -559,7 +564,7 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
         final tag = (expense.tag == null || expense.tag!.isEmpty)
             ? 'analytics_untagged'.tr()
             : _translateCategoryLike(resolveTagLabel(expense.tag!, data.tags));
-        return '$tag • ${DateFormat.yMMMd().format(expense.date)}';
+        return '${isolateBidi(tag)} • ${DateFormat.yMMMd().format(expense.date)}';
       },
     );
   }
@@ -957,7 +962,7 @@ class _TrendChartCard extends StatelessWidget {
               ),
             ),
           ),
-          barTouchData: const BarTouchData(enabled: true),
+          barTouchData: BarTouchData(enabled: !UiPerf.preferCheapCharts),
           barGroups: visiblePoints.asMap().entries.map((entry) {
             final index = entry.key;
             final point = entry.value;
@@ -1019,7 +1024,7 @@ class _TrendChartCard extends StatelessWidget {
               ),
               borderData: FlBorderData(show: false),
               lineTouchData: LineTouchData(
-                enabled: true,
+                enabled: !UiPerf.preferCheapCharts,
                 getTouchedSpotIndicator: (barData, spotIndexes) => spotIndexes
                     .map(
                       (_) => const TouchedSpotIndicatorData(
@@ -1065,7 +1070,7 @@ class _TrendChartCard extends StatelessWidget {
                           ? '${DateFormat.yMMMd().format(referencePoints[pointIndex].start)}\n'
                           : '';
                       return LineTooltipItem(
-                        '$datePrefix$seriesLabel: $value',
+                        '$datePrefix${isolateBidi(seriesLabel)}: $value',
                         Theme.of(context).textTheme.bodySmall!.copyWith(
                           color: Theme.of(context).colorScheme.onSurface,
                           fontWeight: FontWeight.w600,
@@ -1206,7 +1211,7 @@ class _TrendChartCard extends StatelessWidget {
               maxY: maxY * 1.2,
               alignment: BarChartAlignment.spaceAround,
               groupsSpace: 6,
-              barTouchData: const BarTouchData(enabled: true),
+              barTouchData: BarTouchData(enabled: !UiPerf.preferCheapCharts),
               borderData: FlBorderData(show: false),
               gridData: FlGridData(
                 show: true,
@@ -1408,7 +1413,7 @@ class _LegendChip extends StatelessWidget {
           decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3)),
         ),
         const SizedBox(width: 5),
-        Text(
+        UserText(
           label,
           style: Theme.of(context).textTheme.labelMedium,
         ),
@@ -1620,11 +1625,12 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
               (isExcluded || !isLastVisible);
           final color = colorById[row.id] ?? palette.first;
 
+          // Prefer color alpha over Opacity (Opacity forces a saveLayer).
+          final dim = isExcluded ? 0.45 : 1.0;
+          final swatch = color.withValues(alpha: color.a * dim);
           return Padding(
             padding: const EdgeInsets.only(bottom: 4),
-            child: Opacity(
-              opacity: isExcluded ? 0.45 : 1,
-              child: InkWell(
+            child: InkWell(
                 borderRadius: BorderRadius.circular(12),
                 onTap: isExcluded || widget.onOpenRowExpenses == null
                     ? null
@@ -1643,7 +1649,7 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
                             width: 12,
                             height: 12,
                             decoration: BoxDecoration(
-                              color: color,
+                              color: swatch,
                               borderRadius: BorderRadius.circular(4),
                             ),
                           ),
@@ -1652,12 +1658,14 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
+                                UserText(
                                   label,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: theme.textTheme.bodyMedium?.copyWith(
                                     fontWeight: FontWeight.w700,
+                                    color: theme.colorScheme.onSurface
+                                        .withValues(alpha: dim),
                                     decoration: isExcluded
                                         ? TextDecoration.lineThrough
                                         : null,
@@ -1668,7 +1676,8 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
                                       ? _expenseCountLabel(row.count)
                                       : '${_expenseCountLabel(row.count)} · $pct%',
                                   style: theme.textTheme.labelSmall?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
+                                    color: theme.colorScheme.onSurfaceVariant
+                                        .withValues(alpha: dim),
                                   ),
                                 ),
                               ],
@@ -1681,6 +1690,8 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
                             ),
                             style: theme.textTheme.bodySmall?.copyWith(
                               fontWeight: FontWeight.w700,
+                              color: theme.colorScheme.onSurface
+                                  .withValues(alpha: dim),
                             ),
                           ),
                           if (canToggle)
@@ -1695,7 +1706,8 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
                                     ? Icons.visibility_off_rounded
                                     : Icons.visibility_rounded,
                                 size: 18,
-                                color: theme.colorScheme.onSurfaceVariant,
+                                color: theme.colorScheme.onSurfaceVariant
+                                    .withValues(alpha: dim),
                               ),
                               onPressed: () =>
                                   widget.onToggleExcluded!.call(row.id),
@@ -1708,7 +1720,8 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
                               child: Icon(
                                 Icons.lock_outline_rounded,
                                 size: 16,
-                                color: theme.colorScheme.onSurfaceVariant,
+                                color: theme.colorScheme.onSurfaceVariant
+                                    .withValues(alpha: dim),
                               ),
                             ),
                           if (widget.onOpenRowExpenses != null && !isExcluded)
@@ -1723,7 +1736,9 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
                         borderRadius: BorderRadius.circular(999),
                         child: TweenAnimationBuilder<double>(
                           tween: Tween(begin: 0, end: progress.toDouble()),
-                          duration: const Duration(milliseconds: 420),
+                          duration: UiPerf.preferCheapCharts
+                              ? Duration.zero
+                              : const Duration(milliseconds: 420),
                           curve: Curves.easeOutCubic,
                           builder: (context, value, _) {
                             return LinearProgressIndicator(
@@ -1731,7 +1746,7 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
                               minHeight: 9,
                               backgroundColor:
                                   theme.colorScheme.surfaceContainerHighest,
-                              color: color,
+                              color: swatch,
                             );
                           },
                         ),
@@ -1740,7 +1755,6 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
                   ),
                 ),
               ),
-            ),
           );
         }),
         if (hasExcluded && widget.onClearExcluded != null)
@@ -2005,9 +2019,13 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
           final canToggle = widget.onToggleExcluded != null &&
               (isExcluded || !isLastVisible);
           final color = colorByCategoryId[row.id] ?? palette.first;
+          final dim = isExcluded ? 0.45 : 1.0;
+          final swatch = color.withValues(alpha: color.a * dim);
 
           return AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
+            duration: UiPerf.preferCheapCharts
+                ? Duration.zero
+                : const Duration(milliseconds: 180),
             margin: const EdgeInsets.only(bottom: 2),
             decoration: BoxDecoration(
               color: isSelected
@@ -2018,100 +2036,102 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
                   ? Border.all(color: color.withValues(alpha: 0.55))
                   : null,
             ),
-            child: Opacity(
-              opacity: isExcluded ? 0.45 : 1,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(10),
-                onTap: isExcluded ? null : () => _onSliceOrLegendTap(row),
-                onLongPress: canToggle
-                    ? () => widget.onToggleExcluded!.call(row.id)
-                    : null,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 8,
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: color,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: isExcluded ? null : () => _onSliceOrLegendTap(row),
+              onLongPress: canToggle
+                  ? () => widget.onToggleExcluded!.call(row.id)
+                  : null,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 8,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: swatch,
+                        borderRadius: BorderRadius.circular(4),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              label,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: theme.colorScheme.onSurface,
-                                decoration: isExcluded
-                                    ? TextDecoration.lineThrough
-                                    : null,
-                              ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          UserText(
+                            label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: theme.colorScheme.onSurface
+                                  .withValues(alpha: dim),
+                              decoration: isExcluded
+                                  ? TextDecoration.lineThrough
+                                  : null,
                             ),
-                            Text(
-                              isExcluded
-                                  ? _expenseCountLabel(row.count)
-                                  : '${_expenseCountLabel(row.count)} · $pct%',
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        CurrencyFormatter.formatCents(
-                          row.amountCents,
-                          widget.currencyCode,
-                        ),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      if (canToggle) ...[
-                        const SizedBox(width: 2),
-                        IconButton(
-                          visualDensity: VisualDensity.compact,
-                          tooltip: (isExcluded
-                                  ? 'analytics_pie_show'
-                                  : 'analytics_pie_hide')
-                              .tr(),
-                          icon: Icon(
-                            isExcluded
-                                ? Icons.visibility_off_rounded
-                                : Icons.visibility_rounded,
-                            size: 18,
-                            color: theme.colorScheme.onSurfaceVariant,
                           ),
-                          onPressed: () =>
-                              widget.onToggleExcluded!.call(row.id),
+                          Text(
+                            isExcluded
+                                ? _expenseCountLabel(row.count)
+                                : '${_expenseCountLabel(row.count)} · $pct%',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant
+                                  .withValues(alpha: dim),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      CurrencyFormatter.formatCents(
+                        row.amountCents,
+                        widget.currencyCode,
+                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface
+                            .withValues(alpha: dim),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (canToggle) ...[
+                      const SizedBox(width: 2),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        tooltip: (isExcluded
+                                ? 'analytics_pie_show'
+                                : 'analytics_pie_hide')
+                            .tr(),
+                        icon: Icon(
+                          isExcluded
+                              ? Icons.visibility_off_rounded
+                              : Icons.visibility_rounded,
+                          size: 18,
+                          color: theme.colorScheme.onSurfaceVariant
+                              .withValues(alpha: dim),
                         ),
-                      ] else if (isLastVisible) ...[
-                        const SizedBox(width: 8),
-                        Icon(
-                          Icons.lock_outline_rounded,
-                          size: 16,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ],
-                      if (widget.onOpenRowExpenses != null && !isExcluded)
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                        onPressed: () =>
+                            widget.onToggleExcluded!.call(row.id),
+                      ),
+                    ] else if (isLastVisible) ...[
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.lock_outline_rounded,
+                        size: 16,
+                        color: theme.colorScheme.onSurfaceVariant
+                            .withValues(alpha: dim),
+                      ),
                     ],
-                  ),
+                    if (widget.onOpenRowExpenses != null && !isExcluded)
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                  ],
                 ),
               ),
             ),
@@ -2211,7 +2231,7 @@ class _FilterDropdown extends StatelessWidget {
             child: Row(
               children: [
                 Expanded(
-                  child: Text(
+                  child: UserText(
                     selectedLabel,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

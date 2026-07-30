@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../../domain/domain.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/user_text.dart';
+import '../../../core/widgets/user_text.dart';
 import '../category_icons.dart';
 
 class ExpenseListTile extends StatelessWidget {
@@ -106,7 +108,7 @@ class ExpenseListTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
+              UserText(
                 expense.title,
                 style: theme.textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w600,
@@ -119,9 +121,11 @@ class ExpenseListTile extends StatelessWidget {
                 detail!,
               ] else if (detailLine != null || showPaidBy) ...[
                 const SizedBox(height: 3),
-                Text(
+                UserText(
                   detailLine ??
-                      'paid_by'.tr(namedArgs: {'name': payerName}),
+                      'paid_by'.tr(
+                        namedArgs: {'name': isolateBidi(payerName)},
+                      ),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),

@@ -5,6 +5,7 @@ import '../../../core/theme/accent_style.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/widgets/group_section_header.dart';
 import '../../../core/widgets/participant_avatar.dart';
+import '../../../core/widgets/user_text.dart';
 import '../../../domain/domain.dart';
 import '../constants/expense_form_constants.dart';
 
@@ -429,13 +430,14 @@ class ExpenseSplitSection extends StatelessWidget {
                               height: kMinTapHeight,
                               child: Align(
                                 alignment: AlignmentDirectional.centerStart,
-                                child: Text(
+                                child: UserText(
                                   p.name,
                                   style: theme.textTheme.bodyLarge?.copyWith(
                                     color: included
                                         ? theme.colorScheme.onSurface
                                         : theme.colorScheme.onSurfaceVariant,
                                   ),
+                                  maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),

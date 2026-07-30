@@ -5,6 +5,7 @@ import '../layout/layout_breakpoints.dart';
 import '../layout/responsive_sheet.dart';
 import '../theme/accent_style.dart';
 import 'sheet_option_tile.dart';
+import 'user_text.dart';
 
 /// One row for [showOptionPickerSheet].
 class SheetPickerOption<T> {
@@ -48,7 +49,7 @@ Future<T?> showOptionPickerSheet<T>(
                 if (!isTablet)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    child: Text(
+                    child: UserText(
                       title,
                       style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
@@ -83,6 +84,10 @@ const double _kSheetBodyActionsGap = 20.0;
 /// Builds the shared sheet layout: optional title (in body), body, and action row.
 /// When [showTitleInBody] is false, the title is not rendered here (caller shows
 /// it in the responsive sheet top bar on tablet+).
+///
+/// Shrink-wraps to content height ([Align] + [heightFactor]) so short dialogs
+/// do not stretch to the sheet [maxHeight] and leave a large empty gap above
+/// the action row.
 Widget buildSheetShell(
   BuildContext ctx, {
   required String title,
@@ -91,52 +96,60 @@ Widget buildSheetShell(
   bool showTitleInBody = true,
 }) {
   return SafeArea(
-    child: SingleChildScrollView(
-      child: Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(ctx).padding.bottom + _kSheetPadding,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (showTitleInBody)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  _kSheetPadding,
-                  _kSheetPadding,
-                  _kSheetPadding,
-                  8,
-                ),
-                child: Text(
-                  title,
-                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
+    child: Align(
+      alignment: Alignment.topCenter,
+      heightFactor: 1,
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: EdgeInsets.only(
+            top: showTitleInBody ? 0 : _kSheetPadding,
+            bottom: MediaQuery.of(ctx).padding.bottom + _kSheetPadding,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (showTitleInBody)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    _kSheetPadding,
+                    _kSheetPadding,
+                    _kSheetPadding,
+                    8,
+                  ),
+                  child: UserText(
+                    title,
+                    style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-              ),
-            body,
-            if (actions.isNotEmpty) ...[
-              const SizedBox(height: _kSheetBodyActionsGap),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: _kSheetPadding),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    for (int i = 0; i < actions.length; i++) ...[
-                      if (i > 0) const SizedBox(width: _kSheetActionsSpacing),
-                      Focus(
-                        canRequestFocus: false,
-                        skipTraversal: true,
-                        descendantsAreFocusable: false,
-                        child: actions[i],
-                      ),
+              body,
+              if (actions.isNotEmpty) ...[
+                const SizedBox(height: _kSheetBodyActionsGap),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: _kSheetPadding,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      for (int i = 0; i < actions.length; i++) ...[
+                        if (i > 0)
+                          const SizedBox(width: _kSheetActionsSpacing),
+                        Focus(
+                          canRequestFocus: false,
+                          skipTraversal: true,
+                          descendantsAreFocusable: false,
+                          child: actions[i],
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     ),
@@ -181,7 +194,7 @@ Future<bool?> showConfirmSheet(
         title: title,
         body: _sheetBodyPanel(
           ctx,
-          child: Text(
+          child: UserText(
             content,
             style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
               color: Theme.of(ctx).colorScheme.onSurfaceVariant,

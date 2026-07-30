@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/widgets/sheet_helpers.dart';
+import '../../../core/widgets/user_text.dart';
 import '../domain/draft_transaction.dart';
 import '../providers/scanner_providers.dart';
 import 'draft_transaction_detail_page.dart';
@@ -171,7 +172,7 @@ class _DraftCard extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      UserText(
                         draft.displayTitle,
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w600,

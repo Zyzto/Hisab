@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/accent_style.dart';
 import 'group_section_header.dart';
+import 'user_text.dart';
 
 /// A tappable section header that expands/collapses to show [child].
 /// Used to indicate "there's something here" for optional or secondary content.
@@ -77,12 +78,13 @@ class _ExpandableSectionState extends State<ExpandableSection> {
                       if (summary != null && summary.isNotEmpty) ...[
                         ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 160),
-                          child: Text(
+                          child: UserText(
                             summary,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: colorScheme.onSurfaceVariant,
                             ),
                             overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
                         ),
                         const SizedBox(width: 8),

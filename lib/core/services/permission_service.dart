@@ -8,6 +8,7 @@ import '../constants/supabase_config.dart';
 import '../layout/layout_breakpoints.dart';
 import '../layout/responsive_sheet.dart';
 import '../pwa/pwa_capabilities.dart';
+import '../theme/accent_style.dart';
 import '../widgets/pwa_install_guide_sheet.dart';
 import '../widgets/sheet_helpers.dart';
 import '../widgets/toast.dart';
@@ -228,41 +229,59 @@ class PermissionService {
     bool showOpenSettings = true,
   }) {
     if (!context.mounted) return;
+    final isTablet = LayoutBreakpoints.isTabletOrWider(context);
     showResponsiveSheet<void>(
       context: context,
       title: 'permission_denied_title'.tr(),
-      maxHeight: MediaQuery.of(context).size.height * 0.4,
+      // Short copy — keep a modest cap; shell shrink-wraps to content.
+      maxHeight: MediaQuery.of(context).size.height * 0.5,
       isScrollControlled: true,
       centerInFullViewport: true,
       child: Builder(
-        builder: (ctx) => buildSheetShell(
-          ctx,
-          title: 'permission_denied_title'.tr(),
-          showTitleInBody: !LayoutBreakpoints.isTabletOrWider(context),
-          body: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(message),
-          ),
-          actions: [
-            if (!LayoutBreakpoints.isTabletOrWider(context) || !showOpenSettings)
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: Text(
-                  showOpenSettings
-                      ? 'permission_cancel'.tr()
-                      : 'install_app_got_it'.tr(),
+        builder: (ctx) {
+          final cs = Theme.of(ctx).colorScheme;
+          return buildSheetShell(
+            ctx,
+            title: 'permission_denied_title'.tr(),
+            showTitleInBody: !isTablet,
+            body: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: DecoratedBox(
+                decoration: AccentSurfaces.flatPanel(cs),
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Text(
+                    message,
+                    style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                      color: cs.onSurfaceVariant,
+                      height: 1.45,
+                    ),
+                  ),
                 ),
               ),
-            if (showOpenSettings)
-              FilledButton(
-                onPressed: () {
-                  Navigator.of(ctx).pop();
-                  openAppSettings();
-                },
-                child: Text('permission_open_settings'.tr()),
-              ),
-          ],
-        ),
+            ),
+            actions: [
+              if (!isTablet || !showOpenSettings)
+                showOpenSettings
+                    ? TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: Text('permission_cancel'.tr()),
+                      )
+                    : FilledButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: Text('install_app_got_it'.tr()),
+                      ),
+              if (showOpenSettings)
+                FilledButton(
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    openAppSettings();
+                  },
+                  child: Text('permission_open_settings'.tr()),
+                ),
+            ],
+          );
+        },
       ),
     );
   }

@@ -26,6 +26,7 @@ import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/constants/supabase_config.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/platform/network_image_decode.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/update/update_check_providers.dart';
 import '../../../core/services/delete_my_data_service.dart';
@@ -134,6 +135,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   _languageTile(context, ref, settings),
                   _themeModeTile(context, ref, settings),
                   _themeSchemeTile(context, ref, settings),
+                  buildBoolSettingTile(
+                    ref,
+                    settings,
+                    subtleAccentsSettingDef,
+                    titleKey: 'subtle_accents',
+                    subtitleKey: 'subtle_accents_description',
+                  ),
                   _fontSizeTile(context, ref, settings),
                   _favoriteCurrenciesTile(context, ref, settings),
                   _displayCurrencyTile(context, ref, settings),
@@ -143,13 +151,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     use24HourFormatSettingDef,
                     titleKey: 'use_24_hour_format',
                     subtitleKey: 'use_24_hour_format_description',
-                  ),
-                  buildBoolSettingTile(
-                    ref,
-                    settings,
-                    subtleAccentsSettingDef,
-                    titleKey: 'subtle_accents',
-                    subtitleKey: 'subtle_accents_description',
                   ),
                 ]),
                 // Functional: behavior toggles (expense form mode, etc.)
@@ -175,30 +176,32 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     onImport: () => _importData(context, ref),
                   ),
                 ),
-                _buildSection(
-                  context,
-                  ref,
-                  settings,
-                  receiptAiSection,
-                  buildReceiptAiSectionTiles(
+                // Receipt OCR/AI is native-only (ML Kit + LLM); hidden on web.
+                if (!kIsWeb)
+                  _buildSection(
                     context,
                     ref,
                     settings,
-                    ({
-                      required BuildContext context,
-                      required WidgetRef ref,
-                      required String titleKey,
-                      required String currentValue,
-                      required StringSetting settingDef,
-                    }) => _showApiKeyDialog(
-                      context: context,
-                      ref: ref,
-                      titleKey: titleKey,
-                      currentValue: currentValue,
-                      settingDef: settingDef,
+                    receiptAiSection,
+                    buildReceiptAiSectionTiles(
+                      context,
+                      ref,
+                      settings,
+                      ({
+                        required BuildContext context,
+                        required WidgetRef ref,
+                        required String titleKey,
+                        required String currentValue,
+                        required StringSetting settingDef,
+                      }) => _showApiKeyDialog(
+                        context: context,
+                        ref: ref,
+                        titleKey: titleKey,
+                        currentValue: currentValue,
+                        settingDef: settingDef,
+                      ),
                     ),
                   ),
-                ),
                 if (scannerAvailable)
                   _buildSection(
                     context,
@@ -1493,21 +1496,34 @@ class _AboutMeDialogContentState extends State<_AboutMeDialogContent> {
       children: [
         if (avatarUrl != null && avatarUrl.isNotEmpty)
           ClipOval(
-            child: Image.network(
-              avatarUrl,
-              fit: BoxFit.cover,
-              width: 80,
-              height: 80,
-              errorBuilder: (_, _, _) => Container(
-                width: 80,
-                height: 80,
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                child: Icon(
-                  Icons.person,
-                  size: 40,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
+            child: Builder(
+              builder: (context) {
+                final decode = NetworkImageDecode.cacheSize(
+                  context,
+                  logicalWidth: 80,
+                  logicalHeight: 80,
+                );
+                return Image.network(
+                  avatarUrl,
+                  fit: BoxFit.cover,
+                  width: 80,
+                  height: 80,
+                  cacheWidth: decode.width,
+                  cacheHeight: decode.height,
+                  errorBuilder: (_, _, _) => Container(
+                    width: 80,
+                    height: 80,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
+                    child: Icon(
+                      Icons.person,
+                      size: 40,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                );
+              },
             ),
           )
         else

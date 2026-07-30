@@ -11,6 +11,8 @@ import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/user_text.dart';
+import '../../../core/widgets/user_text.dart';
 import '../../../domain/domain.dart';
 import '../../balance/providers/balance_provider.dart';
 import '../../groups/providers/groups_provider.dart';
@@ -239,7 +241,7 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
       onPressed: () => context.pop(),
     );
     final appBarTitle = expense != null
-        ? Text(
+        ? UserText(
             expense.title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -386,7 +388,7 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
       context,
       title: 'delete_expense_confirm'.tr(),
       content:
-          '${expense.title} – ${CurrencyFormatter.formatCents(expense.amountCents, expense.currencyCode)}',
+          '${isolateBidi(expense.title)} – ${CurrencyFormatter.formatCents(expense.amountCents, expense.currencyCode)}',
       confirmLabel: 'delete'.tr(),
       isDestructive: true,
       centerInFullViewport: true,

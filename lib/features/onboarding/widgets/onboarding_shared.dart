@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/motion/app_motion.dart';
+import '../../../core/platform/ui_perf.dart';
+import '../../../core/theme/accent_style.dart';
 import '../../../core/theme/theme_config.dart';
 
 /// Shared scroll + padding wrapper for all onboarding page bodies.
@@ -50,7 +53,10 @@ Widget onboardingPageBodyWithFixedTitle(
               SizedBox(
                 height: topThirdHeight,
                 child: Center(
-                  child: Align(alignment: Alignment.bottomLeft, child: title),
+                  child: Align(
+                    alignment: AlignmentDirectional.bottomStart,
+                    child: title,
+                  ),
                 ),
               ),
               const SizedBox(height: titleContentGap),
@@ -66,7 +72,74 @@ Widget onboardingPageBodyWithFixedTitle(
   );
 }
 
-/// Icon container used in onboarding list cards (pages 2 and 3).
+/// One-shot fade (+ optional slide-up) when a step body first mounts.
+///
+/// On iOS web (`UiPerf.preferFadeOnlyPageTransitions`), uses fade only.
+class OnboardingStepEnter extends StatefulWidget {
+  const OnboardingStepEnter({
+    super.key,
+    required this.child,
+    this.slidePx = 20,
+  });
+
+  final Widget child;
+  final double slidePx;
+
+  @override
+  State<OnboardingStepEnter> createState() => _OnboardingStepEnterState();
+}
+
+class _OnboardingStepEnterState extends State<OnboardingStepEnter>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final CurvedAnimation _t;
+
+  @override
+  void initState() {
+    super.initState();
+    // iOS web: skip enter motion entirely (Opacity + slide is expensive).
+    if (UiPerf.preferFadeOnlyPageTransitions) {
+      _controller = AnimationController(vsync: this, value: 1);
+      _t = CurvedAnimation(parent: _controller, curve: AppMotion.enterCurve);
+      return;
+    }
+    _controller = AnimationController(vsync: this, duration: AppMotion.page);
+    _t = CurvedAnimation(parent: _controller, curve: AppMotion.enterCurve);
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _t.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (UiPerf.preferFadeOnlyPageTransitions || _controller.isCompleted) {
+      return widget.child;
+    }
+    final fadeOnly = UiPerf.preferFadeOnlyPageTransitions;
+    return AnimatedBuilder(
+      animation: _t,
+      builder: (context, child) {
+        final v = _t.value;
+        Widget result = child!;
+        if (!fadeOnly) {
+          result = Transform.translate(
+            offset: Offset(0, (1 - v) * widget.slidePx),
+            child: result,
+          );
+        }
+        return Opacity(opacity: v, child: result);
+      },
+      child: widget.child,
+    );
+  }
+}
+
+/// Icon container used in onboarding list cards.
 class OnboardingListCardIcon extends StatelessWidget {
   const OnboardingListCardIcon({
     super.key,
@@ -81,16 +154,18 @@ class OnboardingListCardIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.all(ThemeConfig.spacingS),
+      width: 40,
+      height: 40,
+      alignment: Alignment.center,
       decoration: BoxDecoration(
         color: usePrimaryContainer
-            ? colorScheme.primaryContainer.withValues(alpha: 0.5)
+            ? colorScheme.primaryContainer.withValues(alpha: 0.55)
             : colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(ThemeConfig.radiusM),
       ),
       child: Icon(
         icon,
-        size: 24,
+        size: 22,
         color: usePrimaryContainer
             ? colorScheme.onPrimaryContainer
             : colorScheme.onSurfaceVariant,
@@ -99,8 +174,7 @@ class OnboardingListCardIcon extends StatelessWidget {
   }
 }
 
-/// Shared list row style for onboarding pages 2 and 3: Card with icon container,
-/// title, subtitle, and optional trailing. Uses ThemeConfig for consistency.
+/// Flat-panel list row for onboarding preferences / permissions.
 class OnboardingListCard extends StatelessWidget {
   const OnboardingListCard({
     super.key,
@@ -117,11 +191,13 @@ class OnboardingListCard extends StatelessWidget {
   final Widget? trailing;
   final VoidCallback? onTap;
 
+  static const double _radius = 14;
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final content = Padding(
-      padding: const EdgeInsets.all(ThemeConfig.spacingS),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -143,24 +219,40 @@ class OnboardingListCard extends StatelessWidget {
               ],
             ),
           ),
-          ...([trailing].whereType<Widget>()),
+          if (trailing != null) ...[
+            const SizedBox(width: ThemeConfig.spacingXS),
+            // flex:0 + loose: intrinsic width, but capped so AR/large font can't overflow.
+            Flexible(
+              flex: 0,
+              fit: FlexFit.loose,
+              child: Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: trailing!,
+              ),
+            ),
+          ],
         ],
       ),
     );
-    return Card(
-      margin: const EdgeInsets.only(bottom: ThemeConfig.spacingS),
-      elevation: ThemeConfig.cardElevation,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(ThemeConfig.cardBorderRadius),
-        side: BorderSide(color: colorScheme.outline.withValues(alpha: 0.2)),
+
+    final panel = Ink(
+      decoration: AccentSurfaces.flatPanel(colorScheme, radius: _radius),
+      child: content,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: ThemeConfig.spacingS),
+      child: Material(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(_radius),
+        child: onTap != null
+            ? InkWell(
+                onTap: onTap,
+                borderRadius: BorderRadius.circular(_radius),
+                child: panel,
+              )
+            : panel,
       ),
-      child: onTap != null
-          ? InkWell(
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(ThemeConfig.cardBorderRadius),
-              child: content,
-            )
-          : content,
     );
   }
 }

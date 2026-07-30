@@ -1,69 +1,92 @@
-# iOS Safari Web Performance
+# iOS Safari / PWA Performance
 
-This note explains why Flutter web can feel much slower on iOS Safari than Android and how this repo mitigates it.
+Flutter web is **not one platform**. iOS WebKit (Safari + every iOS browser + Home Screen PWAs), Android Chrome, desktop browsers, and native iOS/Android each need different budgets. Policy lives in [`lib/core/platform/ui_perf.dart`](../lib/core/platform/ui_perf.dart) (`UiPerf`).
 
-## Diagnosis summary
+## Research snapshot (2025–2026)
 
-- iOS Safari has known Flutter web performance issues around accessibility semantics and scrolling.
-- This app previously enabled semantics globally on web startup via `SemanticsBinding.instance.ensureSemantics()`.
-- Enabling semantics globally can significantly degrade scroll/input smoothness on iOS Safari.
+Sources: [Flutter Wasm docs](https://docs.flutter.dev/platform-integration/web/wasm), [Flutter renderers](https://docs.flutter.dev/platform-integration/web/renderers), Flutter issues [#176327](https://github.com/flutter/flutter/issues/176327) / [#179784](https://github.com/flutter/flutter/issues/179784) / [#178524](https://github.com/flutter/flutter/issues/178524) / [#187660](https://github.com/flutter/flutter/issues/187660) / [#188796](https://github.com/flutter/flutter/issues/188796), WebKit blur/compositor guidance.
 
-## Current project decision
+| Finding | Implication for Hisab |
+|---|---|
+| Global `ensureSemantics()` causes severe iOS WebKit scroll jank | Keep `ENABLE_WEB_SEMANTICS=false` in production |
+| CanvasKit is still the practical default on many iOS Safari builds; Skwasm/`--wasm` is Chromium-strong and Safari readiness is gated (WasmGC + presentation bugs; `skwasm_heavy` often required) | Keep default CanvasKit release; A/B `--wasm` on real iPhones only |
+| CanvasKit + network images can leak GPU memory on iOS WebKit | Prefer local/cached images; avoid thrashing network image lists on iOS web |
+| Large blur / dual shadows / backdrop-filter are top mobile scroll killers | Cheap shadows **only on iOS web** |
+| Opacity crossfades that paint two full trees burn XR-class GPUs | Instant shell tabs **only on iOS web** |
+| Chart touch layers fight finger scroll on coarse pointers | Disable fl_chart touch on **mobile web** (iOS + Android browsers) |
+| Async/deferred third-party JS improves INP / first paint | Firebase SDK loads async before Flutter bootstrap (all web) |
+| OPFS needs COOP/COEP; breaks cross-origin Firebase CDN | Do **not** enable isolation headers in Hosting while using gstatic Firebase |
 
-- Default behavior: do **not** force-enable web semantics.
-- Accessibility opt-in remains available through build-time define:
-  - `--dart-define=ENABLE_WEB_SEMANTICS=true`
-- Production web builds default to:
-  - `--dart-define=ENABLE_WEB_SEMANTICS=false`
-- Web SQLite change detection uses a **1.5s poll** (not native `watch`) because PowerSync’s web update stream can throw `LegacyJavaScriptObject`/`UpdateNotification`. Polls are **fingerprint-gated** so unchanged data does not rebuild Riverpod widgets every tick (important for Safari scroll FPS).
+## Platform matrix
 
-This keeps iOS Safari responsive for most users while still allowing accessibility-targeted builds.
+| Optimization | iOS web | Android web | Desktop web | Native iOS | Native Android |
+|---|---|---|---|---|---|
+| Cheap nav / segment shadows | yes (`UiPerf`) | no | no | no | no |
+| Instant Home↔Settings (no Opacity crossfade) | yes | no | no | no | no |
+| Instant group-detail tab switch | yes | no | no | no | no |
+| Fade-only page transitions | yes | no | no | no | no |
+| Disable chart touch tooltips (bar/line) | yes | yes (mobile) | no | no | no |
+| Skip legend `Opacity` / progress tweens | yes | yes (mobile) | no | no | no |
+| Onboarding: no chrome demo timers / lazy steps | yes | no | no | no | no |
+| Network image decode caps (`cacheWidth`) | capped 1280px | display×DPR | display×DPR | display×DPR | display×DPR |
+| Sliver home group list + `RepaintBoundary` | yes | yes | yes | yes | yes |
+| Lazy group-detail `PageView.builder` + keepAlive | yes | yes | yes | yes | yes |
+| App root `listenManual` for sync/scanner | yes | yes | yes | yes | yes |
+| Async Firebase boot | yes | yes | yes | n/a | n/a |
+| Semantics off by default | yes (critical) | yes | yes | n/a (native a11y) | n/a |
+| Full floating-nav blur shadows | no | yes | yes | yes | yes |
+| Shell tab crossfade | no | yes | yes | yes | yes |
+
+Detection for web OS uses the existing PWA UA helpers (`isPwaIos` / `isPwaAndroid` / `isPwaMobile` in `lib/core/pwa/`).
+
+### Done in follow-ups
+
+- Profile page: `CustomScrollView` section slivers + lazy activity/group lists
+- Home reorder: custom `HomeReorderableGroupsSliver` (long-press drag + insert line; no nested `shrinkWrap`)
+- Settings lazy-mount in shell (created on first visit)
+- Receipt OCR/AI: web stub export (no ML Kit / langchain on web); settings section hidden on web
+
+## Current project decisions
+
+- Default: do **not** force-enable web semantics (`ENABLE_WEB_SEMANTICS=false`).
+- Accessibility builds may pass `--dart-define=ENABLE_WEB_SEMANTICS=true` (expect iOS scroll cost).
+- Web SQLite change detection: **1.5s poll**, fingerprint-gated (avoids rebuild ticks during Safari scroll).
+- Visual / interaction cheap-paths: gated by `UiPerf` per surface above.
 
 ## Renderer strategy (rollout)
 
-- Default release path remains standard `flutter build web` (CanvasKit path).
-- Manual release runs can choose WebAssembly mode (`--wasm`) through workflow input `web_build_mode=wasm`.
-- Rollout recommendation:
-  1. Validate `wasm` on staging and real iOS Safari devices.
-  2. Compare startup time, scroll FPS, and interaction latency.
-  3. Keep default mode unless `wasm` is consistently better across your supported browsers/devices.
+- Default release: `flutter build web` → **CanvasKit**.
+- Optional workflow input `web_build_mode=wasm` for staging A/B.
+- On iOS, expect JS/CanvasKit fallback until Flutter’s Safari Skwasm path is production-ready; do not flip production to wasm-only based on Chromium numbers alone.
+- Validate on a real iPhone XR (or similar) before promoting wasm.
 
-## Verification checklist (iOS Safari)
+## OPFS headers (not enabled in Hosting)
 
-Use a real iPhone and Safari with production-like build.
+Local experiment only:
 
-- Home:
-  - Scroll group list continuously for 10-15 seconds.
-  - Open/close group cards and confirm no visible frame stutter spikes.
-- Settings:
-  - Scroll entire page top-to-bottom multiple times.
-  - Toggle a few settings and ensure touch response remains immediate.
-- Group detail:
-  - Navigate between tabs/sections and scroll long content.
-  - Open and close at least one responsive sheet/dialog.
-- Analytics page:
-  - Switch chart modes and range filters.
-  - Scroll while charts are visible and watch for dropped frames.
-- Regression compare:
-  - Compare with Android Chrome on the same account/data size.
-  - If iOS remains poor, test a build with `--wasm` and compare.
+```bash
+flutter run -d chrome \
+  --web-header "Cross-Origin-Opener-Policy=same-origin" \
+  --web-header "Cross-Origin-Embedder-Policy=require-corp"
+```
+
+## Verification checklist
+
+Prefer a physical **iPhone XR-class** device + Home Screen PWA, then compare Android Chrome PWA and native builds.
+
+- **iOS web:** Home scroll 10–15s; Home↔Settings feels instant; nav has light border (not soft blur); analytics scrolls without tooltip fights; page pushes are fade-only.
+- **Android web:** Home↔Settings still crossfades; nav keeps soft shadow; chart tooltips off on phone.
+- **Native:** Full motion + shadows unchanged; home list still uses slivers.
 
 ## Build examples
 
-Default web build (recommended baseline):
-
 ```bash
+# Production baseline
 flutter build web --dart-define=ENABLE_WEB_SEMANTICS=false
-```
 
-Accessibility-focused web build:
-
-```bash
+# Accessibility-targeted (slower on iOS Safari)
 flutter build web --dart-define=ENABLE_WEB_SEMANTICS=true
-```
 
-Wasm experiment:
-
-```bash
+# Staging Wasm experiment (still falls back to CanvasKit where Skwasm is unsafe)
 flutter build web --wasm --dart-define=ENABLE_WEB_SEMANTICS=false
 ```
