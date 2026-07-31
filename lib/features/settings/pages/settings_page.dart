@@ -10,7 +10,6 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 import 'package:feedback/feedback.dart';
@@ -50,6 +49,7 @@ import '../sections/settings_privacy_section.dart';
 import '../sections/settings_advanced_section.dart';
 import '../sections/settings_data_backup_section.dart';
 import '../sections/settings_receipt_ai_section.dart';
+import '../../../core/widgets/page_section_index.dart';
 import '../../../core/widgets/participant_avatar.dart';
 import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/sheet_option_tile.dart';
@@ -67,6 +67,26 @@ class SettingsPage extends ConsumerStatefulWidget {
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   final Map<String, bool> _sectionExpanded = {};
+  final _scrollController = ScrollController();
+  final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
+  final _anchors = SettingAnchorRegistry();
+  final Map<String, GlobalKey> _sectionKeys = {
+    'account': GlobalKey(),
+    'appearance': GlobalKey(),
+    'functional': GlobalKey(),
+    'data_backup': GlobalKey(),
+    'receipt_ai': GlobalKey(),
+    'scanner': GlobalKey(),
+    'privacy': GlobalKey(),
+    'advanced': GlobalKey(),
+    'about': GlobalKey(),
+  };
+  final Map<String, double> _sectionOffsets = {};
+  String? _activeSectionId;
+  bool _programmaticScroll = false;
+  int _scrollGeneration = 0;
+  String _searchQuery = '';
 
   static const List<Locale> _supportedLocales = [Locale('en'), Locale('ar')];
 
@@ -80,12 +100,241 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
   }
 
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    _scrollController.dispose();
+    _anchors.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    final query = _searchController.text.trim();
+    if (query != _searchQuery) setState(() => _searchQuery = query);
+  }
+
   bool _isExpanded(SettingSection section) {
     return _sectionExpanded[section.key] ?? section.initiallyExpanded;
   }
 
   void _onExpansionChanged(String key, bool expanded) {
     setState(() => _sectionExpanded[key] = expanded);
+  }
+
+  List<PageSectionIndexEntry> _indexEntries({
+    required bool showReceiptAi,
+    required bool showScanner,
+  }) {
+    final sections = <SettingSection>[
+      accountSection,
+      appearanceSection,
+      functionalSection,
+      dataBackupSection,
+      if (showReceiptAi) receiptAiSection,
+      if (showScanner) scannerSection,
+      privacySection,
+      advancedSection,
+      aboutSection,
+    ];
+    return [
+      for (final section in sections)
+        PageSectionIndexEntry(
+          id: section.key,
+          label: section.titleKey.tr(),
+          key: _sectionKeys[section.key]!,
+          icon: section.icon,
+        ),
+    ];
+  }
+
+  void _rememberSectionOffset(String id, GlobalKey key) {
+    final ctx = key.currentContext;
+    if (ctx == null || !_scrollController.hasClients) return;
+    final box = ctx.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return;
+    final scrollable = Scrollable.maybeOf(ctx);
+    if (scrollable == null) return;
+    final scrollBox = scrollable.context.findRenderObject();
+    if (scrollBox is! RenderBox) return;
+    final local = box.localToGlobal(Offset.zero, ancestor: scrollBox);
+    _sectionOffsets[id] = (local.dy + scrollable.position.pixels).clamp(
+      0.0,
+      double.infinity,
+    );
+  }
+
+  void _captureVisibleOffsets(List<PageSectionIndexEntry> entries) {
+    for (final entry in entries) {
+      _rememberSectionOffset(entry.id, entry.key);
+    }
+  }
+
+  Future<void> _jumpToSection(PageSectionIndexEntry entry) async {
+    final token = ++_scrollGeneration;
+    final section = _sectionByKey(entry.id);
+    final wasCollapsed =
+        section != null && !(_sectionExpanded[entry.id] ?? section.initiallyExpanded);
+
+    setState(() {
+      _activeSectionId = entry.id;
+      _programmaticScroll = true;
+      _sectionExpanded[entry.id] = true;
+    });
+
+    // Let CardSettingsSection AnimatedSize (~200ms) finish before measuring.
+    if (wasCollapsed) {
+      await Future<void>.delayed(const Duration(milliseconds: 220));
+    }
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted || token != _scrollGeneration) return;
+
+    _rememberSectionOffset(entry.id, entry.key);
+    final known = entry.id == 'account' ? 0.0 : _sectionOffsets[entry.id];
+    await scrollToPageSection(
+      entry.key,
+      controller: _scrollController,
+      knownOffset: known,
+    );
+    if (!mounted || token != _scrollGeneration) return;
+
+    _captureVisibleOffsets(_indexEntries(
+      showReceiptAi: !kIsWeb,
+      showScanner: scannerAvailable,
+    ));
+    // Hold scroll-spy until ensureVisible settles so the index doesn't flash.
+    await Future<void>.delayed(const Duration(milliseconds: 320));
+    if (mounted && token == _scrollGeneration) {
+      setState(() {
+        _activeSectionId = entry.id;
+        _programmaticScroll = false;
+      });
+    }
+  }
+
+  SettingSection? _sectionByKey(String key) {
+    for (final s in allSections) {
+      if (s.key == key) return s;
+    }
+    return null;
+  }
+
+  bool _onScroll(
+    ScrollNotification notification,
+    List<PageSectionIndexEntry> entries,
+  ) {
+    if (notification is ScrollUpdateNotification ||
+        notification is ScrollEndNotification) {
+      _captureVisibleOffsets(entries);
+    }
+    if (_programmaticScroll) return false;
+    if (notification is! ScrollUpdateNotification &&
+        notification is! ScrollEndNotification) {
+      return false;
+    }
+    final scrollCtx = notification.context;
+    if (scrollCtx == null) return false;
+    final next = activePageSectionId(
+      entries: entries,
+      scrollContext: scrollCtx,
+    );
+    if (next != null && next != _activeSectionId) {
+      setState(() => _activeSectionId = next);
+    }
+    return false;
+  }
+
+  /// Settings that are searchable but live inside sheets/hubs: jump to the
+  /// nearest on-page tile instead of a missing anchor.
+  static const _searchJumpAliases = <String, String>{
+    'theme_color': 'theme_scheme',
+    'scanner_location_enabled': 'scanner_enabled',
+    'scanner_notify_on_capture': 'action_scanner_hub',
+    'gemini_api_key': 'receipt_ai_provider',
+    'openai_api_key': 'receipt_ai_provider',
+  };
+
+  bool _includeSearchResult(SearchResult result) {
+    final section = result.setting.section;
+    if (section == null || !settingsPageSectionKeys.contains(section)) {
+      return false;
+    }
+    if (section == 'home_list') return false;
+    if (section == 'receipt_ai' && kIsWeb) return false;
+    if (section == 'scanner' && !scannerAvailable) return false;
+    return true;
+  }
+
+  Future<void> _onSearchResultSelected(SearchResult result) async {
+    final setting = result.setting;
+    final sectionKey = setting.section;
+    final jumpKey = _searchJumpAliases[setting.key] ?? setting.key;
+    final token = ++_scrollGeneration;
+    setState(() {
+      _searchController.clear();
+      _searchQuery = '';
+      _programmaticScroll = true;
+      if (sectionKey != null) {
+        _activeSectionId = sectionKey;
+        _sectionExpanded[sectionKey] = true;
+      }
+    });
+    _searchFocusNode.unfocus();
+
+    await Future<void>.delayed(const Duration(milliseconds: 220));
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted || token != _scrollGeneration) return;
+
+    if (sectionKey != null) {
+      final sectionGlobalKey = _sectionKeys[sectionKey];
+      if (sectionGlobalKey != null) {
+        _rememberSectionOffset(sectionKey, sectionGlobalKey);
+      }
+    }
+    final sectionOffset =
+        sectionKey != null ? _sectionOffsets[sectionKey] : null;
+
+    // Prefer section scroll first so the tile is built, then highlight.
+    if (sectionKey != null) {
+      final sectionGlobalKey = _sectionKeys[sectionKey];
+      if (sectionGlobalKey != null) {
+        await scrollToPageSection(
+          sectionGlobalKey,
+          controller: _scrollController,
+          knownOffset: sectionOffset,
+        );
+      }
+    }
+    if (!mounted || token != _scrollGeneration) return;
+
+    await _anchors.scrollTo(
+      jumpKey,
+      controller: _scrollController,
+      knownOffset: sectionOffset,
+    );
+    if (_anchors.keyFor(jumpKey).currentContext == null) {
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      if (!mounted || token != _scrollGeneration) return;
+      await _anchors.scrollTo(
+        jumpKey,
+        controller: _scrollController,
+        knownOffset: sectionOffset,
+      );
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 320));
+    if (mounted && token == _scrollGeneration) {
+      setState(() => _programmaticScroll = false);
+    }
+  }
+
+  bool _canShowSideIndex(BuildContext context, double contentAreaWidth) {
+    return LayoutBreakpoints.canShowContentAside(context, contentAreaWidth);
   }
 
   @override
@@ -112,8 +361,23 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       );
     }
 
+    final showReceiptAi = !kIsWeb;
+    final showScanner = scannerAvailable;
+    final entries = _indexEntries(
+      showReceiptAi: showReceiptAi,
+      showScanner: showScanner,
+    );
+    final entryIds = {for (final e in entries) e.id};
+    final activeId =
+        (_activeSectionId != null && entryIds.contains(_activeSectionId))
+            ? _activeSectionId
+            : entries.firstOrNull?.id;
+    final hasSearch = _searchQuery.isNotEmpty;
+
     return LayoutBuilder(
       builder: (context, layoutConstraints) {
+        final showSideIndex =
+            !hasSearch && _canShowSideIndex(context, layoutConstraints.maxWidth);
         return Scaffold(
           appBar: ContentAlignedAppBar(
             contentAreaWidth: layoutConstraints.maxWidth,
@@ -126,124 +390,252 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ],
           ),
           body: ConstrainedContent(
-            child: ListView(
-              key: const PageStorageKey<String>('settings_list'),
+            aside: showSideIndex
+                ? PageSectionIndex(
+                    entries: entries,
+                    activeId: activeId,
+                    onSelect: _jumpToSection,
+                  )
+                : null,
+            child: Column(
               children: [
-                _buildAccountSection(context, ref, settings),
-                // Appearance: merged General + old Appearance
-                _buildSection(context, ref, settings, appearanceSection, [
-                  _languageTile(context, ref, settings),
-                  _themeModeTile(context, ref, settings),
-                  _themeSchemeTile(context, ref, settings),
-                  buildBoolSettingTile(
-                    ref,
-                    settings,
-                    subtleAccentsSettingDef,
-                    titleKey: 'subtle_accents',
-                    subtitleKey: 'subtle_accents_description',
-                  ),
-                  _fontSizeTile(context, ref, settings),
-                  _favoriteCurrenciesTile(context, ref, settings),
-                  _displayCurrencyTile(context, ref, settings),
-                  buildBoolSettingTile(
-                    ref,
-                    settings,
-                    use24HourFormatSettingDef,
-                    titleKey: 'use_24_hour_format',
-                    subtitleKey: 'use_24_hour_format_description',
-                  ),
-                ]),
-                // Functional: behavior toggles (expense form mode, etc.)
-                _buildSection(
-                  context,
-                  ref,
-                  settings,
-                  functionalSection,
-                  buildFunctionalSectionTiles(context, ref, settings),
-                ),
-                // Data & Backup: merged Data + old Backup
-                _buildSection(
-                  context,
-                  ref,
-                  settings,
-                  dataBackupSection,
-                  buildDataBackupSectionTiles(
-                    context,
-                    ref,
-                    settings,
-                    localOnlyTile: _buildLocalOnlyTile(context, ref, settings),
-                    onExport: () => _exportData(context, ref),
-                    onImport: () => _importData(context, ref),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  child: SettingsSearchBar(
+                    mode: SettingsSearchBarMode.persistent,
+                    hintText: 'settings_search_hint'.tr(),
+                    controller: _searchController,
+                    focusNode: _searchFocusNode,
+                    onChanged: (_) {},
                   ),
                 ),
-                // Receipt OCR/AI is native-only (ML Kit + LLM); hidden on web.
-                if (!kIsWeb)
-                  _buildSection(
-                    context,
-                    ref,
-                    settings,
-                    receiptAiSection,
-                    buildReceiptAiSectionTiles(
-                      context,
-                      ref,
-                      settings,
-                      ({
-                        required BuildContext context,
-                        required WidgetRef ref,
-                        required String titleKey,
-                        required String currentValue,
-                        required StringSetting settingDef,
-                      }) => _showApiKeyDialog(
-                        context: context,
-                        ref: ref,
-                        titleKey: titleKey,
-                        currentValue: currentValue,
-                        settingDef: settingDef,
+                Expanded(
+                  child: Stack(
+                    children: [
+                      NotificationListener<ScrollNotification>(
+                        onNotification: (n) => _onScroll(n, entries),
+                        child: hasSearch
+                            ? ListView(
+                                padding: const EdgeInsets.only(bottom: 32),
+                                children: _buildSearchBody(settings),
+                              )
+                            : ListView(
+                                key: const PageStorageKey<String>(
+                                  'settings_list',
+                                ),
+                                controller: _scrollController,
+                                // Keep section cards mounted so index jumps
+                                // don't need multi-step probes.
+                                cacheExtent: 2400,
+                                padding: EdgeInsets.only(
+                                  bottom: showSideIndex ? 32 : 88,
+                                ),
+                                children: _buildBrowseChildren(
+                                  context,
+                                  ref,
+                                  settings,
+                                  showReceiptAi: showReceiptAi,
+                                  showScanner: showScanner,
+                                ),
+                              ),
                       ),
-                    ),
-                  ),
-                if (scannerAvailable)
-                  _buildSection(
-                    context,
-                    ref,
-                    settings,
-                    scannerSection,
-                    _buildScannerSectionTiles(context, ref, settings),
-                  ),
-                // Privacy: renamed from Logging
-                _buildSection(
-                  context,
-                  ref,
-                  settings,
-                  privacySection,
-                  buildPrivacySectionTiles(context, ref, settings),
-                ),
-                _buildSection(
-                  context,
-                  ref,
-                  settings,
-                  advancedSection,
-                  buildAdvancedSectionTiles(
-                    context,
-                    ref,
-                    settings,
-                    onReturnToOnboarding: () =>
-                        _resetToOnboarding(context, ref, settings),
-                    onViewLogs: () => _showLogsDialog(context),
-                    onResetAllSettings: () =>
-                        _resetAllSettings(context, ref, settings),
-                    onDeleteLocalData: () => _showDeleteLocalData(context, ref),
-                    onDeleteCloudData: () => _showDeleteCloudData(context, ref),
-                    supabaseAvailable: supabaseConfigAvailable,
-                    isSignedIn: ref.watch(currentUserProvider) != null,
+                      if (!hasSearch && !showSideIndex)
+                        PageSectionIndexOverlay(
+                          entries: entries,
+                          activeId: activeId,
+                          onSelect: _jumpToSection,
+                        ),
+                    ],
                   ),
                 ),
-                _buildAboutSection(context, ref, settings),
               ],
             ),
           ),
         );
       },
+    );
+  }
+
+  List<Widget> _buildBrowseChildren(
+    BuildContext context,
+    WidgetRef ref,
+    SettingsProviders settings, {
+    required bool showReceiptAi,
+    required bool showScanner,
+  }) {
+    return [
+      _buildAccountSection(context, ref, settings),
+      _buildSection(context, ref, settings, appearanceSection, [
+        _anchors.wrap(
+          languageSettingDef.key,
+          _languageTile(context, ref, settings),
+        ),
+        _anchors.wrap(
+          themeModeSettingDef.key,
+          _themeModeTile(context, ref, settings),
+        ),
+        _anchors.wrap(
+          themeSchemeSettingDef.key,
+          _themeSchemeTile(context, ref, settings),
+        ),
+        buildBoolSettingTile(
+          ref,
+          settings,
+          subtleAccentsSettingDef,
+          anchors: _anchors,
+        ),
+        _anchors.wrap(
+          fontSizeScaleSettingDef.key,
+          _fontSizeTile(context, ref, settings),
+        ),
+        _anchors.wrap(
+          favoriteCurrenciesSettingDef.key,
+          _favoriteCurrenciesTile(context, ref, settings),
+        ),
+        _anchors.wrap(
+          displayCurrencySettingDef.key,
+          _displayCurrencyTile(context, ref, settings),
+        ),
+        buildBoolSettingTile(
+          ref,
+          settings,
+          use24HourFormatSettingDef,
+          anchors: _anchors,
+        ),
+      ]),
+      _buildSection(
+        context,
+        ref,
+        settings,
+        functionalSection,
+        buildFunctionalSectionTiles(
+          context,
+          ref,
+          settings,
+          anchors: _anchors,
+        ),
+      ),
+      _buildSection(
+        context,
+        ref,
+        settings,
+        dataBackupSection,
+        buildDataBackupSectionTiles(
+          context,
+          ref,
+          settings,
+          localOnlyTile: _anchors.wrap(
+            localOnlySettingDef.key,
+            _buildLocalOnlyTile(context, ref, settings),
+          ),
+          onExport: () => _exportData(context, ref),
+          onImport: () => _importData(context, ref),
+          anchors: _anchors,
+        ),
+      ),
+      if (showReceiptAi)
+        _buildSection(
+          context,
+          ref,
+          settings,
+          receiptAiSection,
+          buildReceiptAiSectionTiles(
+            context,
+            ref,
+            settings,
+            ({
+              required BuildContext context,
+              required WidgetRef ref,
+              required String titleKey,
+              required String currentValue,
+              required StringSetting settingDef,
+            }) => _showApiKeyDialog(
+              context: context,
+              ref: ref,
+              titleKey: titleKey,
+              currentValue: currentValue,
+              settingDef: settingDef,
+            ),
+            anchors: _anchors,
+          ),
+        ),
+      if (showScanner)
+        _buildSection(
+          context,
+          ref,
+          settings,
+          scannerSection,
+          _buildScannerSectionTiles(context, ref, settings),
+        ),
+      _buildSection(
+        context,
+        ref,
+        settings,
+        privacySection,
+        buildPrivacySectionTiles(
+          context,
+          ref,
+          settings,
+          anchors: _anchors,
+        ),
+      ),
+      _buildSection(
+        context,
+        ref,
+        settings,
+        advancedSection,
+        buildAdvancedSectionTiles(
+          context,
+          ref,
+          settings,
+          onReturnToOnboarding: () =>
+              _resetToOnboarding(context, ref, settings),
+          onViewLogs: () => _showLogsDialog(context),
+          onResetAllSettings: () => _resetAllSettings(context, ref, settings),
+          onDeleteLocalData: () => _showDeleteLocalData(context, ref),
+          onDeleteCloudData: () => _showDeleteCloudData(context, ref),
+          supabaseAvailable: supabaseConfigAvailable,
+          isSignedIn: ref.watch(currentUserProvider) != null,
+          anchors: _anchors,
+        ),
+      ),
+      _buildAboutSection(context, ref, settings),
+    ];
+  }
+
+  List<Widget> _buildSearchBody(SettingsProviders settings) {
+    final results = ref
+        .watch(settingsSearchResultsProvider(_searchQuery))
+        .where(_includeSearchResult)
+        .toList();
+    if (results.isEmpty) {
+      return [
+        EmptySearchResults(
+          query: _searchQuery,
+          message: 'settings_search_empty'.tr(
+            namedArgs: {'query': _searchQuery},
+          ),
+        ),
+      ];
+    }
+    return buildSearchResultWidgets(
+      results,
+      tileBuilder: (setting) {
+        final title = setting.titleKey.tr();
+        final subtitle = setting.subtitleKey?.tr();
+        return ListTile(
+          leading: setting.icon != null ? Icon(setting.icon) : null,
+          title: Text(title),
+          subtitle: subtitle != null ? Text(subtitle) : null,
+          trailing: const Icon(Icons.chevron_right),
+        );
+      },
+      sectionTitleBuilder: (sectionKey) {
+        final section = settings.registry.getSection(sectionKey);
+        return (section?.titleKey ?? sectionKey).tr();
+      },
+      settingTitleBuilder: (setting) => setting.titleKey.tr(),
+      onResultSelected: _onSearchResultSelected,
     );
   }
 
@@ -258,29 +650,32 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         profile?.name ?? profile?.email ?? 'profile'.tr();
 
     return _buildSection(context, ref, settings, accountSection, [
-      ListTile(
-        leading: profile != null
-            ? ParticipantAvatar(
-                name: displayName,
-                avatarId: profile.avatarId,
-                initials: AccountModeActions.initials(
-                  profile.name,
-                  profile.email,
+      _anchors.wrap(
+        actionOpenProfileSettingDef.key,
+        ListTile(
+          leading: profile != null
+              ? ParticipantAvatar(
+                  name: displayName,
+                  avatarId: profile.avatarId,
+                  initials: AccountModeActions.initials(
+                    profile.name,
+                    profile.email,
+                  ),
+                  backgroundColor: colorScheme.primaryContainer,
+                  foregroundColor: colorScheme.onPrimaryContainer,
+                )
+              : CircleAvatar(
+                  backgroundColor: colorScheme.primaryContainer,
+                  child: Icon(
+                    Icons.person_outline,
+                    color: colorScheme.onPrimaryContainer,
+                  ),
                 ),
-                backgroundColor: colorScheme.primaryContainer,
-                foregroundColor: colorScheme.onPrimaryContainer,
-              )
-            : CircleAvatar(
-                backgroundColor: colorScheme.primaryContainer,
-                child: Icon(
-                  Icons.person_outline,
-                  color: colorScheme.onPrimaryContainer,
-                ),
-              ),
-        title: Text('profile'.tr()),
-        subtitle: Text('profile_settings_link_subtitle'.tr()),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => context.push(RoutePaths.profile),
+          title: Text('profile'.tr()),
+          subtitle: Text('profile_settings_link_subtitle'.tr()),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => context.push(RoutePaths.profile),
+        ),
       ),
     ]);
   }
@@ -295,7 +690,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final isExpanded = _isExpanded(section);
     final title = section.titleKey.tr();
     final icon = section.icon ?? Icons.settings;
-    return CardSettingsSection(
+    final sectionKey = _sectionKeys[section.key];
+    final card = CardSettingsSection(
       title: title,
       icon: icon,
       sectionId: section.key,
@@ -305,6 +701,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       isLandscape: false,
       children: children,
     );
+    if (sectionKey == null) return card;
+    return KeyedSubtree(key: sectionKey, child: card);
   }
 
   static Future<void> _resetToOnboarding(
@@ -603,6 +1001,29 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     (0xFFE65100, 'orange'),
   ];
 
+  /// Color swatch sized like a default [Icon] (24) so ListTile alignment matches.
+  static Widget _schemeColorSwatch(
+    BuildContext context,
+    Color color, {
+    double size = 24,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    final fill = color == Colors.transparent
+        ? cs.surfaceContainerHighest
+        : color;
+    return SizedBox(
+      width: size,
+      height: size,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: fill,
+          shape: BoxShape.circle,
+          border: Border.all(color: cs.outline),
+        ),
+      ),
+    );
+  }
+
   Widget _themeSchemeTile(
     BuildContext context,
     WidgetRef ref,
@@ -614,24 +1035,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final displayColor = schemeValue == 'custom'
         ? Color(themeColorValue)
         : primaryColorForSchemeId(schemeValue);
+    // Match default Icon size (24) so the swatch aligns with sibling leadings.
+    const swatchSize = 24.0;
     return ListTile(
-      leading: Container(
-        width: 40,
-        height: 40,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: displayColor != Colors.transparent
-              ? displayColor
-              : Theme.of(context).colorScheme.surfaceContainerHighest,
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outline,
-            width: 1.5,
-          ),
-        ),
-        child: displayColor == Colors.transparent
-            ? Icon(themeSchemeSettingDef.icon, size: 22)
-            : null,
+      leading: _schemeColorSwatch(
+        context,
+        displayColor,
+        size: swatchSize,
       ),
       title: Text('color_scheme'.tr()),
       subtitle: Text(currentLabel),
@@ -651,21 +1061,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     final chipColor = schemeId == 'custom'
                         ? Color(themeColorValue)
                         : primaryColorForSchemeId(schemeId);
-                    return Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: chipColor != Colors.transparent
-                            ? chipColor
-                            : Theme.of(ctx)
-                                .colorScheme
-                                .surfaceContainerHighest,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Theme.of(ctx).colorScheme.outline,
-                        ),
-                      ),
-                    );
+                    return _schemeColorSwatch(ctx, chipColor, size: swatchSize);
                   },
                 ),
               ),
@@ -962,73 +1358,92 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     WidgetRef ref,
     SettingsProviders settings,
   ) {
-    return CardSettingsSection(
-      title: 'about'.tr(),
-      icon: aboutSection.icon ?? Icons.info,
-      sectionId: aboutSection.key,
-      isExpanded: _isExpanded(aboutSection),
-      onExpansionChanged: (expanded) =>
-          _onExpansionChanged(aboutSection.key, expanded),
-      isLandscape: false,
-      children: [
-        FutureBuilder<PackageInfo>(
-          future: PackageInfo.fromPlatform(),
-          builder: (context, snapshot) {
-            final version = snapshot.hasData
-                ? '${snapshot.data!.appName} ${snapshot.data!.version}+${snapshot.data!.buildNumber}'
-                : '—';
-            final isWeb = kIsWeb;
-            return NavigationSettingsTile(
+    final sectionKey = _sectionKeys[aboutSection.key]!;
+    return KeyedSubtree(
+      key: sectionKey,
+      child: CardSettingsSection(
+        title: 'about'.tr(),
+        icon: aboutSection.icon ?? Icons.info,
+        sectionId: aboutSection.key,
+        isExpanded: _isExpanded(aboutSection),
+        onExpansionChanged: (expanded) =>
+            _onExpansionChanged(aboutSection.key, expanded),
+        isLandscape: false,
+        children: [
+          _anchors.wrap(
+            actionVersionSettingDef.key,
+            FutureBuilder<PackageInfo>(
+              future: PackageInfo.fromPlatform(),
+              builder: (context, snapshot) {
+                final version = snapshot.hasData
+                    ? '${snapshot.data!.appName} ${snapshot.data!.version}+${snapshot.data!.buildNumber}'
+                    : '—';
+                final isWeb = kIsWeb;
+                return NavigationSettingsTile(
+                  leading: const Icon(Icons.info_outline),
+                  title: Text('version'.tr()),
+                  subtitle: Text(version),
+                  onTap: isWeb
+                      ? null
+                      : () {
+                          final trigger = ref
+                              .read(updateCheckTriggerProvider)
+                              .callback;
+                          if (trigger != null) {
+                            if (context.mounted) {
+                              context.showToast('checking_for_updates'.tr());
+                            }
+                            trigger(context);
+                          }
+                        },
+                );
+              },
+            ),
+          ),
+          _anchors.wrap(
+            actionSendFeedbackSettingDef.key,
+            NavigationSettingsTile(
+              leading: const Icon(Icons.feedback_outlined),
+              title: Text('send_feedback'.tr()),
+              onTap: () {
+                if (!context.mounted) return;
+                // Reset controller so sheet can open again after being dismissed.
+                BetterFeedback.of(context).hide();
+                BetterFeedback.of(context).show(
+                  (UserFeedback feedback) =>
+                      handleFeedback(context, feedback: feedback),
+                );
+              },
+            ),
+          ),
+          _anchors.wrap(
+            actionLicensesSettingDef.key,
+            NavigationSettingsTile(
               leading: const Icon(Icons.info_outline),
-              title: Text('version'.tr()),
-              subtitle: Text(version),
-              onTap: isWeb
-                  ? null
-                  : () {
-                      final trigger = ref
-                          .read(updateCheckTriggerProvider)
-                          .callback;
-                      if (trigger != null) {
-                        if (context.mounted) {
-                          context.showToast('checking_for_updates'.tr());
-                        }
-                        trigger(context);
-                      }
-                    },
-            );
-          },
-        ),
-        NavigationSettingsTile(
-          leading: const Icon(Icons.feedback_outlined),
-          title: Text('send_feedback'.tr()),
-          onTap: () {
-            if (!context.mounted) return;
-            // Reset controller so sheet can open again after being dismissed (e.g. if user navigated away without submitting).
-            BetterFeedback.of(context).hide();
-            BetterFeedback.of(context).show(
-              (UserFeedback feedback) =>
-                  handleFeedback(context, feedback: feedback),
-            );
-          },
-        ),
-        NavigationSettingsTile(
-          leading: const Icon(Icons.info_outline),
-          title: Text('licenses'.tr()),
-          onTap: () => _showLicenses(context),
-        ),
-        NavigationSettingsTile(
-          leading: const Icon(Icons.person_outline),
-          title: Text('about_me'.tr()),
-          subtitle: Text('about_me_description'.tr()),
-          onTap: () => _showAboutMe(context),
-        ),
-        NavigationSettingsTile(
-          leading: const Icon(Icons.favorite_outline),
-          title: Text('donate'.tr()),
-          subtitle: Text('donate_description'.tr()),
-          onTap: () => _openDonateLink(context),
-        ),
-      ],
+              title: Text('licenses'.tr()),
+              onTap: () => _showLicenses(context),
+            ),
+          ),
+          _anchors.wrap(
+            actionAboutMeSettingDef.key,
+            NavigationSettingsTile(
+              leading: const Icon(Icons.person_outline),
+              title: Text('about_me'.tr()),
+              subtitle: Text('about_me_description'.tr()),
+              onTap: () => _showAboutMe(context),
+            ),
+          ),
+          _anchors.wrap(
+            actionDonateSettingDef.key,
+            NavigationSettingsTile(
+              leading: const Icon(Icons.favorite_outline),
+              title: Text('donate'.tr()),
+              subtitle: Text('donate_description'.tr()),
+              onTap: () => _openDonateLink(context),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1041,31 +1456,37 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final pendingCount =
         ref.watch(pendingDraftCountProvider).asData?.value ?? 0;
     return [
-      SwitchSettingsTile.fromSetting(
-        setting: scannerEnabledSettingDef,
-        title: 'scanner_enabled'.tr(),
-        subtitle: 'scanner_enabled_description'.tr(),
-        value: isEnabled,
-        onChanged: (v) {
-          applySetting(ref, settings, scannerEnabledSettingDef, v);
-          NotificationBridge.setEnabled(v);
-        },
+      _anchors.wrap(
+        scannerEnabledSettingDef.key,
+        SwitchSettingsTile.fromSetting(
+          setting: scannerEnabledSettingDef,
+          title: 'scanner_enabled'.tr(),
+          subtitle: 'scanner_enabled_description'.tr(),
+          value: isEnabled,
+          onChanged: (v) {
+            applySetting(ref, settings, scannerEnabledSettingDef, v);
+            NotificationBridge.setEnabled(v);
+          },
+        ),
       ),
-      NavigationSettingsTile(
-        leading: const Icon(Icons.checklist),
-        title: Text('scanner_pending_title'.tr()),
-        subtitle: pendingCount > 0
-            ? Text(
-                'scanner_pending_count'.tr(args: [pendingCount.toString()]),
-              )
-            : Text('scanner_no_pending'.tr()),
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => const ScannerHubPage(),
-            ),
-          );
-        },
+      _anchors.wrap(
+        actionScannerHubSettingDef.key,
+        NavigationSettingsTile(
+          leading: const Icon(Icons.checklist),
+          title: Text('scanner_pending_title'.tr()),
+          subtitle: pendingCount > 0
+              ? Text(
+                  'scanner_pending_count'.tr(args: [pendingCount.toString()]),
+                )
+              : Text('scanner_no_pending'.tr()),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const ScannerHubPage(),
+              ),
+            );
+          },
+        ),
       ),
     ];
   }
@@ -1382,6 +1803,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   static void _showAboutMe(BuildContext context) {
+    final isTablet = LayoutBreakpoints.isTabletOrWider(context);
     showResponsiveSheet<void>(
       context: context,
       title: 'about_me'.tr(),
@@ -1389,50 +1811,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       isScrollControlled: true,
       centerInFullViewport: false,
       child: Builder(
-        builder: (ctx) => SafeArea(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(ctx).padding.bottom + 16,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (!LayoutBreakpoints.isTabletOrWider(context))
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(
-                        'about_me'.tr(),
-                        style: Theme.of(ctx).textTheme.titleMedium,
-                      ),
-                    ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: _AboutMeDialogContent(
-                      profileUrl: githubDeveloperProfileUrl,
-                      username: githubDeveloperUsername,
-                    ),
-                  ),
-                  if (!LayoutBreakpoints.isTabletOrWider(context)) ...[
-                    const SizedBox(height: 24),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          FilledButton(
-                            onPressed: () => Navigator.pop(ctx),
-                            child: Text('done'.tr()),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
+        builder: (ctx) => buildSheetShell(
+          ctx,
+          title: 'about_me'.tr(),
+          showTitleInBody: !isTablet,
+          body: _AboutMeDialogContent(
+            profileUrl: githubDeveloperProfileUrl,
+            username: githubDeveloperUsername,
           ),
+          actions: [
+            if (!isTablet)
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('done'.tr()),
+              ),
+          ],
         ),
       ),
     );

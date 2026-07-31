@@ -24,58 +24,67 @@ List<Widget> buildReceiptAiSectionTiles(
   BuildContext context,
   WidgetRef ref,
   SettingsProviders settings,
-  ShowApiKeyDialogCallback showApiKeyDialog,
-) {
+  ShowApiKeyDialogCallback showApiKeyDialog, {
+  SettingAnchorRegistry? anchors,
+}) {
+  Widget wrap(String key, Widget tile) => anchors?.wrap(key, tile) ?? tile;
   return [
     buildBoolSettingTile(
       ref,
       settings,
       receiptOcrEnabledSettingDef,
-      titleKey: 'receipt_ocr_enabled',
-      subtitleKey: 'receipt_ocr_enabled_description',
+      anchors: anchors,
     ),
     buildBoolSettingTile(
       ref,
       settings,
       receiptAiEnabledSettingDef,
-      titleKey: 'receipt_ai_enabled',
-      subtitleKey: 'receipt_ai_enabled_description',
+      anchors: anchors,
     ),
-    _receiptAiProviderTile(context, ref, settings),
+    wrap(
+      receiptAiProviderSettingDef.key,
+      _receiptAiProviderTile(context, ref, settings),
+    ),
     if (ref.watch(settings.provider(receiptAiProviderSettingDef)) == 'gemini' ||
         ref.watch(geminiApiKeyProvider).isNotEmpty)
-      ListTile(
-        leading: const Icon(Icons.key),
-        title: Text('gemini_api_key'.tr()),
-        subtitle: Text(
-          ref.watch(geminiApiKeyProvider).isEmpty
-              ? 'receipt_ai_key_not_set'.tr()
-              : 'receipt_ai_key_set'.tr(),
-        ),
-        onTap: () => showApiKeyDialog(
-          context: context,
-          ref: ref,
-          titleKey: 'gemini_api_key',
-          currentValue: ref.read(geminiApiKeyProvider),
-          settingDef: geminiApiKeySettingDef,
+      wrap(
+        geminiApiKeySettingDef.key,
+        ListTile(
+          leading: const Icon(Icons.key),
+          title: Text('gemini_api_key'.tr()),
+          subtitle: Text(
+            ref.watch(geminiApiKeyProvider).isEmpty
+                ? 'receipt_ai_key_not_set'.tr()
+                : 'receipt_ai_key_set'.tr(),
+          ),
+          onTap: () => showApiKeyDialog(
+            context: context,
+            ref: ref,
+            titleKey: 'gemini_api_key',
+            currentValue: ref.read(geminiApiKeyProvider),
+            settingDef: geminiApiKeySettingDef,
+          ),
         ),
       ),
     if (ref.watch(settings.provider(receiptAiProviderSettingDef)) == 'openai' ||
         ref.watch(openaiApiKeyProvider).isNotEmpty)
-      ListTile(
-        leading: const Icon(Icons.key),
-        title: Text('openai_api_key'.tr()),
-        subtitle: Text(
-          ref.watch(openaiApiKeyProvider).isEmpty
-              ? 'receipt_ai_key_not_set'.tr()
-              : 'receipt_ai_key_set'.tr(),
-        ),
-        onTap: () => showApiKeyDialog(
-          context: context,
-          ref: ref,
-          titleKey: 'openai_api_key',
-          currentValue: ref.read(openaiApiKeyProvider),
-          settingDef: openaiApiKeySettingDef,
+      wrap(
+        openaiApiKeySettingDef.key,
+        ListTile(
+          leading: const Icon(Icons.key),
+          title: Text('openai_api_key'.tr()),
+          subtitle: Text(
+            ref.watch(openaiApiKeyProvider).isEmpty
+                ? 'receipt_ai_key_not_set'.tr()
+                : 'receipt_ai_key_set'.tr(),
+          ),
+          onTap: () => showApiKeyDialog(
+            context: context,
+            ref: ref,
+            titleKey: 'openai_api_key',
+            currentValue: ref.read(openaiApiKeyProvider),
+            settingDef: openaiApiKeySettingDef,
+          ),
         ),
       ),
   ];

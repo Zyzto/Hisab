@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 
 import 'app_router.dart';
+import 'invite_auth_helpers.dart';
+import 'route_paths.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
 import '../../features/settings/settings_definitions.dart';
 
@@ -88,10 +90,12 @@ class _InviteLinkHandlerState extends ConsumerState<InviteLinkHandler> {
       Log.info(
         'Setting changed: ${pendingInviteTokenSettingDef.key}=(set from link)',
       );
-      // Always refresh so router redirect runs (readonly invite can skip onboarding).
+      // Force online + go invite directly. refresh() while on onboarding is a
+      // no-op for pending invite (stay-on-onboarding). Initial link wins.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        ref.read(routerProvider).refresh();
+        prepareInviteOnlineMode(ref);
+        ref.read(routerProvider).go(RoutePaths.inviteAccept(initialToken));
       });
     }
 
@@ -103,7 +107,9 @@ class _InviteLinkHandlerState extends ConsumerState<InviteLinkHandler> {
         Log.info(
           'Setting changed: ${pendingInviteTokenSettingDef.key}=(set from stream)',
         );
-        if (mounted) ref.read(routerProvider).refresh();
+        if (!mounted) return;
+        prepareInviteOnlineMode(ref);
+        ref.read(routerProvider).refresh();
       }
     });
   }

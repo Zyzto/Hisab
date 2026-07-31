@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:flutter/services.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
@@ -9,6 +12,21 @@ import '../../../core/constants/supabase_config.dart';
 import '../../../core/theme/flex_theme_builder.dart' show defaultThemeSchemeId;
 
 part 'settings_framework_providers.g.dart';
+
+/// Load flat translation JSON maps for bilingual settings search indexing.
+Future<PreIndexedLocalizationProvider> loadSettingsLocalizationProvider() async {
+  Future<Map<String, String>> loadLocale(String assetPath) async {
+    final raw = jsonDecode(await rootBundle.loadString(assetPath));
+    if (raw is! Map) return {};
+    return raw.map(
+      (key, value) => MapEntry(key.toString(), value?.toString() ?? ''),
+    );
+  }
+
+  final en = await loadLocale('assets/translations/en.json');
+  final ar = await loadLocale('assets/translations/ar.json');
+  return PreIndexedLocalizationProvider({'en': en, 'ar': ar});
+}
 
 /// App-owned provider for [SettingsProviders]. Override in main with the result of [initializeHisabSettings].
 /// Use this in UI (e.g. settings page) to avoid depending on the framework's provider symbol.
@@ -83,9 +101,11 @@ Future<SettingsProviders?> initializeHisabSettings() async {
   try {
     final registry = createHisabSettingsRegistry();
     final storage = SharedPreferencesStorage();
+    final localizationProvider = await loadSettingsLocalizationProvider();
     final providers = await initializeSettings(
       registry: registry,
       storage: storage,
+      localizationProvider: localizationProvider,
     );
     // ignore: unnecessary_null_comparison -- initializeSettings may return null on failure
     if (providers != null) {

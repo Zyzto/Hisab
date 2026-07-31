@@ -20,10 +20,11 @@ Widget buildBoolSettingTile(
   String? subtitleKey,
   ValueChanged<bool>? onChanged,
   bool enabled = true,
+  SettingAnchorRegistry? anchors,
 }) {
   final title = (titleKey ?? settingDef.titleKey).tr();
-  final subtitle = subtitleKey?.tr();
-  return SwitchSettingsTile.fromSetting(
+  final subtitle = (subtitleKey ?? settingDef.subtitleKey)?.tr();
+  final tile = SwitchSettingsTile.fromSetting(
     setting: settingDef,
     title: title,
     subtitle: subtitle,
@@ -36,4 +37,5 @@ Widget buildBoolSettingTile(
         },
     enabled: enabled,
   );
+  return anchors?.wrap(settingDef.key, tile) ?? tile;
 }

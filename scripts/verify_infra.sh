@@ -41,11 +41,19 @@ grep -q 'invite-redirect' firebase.json \
 # ── Web PWA shell ─────────────────────────────────────────────────────────────
 echo "==> Checking web shell assets"
 for f in web/index.html web/flutter_bootstrap.js web/manifest.json \
-  web/invite-redirect-template.html web/redirect.html; do
+  web/invite-redirect-template.html web/redirect.html web/in_app_browser.js; do
   [[ -f "$f" ]] || fail "Missing web asset: $f"
 done
 grep -q '__hisabFirebaseReady\|__FIREBASE_' web/index.html \
   || fail "web/index.html missing Firebase ready/placeholder wiring"
+grep -q 'in_app_browser.js' web/index.html \
+  || fail "web/index.html missing in_app_browser.js gate"
+grep -q '__hisabInAppBlocked' web/index.html \
+  || fail "web/index.html missing __hisabInAppBlocked gate"
+grep -q 'HisabInApp' web/redirect.html \
+  || fail "web/redirect.html missing HisabInApp gate"
+grep -q 'isInAppBrowser' web/in_app_browser.js \
+  || fail "web/in_app_browser.js missing isInAppBrowser"
 grep -q '_flutter.loader.load' web/flutter_bootstrap.js \
   || fail "web/flutter_bootstrap.js missing _flutter.loader.load()"
 

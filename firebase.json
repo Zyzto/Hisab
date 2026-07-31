@@ -50,6 +50,15 @@
                 ]
             },
             {
+                "source": "/in_app_browser.js",
+                "headers": [
+                    {
+                        "key": "Cache-Control",
+                        "value": "public, max-age=0, must-revalidate"
+                    }
+                ]
+            },
+            {
                 "source": "/flutter.js",
                 "headers": [
                     {

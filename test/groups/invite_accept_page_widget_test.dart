@@ -11,6 +11,7 @@ import 'package:hisab/core/auth/auth_user_profile.dart';
 import 'package:hisab/core/auth/auth_providers.dart';
 import 'package:hisab/core/repository/group_invite_repository.dart';
 import 'package:hisab/core/repository/repository_providers.dart';
+import 'package:hisab/core/services/connectivity_service.dart';
 import 'package:hisab/domain/domain.dart';
 import 'package:hisab/features/groups/pages/invite_accept_page.dart';
 import 'package:hisab/features/settings/providers/settings_framework_providers.dart';
@@ -87,6 +88,16 @@ class _FakeGroupInviteRepository implements IGroupInviteRepository {
 
   @override
   Stream<List<InviteUsage>> watchUsages(String inviteId) => Stream.value([]);
+}
+
+/// Bounded pumps for invite auto-join tests. Avoid [WidgetTester.pumpAndSettle]
+/// (CircularProgressIndicator never idles). Advance clock briefly to flush the
+/// logging aggregation timer from invite entry helpers.
+Future<void> pumpInviteAutoJoinFrames(WidgetTester tester) async {
+  for (var i = 0; i < 12; i++) {
+    await tester.pump();
+  }
+  await tester.pump(const Duration(milliseconds: 120));
 }
 
 void main() {
@@ -346,20 +357,24 @@ void main() {
     expect(find.textContaining('join'), findsWidgets);
   }, skip: !kIsWeb);
 
-  testWidgets('readonly_join unauthenticated join CTA goes to onboarding', (
-    tester,
-  ) async {
-    final repo = _FakeGroupInviteRepository(
-      invite: makeInvite().copyWith(accessMode: InviteAccessMode.readonlyJoin),
-      group: makeGroup(),
-    );
-    await pumpWithRouter(tester, repo, authenticated: false);
+  testWidgets(
+    'readonly_join unauthenticated join CTA opens sign-in not onboarding',
+    (tester) async {
+      final repo = _FakeGroupInviteRepository(
+        invite: makeInvite().copyWith(accessMode: InviteAccessMode.readonlyJoin),
+        group: makeGroup(),
+      );
+      await pumpWithRouter(tester, repo, authenticated: false);
 
-    await tester.tap(find.textContaining('join').first);
-    await tester.pumpAndSettle();
+      await tester.tap(find.textContaining('join').first);
+      await tester.pumpAndSettle();
 
-    expect(find.text('ONBOARDING_PAGE'), findsOneWidget);
-  }, skip: !kIsWeb);
+      expect(find.text('ONBOARDING_PAGE'), findsNothing);
+      // Sign-in sheet title (login / register), not full onboarding.
+      expect(find.text('sign_in'.tr()), findsWidgets);
+    },
+    skip: !kIsWeb,
+  );
 
   testWidgets('unauthenticated readonly_only routes directly to preview', (
     tester,
@@ -373,30 +388,35 @@ void main() {
     expect(find.text('PREVIEW_PAGE_token-1'), findsOneWidget);
   }, skip: !kIsWeb);
 
-  testWidgets('local-only readonly_join authenticated join CTA routes to settings', (
-    tester,
-  ) async {
-    final repo = _FakeGroupInviteRepository(
-      invite: makeInvite().copyWith(accessMode: InviteAccessMode.readonlyJoin),
-      group: makeGroup(),
-    );
-    await pumpWithRouter(
-      tester,
-      repo,
-      authenticated: true,
-      localOnly: true,
-    );
+  testWidgets(
+    'local-only readonly_join authenticated join CTA stays on invite not settings',
+    (tester) async {
+      final repo = _FakeGroupInviteRepository(
+        invite: makeInvite().copyWith(accessMode: InviteAccessMode.readonlyJoin),
+        group: makeGroup(),
+      );
+      await pumpWithRouter(
+        tester,
+        repo,
+        authenticated: true,
+        localOnly: true,
+      );
 
-    await tester.tap(find.textContaining('join').first);
-    await tester.pumpAndSettle();
+      await tester.tap(find.textContaining('join').first);
+      await tester.pumpAndSettle();
 
-    expect(find.text('SETTINGS_PAGE'), findsOneWidget);
-  }, skip: !kIsWeb);
+      expect(find.text('SETTINGS_PAGE'), findsNothing);
+      expect(find.text('ONBOARDING_PAGE'), findsNothing);
+      // Still on invite accept (force-online cannot flip when overridden local-only).
+      expect(find.textContaining('join'), findsWidgets);
+    },
+    skip: !kIsWeb,
+  );
 
   testWidgets(
     'authenticated view+join auto-accepts when pending_invite_auto_join is set',
     (tester) async {
-      final settings = await initializeHisabSettings();
+      final settings = await tester.runAsync(initializeHisabSettings);
       expect(settings, isNotNull);
       settings!.controller.set(pendingInviteTokenSettingDef, 'token-1');
       settings.controller.set(pendingInviteAutoJoinSettingDef, true);
@@ -414,6 +434,7 @@ void main() {
           overrides: [
             hisabSettingsProvidersProvider.overrideWithValue(settings),
             effectiveLocalOnlyProvider.overrideWith((ref) => false),
+            connectivityProvider.overrideWithValue(true),
             isAuthenticatedProvider.overrideWith((ref) => true),
             authServiceProvider.overrideWith((ref) => _FakeAuthService()),
             groupInviteRepositoryProvider.overrideWithValue(repo),
@@ -429,7 +450,7 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await pumpInviteAutoJoinFrames(tester);
 
       expect(repo.acceptCalls, greaterThanOrEqualTo(1));
       expect(find.textContaining('already'), findsOneWidget);
@@ -448,7 +469,7 @@ void main() {
   testWidgets(
     'authenticated standard invite auto-accepts when auto-join flag set',
     (tester) async {
-      final settings = await initializeHisabSettings();
+      final settings = await tester.runAsync(initializeHisabSettings);
       expect(settings, isNotNull);
       settings!.controller.set(pendingInviteAutoJoinSettingDef, true);
 
@@ -464,6 +485,7 @@ void main() {
           overrides: [
             hisabSettingsProvidersProvider.overrideWithValue(settings),
             effectiveLocalOnlyProvider.overrideWith((ref) => false),
+            connectivityProvider.overrideWithValue(true),
             isAuthenticatedProvider.overrideWith((ref) => true),
             authServiceProvider.overrideWith((ref) => _FakeAuthService()),
             groupInviteRepositoryProvider.overrideWithValue(repo),
@@ -479,7 +501,7 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await pumpInviteAutoJoinFrames(tester);
 
       expect(repo.acceptCalls, 1);
     },
@@ -488,7 +510,7 @@ void main() {
   testWidgets(
     'authenticated does not auto-accept when auto-join flag is off',
     (tester) async {
-      final settings = await initializeHisabSettings();
+      final settings = await tester.runAsync(initializeHisabSettings);
       expect(settings, isNotNull);
       settings!.controller.set(pendingInviteAutoJoinSettingDef, false);
 
@@ -504,6 +526,7 @@ void main() {
           overrides: [
             hisabSettingsProvidersProvider.overrideWithValue(settings),
             effectiveLocalOnlyProvider.overrideWith((ref) => false),
+            connectivityProvider.overrideWithValue(true),
             isAuthenticatedProvider.overrideWith((ref) => true),
             authServiceProvider.overrideWith((ref) => _FakeAuthService()),
             groupInviteRepositoryProvider.overrideWithValue(repo),
@@ -519,7 +542,7 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await pumpInviteAutoJoinFrames(tester);
 
       expect(repo.acceptCalls, 0);
     },
@@ -528,7 +551,7 @@ void main() {
   testWidgets(
     'readonly_only never auto-accepts even with auto-join flag',
     (tester) async {
-      final settings = await initializeHisabSettings();
+      final settings = await tester.runAsync(initializeHisabSettings);
       expect(settings, isNotNull);
       settings!.controller.set(pendingInviteAutoJoinSettingDef, true);
 
@@ -544,6 +567,7 @@ void main() {
           overrides: [
             hisabSettingsProvidersProvider.overrideWithValue(settings),
             effectiveLocalOnlyProvider.overrideWith((ref) => false),
+            connectivityProvider.overrideWithValue(true),
             isAuthenticatedProvider.overrideWith((ref) => true),
             authServiceProvider.overrideWith((ref) => _FakeAuthService()),
             groupInviteRepositoryProvider.overrideWithValue(repo),
@@ -559,7 +583,7 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await pumpInviteAutoJoinFrames(tester);
 
       expect(repo.acceptCalls, 0);
     },
@@ -568,7 +592,7 @@ void main() {
   testWidgets(
     'local-only authenticated does not auto-accept with auto-join flag',
     (tester) async {
-      final settings = await initializeHisabSettings();
+      final settings = await tester.runAsync(initializeHisabSettings);
       expect(settings, isNotNull);
       settings!.controller.set(pendingInviteAutoJoinSettingDef, true);
 
@@ -584,6 +608,7 @@ void main() {
           overrides: [
             hisabSettingsProvidersProvider.overrideWithValue(settings),
             effectiveLocalOnlyProvider.overrideWith((ref) => true),
+            connectivityProvider.overrideWithValue(true),
             isAuthenticatedProvider.overrideWith((ref) => true),
             authServiceProvider.overrideWith((ref) => _FakeAuthService()),
             groupInviteRepositoryProvider.overrideWithValue(repo),
@@ -599,7 +624,7 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await pumpInviteAutoJoinFrames(tester);
 
       expect(repo.acceptCalls, 0);
     },
@@ -608,7 +633,7 @@ void main() {
   testWidgets(
     'auto-join accepts at most once even if widget rebuilds',
     (tester) async {
-      final settings = await initializeHisabSettings();
+      final settings = await tester.runAsync(initializeHisabSettings);
       expect(settings, isNotNull);
       settings!.controller.set(pendingInviteAutoJoinSettingDef, true);
 
@@ -623,6 +648,7 @@ void main() {
           overrides: [
             hisabSettingsProvidersProvider.overrideWithValue(settings),
             effectiveLocalOnlyProvider.overrideWith((ref) => false),
+            connectivityProvider.overrideWithValue(true),
             isAuthenticatedProvider.overrideWith((ref) => true),
             authServiceProvider.overrideWith((ref) => _FakeAuthService()),
             groupInviteRepositoryProvider.overrideWithValue(repo),
@@ -638,7 +664,7 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      await pumpInviteAutoJoinFrames(tester);
       // Re-enable flag and force another frame (simulates setting flicker).
       settings.controller.set(pendingInviteAutoJoinSettingDef, true);
       await tester.pump();
@@ -649,7 +675,7 @@ void main() {
   );
 
   testWidgets('accept error for expired invite surfaces message', (tester) async {
-    final settings = await initializeHisabSettings();
+    final settings = await tester.runAsync(initializeHisabSettings);
     expect(settings, isNotNull);
     settings!.controller.set(pendingInviteAutoJoinSettingDef, true);
 
@@ -664,6 +690,7 @@ void main() {
         overrides: [
           hisabSettingsProvidersProvider.overrideWithValue(settings),
           effectiveLocalOnlyProvider.overrideWith((ref) => false),
+          connectivityProvider.overrideWithValue(true),
           isAuthenticatedProvider.overrideWith((ref) => true),
           authServiceProvider.overrideWith((ref) => _FakeAuthService()),
           groupInviteRepositoryProvider.overrideWithValue(repo),
@@ -679,7 +706,7 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await pumpInviteAutoJoinFrames(tester);
 
     expect(repo.acceptCalls, 1);
     expect(find.textContaining('expired'), findsOneWidget);

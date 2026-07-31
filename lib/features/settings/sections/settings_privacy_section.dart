@@ -18,32 +18,40 @@ import '../widgets/setting_tile_helper.dart';
 List<Widget> buildPrivacySectionTiles(
   BuildContext context,
   WidgetRef ref,
-  SettingsProviders settings,
-) {
+  SettingsProviders settings, {
+  SettingAnchorRegistry? anchors,
+}) {
   final localOnly = ref.watch(effectiveLocalOnlyProvider);
   return [
-    ListTile(
-      leading: const Icon(Icons.privacy_tip_outlined),
-      title: Text('privacy_policy'.tr()),
-      onTap: () => context.push(RoutePaths.privacyPolicy),
-    ),
+    anchors?.wrap(
+          actionPrivacyPolicySettingDef.key,
+          ListTile(
+            leading: Icon(actionPrivacyPolicySettingDef.icon),
+            title: Text(actionPrivacyPolicySettingDef.titleKey.tr()),
+            onTap: () => context.push(RoutePaths.privacyPolicy),
+          ),
+        ) ??
+        ListTile(
+          leading: Icon(actionPrivacyPolicySettingDef.icon),
+          title: Text(actionPrivacyPolicySettingDef.titleKey.tr()),
+          onTap: () => context.push(RoutePaths.privacyPolicy),
+        ),
     buildBoolSettingTile(
       ref,
       settings,
       telemetryEnabledSettingDef,
-      titleKey: 'telemetry_enabled',
-      subtitleKey: 'telemetry_enabled_description',
+      anchors: anchors,
     ),
     if (!localOnly)
       buildBoolSettingTile(
         ref,
         settings,
         notificationsEnabledSettingDef,
-        titleKey: 'notifications_enabled',
         subtitleKey: kIsWeb &&
                 pwaNotificationSupport == PwaNotificationSupport.needsInstall
             ? 'onboarding_permission_notifications_needs_install'
-            : 'notifications_enabled_description',
+            : null,
+        anchors: anchors,
         onChanged: (v) async {
           final notifier = ref.read(
             settings.provider(notificationsEnabledSettingDef).notifier,

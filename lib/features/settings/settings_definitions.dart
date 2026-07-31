@@ -36,6 +36,7 @@ final dataBackupSection = const SettingSection(
   titleKey: 'data_backup',
   icon: Icons.storage,
   order: 2,
+  initiallyExpanded: true,
 );
 
 final receiptAiSection = const SettingSection(
@@ -43,6 +44,7 @@ final receiptAiSection = const SettingSection(
   titleKey: 'receipt_ai_section',
   icon: Icons.receipt_long,
   order: 3,
+  initiallyExpanded: true,
 );
 
 /// Renamed from old Logging section.
@@ -51,6 +53,7 @@ final privacySection = const SettingSection(
   titleKey: 'privacy',
   icon: Icons.shield_outlined,
   order: 4,
+  initiallyExpanded: true,
 );
 
 /// When true, send anonymous usage data to telemetry endpoint. No-op if endpoint is empty.
@@ -58,9 +61,14 @@ final telemetryEnabledSettingDef = const BoolSetting(
   'telemetry_enabled',
   defaultValue: true,
   titleKey: 'telemetry_enabled',
+  subtitleKey: 'telemetry_enabled_description',
   icon: Icons.analytics,
   section: 'privacy',
   order: 0,
+  searchTerms: {
+    'en': ['analytics', 'usage', 'tracking'],
+    'ar': ['تحليلات', 'تتبع'],
+  },
 );
 
 /// When true, push notifications are active (FCM token registered).
@@ -69,9 +77,14 @@ final notificationsEnabledSettingDef = const BoolSetting(
   'notifications_enabled',
   defaultValue: true,
   titleKey: 'notifications_enabled',
+  subtitleKey: 'notifications_enabled_description',
   icon: Icons.notifications_outlined,
   section: 'privacy',
   order: 1,
+  searchTerms: {
+    'en': ['push', 'fcm', 'alerts'],
+    'ar': ['إشعارات', 'تنبيهات'],
+  },
 );
 
 final advancedSection = const SettingSection(
@@ -79,6 +92,7 @@ final advancedSection = const SettingSection(
   titleKey: 'advanced',
   icon: Icons.build,
   order: 5,
+  initiallyExpanded: true,
 );
 
 final aboutSection = const SettingSection(
@@ -86,6 +100,7 @@ final aboutSection = const SettingSection(
   titleKey: 'about',
   icon: Icons.info,
   order: 6,
+  initiallyExpanded: true,
 );
 
 final themeModeSettingDef = const EnumSetting(
@@ -102,6 +117,10 @@ final themeModeSettingDef = const EnumSetting(
   icon: Icons.dark_mode,
   section: 'appearance',
   order: 0,
+  searchTerms: {
+    'en': ['dark', 'light', 'mode', 'amoled', 'appearance'],
+    'ar': ['داكن', 'فاتح', 'سمة', 'مظهر'],
+  },
 );
 
 /// Color scheme: predefined FlexScheme or "custom" (then [theme_color] is used).
@@ -125,6 +144,10 @@ final themeSchemeSettingDef = const EnumSetting(
   icon: Icons.palette_outlined,
   section: 'appearance',
   order: 1,
+  searchTerms: {
+    'en': ['color', 'palette', 'scheme'],
+    'ar': ['لون', 'ألوان'],
+  },
 );
 
 final themeColorSettingDef = const ColorSetting(
@@ -134,6 +157,10 @@ final themeColorSettingDef = const ColorSetting(
   icon: Icons.palette,
   section: 'appearance',
   order: 2,
+  searchTerms: {
+    'en': ['custom color', 'accent'],
+    'ar': ['لون مخصص'],
+  },
 );
 
 final languageSettingDef = const EnumSetting(
@@ -145,6 +172,10 @@ final languageSettingDef = const EnumSetting(
   icon: Icons.language,
   section: 'appearance',
   order: 3,
+  searchTerms: {
+    'en': ['locale', 'english', 'arabic', 'translation'],
+    'ar': ['لغة', 'إنجليزي', 'عربي', 'ترجمة'],
+  },
 );
 
 final fontSizeScaleSettingDef = const EnumSetting(
@@ -161,6 +192,10 @@ final fontSizeScaleSettingDef = const EnumSetting(
   icon: Icons.text_fields,
   section: 'appearance',
   order: 4,
+  searchTerms: {
+    'en': ['text size', 'typography', 'accessibility'],
+    'ar': ['حجم الخط', 'نص'],
+  },
 );
 
 /// When true, user has completed first-launch onboarding.
@@ -170,7 +205,8 @@ final onboardingCompletedSettingDef = const BoolSetting(
   titleKey: 'onboarding_completed',
   icon: Icons.check_circle_outline,
   section: 'appearance',
-  order: -1, // Internal, not shown in settings UI
+  order: -1,
+  visible: false,
 );
 
 /// When true, user selected Online and tapped Complete; OAuth redirect in progress (web).
@@ -181,7 +217,8 @@ final onboardingOnlinePendingSettingDef = const BoolSetting(
   titleKey: 'onboarding_online_pending',
   icon: Icons.pending,
   section: 'appearance',
-  order: -2, // Internal, not shown in settings UI
+  order: -2,
+  visible: false,
 );
 
 /// When true, user switched to online in settings; OAuth redirect in progress (web).
@@ -192,7 +229,8 @@ final settingsOnlinePendingSettingDef = const BoolSetting(
   titleKey: 'settings_online_pending',
   icon: Icons.pending,
   section: 'appearance',
-  order: -3, // Internal, not shown in settings UI
+  order: -3,
+  visible: false,
 );
 
 /// Pending invite token from deep link; cleared when user reaches invite page or completes accept.
@@ -203,7 +241,8 @@ final pendingInviteTokenSettingDef = const StringSetting(
   titleKey: 'pending_invite_token',
   icon: Icons.link,
   section: 'appearance',
-  order: -4, // Internal, not shown in settings UI
+  order: -4,
+  visible: false,
 );
 
 /// When true, after login/register the invite page should auto-accept and open the group
@@ -214,7 +253,8 @@ final pendingInviteAutoJoinSettingDef = const BoolSetting(
   titleKey: 'pending_invite_auto_join',
   icon: Icons.group_add,
   section: 'appearance',
-  order: -5, // Internal, not shown in settings UI
+  order: -5,
+  visible: false,
 );
 
 /// Last route path when app went to background; used to restore after process kill (e.g. returning from camera).
@@ -225,7 +265,8 @@ final lastRoutePathSettingDef = const StringSetting(
   titleKey: 'last_route_path',
   icon: Icons.route,
   section: 'appearance',
-  order: -5, // Internal, not shown in settings UI
+  order: -5,
+  visible: false,
 );
 
 /// When true, app uses only local storage (PowerSync SQLite). When false, syncs with Supabase.
@@ -233,9 +274,14 @@ final localOnlySettingDef = const BoolSetting(
   'local_only',
   defaultValue: true,
   titleKey: 'local_only',
+  subtitleKey: 'local_only_description',
   icon: Icons.storage,
   section: 'data_backup',
   order: 0,
+  searchTerms: {
+    'en': ['offline', 'online', 'sync', 'cloud'],
+    'ar': ['محلي', 'مزامنة', 'سحابة'],
+  },
 );
 
 /// When non-empty, stores the user id at the time the user switched to local-only from online.
@@ -246,7 +292,8 @@ final localDataFromOnlineUserIdSettingDef = const StringSetting(
   titleKey: 'local_data_from_online_user_id',
   icon: Icons.storage,
   section: 'data_backup',
-  order: -1, // Internal, not shown in settings UI
+  order: -1,
+  visible: false,
 );
 
 /// When true, run OCR on scanned images (and optionally AI). When false, only attach the picture.
@@ -254,9 +301,14 @@ final receiptOcrEnabledSettingDef = const BoolSetting(
   'receipt_ocr_enabled',
   defaultValue: false,
   titleKey: 'receipt_ocr_enabled',
+  subtitleKey: 'receipt_ocr_enabled_description',
   icon: Icons.document_scanner,
   section: 'receipt_ai',
   order: 0,
+  searchTerms: {
+    'en': ['ocr', 'scan', 'receipt'],
+    'ar': ['مسح', 'إيصال'],
+  },
 );
 
 /// When true, use AI (Gemini/OpenAI) to extract receipt details from scanned image.
@@ -264,9 +316,14 @@ final receiptAiEnabledSettingDef = const BoolSetting(
   'receipt_ai_enabled',
   defaultValue: false,
   titleKey: 'receipt_ai_enabled',
+  subtitleKey: 'receipt_ai_enabled_description',
   icon: Icons.auto_awesome,
   section: 'receipt_ai',
   order: 1,
+  searchTerms: {
+    'en': ['ai', 'llm', 'gemini', 'openai'],
+    'ar': ['ذكاء', 'اصطناعي'],
+  },
 );
 
 /// Which LLM provider to use for receipt extraction.
@@ -293,6 +350,10 @@ final geminiApiKeySettingDef = const StringSetting(
   icon: Icons.key,
   section: 'receipt_ai',
   order: 3,
+  searchTerms: {
+    'en': ['api key', 'google'],
+    'ar': ['مفتاح'],
+  },
 );
 
 /// OpenAI API key. Used when provider is openai.
@@ -303,6 +364,10 @@ final openaiApiKeySettingDef = const StringSetting(
   icon: Icons.key,
   section: 'receipt_ai',
   order: 4,
+  searchTerms: {
+    'en': ['api key', 'chatgpt'],
+    'ar': ['مفتاح'],
+  },
 );
 
 // --- Home list (home page groups/personal order and display) ---
@@ -354,6 +419,7 @@ final homeListCustomOrderSettingDef = const StringSetting(
   icon: Icons.drag_indicator,
   section: 'home_list',
   order: 2,
+  visible: false,
 );
 
 /// Comma-separated group IDs that stay at top (unless apply sort to pinned is on).
@@ -364,6 +430,7 @@ final homeListPinnedIdsSettingDef = const StringSetting(
   icon: Icons.push_pin,
   section: 'home_list',
   order: 3,
+  visible: false,
 );
 
 /// When true, show creation date on the left of each group/personal card.
@@ -382,6 +449,7 @@ final scannerSection = const SettingSection(
   titleKey: 'scanner_section',
   icon: Icons.document_scanner_outlined,
   order: 3,
+  initiallyExpanded: true,
 );
 
 /// Master toggle for the notification transaction scanner. Disabled by default.
@@ -392,6 +460,10 @@ final scannerEnabledSettingDef = const BoolSetting(
   icon: Icons.notifications_active_outlined,
   section: 'scanner',
   order: 0,
+  searchTerms: {
+    'en': ['notification listener', 'bank', 'sms'],
+    'ar': ['ماسح', 'إشعارات بنكية'],
+  },
 );
 
 /// When true, capture GPS location at notification time. Disabled by default.
@@ -437,6 +509,10 @@ final favoriteCurrenciesSettingDef = const StringSetting(
   icon: Icons.star_outline,
   section: 'appearance',
   order: 5,
+  searchTerms: {
+    'en': ['currency', 'currencies', 'favorites'],
+    'ar': ['عملة', 'عملات', 'مفضلة'],
+  },
 );
 
 /// Optional single currency to show as secondary amount below main amounts (group detail, expense detail).
@@ -445,9 +521,14 @@ final displayCurrencySettingDef = const StringSetting(
   'display_currency',
   defaultValue: '',
   titleKey: 'display_currency',
+  subtitleKey: 'display_currency_hint',
   icon: Icons.visibility_outlined,
   section: 'appearance',
   order: 6,
+  searchTerms: {
+    'en': ['secondary currency', 'conversion'],
+    'ar': ['عملة العرض'],
+  },
 );
 
 /// When true, show times in 24-hour format (e.g. 14:30). When false, use 12-hour AM/PM.
@@ -455,9 +536,14 @@ final use24HourFormatSettingDef = const BoolSetting(
   'use_24_hour_format',
   defaultValue: false,
   titleKey: 'use_24_hour_format',
+  subtitleKey: 'use_24_hour_format_description',
   icon: Icons.schedule,
   section: 'appearance',
   order: 7,
+  searchTerms: {
+    'en': ['time', 'clock', 'am', 'pm', '24h'],
+    'ar': ['وقت', 'ساعة'],
+  },
 );
 
 /// When true, tone down decorative accent fills in cards/headers.
@@ -465,6 +551,7 @@ final subtleAccentsSettingDef = const BoolSetting(
   'subtle_accents',
   defaultValue: false,
   titleKey: 'subtle_accents',
+  subtitleKey: 'subtle_accents_description',
   icon: Icons.tonality,
   section: 'appearance',
   order: 8,
@@ -476,6 +563,7 @@ final expenseFormFullFeaturesSettingDef = const BoolSetting(
   'expense_form_full_features',
   defaultValue: false,
   titleKey: 'expense_form_full_features',
+  subtitleKey: 'expense_form_full_features_description',
   icon: Icons.receipt_long_outlined,
   section: 'functional',
   order: 0,
@@ -486,6 +574,7 @@ final expenseFormExpandDescriptionSettingDef = const BoolSetting(
   'expense_form_expand_description',
   defaultValue: false,
   titleKey: 'expense_form_expand_description',
+  subtitleKey: 'expense_form_expand_description_setting',
   icon: Icons.text_fields,
   section: 'functional',
   order: 1,
@@ -496,9 +585,200 @@ final expenseFormExpandBillBreakdownSettingDef = const BoolSetting(
   'expense_form_expand_bill_breakdown',
   defaultValue: false,
   titleKey: 'expense_form_expand_bill_breakdown',
+  subtitleKey: 'expense_form_expand_bill_breakdown_setting',
   icon: Icons.receipt_long,
   section: 'functional',
   order: 2,
+);
+
+// --- Searchable action / navigation rows (non-persisted) ---
+
+final actionOpenProfileSettingDef = const ActionSetting(
+  'action_open_profile',
+  titleKey: 'profile',
+  subtitleKey: 'profile_settings_link_subtitle',
+  icon: Icons.person_outline,
+  section: 'account',
+  order: 0,
+  searchTerms: {
+    'en': ['account', 'avatar', 'name'],
+    'ar': ['حساب', 'ملف'],
+  },
+);
+
+final actionExportDataSettingDef = const ActionSetting(
+  'action_export_data',
+  titleKey: 'export_data',
+  icon: Icons.upload_file,
+  section: 'data_backup',
+  order: 1,
+  searchTerms: {
+    'en': ['backup', 'download', 'json'],
+    'ar': ['تصدير', 'نسخ'],
+  },
+);
+
+final actionImportDataSettingDef = const ActionSetting(
+  'action_import_data',
+  titleKey: 'import_data',
+  subtitleKey: 'import_data_subtitle',
+  icon: Icons.download,
+  section: 'data_backup',
+  order: 2,
+  searchTerms: {
+    'en': ['restore', 'upload', 'json'],
+    'ar': ['استيراد', 'استعادة'],
+  },
+);
+
+final actionPrivacyPolicySettingDef = const ActionSetting(
+  'action_privacy_policy',
+  titleKey: 'privacy_policy',
+  icon: Icons.policy_outlined,
+  section: 'privacy',
+  order: 2,
+  searchTerms: {
+    'en': ['legal', 'gdpr', 'policy'],
+    'ar': ['سياسة', 'خصوصية'],
+  },
+);
+
+final actionReturnToOnboardingSettingDef = const ActionSetting(
+  'action_return_to_onboarding',
+  titleKey: 'return_to_onboarding',
+  subtitleKey: 'return_to_onboarding_description',
+  icon: Icons.replay,
+  section: 'advanced',
+  order: 0,
+  searchTerms: {
+    'en': ['onboarding', 'welcome', 'setup'],
+    'ar': ['إعداد', 'ترحيب'],
+  },
+);
+
+final actionViewLogsSettingDef = const ActionSetting(
+  'action_view_logs',
+  titleKey: 'view_logs',
+  icon: Icons.description,
+  section: 'advanced',
+  order: 1,
+  searchTerms: {
+    'en': ['debug', 'logs', 'diagnostics'],
+    'ar': ['سجلات'],
+  },
+);
+
+final actionResetAllSettingsSettingDef = const ActionSetting(
+  'action_reset_all_settings',
+  titleKey: 'reset_all_settings',
+  subtitleKey: 'reset_all_settings_description',
+  icon: Icons.restore,
+  section: 'advanced',
+  order: 2,
+  searchTerms: {
+    'en': ['defaults', 'reset', 'clear settings'],
+    'ar': ['إعادة تعيين'],
+  },
+);
+
+final actionDeleteLocalDataSettingDef = const ActionSetting(
+  'action_delete_local_data',
+  titleKey: 'delete_local_data',
+  subtitleKey: 'delete_local_data_description',
+  icon: Icons.phone_android,
+  section: 'advanced',
+  order: 3,
+  searchTerms: {
+    'en': ['wipe', 'erase', 'clear data'],
+    'ar': ['حذف', 'مسح البيانات'],
+  },
+);
+
+final actionDeleteCloudDataSettingDef = const ActionSetting(
+  'action_delete_cloud_data',
+  titleKey: 'delete_cloud_data',
+  subtitleKey: 'delete_cloud_data_description',
+  icon: Icons.cloud,
+  section: 'advanced',
+  order: 4,
+  searchTerms: {
+    'en': ['wipe', 'erase', 'server', 'account deletion'],
+    'ar': ['حذف سحابة', 'خادم'],
+  },
+);
+
+final actionSendFeedbackSettingDef = const ActionSetting(
+  'action_send_feedback',
+  titleKey: 'send_feedback',
+  icon: Icons.feedback_outlined,
+  section: 'about',
+  order: 1,
+  searchTerms: {
+    'en': ['bug', 'report', 'contact'],
+    'ar': ['ملاحظات', 'بلاغ'],
+  },
+);
+
+final actionLicensesSettingDef = const ActionSetting(
+  'action_licenses',
+  titleKey: 'licenses',
+  icon: Icons.article_outlined,
+  section: 'about',
+  order: 2,
+  searchTerms: {
+    'en': ['oss', 'open source', 'legal'],
+    'ar': ['تراخيص'],
+  },
+);
+
+final actionAboutMeSettingDef = const ActionSetting(
+  'action_about_me',
+  titleKey: 'about_me',
+  subtitleKey: 'about_me_description',
+  icon: Icons.person_search_outlined,
+  section: 'about',
+  order: 3,
+  searchTerms: {
+    'en': ['developer', 'author', 'github'],
+    'ar': ['مطور'],
+  },
+);
+
+final actionDonateSettingDef = const ActionSetting(
+  'action_donate',
+  titleKey: 'donate',
+  subtitleKey: 'donate_description',
+  icon: Icons.favorite_outline,
+  section: 'about',
+  order: 4,
+  searchTerms: {
+    'en': ['sponsor', 'support', 'github'],
+    'ar': ['تبرع', 'دعم'],
+  },
+);
+
+final actionVersionSettingDef = const ActionSetting(
+  'action_version',
+  titleKey: 'version',
+  icon: Icons.info_outline,
+  section: 'about',
+  order: 0,
+  searchTerms: {
+    'en': ['update', 'release', 'build'],
+    'ar': ['إصدار', 'تحديث'],
+  },
+);
+
+final actionScannerHubSettingDef = const ActionSetting(
+  'action_scanner_hub',
+  titleKey: 'scanner_section',
+  icon: Icons.document_scanner_outlined,
+  section: 'scanner',
+  order: 10,
+  searchTerms: {
+    'en': ['transaction scanner', 'hub'],
+    'ar': ['ماسح المعاملات'],
+  },
 );
 
 final allSettings = <SettingDefinition>[
@@ -537,7 +817,35 @@ final allSettings = <SettingDefinition>[
   homeListCustomOrderSettingDef,
   homeListPinnedIdsSettingDef,
   homeListShowCreatedAtSettingDef,
+  actionOpenProfileSettingDef,
+  actionExportDataSettingDef,
+  actionImportDataSettingDef,
+  actionPrivacyPolicySettingDef,
+  actionReturnToOnboardingSettingDef,
+  actionViewLogsSettingDef,
+  actionResetAllSettingsSettingDef,
+  actionDeleteLocalDataSettingDef,
+  actionDeleteCloudDataSettingDef,
+  actionSendFeedbackSettingDef,
+  actionLicensesSettingDef,
+  actionAboutMeSettingDef,
+  actionDonateSettingDef,
+  actionVersionSettingDef,
+  actionScannerHubSettingDef,
 ];
+
+/// Sections shown on the Settings page (excludes home_list, edited from Home).
+const settingsPageSectionKeys = <String>{
+  'account',
+  'appearance',
+  'functional',
+  'data_backup',
+  'receipt_ai',
+  'scanner',
+  'privacy',
+  'advanced',
+  'about',
+};
 
 SettingsRegistry createHisabSettingsRegistry() {
   return SettingsRegistry.withSettings(

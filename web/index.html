@@ -77,8 +77,28 @@
     <div class="title">Hisab</div>
     <div class="subtitle" id="hisab-boot-splash-status">Loading…</div>
   </div>
+
+  <!-- Sync: gate in-app browsers before Firebase / Flutter (fail open if script missing). -->
+  <script src="in_app_browser.js"></script>
+  <script>
+    window.__hisabInAppBlocked = !!(
+      window.HisabInApp &&
+      typeof window.HisabInApp.isInAppBrowser === "function" &&
+      window.HisabInApp.isInAppBrowser()
+    );
+    if (window.__hisabInAppBlocked) {
+      (function () {
+        var splash = document.getElementById("hisab-boot-splash");
+        if (splash && splash.parentNode) splash.parentNode.removeChild(splash);
+        // Preserve full URL (including ?code= / hash) for OAuth returns.
+        window.HisabInApp.mountGate({ targetUrl: window.location.href });
+      })();
+    }
+  </script>
+
   <script>
     (function () {
+      if (window.__hisabInAppBlocked) return;
       try {
         var params = new URLSearchParams(window.location.search);
         var hash = window.location.hash || "";
@@ -100,8 +120,10 @@
       setTimeout(removeBootSplash, 15000);
     })();
   </script>
+
   <!-- Firebase SDK: load async so the boot splash paints before gstatic download. -->
   <script>
+    if (!window.__hisabInAppBlocked) {
     // Firebase config — placeholders replaced at build time (CI) or from dart_defines_online.json (debug).
     // Do not commit real values. See CONFIGURATION.md and dart_defines_online.example.json.
     const firebaseConfig = {
@@ -148,10 +170,14 @@
           console.warn("[hisab] Firebase web SDK failed to load; push disabled.", err);
         });
     })();
+    } else {
+      window.__hisabFirebaseReady = Promise.resolve();
+    }
   </script>
 
   <!-- PWA capability bridge (used by lib/core/pwa) + notification click routing -->
   <script>
+    if (!window.__hisabInAppBlocked) {
     function handleNotificationClickUrl(targetUrl) {
       if (typeof targetUrl !== "string" || targetUrl.length === 0) return;
 
@@ -243,8 +269,17 @@
         }
       } catch (_) {}
     })();
+    }
   </script>
 
-  <script src="flutter_bootstrap.js" async></script>
+  <script>
+    (function () {
+      if (window.__hisabInAppBlocked) return;
+      var s = document.createElement("script");
+      s.src = "flutter_bootstrap.js";
+      s.async = true;
+      document.body.appendChild(s);
+    })();
+  </script>
 </body>
 </html>

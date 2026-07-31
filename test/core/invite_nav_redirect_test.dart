@@ -87,6 +87,18 @@ void main() {
       );
     });
 
+    test('already on bare /invite → stay (query-token form)', () {
+      expect(
+        pendingInviteRedirectTarget(
+          pendingToken: 'tok',
+          currentPath: '/invite',
+          onOnboarding: false,
+          onPrivacyPolicy: false,
+        ),
+        isNull,
+      );
+    });
+
     test('already on /invite/<token>/preview → stay', () {
       expect(
         pendingInviteRedirectTarget(
@@ -308,29 +320,42 @@ void main() {
     });
   });
 
+  group('isInviteRoutePath', () {
+    test('matches /invite and /invite/...', () {
+      expect(isInviteRoutePath('/invite'), isTrue);
+      expect(isInviteRoutePath('/invite/tok'), isTrue);
+      expect(isInviteRoutePath('/invite/tok/preview'), isTrue);
+    });
+
+    test('does not match scan-invite or unrelated paths', () {
+      expect(isInviteRoutePath('/scan-invite'), isFalse);
+      expect(isInviteRoutePath('/'), isFalse);
+      expect(isInviteRoutePath('/onboarding'), isFalse);
+      expect(isInviteRoutePath('/groups/1/invites'), isFalse);
+    });
+  });
+
   group('unauthenticatedAutoJoinResume', () {
-    test('new user → onboarding', () {
+    test('new user → signIn (skip onboarding)', () {
       expect(
         unauthenticatedAutoJoinResume(
           autoJoinFlag: true,
           isAuthenticated: false,
           localOnly: false,
           canAcceptInvite: true,
-          onboardingCompleted: false,
           alreadyAttempted: false,
         ),
-        InviteUnauthResumeAction.onboarding,
+        InviteUnauthResumeAction.signIn,
       );
     });
 
-    test('returning onboarded user → signIn (not onboarding→home bounce)', () {
+    test('returning user → signIn', () {
       expect(
         unauthenticatedAutoJoinResume(
           autoJoinFlag: true,
           isAuthenticated: false,
           localOnly: false,
           canAcceptInvite: true,
-          onboardingCompleted: true,
           alreadyAttempted: false,
         ),
         InviteUnauthResumeAction.signIn,
@@ -344,7 +369,6 @@ void main() {
           isAuthenticated: false,
           localOnly: false,
           canAcceptInvite: true,
-          onboardingCompleted: false,
           alreadyAttempted: false,
         ),
         InviteUnauthResumeAction.none,
@@ -358,7 +382,6 @@ void main() {
           isAuthenticated: true,
           localOnly: false,
           canAcceptInvite: true,
-          onboardingCompleted: true,
           alreadyAttempted: false,
         ),
         InviteUnauthResumeAction.none,
@@ -372,7 +395,6 @@ void main() {
           isAuthenticated: false,
           localOnly: true,
           canAcceptInvite: true,
-          onboardingCompleted: false,
           alreadyAttempted: false,
         ),
         InviteUnauthResumeAction.none,
@@ -386,7 +408,6 @@ void main() {
           isAuthenticated: false,
           localOnly: false,
           canAcceptInvite: false,
-          onboardingCompleted: false,
           alreadyAttempted: false,
         ),
         InviteUnauthResumeAction.none,
@@ -400,7 +421,6 @@ void main() {
           isAuthenticated: false,
           localOnly: false,
           canAcceptInvite: true,
-          onboardingCompleted: false,
           alreadyAttempted: true,
         ),
         InviteUnauthResumeAction.none,

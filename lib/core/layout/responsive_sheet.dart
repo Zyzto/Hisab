@@ -15,6 +15,13 @@ const double _kSheetDialogRadius = 16.0;
 /// Top corner radius for phone bottom sheets.
 const double _kSheetBottomRadius = 16.0;
 
+/// Default inset for free-form sheet bodies (not option lists that pad themselves).
+///
+/// [showResponsiveSheet] does **not** apply this automatically — pass it as
+/// [contentPadding], or wrap with `buildSheetShell` from `sheet_helpers.dart`.
+/// Skipping both is why custom sheets keep shipping flush to the panel edges.
+const EdgeInsets kSheetContentPadding = EdgeInsets.fromLTRB(20, 16, 20, 20);
+
 /// Returns rail width when dialog should be centered in content area (shell routes only).
 /// Returns 0 when [centerInFullViewport] is true or when path is outside shell (groups, invite, etc.).
 double _railWidthForDialog({
@@ -68,6 +75,11 @@ Future<T?> showResponsiveSheet<T>({
   /// When true (default), never add rail padding (center in full viewport).
   /// When false, center in content area (e.g. next to rail on shell routes).
   bool centerInFullViewport = true,
+
+  /// Inset around [child]. Null (default) means no body inset — callers that
+  /// already pad (option lists, [buildSheetShell]) stay unchanged. For free-form
+  /// bodies use [kSheetContentPadding] (or [buildSheetShell]).
+  EdgeInsetsGeometry? contentPadding,
 }) {
   assert(isScrollControlled || !isScrollControlled);
 
@@ -96,6 +108,7 @@ Future<T?> showResponsiveSheet<T>({
         centerInFullViewport: centerInFullViewport,
         pathWhenOpened: pathWhenOpened,
         openAnimation: animation,
+        contentPadding: contentPadding,
         child: child,
       );
     },
@@ -123,6 +136,7 @@ class _AdaptiveSheetHost extends StatelessWidget {
     this.maxWidth,
     this.maxHeight,
     this.sheetShape,
+    this.contentPadding,
   });
 
   final Widget child;
@@ -137,6 +151,7 @@ class _AdaptiveSheetHost extends StatelessWidget {
   final double? maxWidth;
   final double? maxHeight;
   final ShapeBorder? sheetShape;
+  final EdgeInsetsGeometry? contentPadding;
 
   @override
   Widget build(BuildContext context) {
@@ -188,7 +203,7 @@ class _AdaptiveSheetHost extends StatelessWidget {
               ),
             ),
             child: Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(12, 16, 8, 12),
+              padding: const EdgeInsetsDirectional.fromSTEB(16, 16, 12, 12),
               child: Row(
                 children: [
                   if (showTitle)
@@ -196,7 +211,7 @@ class _AdaptiveSheetHost extends StatelessWidget {
                       child: Align(
                         alignment: AlignmentDirectional.centerStart,
                         child: Padding(
-                          padding: const EdgeInsetsDirectional.only(start: 8),
+                          padding: const EdgeInsetsDirectional.only(start: 4),
                           child: UserText(
                             title!,
                             style: theme.textTheme.titleMedium?.copyWith(
@@ -280,7 +295,12 @@ class _AdaptiveSheetHost extends StatelessWidget {
         ),
         ConstrainedBox(
           constraints: BoxConstraints(maxHeight: bodyMaxHeight),
-          child: FocusScope(autofocus: false, child: child),
+          child: FocusScope(
+            autofocus: false,
+            child: contentPadding != null
+                ? Padding(padding: contentPadding!, child: child)
+                : child,
+          ),
         ),
       ],
     );

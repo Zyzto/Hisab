@@ -60,6 +60,7 @@ p{color:var(--muted);margin-bottom:20px;font-size:.95rem}
   <a id="fallback" href="#" class="btn btn-outline" style="display:none" data-i18n="redirect.openInBrowser">Open in Browser</a>
 </div>
 
+<script src="in_app_browser.js"></script>
 <script>
 (function() {
   var i18n = {
@@ -69,13 +70,13 @@ p{color:var(--muted);margin-bottom:20px;font-size:.95rem}
       expired: "This invite link is invalid or expired.",
       missing: "Missing or invalid invite link.",
       heading: "You have a group invite",
-      message: "We'll try opening the invite in the Hisab app. If nothing happens, use the options below.",
-      iosMessage: "Continue in the browser to preview the group. If joining is enabled, you can sign in later.",
+      message: "We'll try opening the invite in the Hisab app. If nothing happens, continue in the browser to sign in or create an account and join.",
+      iosMessage: "Continue in the browser to open your invite. Sign in or create an account to join the group.",
       openApp: "Open in Hisab app",
       fallback: "Continue in browser",
       tapHint: "If the app did not open, tap below.",
-      iosTapHint: "Continue in browser to preview the group.",
-      hint: "Didn't open? Continue in browser to preview the group. If joining is enabled, you can sign in later."
+      iosTapHint: "Continue in browser to sign in or create an account and join.",
+      hint: "Didn't open? Continue in browser to sign in or create an account and join the group."
     },
     ar: {
       title: "حساب - جاري التوجيه...",
@@ -83,13 +84,13 @@ p{color:var(--muted);margin-bottom:20px;font-size:.95rem}
       expired: "رابط الدعوة غير صالح أو منتهي الصلاحية.",
       missing: "رابط الدعوة مفقود أو غير صالح.",
       heading: "لديك دعوة لمجموعة",
-      message: "سنحاول فتح الدعوة في تطبيق حساب. إذا لم يحدث شيء، استخدم الخيارات أدناه.",
-      iosMessage: "تابع في المتصفح لمعاينة المجموعة. إذا كان الانضمام متاحًا، يمكنك تسجيل الدخول لاحقًا.",
+      message: "سنحاول فتح الدعوة في تطبيق حساب. إذا لم يحدث شيء، تابع في المتصفح وسجّل الدخول أو أنشئ حسابًا للانضمام.",
+      iosMessage: "تابع في المتصفح لفتح الدعوة. سجّل الدخول أو أنشئ حسابًا للانضمام إلى المجموعة.",
       openApp: "فتح في تطبيق حساب",
       fallback: "المتابعة في المتصفح",
       tapHint: "إذا لم يفتح التطبيق، اضغط أدناه.",
-      iosTapHint: "تابع في المتصفح لمعاينة المجموعة.",
-      hint: "لم يفتح؟ تابع في المتصفح لمعاينة المجموعة. إذا كان الانضمام متاحًا، يمكنك تسجيل الدخول لاحقًا."
+      iosTapHint: "تابع في المتصفح وسجّل الدخول أو أنشئ حسابًا للانضمام.",
+      hint: "لم يفتح؟ تابع في المتصفح وسجّل الدخول أو أنشئ حسابًا للانضمام إلى المجموعة."
     }
   };
   var locale = navigator.language && navigator.language.toLowerCase().startsWith("ar") ? "ar" : "en";
@@ -106,6 +107,7 @@ p{color:var(--muted);margin-bottom:20px;font-size:.95rem}
   var openApp = document.getElementById("openApp");
   var fallback = document.getElementById("fallback");
   var spinner = document.getElementById("spinner");
+  var content = document.getElementById("content");
 
   // Error state
   if (error || !token) {
@@ -118,9 +120,21 @@ p{color:var(--muted);margin-bottom:20px;font-size:.95rem}
   }
 
   var encodedToken = encodeURIComponent(token);
-  var webUrl = window.location.origin + "/invite?token=" + encodedToken;
+  var webUrl = window.location.origin + "/invite/" + encodedToken;
 
-  // Set fallback button (web/PWA)
+  // In-app browsers: do not hop to /invite in the same WebView (Flutter hangs).
+  // Escape to Safari/Chrome or copy link instead.
+  if (
+    window.HisabInApp &&
+    typeof window.HisabInApp.isInAppBrowser === "function" &&
+    window.HisabInApp.isInAppBrowser()
+  ) {
+    if (content) content.style.display = "none";
+    window.HisabInApp.mountGate({ targetUrl: webUrl });
+    return;
+  }
+
+  // Set fallback button (web/PWA) — only for real system browsers.
   fallback.href = webUrl;
 
   // Detect platform
@@ -147,7 +161,7 @@ p{color:var(--muted);margin-bottom:20px;font-size:.95rem}
     var iosTapHintEl = document.createElement("p");
     iosTapHintEl.style.cssText = "color:var(--muted);font-size:0.9rem;margin-top:16px";
     iosTapHintEl.textContent = i18n[locale].iosTapHint;
-    document.getElementById("content").appendChild(iosTapHintEl);
+    content.appendChild(iosTapHintEl);
     return;
   }
 
@@ -170,13 +184,13 @@ p{color:var(--muted);margin-bottom:20px;font-size:.95rem}
     var tapHintEl = document.createElement("p");
     tapHintEl.style.cssText = "color:var(--muted);font-size:0.9rem;margin-bottom:12px;display:none";
     tapHintEl.textContent = i18n[locale].tapHint;
-    document.getElementById("content").insertBefore(tapHintEl, openApp);
+    content.insertBefore(tapHintEl, openApp);
 
     var hintEl = document.createElement("p");
     hintEl.id = "hint";
     hintEl.style.cssText = "color:var(--muted);font-size:0.85rem;margin-top:24px;display:none";
     hintEl.textContent = i18n[locale].hint;
-    document.getElementById("content").appendChild(hintEl);
+    content.appendChild(hintEl);
 
     setTimeout(function() {
       window.location.href = appUrl;

@@ -13,6 +13,7 @@ import '../../../core/auth/sign_in_sheet.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/constrained_content.dart';
+import '../../../core/navigation/invite_auth_helpers.dart';
 import '../../../core/navigation/invite_nav_redirect.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/utils/error_report_helper.dart';
@@ -78,16 +79,39 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
   String? _error;
   bool _didAttemptWebPreviewRedirect = false;
   bool _didAttemptPreviewRedirectForNotOnboarded = false;
-  bool _didAttemptOnboardingRedirectForNotOnboarded = false;
   bool _didAttemptAutoJoin = false;
   bool _didScheduleAutoJoin = false;
   bool _didScheduleUnauthResume = false;
+  bool _didPrepareInviteEntry = false;
 
   bool _shouldAutoRedirectToPreview(InviteAccessMode? mode) =>
       mode == InviteAccessMode.readonlyOnly;
 
   /// Set when accept fails because user is already a member; enables "Open Group" action.
   String? _alreadyMemberGroupId;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _prepareInviteEntry());
+  }
+
+  void _prepareInviteEntry() {
+    if (!mounted || _didPrepareInviteEntry) return;
+    if (widget.token.isEmpty) {
+      _didPrepareInviteEntry = true;
+      return;
+    }
+    // Settings may not be ready on the first frame — retry next frame.
+    if (ref.read(hisabSettingsProvidersProvider) == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _prepareInviteEntry());
+      return;
+    }
+    _didPrepareInviteEntry = true;
+    // Invite openers want online features; persist token for OAuth/reload.
+    prepareInviteOnlineMode(ref);
+    persistPendingInviteToken(ref, widget.token);
+  }
 
   _InviteAcceptErrorKind _classifyInviteAcceptError(Object error) {
     if (error is AuthException) return _InviteAcceptErrorKind.unauthenticated;
@@ -153,7 +177,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
     final onboardingCompleted = ref.watch(onboardingCompletedProvider);
     final inviteAsync = ref.watch(inviteByTokenProvider(widget.token));
 
-    // Not onboarded and not authenticated: resolve via preview (anon) and redirect to preview or onboarding
+    // Not onboarded and not authenticated: resolve via anon preview, then sign-in.
     if (!onboardingCompleted &&
         !isAuthenticated &&
         supabaseConfigAvailable &&
@@ -243,47 +267,38 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                   }
                   return const Center(child: CircularProgressIndicator());
                 }
-                if (preview == null &&
-                    !_didAttemptOnboardingRedirectForNotOnboarded) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (!mounted) return;
-                    if (_didAttemptOnboardingRedirectForNotOnboarded) return;
-                    setState(
-                        () => _didAttemptOnboardingRedirectForNotOnboarded = true);
-                    _persistPendingInviteToken();
-                    if (mounted) context.go(RoutePaths.onboarding);
-                  });
-                }
-                if (preview == null &&
-                    _didAttemptOnboardingRedirectForNotOnboarded) {
-                  return _inviteStalledNavigationBody(
-                    context,
-                    onPrimary: () {
-                      _persistPendingInviteToken();
-                      context.go(RoutePaths.onboarding);
-                    },
-                    primaryLabelKey: 'onboarding_next',
-                    onGoHome: () => _dismissInvite(context),
-                  );
-                }
+                // Preview unavailable — stay on invite and offer sign-in (no onboarding).
                 return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const CircularProgressIndicator(),
-                      const SizedBox(height: 24),
-                      Text(
-                        'invite_taking_to_sign_in'.tr(),
-                        style: Theme.of(context).textTheme.bodyMedium,
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      TextButton.icon(
-                        onPressed: () => _dismissInvite(context),
-                        icon: const Icon(Icons.home_outlined, size: 20),
-                        label: Text('go_home'.tr()),
-                      ),
-                    ],
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'invite_web_heading'.tr(),
+                          style: Theme.of(context).textTheme.headlineSmall,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'invite_web_message'.tr(),
+                          style: Theme.of(context).textTheme.bodyLarge,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 32),
+                        FilledButton.icon(
+                          onPressed: () => _openSignInForInvite(context),
+                          icon: const Icon(Icons.login),
+                          label: Text('invite_web_sign_in'.tr()),
+                        ),
+                        const SizedBox(height: 16),
+                        TextButton.icon(
+                          onPressed: () => _dismissInvite(context),
+                          icon: const Icon(Icons.home_outlined, size: 20),
+                          label: Text('go_home'.tr()),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
@@ -302,24 +317,26 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                 ),
               ),
               error: (e, st) {
-                if (!_didAttemptOnboardingRedirectForNotOnboarded) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (!mounted) return;
-                    if (_didAttemptOnboardingRedirectForNotOnboarded) return;
-                    setState(
-                        () => _didAttemptOnboardingRedirectForNotOnboarded = true);
-                    _persistPendingInviteToken();
-                    if (mounted) context.go(RoutePaths.onboarding);
-                  });
-                }
                 return Center(
-                  child: ErrorContentWidget(
-                    message: e.toString(),
-                    details: e.toString(),
-                    stackTrace: st,
-                    onRetry: () =>
-                        ref.invalidate(invitePreviewDataProvider(widget.token)),
-                    onGoHome: () => _dismissInvite(context),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      ErrorContentWidget(
+                        message: e.toString(),
+                        details: e.toString(),
+                        stackTrace: st,
+                        onRetry: () => ref.invalidate(
+                          invitePreviewDataProvider(widget.token),
+                        ),
+                        onGoHome: () => _dismissInvite(context),
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton.icon(
+                        onPressed: () => _openSignInForInvite(context),
+                        icon: const Icon(Icons.login),
+                        label: Text('invite_web_sign_in'.tr()),
+                      ),
+                    ],
                   ),
                 );
               },
@@ -329,8 +346,26 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
       );
     }
 
-    // Local-only without backend configuration cannot resolve invites at all.
+    // Local-only: invite openers with Supabase available are being flipped online
+    // in initState — show a short loading state instead of the offline dead-end.
     if (localOnly) {
+      if (supabaseConfigAvailable && widget.token.isNotEmpty) {
+        return LayoutBuilder(
+          builder: (context, layoutConstraints) {
+            return Scaffold(
+              appBar: ContentAlignedAppBar(
+                contentAreaWidth: layoutConstraints.maxWidth,
+                title: Text('invite'.tr()),
+                leading: IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => _dismissInvite(context),
+                ),
+              ),
+              body: const Center(child: CircularProgressIndicator()),
+            );
+          },
+        );
+      }
       return LayoutBuilder(
         builder: (context, layoutConstraints) {
           return Scaffold(
@@ -490,7 +525,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                           ),
                           const SizedBox(height: 32),
                           FilledButton.icon(
-                            onPressed: () => _openSignInForWebInvite(context),
+                            onPressed: () => _openSignInForInvite(context),
                             icon: const Icon(Icons.login),
                             label: Text('invite_web_sign_in'.tr()),
                           ),
@@ -642,9 +677,9 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
     final isReadonlyOnly = invite.accessMode == InviteAccessMode.readonlyOnly;
     final showReadonlyBanner = isReadonlyJoin || isReadonlyOnly;
     final canAcceptInvite = !isReadonlyOnly;
-    final showJoinRequiresOnlineCta = isReadonlyJoin && localOnly;
-    final showJoinOnboardingCta =
-        isReadonlyJoin && !isAuthenticated && !localOnly;
+    final showJoinCta = isReadonlyJoin && !isAuthenticated;
+    final showJoinForceOnlineCta =
+        isReadonlyJoin && isAuthenticated && localOnly;
 
     // Resume view+join after login/register without an extra Accept tap.
     final settings = ref.read(hisabSettingsProvidersProvider);
@@ -670,12 +705,11 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
         isAuthenticated: isAuthenticated,
         localOnly: localOnly,
         canAcceptInvite: canAcceptInvite,
-        onboardingCompleted: ref.read(onboardingCompletedProvider),
         alreadyAttempted: _didAttemptAutoJoin || _didScheduleUnauthResume,
       );
       if (resume != InviteUnauthResumeAction.none) {
         _didScheduleUnauthResume = true;
-        // Mark attempted only when we actually open sign-in/onboarding.
+        // Mark attempted only when we actually open sign-in.
         // If auth lands before the frame callback, fall through to auto-join.
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted || _didAttemptAutoJoin || _accepting) return;
@@ -687,17 +721,12 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
             isAuthenticated: ref.read(isAuthenticatedProvider),
             localOnly: ref.read(effectiveLocalOnlyProvider),
             canAcceptInvite: canAcceptInvite,
-            onboardingCompleted: ref.read(onboardingCompletedProvider),
             alreadyAttempted: false,
           );
           switch (action) {
             case InviteUnauthResumeAction.signIn:
               _didAttemptAutoJoin = true;
               unawaited(_signInThenAcceptIfPossible(context));
-            case InviteUnauthResumeAction.onboarding:
-              _didAttemptAutoJoin = true;
-              _persistPendingInviteToken(autoJoin: true);
-              context.go(RoutePaths.onboarding);
             case InviteUnauthResumeAction.none:
               // Auth may have completed between build and frame.
               _maybeAutoJoin(context, invite, group);
@@ -767,6 +796,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
           if (_alreadyMemberGroupId != null)
             FilledButton(
               onPressed: () {
+                markInviteOnboardingDone(ref);
                 _clearPendingInviteState();
                 context.go(RoutePaths.groupDetail(_alreadyMemberGroupId!));
               },
@@ -784,14 +814,22 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                   ),
                   const SizedBox(height: 12),
                 ],
-                if (showJoinRequiresOnlineCta)
+                if (showJoinForceOnlineCta)
                   FilledButton(
-                    onPressed: () => _goToOnlineRequiredForInvite(context),
-                    child: Text('invite_preview_join_cta'.tr()),
+                    onPressed: _accepting
+                        ? null
+                        : () => _joinForceOnlineThenAccept(context, group),
+                    child: _accepting
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text('invite_preview_join_cta'.tr()),
                   )
-                else if (showJoinOnboardingCta)
+                else if (showJoinCta)
                   FilledButton(
-                    onPressed: () => _goToOnboardingForInvite(context),
+                    onPressed: () => _joinViaSignIn(context),
                     child: Text('invite_preview_join_cta'.tr()),
                   )
                 else if (canAcceptInvite)
@@ -815,19 +853,6 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
         ],
       ),
     );
-  }
-
-  void _persistPendingInviteToken({bool autoJoin = false}) {
-    final settings = ref.read(hisabSettingsProvidersProvider);
-    if (settings == null) return;
-    ref.read(settings.provider(pendingInviteTokenSettingDef).notifier).set(
-      widget.token,
-    );
-    if (autoJoin) {
-      ref
-          .read(settings.provider(pendingInviteAutoJoinSettingDef).notifier)
-          .set(true);
-    }
   }
 
   void _clearAutoJoinFlag() {
@@ -877,42 +902,35 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
     if (_didAttemptAutoJoin || _accepting) return;
     if (invite.accessMode == InviteAccessMode.readonlyOnly) return;
     if (!ref.read(isAuthenticatedProvider)) return;
-    if (ref.read(effectiveLocalOnlyProvider)) return;
+    if (ref.read(effectiveLocalOnlyProvider)) {
+      prepareInviteOnlineMode(ref);
+      if (ref.read(effectiveLocalOnlyProvider)) return;
+    }
     if (!_consumeAutoJoinFlag()) return;
     _didAttemptAutoJoin = true;
     unawaited(_accept(context, group));
   }
 
-  void _goToOnboardingForInvite(BuildContext context) {
-    _persistPendingInviteToken(autoJoin: true);
-    final onboardingCompleted = ref.read(onboardingCompletedProvider);
-    if (onboardingCompleted) {
-      // Returning user: sign in here — router would bounce /onboarding → home.
-      unawaited(_signInThenAcceptIfPossible(context));
-      return;
-    }
-    context.go(RoutePaths.onboarding);
+  void _joinViaSignIn(BuildContext context) {
+    prepareInviteJoinPending(ref, widget.token);
+    unawaited(_signInThenAcceptIfPossible(context));
   }
 
-  void _goToOnlineRequiredForInvite(BuildContext context) {
-    _persistPendingInviteToken(autoJoin: true);
-    final isAuthenticated = ref.read(isAuthenticatedProvider);
-    if (isAuthenticated) {
-      context.go(RoutePaths.settings);
-      return;
-    }
-    final onboardingCompleted = ref.read(onboardingCompletedProvider);
-    if (onboardingCompleted) {
-      unawaited(_signInThenAcceptIfPossible(context));
-      return;
-    }
-    context.go(RoutePaths.onboarding);
+  Future<void> _joinForceOnlineThenAccept(
+    BuildContext context,
+    Group group,
+  ) async {
+    prepareInviteOnlineMode(ref);
+    prepareInviteJoinPending(ref, widget.token);
+    await _accept(context, group);
   }
 
   Future<void> _signInThenAcceptIfPossible(BuildContext context) async {
+    prepareInviteJoinPending(ref, widget.token);
     final result = await showSignInSheet(context, ref);
     switch (result) {
       case SignInResult.success:
+        markInviteOnboardingDone(ref);
         await ref.read(dataSyncServiceProvider.notifier).syncNow();
         if (!context.mounted) return;
         final data = await ref.read(
@@ -923,7 +941,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
         }
         break;
       case SignInResult.pendingRedirect:
-        _persistPendingInviteToken(autoJoin: true);
+        prepareInviteJoinPending(ref, widget.token);
         break;
       case SignInResult.cancelled:
         _clearAutoJoinFlag();
@@ -932,11 +950,12 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
     }
   }
 
-  Future<void> _openSignInForWebInvite(BuildContext context) async {
-    _persistPendingInviteToken(autoJoin: true);
+  Future<void> _openSignInForInvite(BuildContext context) async {
+    prepareInviteJoinPending(ref, widget.token);
     final result = await showSignInSheet(context, ref);
     switch (result) {
       case SignInResult.success:
+        markInviteOnboardingDone(ref);
         await ref.read(dataSyncServiceProvider.notifier).syncNow();
         if (!context.mounted) return;
         final data = await ref.read(
@@ -947,7 +966,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
         }
         break;
       case SignInResult.pendingRedirect:
-        _persistPendingInviteToken(autoJoin: true);
+        prepareInviteJoinPending(ref, widget.token);
         break;
       case SignInResult.cancelled:
         _clearAutoJoinFlag();
@@ -958,19 +977,30 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
 
   Future<void> _accept(BuildContext context, Group group) async {
     if (!ref.read(isAuthenticatedProvider)) {
+      prepareInviteJoinPending(ref, widget.token);
       final result = await showSignInSheet(context, ref);
       switch (result) {
         case SignInResult.success:
+          markInviteOnboardingDone(ref);
           await ref.read(dataSyncServiceProvider.notifier).syncNow();
           break;
         case SignInResult.pendingRedirect:
-          _persistPendingInviteToken(autoJoin: true);
+          prepareInviteJoinPending(ref, widget.token);
           return;
         case SignInResult.cancelled:
           _clearAutoJoinFlag();
           if (context.mounted) context.showToast('sign_in_required'.tr());
           return;
       }
+    }
+
+    // Online is required to accept; flip if still local-only.
+    prepareInviteOnlineMode(ref);
+    if (ref.read(effectiveLocalOnlyProvider)) {
+      if (mounted) {
+        setState(() => _error = 'invite_requires_online'.tr());
+      }
+      return;
     }
 
     setState(() {
@@ -1014,6 +1044,8 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
       Log.info('Sync after invite complete, navigating to group $groupId');
       ref.invalidate(groupsProvider);
       ref.invalidate(futureGroupProvider(groupId));
+      // Must mark onboarded before leaving invite, or router bounces to onboarding.
+      markInviteOnboardingDone(ref);
       // Must clear before go() — leftover pending token redirects /groups → /invite.
       _clearPendingInviteState();
       if (context.mounted) {
@@ -1079,19 +1111,6 @@ class _InvitePreviewFallbackOnErrorState
     extends ConsumerState<_InvitePreviewFallbackOnError> {
   bool _didRedirect = false;
 
-  void _persistPendingInviteToken({bool autoJoin = false}) {
-    final settings = ref.read(hisabSettingsProvidersProvider);
-    if (settings == null) return;
-    ref.read(settings.provider(pendingInviteTokenSettingDef).notifier).set(
-      widget.token,
-    );
-    if (autoJoin) {
-      ref
-          .read(settings.provider(pendingInviteAutoJoinSettingDef).notifier)
-          .set(true);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     if (widget.token.isEmpty) {
@@ -1135,14 +1154,9 @@ class _InvitePreviewFallbackOnErrorState
                     const SizedBox(height: 12),
                     FilledButton(
                       onPressed: () {
-                        _persistPendingInviteToken(autoJoin: true);
-                        final onboarded = ref.read(onboardingCompletedProvider);
-                        if (onboarded) {
-                          // Stay on invite accept; parent page handles sign-in.
-                          context.go(RoutePaths.inviteAccept(widget.token));
-                        } else {
-                          context.go(RoutePaths.onboarding);
-                        }
+                        // Stay on invite accept with auto-join; parent opens sign-in.
+                        prepareInviteJoinPending(ref, widget.token);
+                        context.go(RoutePaths.inviteAccept(widget.token));
                       },
                       child: Text('invite_preview_join_cta'.tr()),
                     ),
