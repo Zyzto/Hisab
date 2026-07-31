@@ -80,21 +80,27 @@ void main() {
 
         // ── Stage: test export data ──
         await stage('test export data', () async {
-          // Data & Backup section is collapsed by default -- expand it
+          // Sections start expanded; only tap the header if Export is hidden.
           await scrollUntilVisible(
             tester,
             textAnyOf(tester, ['Data & Backup', 'البيانات والنسخة الاحتياطية']),
           );
-          await tapAndSettle(
-            tester,
-            textAnyOf(tester, ['Data & Backup', 'البيانات والنسخة الاحتياطية']),
-          );
-          await pumpAndSettleWithTimeout(tester);
+          final exportTile = textAnyOf(tester, [
+            'Export data',
+            'تصدير البيانات',
+          ]);
+          if (exportTile.evaluate().isEmpty) {
+            await tapAndSettle(
+              tester,
+              textAnyOf(tester, [
+                'Data & Backup',
+                'البيانات والنسخة الاحتياطية',
+              ]),
+            );
+            await pumpAndSettleWithTimeout(tester);
+          }
 
-          await scrollUntilVisible(
-            tester,
-            textAnyOf(tester, ['Export data', 'تصدير البيانات']),
-          );
+          await scrollUntilVisible(tester, exportTile);
           expect(
             find.text('Export data').evaluate().isNotEmpty ||
                 find.text('تصدير البيانات').evaluate().isNotEmpty,
@@ -171,21 +177,24 @@ void main() {
 
         // ── Stage: toggle telemetry ──
         await stage('toggle telemetry', () async {
-          // Privacy section is collapsed by default -- expand it
+          // Sections start expanded; only tap the header if the tile is hidden.
           await scrollUntilVisible(
             tester,
             textAnyOf(tester, ['Privacy', 'الخصوصية']),
           );
-          await tapAndSettle(tester, textAnyOf(tester, ['Privacy', 'الخصوصية']));
-          await tester.pumpAndSettle();
-
-          await scrollUntilVisible(
-            tester,
-            textAnyOf(
+          final telemetryLabel = textAnyOf(tester, [
+            'Send anonymous usage data',
+            'إرسال بيانات استخدام مجهولة',
+          ]);
+          if (telemetryLabel.evaluate().isEmpty) {
+            await tapAndSettle(
               tester,
-              ['Send anonymous usage data', 'إرسال بيانات استخدام مجهولة'],
-            ),
-          );
+              textAnyOf(tester, ['Privacy', 'الخصوصية']),
+            );
+            await tester.pumpAndSettle();
+          }
+
+          await scrollUntilVisible(tester, telemetryLabel);
 
           final telemetryTile = find.ancestor(
             of: textAnyOf(
@@ -221,16 +230,19 @@ void main() {
             isTrue,
           );
 
-          // Tap to expand the About section
-          await tapAndSettle(tester, textAnyOf(tester, ['About', 'حول']));
-          await pumpAndSettleWithTimeout(tester);
-
-          // Verify app version info or View logs appears
           final viewLogs = find.text('View logs').evaluate().isNotEmpty
               ? find.text('View logs')
               : find.text('عرض السجلات');
-          if (viewLogs.evaluate().isNotEmpty) {
-            expect(viewLogs, findsOneWidget);
+          if (viewLogs.evaluate().isEmpty) {
+            await tapAndSettle(tester, textAnyOf(tester, ['About', 'حول']));
+            await pumpAndSettleWithTimeout(tester);
+          }
+
+          final viewLogsAfter = find.text('View logs').evaluate().isNotEmpty
+              ? find.text('View logs')
+              : find.text('عرض السجلات');
+          if (viewLogsAfter.evaluate().isNotEmpty) {
+            expect(viewLogsAfter, findsOneWidget);
           }
         });
 
