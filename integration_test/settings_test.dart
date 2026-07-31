@@ -248,15 +248,34 @@ void main() {
 
         // ── Stage: settings persist ──
         await stage('settings persist', () async {
-          // After the about/telemetry stages the ListView is scrolled down.
-          // "Theme" is near the top and has been disposed by the lazy builder.
-          // Scroll UP (positive delta) to bring it back into the viewport.
+          // After about/telemetry the browse list is scrolled down and Theme is
+          // lazily disposed. Scroll the settings ListView specifically — the
+          // page-section index also owns a Scrollable that must not be dragged.
+          final settingsScrollable = find.descendant(
+            of: find.byKey(const PageStorageKey<String>('settings_list')),
+            matching: find.byType(Scrollable),
+          );
+          final themeTile = textAnyOf(tester, ['Theme', 'المظهر']);
           await scrollUntilVisible(
             tester,
-            textAnyOf(tester, ['Theme', 'المظهر']),
+            themeTile,
+            scrollable: settingsScrollable,
             delta: 200,
           );
-          await tapAndSettle(tester, textAnyOf(tester, ['Theme', 'المظهر']));
+          if (themeTile.evaluate().isEmpty) {
+            await tapAndSettle(
+              tester,
+              textAnyOf(tester, ['Appearance', 'المظهر']),
+            );
+            await pumpAndSettleWithTimeout(tester);
+            await scrollUntilVisible(
+              tester,
+              themeTile,
+              scrollable: settingsScrollable,
+              delta: 200,
+            );
+          }
+          await tapAndSettle(tester, themeTile);
 
           await tapAnyText(tester, ['Dark', 'داكن']);
 
@@ -268,7 +287,8 @@ void main() {
 
           await scrollUntilVisible(
             tester,
-            textAnyOf(tester, ['Theme', 'المظهر']),
+            themeTile,
+            scrollable: settingsScrollable,
             delta: 200,
           );
           expect(
