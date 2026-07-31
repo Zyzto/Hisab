@@ -40,7 +40,8 @@ void main() {
     int initialPage = 0,
     Locale locale = const Locale('en'),
   }) async {
-    final settings = await initializeHisabSettings();
+    // rootBundle / SharedPreferences need real async inside testWidgets.
+    final settings = await tester.runAsync(initializeHisabSettings);
     if (settings == null) {
       throw Exception('initializeHisabSettings returned null');
     }

@@ -9,29 +9,27 @@ import '../widgets/setting_tile_helper.dart';
 List<Widget> buildFunctionalSectionTiles(
   BuildContext context,
   WidgetRef ref,
-  SettingsProviders settings,
-) {
+  SettingsProviders settings, {
+  SettingAnchorRegistry? anchors,
+}) {
   return [
     buildBoolSettingTile(
       ref,
       settings,
       expenseFormFullFeaturesSettingDef,
-      titleKey: 'expense_form_full_features',
-      subtitleKey: 'expense_form_full_features_description',
+      anchors: anchors,
     ),
     buildBoolSettingTile(
       ref,
       settings,
       expenseFormExpandDescriptionSettingDef,
-      titleKey: 'expense_form_expand_description',
-      subtitleKey: 'expense_form_expand_description_setting',
+      anchors: anchors,
     ),
     buildBoolSettingTile(
       ref,
       settings,
       expenseFormExpandBillBreakdownSettingDef,
-      titleKey: 'expense_form_expand_bill_breakdown',
-      subtitleKey: 'expense_form_expand_bill_breakdown_setting',
+      anchors: anchors,
     ),
   ];
 }

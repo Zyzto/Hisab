@@ -1,7 +1,7 @@
 name: hisab
 description: "Group expense splitting and settle-up app."
 publish_to: 'none'
-version: 0.6.17+66
+version: 0.6.18+67
 
 environment:
   sdk: ^3.10.0
@@ -69,7 +69,7 @@ dependencies:
   flutter_settings_framework:
     git:
       url: https://github.com/Zyzto/edadat.git
-      ref: b1d07e0e47c241b1ff1d3db0fa6d73bb166c10c7
+      ref: v0.5.1
 
   # About (version, licenses)
   package_info_plus: ^9.0.1

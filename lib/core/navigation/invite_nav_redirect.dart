@@ -2,6 +2,11 @@
 /// Kept free of Flutter/Riverpod so edge cases can be unit-tested.
 library;
 
+/// True for `/invite` (query-token form) and `/invite/...` path forms.
+/// Does not match `/scan-invite`.
+bool isInviteRoutePath(String path) =>
+    path == '/invite' || path.startsWith('/invite/');
+
 /// Where to send the user when a pending invite token exists.
 ///
 /// Returns:
@@ -17,9 +22,10 @@ String? pendingInviteRedirectTarget({
 }) {
   if (pendingToken.isEmpty) return null;
   // Never yank the user off register/login or privacy.
+  // (Cold-start invite links use InviteLinkHandler.go instead of this path.)
   if (onOnboarding || onPrivacyPolicy) return null;
   // Already on invite/preview — keep token for post-auth auto-join.
-  if (currentPath.startsWith('/invite/')) return null;
+  if (isInviteRoutePath(currentPath)) return null;
   return '/invite/$pendingToken';
 }
 
@@ -66,14 +72,13 @@ bool shouldAutoJoinInvite({
 }
 
 /// Unauthenticated resume after Join from preview (auto-join already set).
-enum InviteUnauthResumeAction { none, signIn, onboarding }
+enum InviteUnauthResumeAction { none, signIn }
 
 InviteUnauthResumeAction unauthenticatedAutoJoinResume({
   required bool autoJoinFlag,
   required bool isAuthenticated,
   required bool localOnly,
   required bool canAcceptInvite,
-  required bool onboardingCompleted,
   required bool alreadyAttempted,
 }) {
   if (alreadyAttempted) return InviteUnauthResumeAction.none;
@@ -81,7 +86,5 @@ InviteUnauthResumeAction unauthenticatedAutoJoinResume({
   if (isAuthenticated) return InviteUnauthResumeAction.none;
   if (localOnly) return InviteUnauthResumeAction.none;
   if (!canAcceptInvite) return InviteUnauthResumeAction.none;
-  return onboardingCompleted
-      ? InviteUnauthResumeAction.signIn
-      : InviteUnauthResumeAction.onboarding;
+  return InviteUnauthResumeAction.signIn;
 }

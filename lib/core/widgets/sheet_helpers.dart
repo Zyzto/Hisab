@@ -76,13 +76,16 @@ Future<T?> showOptionPickerSheet<T>(
   );
 }
 
-const double _kSheetPadding = 16.0;
+const double _kSheetPadding = 20.0;
 const double _kSheetActionsSpacing = 8.0;
 const double _kSheetBodyActionsGap = 20.0;
 
 /// Builds the shared sheet layout: optional title (in body), body, and action row.
 /// When [showTitleInBody] is false, the title is not rendered here (caller shows
 /// it in the responsive sheet top bar on tablet+).
+///
+/// Applies [kSheetContentPadding]-aligned horizontal inset around [body] so
+/// free-form content cannot sit flush on the panel edges.
 ///
 /// Shrink-wraps to content height ([Align] + [heightFactor]) so short dialogs
 /// do not stretch to the sheet [maxHeight] and leave a large empty gap above
@@ -123,7 +126,10 @@ Widget buildSheetShell(
                     ),
                   ),
                 ),
-              body,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: _kSheetPadding),
+                child: body,
+              ),
               if (actions.isNotEmpty) ...[
                 const SizedBox(height: _kSheetBodyActionsGap),
                 Padding(
@@ -157,14 +163,12 @@ Widget buildSheetShell(
 
 Widget _sheetBodyPanel(BuildContext context, {required Widget child}) {
   final cs = Theme.of(context).colorScheme;
-  return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: _kSheetPadding),
-    child: DecoratedBox(
-      decoration: AccentSurfaces.flatPanel(cs),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: child,
-      ),
+  // Horizontal inset comes from [buildSheetShell]; panel fills that band.
+  return DecoratedBox(
+    decoration: AccentSurfaces.flatPanel(cs),
+    child: Padding(
+      padding: const EdgeInsets.all(14),
+      child: child,
     ),
   );
 }

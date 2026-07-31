@@ -110,4 +110,29 @@ class LayoutBreakpoints {
     final bandWidth = (contentAreaWidth - leftOffset).clamp(0.0, maxW);
     return (leftOffset, bandWidth);
   }
+
+  /// Free width on the **end** side of the content band (right in LTR, left in
+  /// RTL). Used for rails such as [ConstrainedContent.aside].
+  static double endGutterWidth(BuildContext context, double contentAreaWidth) {
+    final (leftOffset, bandWidth) = contentBandMetrics(
+      context,
+      contentAreaWidth,
+    );
+    final rightFree = (contentAreaWidth - leftOffset - bandWidth).clamp(
+      0.0,
+      double.infinity,
+    );
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
+    return isRtl ? leftOffset : rightFree;
+  }
+
+  /// Whether there is enough end-gutter space for a content aside rail.
+  static bool canShowContentAside(
+    BuildContext context,
+    double contentAreaWidth, {
+    double asideMinGutter = 176,
+  }) {
+    if (!isTabletOrWider(context)) return false;
+    return endGutterWidth(context, contentAreaWidth) >= asideMinGutter + 8;
+  }
 }

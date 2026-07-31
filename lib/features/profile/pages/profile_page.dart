@@ -39,6 +39,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   bool _chronologicalFeed = false;
   String? _activeSectionId;
   bool _programmaticScroll = false;
+  int _scrollGeneration = 0;
 
   final _scrollController = ScrollController();
   final _scrollViewKey = GlobalKey();
@@ -161,24 +162,32 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 
   Future<void> _jumpTo(PageSectionIndexEntry entry) async {
+    final token = ++_scrollGeneration;
     setState(() {
       _activeSectionId = entry.id;
       _programmaticScroll = true;
     });
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted || token != _scrollGeneration) return;
+
     // Account is always at the top; jump there even if the widget was disposed.
-    final known = entry.id == 'account'
-        ? 0.0
-        : _sectionOffsets[entry.id];
+    final known = entry.id == 'account' ? 0.0 : _sectionOffsets[entry.id];
     await scrollToPageSection(
       entry.key,
       controller: _scrollController,
       knownOffset: known,
     );
-    if (!mounted) return;
+    if (!mounted || token != _scrollGeneration) return;
     _captureVisibleOffsets();
-    Future<void>.delayed(const Duration(milliseconds: 420), () {
-      if (mounted) _programmaticScroll = false;
-    });
+    // Keep scroll-spy locked until ensureVisible finishes so the index
+    // highlight does not flash through intermediate sections.
+    await Future<void>.delayed(const Duration(milliseconds: 320));
+    if (mounted && token == _scrollGeneration) {
+      setState(() {
+        _activeSectionId = entry.id;
+        _programmaticScroll = false;
+      });
+    }
   }
 
   bool _onScroll(ScrollNotification notification) {
@@ -287,6 +296,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                       key: _scrollViewKey,
                       controller: _scrollController,
                       physics: const AlwaysScrollableScrollPhysics(),
+                      cacheExtent: 2400,
                       slivers: [
                         SliverToBoxAdapter(
                           child: KeyedSubtree(
@@ -478,16 +488,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   /// Matches [ConstrainedContent] aside visibility so mobile TOC appears when
   /// the side rail would not fit.
   bool _canShowSideIndex(BuildContext context, double contentAreaWidth) {
-    if (!LayoutBreakpoints.isTabletOrWider(context)) return false;
-    final (leftOffset, bandWidth) = LayoutBreakpoints.contentBandMetrics(
-      context,
-      contentAreaWidth,
-    );
-    final rightFree = (contentAreaWidth - leftOffset - bandWidth).clamp(
-      0.0,
-      double.infinity,
-    );
-    return rightFree >= 176 + 8;
+    return LayoutBreakpoints.canShowContentAside(context, contentAreaWidth);
   }
 }
 

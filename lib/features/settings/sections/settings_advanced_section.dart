@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 
+import '../settings_definitions.dart';
+
 /// Returns the list of tiles for the Advanced section.
 List<Widget> buildAdvancedSectionTiles(
   BuildContext context,
@@ -15,44 +17,66 @@ List<Widget> buildAdvancedSectionTiles(
   required VoidCallback? onDeleteCloudData,
   required bool supabaseAvailable,
   required bool isSignedIn,
+  SettingAnchorRegistry? anchors,
 }) {
+  Widget wrap(ActionSetting def, Widget tile) =>
+      anchors?.wrap(def.key, tile) ?? tile;
+
   return [
-    ActionSettingsTile(
-      leading: const Icon(Icons.replay),
-      title: Text('return_to_onboarding'.tr()),
-      subtitle: Text('return_to_onboarding_description'.tr()),
-      onTap: onReturnToOnboarding,
+    wrap(
+      actionReturnToOnboardingSettingDef,
+      ActionSettingsTile(
+        leading: Icon(actionReturnToOnboardingSettingDef.icon),
+        title: Text(actionReturnToOnboardingSettingDef.titleKey.tr()),
+        subtitle: Text(actionReturnToOnboardingSettingDef.subtitleKey!.tr()),
+        onTap: onReturnToOnboarding,
+      ),
     ),
-    ActionSettingsTile(
-      leading: const Icon(Icons.description),
-      title: Text('view_logs'.tr()),
-      onTap: onViewLogs,
+    wrap(
+      actionViewLogsSettingDef,
+      ActionSettingsTile(
+        leading: Icon(actionViewLogsSettingDef.icon),
+        title: Text(actionViewLogsSettingDef.titleKey.tr()),
+        onTap: onViewLogs,
+      ),
     ),
-    ActionSettingsTile(
-      leading: const Icon(Icons.restore),
-      title: Text('reset_all_settings'.tr()),
-      subtitle: Text('reset_all_settings_description'.tr()),
-      onTap: onResetAllSettings,
+    wrap(
+      actionResetAllSettingsSettingDef,
+      ActionSettingsTile(
+        leading: Icon(actionResetAllSettingsSettingDef.icon),
+        title: Text(actionResetAllSettingsSettingDef.titleKey.tr()),
+        subtitle: Text(actionResetAllSettingsSettingDef.subtitleKey!.tr()),
+        onTap: onResetAllSettings,
+      ),
     ),
-    ActionSettingsTile(
-      leading: const Icon(Icons.phone_android),
-      title: Text('delete_local_data'.tr()),
-      subtitle: Text('delete_local_data_description'.tr()),
-      onTap: onDeleteLocalData,
+    wrap(
+      actionDeleteLocalDataSettingDef,
+      ActionSettingsTile(
+        leading: Icon(actionDeleteLocalDataSettingDef.icon),
+        title: Text(actionDeleteLocalDataSettingDef.titleKey.tr()),
+        subtitle: Text(actionDeleteLocalDataSettingDef.subtitleKey!.tr()),
+        onTap: onDeleteLocalData,
+      ),
     ),
     if (supabaseAvailable && isSignedIn)
-      ActionSettingsTile(
-        leading: const Icon(Icons.cloud),
-        title: Text('delete_cloud_data'.tr()),
-        subtitle: Text('delete_cloud_data_description'.tr()),
-        onTap: onDeleteCloudData,
+      wrap(
+        actionDeleteCloudDataSettingDef,
+        ActionSettingsTile(
+          leading: Icon(actionDeleteCloudDataSettingDef.icon),
+          title: Text(actionDeleteCloudDataSettingDef.titleKey.tr()),
+          subtitle: Text(actionDeleteCloudDataSettingDef.subtitleKey!.tr()),
+          onTap: onDeleteCloudData,
+        ),
       )
     else
-      ActionSettingsTile(
-        leading: const Icon(Icons.cloud),
-        title: Text('delete_cloud_data'.tr()),
-        subtitle: Text('delete_cloud_data_sign_in_required'.tr()),
-        onTap: null,
+      wrap(
+        actionDeleteCloudDataSettingDef,
+        ActionSettingsTile(
+          leading: Icon(actionDeleteCloudDataSettingDef.icon),
+          title: Text(actionDeleteCloudDataSettingDef.titleKey.tr()),
+          subtitle: Text('delete_cloud_data_sign_in_required'.tr()),
+          onTap: null,
+        ),
       ),
   ];
 }

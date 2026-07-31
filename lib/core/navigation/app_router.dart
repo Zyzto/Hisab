@@ -188,7 +188,7 @@ GoRouter router(Ref ref) {
       }
       if (!onboardingCompleted && !onOnboarding && !onPrivacyPolicy) {
         // Allow staying on invite routes so readonly preview works without onboarding
-        if (state.uri.path.startsWith('/invite/')) return null;
+        if (isInviteRoutePath(state.uri.path)) return null;
         return RoutePaths.onboarding;
       }
       if (onboardingCompleted && onOnboarding) {
@@ -204,7 +204,7 @@ GoRouter router(Ref ref) {
           pendingToken: pending,
         );
         if (afterOnboarding != null &&
-            afterOnboarding.startsWith('/invite/') &&
+            isInviteRoutePath(afterOnboarding) &&
             settingsForInvite != null) {
           ref
               .read(
@@ -251,6 +251,13 @@ GoRouter router(Ref ref) {
       ),
       GoRoute(
         path: '/invite',
+        redirect: (context, state) {
+          final token = state.uri.queryParameters['token']?.trim() ?? '';
+          if (token.isNotEmpty) {
+            return RoutePaths.inviteAccept(token);
+          }
+          return null;
+        },
         pageBuilder: (context, state) {
           final token =
               state.pathParameters['token'] ??

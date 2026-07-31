@@ -415,7 +415,8 @@ class _IndexLink extends StatelessWidget {
 ///
 /// [ListView] disposes off-screen children, so [key.currentContext] is often
 /// null for sections above/below the cache window. Pass [controller] so we can
-/// probe the scroll extent until the target builds, then ensure it is visible.
+/// reposition (via [jumpTo], not animated probes) until the target builds, then
+/// run a single [Scrollable.ensureVisible] animation.
 ///
 /// Optional [knownOffset] (scroll pixels of the section top) skips probing.
 Future<void> scrollToPageSection(
@@ -423,54 +424,54 @@ Future<void> scrollToPageSection(
   double alignment = 0.08,
   ScrollController? controller,
   double? knownOffset,
+  Duration ensureDuration = const Duration(milliseconds: 280),
 }) async {
   Future<bool> ensure() async {
     final ctx = key.currentContext;
     if (ctx == null) return false;
     await Scrollable.ensureVisible(
       ctx,
-      duration: const Duration(milliseconds: 380),
+      duration: ensureDuration,
       curve: Curves.easeOutCubic,
       alignment: alignment,
     );
     return true;
   }
 
+  // Already in the tree — one smooth ensureVisible, no probing.
   if (await ensure()) return;
 
   final c = controller;
   if (c == null || !c.hasClients) return;
 
   final max = c.position.maxScrollExtent;
-  if (knownOffset != null) {
-    await c.animateTo(
-      knownOffset.clamp(0.0, max),
-      duration: const Duration(milliseconds: 320),
-      curve: Curves.easeOutCubic,
-    );
-    await WidgetsBinding.instance.endOfFrame;
-    if (await ensure()) return;
-    // Offset may be slightly stale; fall through to probes.
+
+  void jump(double offset) {
+    c.jumpTo(offset.clamp(0.0, max));
   }
 
-  // Prefer top first (covers "Account" / early sections), then walk down.
-  final probes = <double>[
-    0,
-    max * 0.2,
-    max * 0.4,
-    max * 0.6,
-    max * 0.8,
-    max,
-  ];
-  for (final raw in probes) {
-    final target = raw.clamp(0.0, max);
-    await c.animateTo(
-      target,
-      duration: const Duration(milliseconds: 90),
-      curve: Curves.linear,
-    );
+  // Instant reposition (no animateTo chain — that caused visible flicker).
+  if (knownOffset != null) {
+    jump(knownOffset);
+  } else {
+    for (final frac in const [0.0, 0.3, 0.6, 1.0]) {
+      jump(max * frac);
+      await WidgetsBinding.instance.endOfFrame;
+      if (key.currentContext != null) break;
+    }
+  }
+
+  await WidgetsBinding.instance.endOfFrame;
+  if (await ensure()) return;
+
+  // Stale offset / still not built: one more quiet scan, then ensure.
+  for (final frac in const [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]) {
+    jump(max * frac);
     await WidgetsBinding.instance.endOfFrame;
-    if (await ensure()) return;
+    if (key.currentContext != null) {
+      await ensure();
+      return;
+    }
   }
 }
 
