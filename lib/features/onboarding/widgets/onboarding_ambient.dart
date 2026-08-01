@@ -7,8 +7,14 @@ import '../../../core/platform/ui_perf.dart';
 /// Whether onboarding may run soft looping chrome (logo float, icon pulse).
 ///
 /// Off on iOS web (`preferReducedChromeMotion`) where timers + transforms on
-/// chrome were historically janky.
-bool get onboardingAmbientAllowed => !UiPerf.preferReducedChromeMotion;
+/// chrome were historically janky. Also off under widget / integration test
+/// bindings so [pumpAndSettle] can finish (repeat animations never settle).
+bool get onboardingAmbientAllowed {
+  if (UiPerf.preferReducedChromeMotion) return false;
+  final name = WidgetsBinding.instance.runtimeType.toString();
+  if (name.contains('TestWidgetsFlutterBinding')) return false;
+  return true;
+}
 
 /// Gentle vertical float + scale breathe for a hero mark (logo).
 ///

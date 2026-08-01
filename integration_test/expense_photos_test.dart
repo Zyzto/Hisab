@@ -18,14 +18,27 @@ void main() {
 
       await stage('enable full form', () async {
         await tapAndSettle(tester, find.text('Settings'));
+        final fullFormLabel = textAnyOf(tester, [
+          'Full expense form (Income & Transfer)',
+          'نموذج مصروف كامل (دخل وتحويل)',
+        ]);
         await scrollUntilVisible(
           tester,
-          find.text('Full expense form (Income & Transfer)'),
+          textAnyOf(tester, ['Functional', 'الوظائف']),
+          maxScrolls: 80,
         );
+        if (fullFormLabel.evaluate().isEmpty) {
+          await tapAndSettle(
+            tester,
+            textAnyOf(tester, ['Functional', 'الوظائف']),
+          );
+          await tester.pump(const Duration(milliseconds: 300));
+        }
+        await scrollUntilVisible(tester, fullFormLabel, maxScrolls: 80);
         final switchFinder = find.descendant(
           of: find.ancestor(
-            of: find.text('Full expense form (Income & Transfer)'),
-            matching: find.byType(ListTile),
+            of: fullFormLabel,
+            matching: find.byType(SwitchListTile),
           ),
           matching: find.byType(Switch),
         );

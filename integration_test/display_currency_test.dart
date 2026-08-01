@@ -157,13 +157,17 @@ void main() {
 
       // ── Stage: group detail shows summary in group currency ──
       await stage('group detail shows group currency', () async {
+        // Non-personal groups show share / paid / total (not "My Expenses").
         expect(
-          find.text('My Expenses').evaluate().isNotEmpty ||
+          find.text('Your share').evaluate().isNotEmpty ||
+              find.text('حصتك').evaluate().isNotEmpty ||
+              find.text('My Expenses').evaluate().isNotEmpty ||
               find.text('مصاريفي').evaluate().isNotEmpty,
           isTrue,
         );
         expect(
           find.text('Total Expenses').evaluate().isNotEmpty ||
+              find.text('إجمالي المصاريف').evaluate().isNotEmpty ||
               find.text('إجمالي المصروفات').evaluate().isNotEmpty,
           isTrue,
         );

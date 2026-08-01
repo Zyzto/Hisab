@@ -208,7 +208,12 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
       duration: const Duration(milliseconds: 150),
     );
 
-    final reduceChrome = UiPerf.preferReducedChromeMotion;
+    // Integration/widget tests use pumpAndSettle; skip looping chrome/timers.
+    final underTestBinding = WidgetsBinding.instance.runtimeType
+        .toString()
+        .contains('TestWidgetsFlutterBinding');
+    final reduceChrome =
+        UiPerf.preferReducedChromeMotion || underTestBinding;
     if (reduceChrome) {
       _languagePulseStopped = true;
       _themeDemoRunning = false;
