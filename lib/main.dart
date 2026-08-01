@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
+import 'package:go_router/go_router.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:powersync/powersync.dart' show PowerSyncDatabase, Schema;
@@ -21,6 +22,7 @@ import 'core/constants/firebase_config.dart';
 import 'core/constants/supabase_config.dart';
 import 'core/database/database_providers.dart';
 import 'core/log_web.dart';
+import 'core/navigation/decorative_route.dart';
 import 'core/database/delete_db_file.dart';
 import 'core/image_picker_init.dart';
 import 'core/database/powersync_schema.dart' as ps;
@@ -37,6 +39,12 @@ const bool enableWebSemantics = bool.fromEnvironment(
 );
 
 void main() {
+  // Default is false: context.push (group, expense, …) would not update the
+  // browser address bar. Hisab relies on push for stack navigation on web.
+  if (kIsWeb) {
+    GoRouter.optionURLReflectsImperativeAPIs = true;
+  }
+
   runZonedGuarded(
     () async {
       void setupErrorHandlers() {
@@ -108,6 +116,10 @@ void main() {
       }
 
       Future<void> runRestOfMain() async {
+        // Clear pathname/hash hybrids (e.g. `/settings#/groups/...`) before
+        // GoRouter binds so address-bar updates work again on web.
+        if (kIsWeb) sanitizeHashStrategyBrowserUrl();
+
         await LoggingService.init(
           const LoggingConfig(
             appName: 'Hisab',

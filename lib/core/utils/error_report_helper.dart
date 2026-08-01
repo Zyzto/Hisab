@@ -11,12 +11,18 @@ import '../constants/app_config.dart';
 import '../navigation/navigation_trace.dart';
 import '../services/connectivity_service.dart';
 import '../telemetry/telemetry_service.dart';
+import '../../features/settings/feedback_clipboard.dart';
+import '../../features/settings/feedback_upload.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
 
 const int _maxMessageForShare = 2000;
 const int _maxMessageForTelemetry = 200;
 const int _maxGithubTitle = 80;
 const int _maxStackChars = 800;
+
+/// English note when a screenshot was captured but could not be uploaded.
+const String kScreenshotManualAttachNoteEnglish =
+    '(Screenshot was captured; please attach it manually if needed.)';
 
 String _deviceLocaleTag() =>
     WidgetsBinding.instance.platformDispatcher.locale.toLanguageTag();
@@ -58,12 +64,17 @@ String _platformLabelEnglish() {
 /// readable on GitHub regardless of UI language. [message] is the string shown
 /// to the user (may be localized). [summaryEnglish] is optional developer-facing
 /// English text (e.g. same as [logMessage] passed to [Log.warning]).
+///
+/// When [screenshotUrl] is set, embeds a markdown image. When upload failed but
+/// a capture exists, set [includeScreenshotManualNote] for the English fallback.
 Future<({String plainText, String githubBody})> buildErrorReportPayload({
   required String message,
   String? details,
   StackTrace? stackTrace,
   String? summaryEnglish,
   String? uiLocaleTag,
+  String? screenshotUrl,
+  bool includeScreenshotManualNote = false,
 }) async {
   String version = 'unknown';
   try {
@@ -115,6 +126,17 @@ Future<({String plainText, String githubBody})> buildErrorReportPayload({
           ? '${stackStr.substring(0, _maxStackChars)}...'
           : stackStr,
     );
+    buffer.writeln();
+  }
+  final url = screenshotUrl?.trim();
+  if (url != null && url.isNotEmpty) {
+    buffer.writeln('**Screenshot**');
+    buffer.writeln('![Screenshot]($url)');
+    buffer.writeln();
+  } else if (includeScreenshotManualNote) {
+    buffer.writeln('**Screenshot**');
+    buffer.writeln(kScreenshotManualAttachNoteEnglish);
+    buffer.writeln();
   }
 
   final githubBody = buffer.toString();
@@ -124,7 +146,9 @@ Future<({String plainText, String githubBody})> buildErrorReportPayload({
       '${sanitizedSummaryEn != null ? 'Summary (en): $sanitizedSummaryEn\n' : ''}'
       'User message (may be localized): $sanitizedMessage\n'
       '${details != null && details.isNotEmpty ? 'Details: $details\n' : ''}'
-      '${NavigationTrace.instance.buildReportSectionEnglish(maxChars: 1200)}';
+      '${NavigationTrace.instance.buildReportSectionEnglish(maxChars: 1200)}'
+      '${url != null && url.isNotEmpty ? 'Screenshot: $url\n' : ''}'
+      '${includeScreenshotManualNote && (url == null || url.isEmpty) ? 'Screenshot: manual attach needed\n' : ''}';
   return (plainText: plainText, githubBody: githubBody);
 }
 
@@ -202,6 +226,62 @@ Future<void> openErrorReportGitHubIssue(
     await Clipboard.setData(ClipboardData(text: payload.githubBody));
     if (context.mounted) onCopied?.call();
   }
+}
+
+/// Uploads an optional screenshot, builds the English report payload, opens GitHub
+/// (or copies when [reportIssueUrl] is empty), and copies body (+ image) to clipboard.
+///
+/// Returns whether the body was written to the clipboard as the primary outcome
+/// (true when [reportIssueUrl] is empty or launch failed after copy fallback).
+Future<bool> submitUserBugReport(
+  BuildContext context, {
+  required String message,
+  Uint8List? screenshotPng,
+  String? summaryEnglish,
+  String? uiLocaleTag,
+}) async {
+  final hasScreenshot = screenshotPng != null && screenshotPng.isNotEmpty;
+  final resolvedUiLocale = uiLocaleTag ?? _uiLocaleTagFromContext(context);
+  String? screenshotUrl;
+  if (hasScreenshot) {
+    screenshotUrl = await uploadFeedbackScreenshot(screenshotPng);
+  }
+
+  final payload = await buildErrorReportPayload(
+    message: message.trim().isEmpty ? '—' : message.trim(),
+    summaryEnglish: summaryEnglish,
+    uiLocaleTag: resolvedUiLocale,
+    screenshotUrl: screenshotUrl,
+    includeScreenshotManualNote: hasScreenshot && screenshotUrl == null,
+  );
+  if (!context.mounted) return false;
+
+  final titleBase = (summaryEnglish != null && summaryEnglish.isNotEmpty)
+      ? summaryEnglish
+      : message;
+  final title = 'Bug: ${_sanitizeForReport(titleBase, _maxGithubTitle)}'
+      .replaceAll('\n', ' ');
+
+  var copiedAsPrimary = reportIssueUrl.isEmpty;
+  try {
+    if (reportIssueUrl.isNotEmpty) {
+      final uri = Uri.parse(reportIssueUrl).replace(
+        queryParameters: <String, String>{
+          'title': title,
+          'body': payload.githubBody,
+        },
+      );
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  } catch (_) {
+    copiedAsPrimary = true;
+  }
+  try {
+    await setFeedbackClipboard(payload.githubBody, screenshotPng);
+  } catch (_) {
+    // Ignore clipboard failure; caller may still show a toast.
+  }
+  return copiedAsPrimary;
 }
 
 /// Sends anonymized error telemetry when the user is online and telemetry is enabled.

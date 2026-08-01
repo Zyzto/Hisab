@@ -8,11 +8,14 @@ import '../../../core/platform/network_image_decode.dart';
 import '../../../core/platform/ui_perf.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/theme/theme_config.dart';
-import '../../../core/widgets/group_section_header.dart';
+import 'onboarding_ambient.dart';
 import 'onboarding_shared.dart';
 
 class OnboardingWelcomePage extends StatefulWidget {
   const OnboardingWelcomePage({super.key});
+
+  /// Logical size of the app mark in the hero card.
+  static const double heroLogoSize = 76;
 
   @override
   State<OnboardingWelcomePage> createState() => _OnboardingWelcomePageState();
@@ -119,60 +122,101 @@ class _OnboardingWelcomePageState extends State<OnboardingWelcomePage>
     super.dispose();
   }
 
+  static const double heroLogoSize = OnboardingWelcomePage.heroLogoSize;
+
   Widget _buildHeroCard(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final subtle = context.subtleAccents;
     final decode = NetworkImageDecode.cacheSize(
       context,
-      logicalWidth: 48,
-      logicalHeight: 48,
+      logicalWidth: heroLogoSize,
+      logicalHeight: heroLogoSize,
     );
-    return Container(
-      padding: const EdgeInsets.all(ThemeConfig.spacingM),
-      decoration: AccentSurfaces.panel(colorScheme, subtle: subtle),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.asset(
-              'assets/Hisab.png',
-              width: 48,
-              height: 48,
-              fit: BoxFit.cover,
-              cacheWidth: decode.width,
-              cacheHeight: decode.height,
-              errorBuilder: (_, error, stackTrace) => Container(
-                width: 48,
-                height: 48,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer.withValues(alpha: 0.55),
-                  borderRadius: BorderRadius.circular(12),
+    const logoRadius = 20.0;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: ThemeConfig.spacingS),
+      child: Material(
+        color: onboardingOpaqueFill(
+          colorScheme,
+          AccentSurfaces.emphasizedFill(colorScheme, subtle: subtle),
+        ),
+        borderRadius: BorderRadius.circular(22),
+        clipBehavior: Clip.antiAlias,
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: AccentSurfaces.emphasizedBorder(
+                colorScheme,
+                subtle: subtle,
+              ).withValues(alpha: 0.55),
+              width: 1.5,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                OnboardingBreathing(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(logoRadius),
+                    child: Image.asset(
+                      'assets/Hisab.png',
+                      width: heroLogoSize,
+                      height: heroLogoSize,
+                      fit: BoxFit.cover,
+                      cacheWidth: decode.width,
+                      cacheHeight: decode.height,
+                      errorBuilder: (_, error, stackTrace) => Container(
+                        width: heroLogoSize,
+                        height: heroLogoSize,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: colorScheme.primaryContainer.withValues(
+                            alpha: 0.55,
+                          ),
+                          borderRadius: BorderRadius.circular(logoRadius),
+                        ),
+                        child: Icon(
+                          Icons.account_balance_wallet_outlined,
+                          color: colorScheme.onPrimaryContainer,
+                          size: 36,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-                child: Icon(
-                  Icons.account_balance_wallet_outlined,
-                  color: colorScheme.onPrimaryContainer,
+                const SizedBox(width: ThemeConfig.spacingM),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'app_name'.tr(),
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.5,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'onboarding_what_is_hisab'.tr(),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
-          const SizedBox(height: ThemeConfig.spacingM),
-          Text(
-            'onboarding_welcome'.tr(),
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: ThemeConfig.spacingS),
-          Text(
-            'onboarding_what_is_hisab'.tr(),
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              height: 1.4,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -180,24 +224,30 @@ class _OnboardingWelcomePageState extends State<OnboardingWelcomePage>
   @override
   Widget build(BuildContext context) {
     final hero = _buildHeroCard(context);
-    return onboardingPageBody(
+    final animatedHero = (_fadeOnly || _heroFade == null)
+        ? hero
+        : FadeTransition(opacity: _heroFade!, child: hero);
+    return onboardingPageBodyWithFixedTitle(
       context,
-      Column(
+      contentAlignment: Alignment.topCenter,
+      title: OnboardingStepEnter(
+        slidePx: 12,
+        child: OnboardingTitleBlock(title: 'onboarding_welcome'.tr()),
+      ),
+      content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (_fadeOnly || _heroFade == null)
-            hero
-          else
-            FadeTransition(opacity: _heroFade!, child: hero),
-          const SizedBox(height: ThemeConfig.spacingL),
-          GroupSectionHeader(label: 'onboarding_how_it_works'.tr()),
+          animatedHero,
+          const SizedBox(height: ThemeConfig.spacingM),
+          OnboardingSectionLabel('onboarding_how_it_works'.tr()),
           const SizedBox(height: ThemeConfig.spacingM),
           for (var i = 0; i < _features.length; i++)
             _StaggeredFeatureRow(
               animation: _featureAnimations[i],
               fadeOnly: _fadeOnly,
               spec: _features[i],
+              iconPhase: i * 0.13,
             ),
         ],
       ),
@@ -224,55 +274,66 @@ class _StaggeredFeatureRow extends StatelessWidget {
     required this.animation,
     required this.fadeOnly,
     required this.spec,
+    required this.iconPhase,
   });
 
   final Animation<double> animation;
   final bool fadeOnly;
   final _FeatureSpec spec;
+  final double iconPhase;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final isOptional = spec.optional;
+    final iconChip = Container(
+      width: 42,
+      height: 42,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: isOptional
+            ? colorScheme.surfaceContainerHighest
+            : onboardingOpaqueFill(
+                colorScheme,
+                colorScheme.primaryContainer.withValues(alpha: 0.55),
+              ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(
+        spec.icon,
+        size: 22,
+        color: isOptional
+            ? colorScheme.onSurfaceVariant
+            : colorScheme.onPrimaryContainer,
+      ),
+    );
     final card = Padding(
       padding: const EdgeInsets.only(bottom: ThemeConfig.spacingS),
       child: Material(
         color: isOptional
-            ? colorScheme.surfaceContainerLow.withValues(alpha: 0.7)
+            ? onboardingOpaqueFill(
+                colorScheme,
+                colorScheme.surfaceContainerLow.withValues(alpha: 0.72),
+              )
             : colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
         child: Ink(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: colorScheme.outlineVariant.withValues(
-                alpha: isOptional ? 0.3 : 0.45,
+                alpha: isOptional ? 0.28 : 0.38,
               ),
             ),
           ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: isOptional
-                        ? colorScheme.surfaceContainerHighest
-                        : colorScheme.primaryContainer.withValues(alpha: 0.55),
-                    borderRadius: BorderRadius.circular(ThemeConfig.radiusM),
-                  ),
-                  child: Icon(
-                    spec.icon,
-                    size: 22,
-                    color: isOptional
-                        ? colorScheme.onSurfaceVariant
-                        : colorScheme.onPrimaryContainer,
-                  ),
-                ),
+                OnboardingIconPulse(phase: iconPhase, child: iconChip),
                 const SizedBox(width: ThemeConfig.spacingM),
                 Expanded(
                   child: Column(
@@ -280,24 +341,24 @@ class _StaggeredFeatureRow extends StatelessWidget {
                     children: [
                       Text(
                         spec.titleKey.tr(),
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: isOptional
-                                  ? colorScheme.onSurfaceVariant
-                                  : null,
-                            ),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.1,
+                          color: isOptional
+                              ? colorScheme.onSurfaceVariant
+                              : null,
+                        ),
                       ),
-                      const SizedBox(height: ThemeConfig.spacingXS),
+                      const SizedBox(height: 4),
                       Text(
                         spec.subtitleKey.tr(),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        style: theme.textTheme.bodySmall?.copyWith(
                           color: isOptional
                               ? colorScheme.onSurfaceVariant.withValues(
                                   alpha: 0.85,
                                 )
                               : colorScheme.onSurfaceVariant,
-                          height: 1.3,
+                          height: 1.35,
                         ),
                       ),
                     ],

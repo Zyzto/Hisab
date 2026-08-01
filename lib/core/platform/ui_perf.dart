@@ -66,4 +66,7 @@ abstract final class UiPerf {
   /// Skip looping onboarding chrome demos (pulse / theme cycle / hint ticker).
   static bool get preferReducedChromeMotion =>
       _policy.preferReducedChromeMotion;
+
+  /// Home list long-press reorder: cheaper feedback / placeholders on iOS web.
+  static bool get preferCheapListDrag => _policy.preferCheapListDrag;
 }

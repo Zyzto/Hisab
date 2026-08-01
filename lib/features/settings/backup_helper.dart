@@ -1,29 +1,29 @@
 import 'dart:convert';
+
 import 'package:flutter_logging_service/flutter_logging_service.dart';
+
+import '../../core/receipt/receipt_utils.dart';
+import '../../core/repository/expense_repository.dart';
 import '../../core/repository/group_repository.dart';
 import '../../core/repository/participant_repository.dart';
-import '../../core/repository/expense_repository.dart';
 import '../../core/repository/tag_repository.dart';
 import '../../domain/domain.dart';
+import 'backup_limits.dart';
 
-/// Result of backup export or import.
-class BackupResult {
-  const BackupResult({this.success = false, this.message, this.path});
+const int kBackupSchemaVersion = 2;
 
-  final bool success;
-  final String? message;
-  final String? path;
-}
-
-/// Export all local data to a JSON-serializable map.
-/// Uses repository interfaces (backed by PowerSync).
+/// Export groups (optionally filtered) to a JSON-serializable map (schema v2).
 Future<Map<String, dynamic>> exportDataToJson({
   required IGroupRepository groupRepo,
   required IParticipantRepository participantRepo,
   required IExpenseRepository expenseRepo,
   required ITagRepository tagRepo,
+  Set<String>? groupIdsFilter,
 }) async {
-  final groups = await groupRepo.getAll();
+  var groups = await groupRepo.getAll();
+  if (groupIdsFilter != null) {
+    groups = groups.where((g) => groupIdsFilter.contains(g.id)).toList();
+  }
   final groupIds = groups.map((g) => g.id).toSet();
 
   final allParticipants = await participantRepo.getAll();
@@ -40,16 +40,18 @@ Future<Map<String, dynamic>> exportDataToJson({
       .where((t) => groupIds.contains(t.groupId))
       .toList();
 
-  final localArchivedGroupIds = await groupRepo.getLocallyArchivedGroupIds();
+  final localArchivedGroupIds = (await groupRepo.getLocallyArchivedGroupIds())
+      .where(groupIds.contains)
+      .toList();
 
   return {
-    'version': 1,
+    'version': kBackupSchemaVersion,
     'exportedAt': DateTime.now().toIso8601String(),
-    'groups': groups.map((g) => _groupToMap(g)).toList(),
-    'participants': participants.map((p) => _participantToMap(p)).toList(),
-    'expenses': expenses.map((e) => _expenseToMap(e)).toList(),
-    'expense_tags': expenseTags.map((t) => _tagToMap(t)).toList(),
-    'localArchivedGroupIds': localArchivedGroupIds.toList(),
+    'groups': groups.map(_groupToMap).toList(),
+    'participants': participants.map(_participantToMap).toList(),
+    'expenses': expenses.map(_expenseToMap).toList(),
+    'expense_tags': expenseTags.map(_tagToMap).toList(),
+    'localArchivedGroupIds': localArchivedGroupIds,
   };
 }
 
@@ -63,6 +65,9 @@ Map<String, dynamic> _groupToMap(Group g) => {
   'treasurerParticipantId': g.treasurerParticipantId,
   'settlementFreezeAt': g.settlementFreezeAt?.millisecondsSinceEpoch,
   'settlementSnapshotJson': g.settlementSnapshotJson,
+  'allowMemberAddExpense': g.allowMemberAddExpense,
+  'allowMemberChangeSettings': g.allowMemberChangeSettings,
+  'allowExpenseAsOtherParticipant': g.allowExpenseAsOtherParticipant,
   'allowMemberSettleForOthers': g.allowMemberSettleForOthers,
   'icon': g.icon,
   'color': g.color,
@@ -76,6 +81,7 @@ Map<String, dynamic> _participantToMap(Participant p) => {
   'groupId': p.groupId,
   'name': p.name,
   'order': p.order,
+  'avatarId': p.avatarId,
   'leftAt': p.leftAt?.toIso8601String(),
   'createdAt': p.createdAt.toIso8601String(),
   'updatedAt': p.updatedAt.toIso8601String(),
@@ -87,6 +93,8 @@ Map<String, dynamic> _expenseToMap(Expense e) => {
   'payerParticipantId': e.payerParticipantId,
   'amountCents': e.amountCents,
   'currencyCode': e.currencyCode,
+  'exchangeRate': e.exchangeRate,
+  'baseAmountCents': e.baseAmountCents,
   'title': e.title,
   'description': e.description,
   'date': e.date.toIso8601String(),
@@ -111,20 +119,25 @@ Map<String, dynamic> _tagToMap(ExpenseTag t) => {
   'updatedAt': t.updatedAt.toIso8601String(),
 };
 
-/// Result of parsing a backup JSON string. [data] is non-null on success;
-/// [errorMessageKey] is a translation key for the UI when parsing failed.
 class BackupParseResult {
-  const BackupParseResult({this.data, this.errorMessageKey});
+  const BackupParseResult({
+    this.data,
+    this.errorMessageKey,
+    this.schemaVersion,
+    this.warnings = const [],
+  });
 
   final BackupData? data;
-
-  /// Translation key (e.g. backup_parse_unsupported_version) for UI to show.
   final String? errorMessageKey;
+  final int? schemaVersion;
+  final List<String> warnings;
 }
 
-/// Validate and parse backup JSON. Returns [BackupParseResult] with [data]
-/// on success or [errorMessageKey] set when invalid.
+/// Validate and parse backup JSON (schema v1 or v2).
 BackupParseResult parseBackupJson(String jsonString) {
+  if (jsonString.length > BackupLimits.maxFileBytes) {
+    return const BackupParseResult(errorMessageKey: 'backup_parse_too_large');
+  }
   try {
     final map = jsonDecode(jsonString) as Map<String, dynamic>?;
     if (map == null) {
@@ -133,11 +146,16 @@ BackupParseResult parseBackupJson(String jsonString) {
       );
     }
     final version = map['version'] as int?;
-    if (version == null || version != 1) {
+    if (version == null || (version != 1 && version != 2)) {
       return const BackupParseResult(
         errorMessageKey: 'backup_parse_unsupported_version',
       );
     }
+    final warnings = <String>[];
+    if (version == 1) {
+      warnings.add('backup_warning_v1_fx');
+    }
+
     final groups =
         (map['groups'] as List<dynamic>?)
             ?.map((e) => _mapToGroup(e as Map<String, dynamic>))
@@ -150,7 +168,7 @@ BackupParseResult parseBackupJson(String jsonString) {
         [];
     final expenses =
         (map['expenses'] as List<dynamic>?)
-            ?.map((e) => _mapToExpense(e as Map<String, dynamic>))
+            ?.map((e) => _mapToExpense(e as Map<String, dynamic>, version))
             .toList() ??
         [];
     final expenseTags =
@@ -163,6 +181,16 @@ BackupParseResult parseBackupJson(String jsonString) {
             ?.map((e) => e as String)
             .toList() ??
         [];
+
+    if (groups.length > BackupLimits.maxGroups ||
+        participants.length > BackupLimits.maxParticipants ||
+        expenses.length > BackupLimits.maxExpenses ||
+        expenseTags.length > BackupLimits.maxTags) {
+      return const BackupParseResult(
+        errorMessageKey: 'backup_parse_too_large',
+      );
+    }
+
     return BackupParseResult(
       data: BackupData(
         groups: groups,
@@ -171,6 +199,8 @@ BackupParseResult parseBackupJson(String jsonString) {
         expenseTags: expenseTags,
         localArchivedGroupIds: localArchivedGroupIds,
       ),
+      schemaVersion: version,
+      warnings: warnings,
     );
   } on FormatException catch (_) {
     return const BackupParseResult(
@@ -202,13 +232,20 @@ Group _mapToGroup(Map<String, dynamic> m) {
     }
   }
   final archivedAt = m['archivedAt'];
-  final isPersonal = m['isPersonal'] == true;
-  final budgetAmountCents = (m['budgetAmountCents'] as num?)?.toInt();
-  final allowMemberSettleForOthers = m['allowMemberSettleForOthers'] == true;
+  final name = _clampStr(m['name'] as String? ?? '', BackupLimits.maxGroupName);
+  final icon = _clampStrNullable(
+    m['icon'] as String?,
+    BackupLimits.maxGroupIcon,
+  );
+  final snapshot = m['settlementSnapshotJson'] as String?;
+  if (snapshot != null &&
+      snapshot.length > BackupLimits.maxSnapshotJsonBytes) {
+    throw FormatException('settlement snapshot too large');
+  }
   return Group(
     id: m['id'] as String,
-    name: m['name'] as String,
-    currencyCode: m['currencyCode'] as String,
+    name: name,
+    currencyCode: _currencyCode(m['currencyCode'] as String?),
     createdAt: DateTime.parse(m['createdAt'] as String),
     updatedAt: DateTime.parse(m['updatedAt'] as String),
     settlementMethod: method,
@@ -216,15 +253,19 @@ Group _mapToGroup(Map<String, dynamic> m) {
     settlementFreezeAt: m['settlementFreezeAt'] != null
         ? DateTime.fromMillisecondsSinceEpoch(m['settlementFreezeAt'] as int)
         : null,
-    settlementSnapshotJson: m['settlementSnapshotJson'] as String?,
-    allowMemberSettleForOthers: allowMemberSettleForOthers,
-    icon: m['icon'] as String?,
+    settlementSnapshotJson: snapshot,
+    allowMemberAddExpense: m['allowMemberAddExpense'] != false,
+    allowMemberChangeSettings: m['allowMemberChangeSettings'] != false,
+    allowExpenseAsOtherParticipant:
+        m['allowExpenseAsOtherParticipant'] != false,
+    allowMemberSettleForOthers: m['allowMemberSettleForOthers'] == true,
+    icon: icon,
     color: (m['color'] as num?)?.toInt(),
     archivedAt: archivedAt != null
         ? DateTime.tryParse(archivedAt as String)
         : null,
-    isPersonal: isPersonal,
-    budgetAmountCents: budgetAmountCents,
+    isPersonal: m['isPersonal'] == true,
+    budgetAmountCents: (m['budgetAmountCents'] as num?)?.toInt(),
   );
 }
 
@@ -233,34 +274,66 @@ Participant _mapToParticipant(Map<String, dynamic> m) {
   return Participant(
     id: m['id'] as String,
     groupId: m['groupId'] as String,
-    name: m['name'] as String,
-    order: m['order'] as int,
+    name: _clampStr(
+      m['name'] as String? ?? '',
+      BackupLimits.maxParticipantName,
+    ),
+    order: (m['order'] as num?)?.toInt() ?? 0,
+    avatarId: m['avatarId'] as String?,
     leftAt: leftAt != null ? DateTime.tryParse(leftAt) : null,
     createdAt: DateTime.parse(m['createdAt'] as String),
     updatedAt: DateTime.parse(m['updatedAt'] as String),
   );
 }
 
-Expense _mapToExpense(Map<String, dynamic> m) {
+Expense _mapToExpense(Map<String, dynamic> m, int version) {
   final lineItems = m['lineItems'] as List<dynamic>?;
+  if (lineItems != null && lineItems.length > BackupLimits.maxLineItems) {
+    throw FormatException('too many line items');
+  }
+  final shares =
+      (m['splitShares'] as Map<String, dynamic>?)?.map(
+        (k, v) => MapEntry(k, (v as num).toInt()),
+      ) ??
+      {};
+  if (shares.length > BackupLimits.maxSplitShareEntries) {
+    throw FormatException('too many split shares');
+  }
+  final description = _clampStrNullable(
+    m['description'] as String?,
+    BackupLimits.maxDescription,
+  );
+  var imagePaths = _backupImagePaths(m);
+  // Import never persists remote URLs (strip at parse for restore safety).
+  if (imagePaths != null) {
+    imagePaths = imagePaths
+        .where((p) => !isNetworkImagePath(p))
+        .take(BackupLimits.maxImagePaths)
+        .map((p) => _clampStr(p, BackupLimits.maxImagePathLength))
+        .where((p) => p.isNotEmpty)
+        .toList();
+    if (imagePaths.isEmpty) imagePaths = null;
+  }
   return Expense(
     id: m['id'] as String,
     groupId: m['groupId'] as String,
     payerParticipantId: m['payerParticipantId'] as String,
-    amountCents: m['amountCents'] as int,
-    currencyCode: m['currencyCode'] as String,
-    title: m['title'] as String,
-    description: m['description'] as String?,
+    amountCents: (m['amountCents'] as num).toInt(),
+    currencyCode: _currencyCode(m['currencyCode'] as String?),
+    exchangeRate: version >= 2
+        ? (m['exchangeRate'] as num?)?.toDouble() ?? 1.0
+        : 1.0,
+    baseAmountCents: version >= 2
+        ? (m['baseAmountCents'] as num?)?.toInt()
+        : null,
+    title: _clampStr(m['title'] as String? ?? '', BackupLimits.maxExpenseTitle),
+    description: description,
     date: DateTime.parse(m['date'] as String),
     splitType: SplitType.values.firstWhere(
       (e) => e.name == m['splitType'],
       orElse: () => SplitType.equal,
     ),
-    splitShares:
-        (m['splitShares'] as Map<String, dynamic>?)?.map(
-          (k, v) => MapEntry(k, (v as num).toInt()),
-        ) ??
-        {},
+    splitShares: shares,
     createdAt: DateTime.parse(m['createdAt'] as String),
     updatedAt: DateTime.parse(m['updatedAt'] as String),
     transactionType: TransactionType.values.firstWhere(
@@ -268,19 +341,13 @@ Expense _mapToExpense(Map<String, dynamic> m) {
       orElse: () => TransactionType.expense,
     ),
     toParticipantId: m['toParticipantId'] as String?,
-    tag: m['tag'] as String?,
+    tag: _clampStrNullable(m['tag'] as String?, BackupLimits.maxTagLabel),
     lineItems: lineItems
         ?.map((e) => ReceiptLineItem.fromJson(e as Map<String, dynamic>))
         .toList(),
-    imagePath: _backupImagePath(m),
-    imagePaths: _backupImagePaths(m),
+    imagePath: imagePaths?.isNotEmpty == true ? imagePaths!.first : null,
+    imagePaths: imagePaths,
   );
-}
-
-String? _backupImagePath(Map<String, dynamic> m) {
-  final paths = _backupImagePaths(m);
-  if (paths != null && paths.isNotEmpty) return paths.first;
-  return (m['imagePath'] ?? m['receiptImagePath']) as String?;
 }
 
 List<String>? _backupImagePaths(Map<String, dynamic> m) {
@@ -296,11 +363,118 @@ List<String>? _backupImagePaths(Map<String, dynamic> m) {
 ExpenseTag _mapToTag(Map<String, dynamic> m) => ExpenseTag(
   id: m['id'] as String,
   groupId: m['groupId'] as String,
-  label: m['label'] as String,
-  iconName: m['iconName'] as String,
+  label: _clampStr(m['label'] as String? ?? '', BackupLimits.maxTagLabel),
+  iconName: _clampStr(
+    m['iconName'] as String? ?? 'label',
+    BackupLimits.maxTagIconName,
+  ),
   createdAt: DateTime.parse(m['createdAt'] as String),
   updatedAt: DateTime.parse(m['updatedAt'] as String),
 );
+
+String _clampStr(String s, int max) =>
+    s.length <= max ? s : s.substring(0, max);
+
+String? _clampStrNullable(String? s, int max) {
+  if (s == null) return null;
+  return _clampStr(s, max);
+}
+
+/// Remap split share keys through [participantIds].
+Map<String, int> remapSplitShares(
+  Map<String, int> shares,
+  Map<String, String> participantIds,
+) {
+  final out = <String, int>{};
+  for (final e in shares.entries) {
+    final newId = participantIds[e.key];
+    if (newId != null) out[newId] = e.value;
+  }
+  return out;
+}
+
+/// Remap participant and expense IDs inside a settlement snapshot JSON string.
+String? remapSettlementSnapshotJson(
+  String? json,
+  Map<String, String> participantIds,
+  Map<String, String> expenseIds,
+) {
+  if (json == null || json.isEmpty) return json;
+  try {
+    final snap = SettlementSnapshot.fromJsonString(json);
+    final balances = snap.balances
+        .map(
+          (b) => ParticipantBalance(
+            participantId: participantIds[b.participantId] ?? b.participantId,
+            balanceCents: b.balanceCents,
+            currencyCode: b.currencyCode,
+          ),
+        )
+        .toList();
+    final settlements = snap.settlements.map((s) {
+      final items = s.items
+          ?.map(
+            (i) => SettlementItem(
+              expenseId: expenseIds[i.expenseId] ?? i.expenseId,
+              title: i.title,
+              amountCents: i.amountCents,
+            ),
+          )
+          .toList();
+      return SettlementTransaction(
+        fromParticipantId:
+            participantIds[s.fromParticipantId] ?? s.fromParticipantId,
+        toParticipantId: participantIds[s.toParticipantId] ?? s.toParticipantId,
+        amountCents: s.amountCents,
+        currencyCode: s.currencyCode,
+        items: items,
+      );
+    }).toList();
+    return SettlementSnapshot(
+      frozenAt: snap.frozenAt,
+      balances: balances,
+      settlements: settlements,
+    ).toJsonString();
+  } catch (e) {
+    Log.warning('Failed to remap settlement snapshot', error: e);
+    return json;
+  }
+}
+
+String _currencyCode(String? raw) {
+  final c = (raw ?? 'USD').trim().toUpperCase();
+  if (c.length == 3) return c;
+  return 'USD';
+}
+
+/// Strip network image paths from an expense (import safety).
+Expense stripRemoteImagePaths(Expense e) {
+  final paths = e.effectiveImageUrls
+      .where((p) => !isNetworkImagePath(p))
+      .toList();
+  return Expense(
+    id: e.id,
+    groupId: e.groupId,
+    payerParticipantId: e.payerParticipantId,
+    amountCents: e.amountCents,
+    currencyCode: e.currencyCode,
+    exchangeRate: e.exchangeRate,
+    baseAmountCents: e.baseAmountCents,
+    title: e.title,
+    description: e.description,
+    date: e.date,
+    splitType: e.splitType,
+    splitShares: e.splitShares,
+    createdAt: e.createdAt,
+    updatedAt: e.updatedAt,
+    transactionType: e.transactionType,
+    toParticipantId: e.toParticipantId,
+    tag: e.tag,
+    lineItems: e.lineItems,
+    imagePath: paths.isNotEmpty ? paths.first : null,
+    imagePaths: paths.isNotEmpty ? paths : null,
+  );
+}
 
 class BackupData {
   const BackupData({

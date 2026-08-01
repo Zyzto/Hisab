@@ -87,6 +87,21 @@ final notificationsEnabledSettingDef = const BoolSetting(
   },
 );
 
+/// When true, prompt to report an issue after an OS screenshot (iOS / Android 14+).
+final screenshotReportPromptEnabledSettingDef = const BoolSetting(
+  'screenshot_report_prompt_enabled',
+  defaultValue: false,
+  titleKey: 'screenshot_report_prompt_enabled',
+  subtitleKey: 'screenshot_report_prompt_enabled_description',
+  icon: Icons.screenshot_outlined,
+  section: 'privacy',
+  order: 2,
+  searchTerms: {
+    'en': ['screenshot', 'bug', 'report', 'feedback'],
+    'ar': ['لقطة', 'بلاغ', 'ملاحظات'],
+  },
+);
+
 final advancedSection = const SettingSection(
   key: 'advanced',
   titleKey: 'advanced',
@@ -557,6 +572,22 @@ final subtleAccentsSettingDef = const BoolSetting(
   order: 8,
 );
 
+/// When true, playful FAB extras (leaf burst, plant blooms, delayed navigation).
+/// Turn off for a calmer UI. Platform reduced-motion (iOS web) still wins.
+final extraAnimationsEnabledSettingDef = const BoolSetting(
+  'extra_animations_enabled',
+  defaultValue: true,
+  titleKey: 'extra_animations_enabled',
+  subtitleKey: 'extra_animations_enabled_description',
+  icon: Icons.animation,
+  section: 'appearance',
+  order: 9,
+  searchTerms: {
+    'en': ['animation', 'motion', 'fab', 'leaves', 'flowers', 'playful'],
+    'ar': ['حركة', 'رسوم', 'تأثيرات'],
+  },
+);
+
 /// When true, expense form shows full options (Expense / Income / Transfer pill).
 /// When false (default), only expense addition is shown; pill is hidden.
 final expenseFormFullFeaturesSettingDef = const BoolSetting(
@@ -613,8 +644,8 @@ final actionExportDataSettingDef = const ActionSetting(
   section: 'data_backup',
   order: 1,
   searchTerms: {
-    'en': ['backup', 'download', 'json'],
-    'ar': ['تصدير', 'نسخ'],
+    'en': ['backup', 'download', 'json', 'csv', 'zip', 'html', 'export'],
+    'ar': ['تصدير', 'نسخ', 'zip', 'csv'],
   },
 );
 
@@ -626,8 +657,8 @@ final actionImportDataSettingDef = const ActionSetting(
   section: 'data_backup',
   order: 2,
   searchTerms: {
-    'en': ['restore', 'upload', 'json'],
-    'ar': ['استيراد', 'استعادة'],
+    'en': ['restore', 'upload', 'json', 'zip', 'backup', 'import'],
+    'ar': ['استيراد', 'استعادة', 'zip'],
   },
 );
 
@@ -797,6 +828,7 @@ final allSettings = <SettingDefinition>[
   displayCurrencySettingDef,
   use24HourFormatSettingDef,
   subtleAccentsSettingDef,
+  extraAnimationsEnabledSettingDef,
   expenseFormFullFeaturesSettingDef,
   expenseFormExpandDescriptionSettingDef,
   expenseFormExpandBillBreakdownSettingDef,
@@ -812,6 +844,7 @@ final allSettings = <SettingDefinition>[
   scannerNotifyOnCaptureSettingDef,
   telemetryEnabledSettingDef,
   notificationsEnabledSettingDef,
+  screenshotReportPromptEnabledSettingDef,
   homeListDisplaySettingDef,
   homeListSortSettingDef,
   homeListCustomOrderSettingDef,

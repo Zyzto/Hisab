@@ -29,6 +29,8 @@ import 'core/layout/layout_breakpoints.dart';
 import 'core/navigation/app_router.dart';
 import 'core/navigation/invite_link_handler.dart';
 import 'core/services/connectivity_service.dart';
+import 'core/celebration/celebration_host.dart';
+import 'core/services/screenshot_report_prompt_host.dart';
 import 'core/widgets/back_button_keyboard_dismiss.dart';
 import 'features/transaction_scanner/providers/scanner_providers.dart';
 import 'core/widgets/toast.dart';
@@ -324,7 +326,7 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
       right: isRtl ? 8 : null,
       child: DebugMenuFab(
         upgrader: _upgrader,
-        navigatorContext: router.routerDelegate.navigatorKey.currentContext,
+        navigatorKey: router.routerDelegate.navigatorKey,
         localeContext: context,
         onBeforeOpen: () => setState(() => _debugFabVisible = false),
         whenSheetClosed: () => setState(() => _debugFabVisible = true),
@@ -390,64 +392,67 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
       localeOverride: context.locale,
       child: InviteLinkHandler(
         ref: ref,
-        child: ToastificationWrapper(
-          config: ToastificationConfig(
-            alignment: Alignment.bottomCenter,
-            itemWidth: LayoutBreakpoints.isTabletOrWider(context)
-                ? LayoutBreakpoints.sheetDialogMaxWidth
-                : (MediaQuery.sizeOf(context).width - 32).clamp(
-                    0.0,
-                    LayoutBreakpoints.sheetDialogMaxWidth,
+        child: ScreenshotReportPromptHost(
+          child: CelebrationHost(
+            child: ToastificationWrapper(
+              config: ToastificationConfig(
+                alignment: Alignment.bottomCenter,
+                itemWidth: LayoutBreakpoints.isTabletOrWider(context)
+                    ? LayoutBreakpoints.sheetDialogMaxWidth
+                    : (MediaQuery.sizeOf(context).width - 32).clamp(
+                        0.0,
+                        LayoutBreakpoints.sheetDialogMaxWidth,
+                      ),
+              ),
+              child: MaterialApp.router(
+              title: 'app_name'.tr(),
+              debugShowCheckedModeBanner: false,
+              scrollBehavior: AppScrollBehavior(),
+              localizationsDelegates: context.localizationDelegates,
+              supportedLocales: context.supportedLocales,
+              locale: context.locale,
+              builder: (context, child) {
+                final isRtl = context.locale.languageCode == 'ar';
+                final isDebug = ref.watch(showDebugMenuProvider);
+                final innerContent = BackButtonKeyboardDismiss(
+                  child: GestureDetector(
+                    onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+                    behavior: HitTestBehavior.deferToChild,
+                    child: Directionality(
+                      textDirection: isRtl
+                          ? ui.TextDirection.rtl
+                          : ui.TextDirection.ltr,
+                      child: child ?? const SizedBox.shrink(),
+                    ),
                   ),
-          ),
-          child: MaterialApp.router(
-            title: 'app_name'.tr(),
-            debugShowCheckedModeBanner: false,
-            scrollBehavior: AppScrollBehavior(),
-            localizationsDelegates: context.localizationDelegates,
-            supportedLocales: context.supportedLocales,
-            locale: context.locale,
-            builder: (context, child) {
-              final isRtl = context.locale.languageCode == 'ar';
-              final isDebug =
-                  ref.watch(isDebugBuildProvider).asData?.value == true;
-              final innerContent = BackButtonKeyboardDismiss(
-                child: GestureDetector(
-                  onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-                  behavior: HitTestBehavior.deferToChild,
-                  child: Directionality(
-                    textDirection: isRtl
-                        ? ui.TextDirection.rtl
-                        : ui.TextDirection.ltr,
-                    child: child ?? const SizedBox.shrink(),
-                  ),
-                ),
-              );
-              final contentWithSyncIndicator = Stack(
-                children: [
-                  Positioned.fill(child: innerContent),
-                  const Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    child: _SyncProgressLine(),
-                  ),
-                ],
-              );
-              // In release, first frame paints without UpgradeAlert to avoid
-              // any upgrader init blocking splash removal.
-              return _buildRootContent(
-                context: context,
-                contentWithSyncIndicator: contentWithSyncIndicator,
-                isDebug: isDebug,
-                isRtl: isRtl,
-                router: router,
-              );
-            },
-            theme: themes.light,
-            darkTheme: themes.dark,
-            themeMode: themeMode,
-            routerConfig: router,
+                );
+                final contentWithSyncIndicator = Stack(
+                  children: [
+                    Positioned.fill(child: innerContent),
+                    const Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: _SyncProgressLine(),
+                    ),
+                  ],
+                );
+                // In release, first frame paints without UpgradeAlert to avoid
+                // any upgrader init blocking splash removal.
+                return _buildRootContent(
+                  context: context,
+                  contentWithSyncIndicator: contentWithSyncIndicator,
+                  isDebug: isDebug,
+                  isRtl: isRtl,
+                  router: router,
+                );
+              },
+              theme: themes.light,
+              darkTheme: themes.dark,
+              themeMode: themeMode,
+              routerConfig: router,
+            ),
+            ),
           ),
         ),
       ),

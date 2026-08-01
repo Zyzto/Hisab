@@ -7,6 +7,7 @@ import '../../../core/database/database_providers.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/layout_breakpoints.dart';
+import '../../../core/navigation/nav_back.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/user_text.dart';
@@ -40,6 +41,19 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   String? _activeSectionId;
   bool _programmaticScroll = false;
   int _scrollGeneration = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      seedParentHistoryForBrowserBack(
+        context: context,
+        parentPath: RoutePaths.home,
+        currentPath: RoutePaths.profile,
+      );
+    });
+  }
 
   final _scrollController = ScrollController();
   final _scrollViewKey = GlobalKey();
@@ -236,7 +250,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             : null) ??
         (!activityAsync.hasValue ? activityAsync.asError : null);
 
-    return LayoutBuilder(
+    final canPop = routerCanPop(context);
+    return PopScope(
+      canPop: canPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) popOrGo(context, RoutePaths.home);
+      },
+      child: LayoutBuilder(
       builder: (context, layoutConstraints) {
         // Use the same width ConstrainedContent will see (scaffold body).
         final showSideIndex = _canShowSideIndex(
@@ -249,13 +269,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             title: Text('profile'.tr()),
             leading: IconButton(
               icon: const Icon(Icons.arrow_back),
-              onPressed: () {
-                if (context.canPop()) {
-                  context.pop();
-                } else {
-                  context.go(RoutePaths.home);
-                }
-              },
+              onPressed: () => popOrGo(context, RoutePaths.home),
             ),
             actions: [
               if (ref.watch(hisabSettingsProvidersProvider)
@@ -339,6 +353,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           ),
         );
       },
+    ),
     );
   }
 

@@ -72,6 +72,134 @@ void main() {
   );
 
   testWidgets(
+    'start-aligned title hugs leading side and uses space before truncating',
+    (tester) async {
+      const titleRowKey = Key('group-title-row');
+      const longGroupName =
+          'This is a very long group name that should use space toward actions';
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: MediaQuery(
+            data: MediaQueryData(size: Size(360, 800)),
+            child: Scaffold(
+              appBar: ContentAlignedAppBar(
+                contentAreaWidth: 360,
+                centerTitle: false,
+                leading: IconButton(
+                  icon: Icon(Icons.arrow_back),
+                  onPressed: _noop,
+                ),
+                title: Row(
+                  key: titleRowKey,
+                  children: [
+                    CircleAvatar(radius: 18),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        longGroupName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                actions: [
+                  IconButton(
+                    icon: Icon(Icons.person_add),
+                    onPressed: _noop,
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.settings),
+                    onPressed: _noop,
+                  ),
+                ],
+              ),
+              body: SizedBox.shrink(),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final titleRect = tester.getRect(find.byKey(titleRowKey));
+      final backButtonRect = tester.getRect(find.byIcon(Icons.arrow_back));
+      final inviteButtonRect = tester.getRect(find.byIcon(Icons.person_add));
+
+      // Start-aligned: title begins near the back button, not centered.
+      expect(titleRect.left, lessThan(backButtonRect.right + 24));
+      expect(titleRect.left, greaterThanOrEqualTo(backButtonRect.right));
+      expect(titleRect.right, lessThanOrEqualTo(inviteButtonRect.left));
+      // Wider than a symmetrically inset centered title would be.
+      expect(titleRect.width, greaterThan(160));
+    },
+  );
+
+  testWidgets(
+    'start-aligned title hugs start edge in RTL',
+    (tester) async {
+      const titleRowKey = Key('group-title-row');
+      const viewportWidth = 360.0;
+
+      final view = tester.view;
+      view.physicalSize = const Size(viewportWidth, 800);
+      view.devicePixelRatio = 1.0;
+      addTearDown(view.resetPhysicalSize);
+      addTearDown(view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          builder: (context, child) => Directionality(
+            textDirection: TextDirection.rtl,
+            child: child!,
+          ),
+          home: const Scaffold(
+            appBar: ContentAlignedAppBar(
+              contentAreaWidth: viewportWidth,
+              centerTitle: false,
+              leading: IconButton(
+                icon: Icon(Icons.arrow_back),
+                onPressed: _noop,
+              ),
+              title: Row(
+                key: titleRowKey,
+                children: [
+                  CircleAvatar(radius: 18),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'اسم مجموعة طويل جداً للتحقق',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                IconButton(
+                  icon: Icon(Icons.settings),
+                  onPressed: _noop,
+                ),
+              ],
+            ),
+            body: SizedBox.shrink(),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final titleRect = tester.getRect(find.byKey(titleRowKey));
+      final backButtonRect = tester.getRect(find.byIcon(Icons.arrow_back));
+
+      // RTL: leading is on the right; title fills toward it from start.
+      expect(titleRect.right, lessThanOrEqualTo(backButtonRect.left + 1));
+      expect(titleRect.right, greaterThan(backButtonRect.left - 24));
+    },
+  );
+
+  testWidgets(
     'content band stays viewport-centered in RTL with a right-side rail',
     (tester) async {
       const titleKey = Key('app-title');

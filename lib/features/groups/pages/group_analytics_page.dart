@@ -10,6 +10,7 @@ import '../../../core/layout/constrained_content.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
+import '../../../core/navigation/nav_back.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/platform/ui_perf.dart';
 import '../../../core/theme/accent_style.dart';
@@ -17,6 +18,7 @@ import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/user_text.dart';
 import '../../../core/widgets/error_content.dart';
+import '../../../core/widgets/missing_route_page.dart';
 import '../../../core/widgets/user_text.dart';
 import '../../../domain/domain.dart';
 import '../../expenses/category_icons.dart';
@@ -131,6 +133,19 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
   String? _tagId;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      seedParentHistoryForBrowserBack(
+        context: context,
+        parentPath: RoutePaths.groupDetail(widget.groupId),
+        currentPath: RoutePaths.groupAnalytics(widget.groupId),
+      );
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final uiState = ref.watch(groupAnalyticsUiStateByGroupProvider(widget.groupId));
     final query = GroupAnalyticsQuery(
@@ -141,40 +156,50 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
     );
     final analyticsAsync = ref.watch(groupAnalyticsDataProvider(query));
 
-    return LayoutBuilder(
-      builder: (context, layoutConstraints) {
-        return Scaffold(
-          appBar: ContentAlignedAppBar(
-            contentAreaWidth: layoutConstraints.maxWidth,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () {
-                if (context.canPop()) {
-                  context.pop();
-                } else {
-                  context.go(RoutePaths.groupDetail(widget.groupId));
-                }
-              },
-            ),
-            title: Text('analytics'.tr()),
+    return analyticsAsync.when(
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, st) => Scaffold(
+        body: Center(
+          child: ErrorContentWidget(
+            message: e.toString(),
+            stackTrace: st,
+            onGoHome: () => context.go(RoutePaths.home),
           ),
-          body: ConstrainedContent(
-            child: analyticsAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, st) => Center(
-                child: ErrorContentWidget(
-                  message: e.toString(),
-                  stackTrace: st,
+        ),
+      ),
+      data: (data) {
+        if (data == null) {
+          return const MissingRoutePage(
+            titleKey: 'group_not_found',
+            messageKey: 'group_not_found_message',
+          );
+        }
+        final groupPath = RoutePaths.groupDetail(widget.groupId);
+        return LayoutBuilder(
+          builder: (context, layoutConstraints) {
+            final canPop = routerCanPop(context);
+            return PopScope(
+              canPop: canPop,
+              onPopInvokedWithResult: (didPop, _) {
+                if (!didPop) popOrGo(context, groupPath);
+              },
+              child: Scaffold(
+                appBar: ContentAlignedAppBar(
+                  contentAreaWidth: layoutConstraints.maxWidth,
+                  leading: IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () => popOrGo(context, groupPath),
+                  ),
+                  title: Text('analytics'.tr()),
+                ),
+                body: ConstrainedContent(
+                  child: _buildContent(context, data, uiState),
                 ),
               ),
-              data: (data) {
-                if (data == null) {
-                  return Center(child: Text('group_not_found'.tr()));
-                }
-                return _buildContent(context, data, uiState);
-              },
-            ),
-          ),
+            );
+          },
         );
       },
     );

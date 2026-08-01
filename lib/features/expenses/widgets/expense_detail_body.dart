@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:easy_localization/easy_localization.dart';
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
+import '../../../core/navigation/nav_back.dart';
+import '../../../core/platform/ui_perf.dart';
 import '../../../core/receipt/receipt_image_view.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/widgets/amount_with_secondary_display.dart';
 import '../../../core/widgets/participant_avatar.dart';
 import '../../../features/settings/providers/settings_framework_providers.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/widgets/missing_route_page.dart';
 import '../../../core/widgets/user_text.dart';
 import '../../../domain/domain.dart';
 import '../../groups/providers/groups_provider.dart';
@@ -26,7 +29,23 @@ class ExpenseDetailBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final expenseAsync = ref.watch(futureExpenseProvider(expenseId));
+    // Prefer the group list stream so PageView neighbors share one DB watch
+    // instead of N× watchById polls (especially costly on web).
+    final expensesAsync = ref.watch(expensesByGroupProvider(groupId));
+    final AsyncValue<Expense?> expenseAsync;
+    if (expensesAsync.hasValue) {
+      final list = expensesAsync.requireValue;
+      Expense? found;
+      for (final e in list) {
+        if (e.id == expenseId) {
+          found = e;
+          break;
+        }
+      }
+      expenseAsync = AsyncValue.data(found);
+    } else {
+      expenseAsync = ref.watch(futureExpenseProvider(expenseId));
+    }
     final participantsAsync = ref.watch(participantsByGroupProvider(groupId));
     final groupAsync = ref.watch(futureGroupProvider(groupId));
     final tagsAsync = ref.watch(tagsByGroupProvider(groupId));
@@ -34,11 +53,23 @@ class ExpenseDetailBody extends ConsumerWidget {
     return expenseAsync.when(
       data: (expense) {
         if (expense == null || expense.groupId != groupId) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            // May race with ExpenseDetailShell._confirmDelete's pop.
-            if (context.mounted && context.canPop()) context.pop();
-          });
-          return const SizedBox.shrink();
+          // In-stack (e.g. just deleted): pop back. Cold deep link: error → home.
+          if (routerCanPop(context)) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!context.mounted || !routerCanPop(context)) return;
+              if (GoRouter.maybeOf(context) != null) {
+                context.pop();
+              } else {
+                Navigator.of(context).pop();
+              }
+            });
+            return const SizedBox.shrink();
+          }
+          return const MissingRoutePage(
+            titleKey: 'expense_not_found',
+            messageKey: 'expense_not_found_message',
+            asBody: true,
+          );
         }
         return participantsAsync.when(
           data: (participants) {
@@ -364,7 +395,7 @@ class ExpenseDetailBodyHeader extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
       decoration: AccentSurfaces.panel(
         colorScheme,
         subtle: subtle,
@@ -372,88 +403,127 @@ class ExpenseDetailBodyHeader extends StatelessWidget {
         accentBorder: accent.color,
         radius: 20,
       ),
+      // Side-spread: title + meta on start, amount on end (list-tile rhythm).
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          AmountWithSecondaryDisplay(
-            amountCents: cents,
-            groupCurrencyCode: currency,
-            primaryStyle: theme.textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.5,
-              color: colorScheme.onSurface,
-            ),
-            secondaryOnSameRow: true,
-          ),
-          if (showOriginalCurrency && expense.currencyCode != currency) ...[
-            const SizedBox(height: 4),
-            Text(
-              CurrencyFormatter.formatCents(
-                expense.amountCents,
-                expense.currencyCode,
-              ),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-          if (categoryLabel != null || typeLabel != null) ...[
-            const SizedBox(height: 14),
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 8,
-              runSpacing: 6,
-              children: [
-                if (categoryLabel != null)
-                  _MetaChip(
-                    label: categoryLabel,
-                    icon: icon,
-                    background: tagChrome.container,
-                    foreground: tagChrome.onContainer,
-                    borderColor: tagChrome.accent,
-                  ),
-                if (typeLabel != null)
-                  _MetaChip(
-                    label: typeLabel,
-                    background: typeChipBg,
-                    foreground: readableOnBackground(
-                      accent.color,
-                      typeChipBg,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              if (categoryLabel != null) ...[
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: tagChrome.container,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: tagChrome.accent.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        icon,
+                        size: 24,
+                        color: tagChrome.onContainer,
+                      ),
                     ),
-                    borderColor: accent.color,
-                  ),
+                    const SizedBox(height: 6),
+                    _MetaChip(
+                      label: categoryLabel,
+                      background: tagChrome.container,
+                      foreground: tagChrome.onContainer,
+                      borderColor: tagChrome.accent,
+                      compact: true,
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 10),
               ],
-            ),
-          ],
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    UserText(
+                      expense.title,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                        letterSpacing: -0.3,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      dateFormat.format(localDate),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (typeLabel != null) ...[
+                      const SizedBox(height: 8),
+                      _MetaChip(
+                        label: typeLabel,
+                        background: typeChipBg,
+                        foreground: readableOnBackground(
+                          accent.color,
+                          typeChipBg,
+                        ),
+                        borderColor: accent.color,
+                        compact: true,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  AmountWithSecondaryDisplay(
+                    amountCents: cents,
+                    groupCurrencyCode: currency,
+                    primaryStyle: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.4,
+                      color: colorScheme.onSurface,
+                    ),
+                    secondaryStyle: theme.textTheme.labelMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    secondaryOnSameRow: false,
+                  ),
+                  if (showOriginalCurrency &&
+                      expense.currencyCode != currency) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      CurrencyFormatter.formatCents(
+                        expense.amountCents,
+                        expense.currencyCode,
+                      ),
+                      textDirection: TextDirection.ltr,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
           if (imageUrls.isNotEmpty) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             _ReceiptThumbnailStrip(urls: imageUrls),
           ],
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-            decoration: BoxDecoration(
-              color: colorScheme.surface.withValues(alpha: 0.72),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.schedule_rounded,
-                  size: 15,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  dateFormat.format(localDate),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
@@ -504,7 +574,7 @@ class ExpenseDetailBodyHeader extends StatelessWidget {
   }
 }
 
-/// Compact receipt strip shown directly under the amount.
+/// Compact receipt strip shown in the expense header card.
 class _ReceiptThumbnailStrip extends StatelessWidget {
   final List<String> urls;
 
@@ -538,15 +608,17 @@ class _ReceiptThumbnailStrip extends StatelessWidget {
                           alpha: 0.55,
                         ),
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: theme.colorScheme.shadow.withValues(
-                            alpha: 0.08,
-                          ),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+                      boxShadow: UiPerf.preferCheapShadows
+                          ? null
+                          : [
+                              BoxShadow(
+                                color: theme.colorScheme.shadow.withValues(
+                                  alpha: 0.08,
+                                ),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                     ),
                     child: buildExpenseImageView(
                       context,
@@ -640,6 +712,7 @@ class _MetaChip extends StatelessWidget {
   final Color background;
   final Color foreground;
   final Color borderColor;
+  final bool compact;
 
   const _MetaChip({
     required this.label,
@@ -647,13 +720,17 @@ class _MetaChip extends StatelessWidget {
     required this.foreground,
     required this.borderColor,
     this.icon,
+    this.compact = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 10 : 12,
+        vertical: compact ? 5 : 7,
+      ),
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(20),
@@ -663,12 +740,15 @@ class _MetaChip extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 15, color: foreground),
-            const SizedBox(width: 6),
+            Icon(icon, size: compact ? 14 : 15, color: foreground),
+            SizedBox(width: compact ? 5 : 6),
           ],
           UserText(
             label,
-            style: theme.textTheme.labelLarge?.copyWith(
+            style: (compact
+                    ? theme.textTheme.labelMedium
+                    : theme.textTheme.labelLarge)
+                ?.copyWith(
               color: foreground,
               fontWeight: FontWeight.w700,
               height: 1.1,

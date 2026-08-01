@@ -1,5 +1,7 @@
 import 'package:web/web.dart' as web;
 
+import '../navigation/decorative_route_web.dart' show safeHistoryReplaceUrl;
+
 const _authParameters = {
   'code',
   'state',
@@ -41,7 +43,9 @@ void clearWebAuthCallbackParams() {
     fragment: _cleanedFragment(current.fragment),
   );
 
-  web.window.history.replaceState(null, '', cleaned.toString());
+  // Never pass null history state — it breaks Flutter/GoRouter web routing
+  // so later context.go/push stop updating the address bar.
+  safeHistoryReplaceUrl(cleaned.toString());
 }
 
 String? _cleanedFragment(String fragment) {

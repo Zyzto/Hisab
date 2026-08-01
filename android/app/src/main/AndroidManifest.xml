@@ -7,6 +7,8 @@
         android:maxSdkVersion="32" />
     <!-- Push notifications: required on Android 13+ (API 33) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Screenshot detection prompt (Android 14+); install-time, no runtime dialog -->
+    <uses-permission android:name="android.permission.DETECT_SCREEN_CAPTURE" />
 
     <application
         android:label="@string/app_name"

@@ -87,6 +87,21 @@ class ContentAlignedFabLocation extends FloatingActionButtonLocation {
     return Offset(x, y);
   }
 
+  // Scaffold restarts the FAB move (scale/rotate) animation when
+  // `floatingActionButtonLocation != oldLocation`. Without value equality,
+  // a fresh instance from [of] on every rebuild (list options, selection,
+  // hold-to-reorder parent rebuilds) makes the FAB pulse in place.
+  @override
+  bool operator ==(Object other) {
+    return other is ContentAlignedFabLocation &&
+        other.leftOffset == leftOffset &&
+        other.bandWidth == bandWidth &&
+        other.textDirection == textDirection;
+  }
+
+  @override
+  int get hashCode => Object.hash(leftOffset, bandWidth, textDirection);
+
   @override
   String toString() =>
       'ContentAlignedFabLocation(left: $leftOffset, band: $bandWidth, '

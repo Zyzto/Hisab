@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:easy_localization/easy_localization.dart';
+// Hide intl's TextDirection (LTR/RTL) so Flutter's TextDirection.ltr/rtl resolve.
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import '../../../domain/domain.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/user_text.dart';
+import '../../../core/widgets/amount_text.dart';
 import '../../../core/widgets/user_text.dart';
 import '../category_icons.dart';
 
@@ -140,7 +142,7 @@ class ExpenseListTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
+            AmountText(
               CurrencyFormatter.formatCents(cents, currencyCode),
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w700,
@@ -163,7 +165,10 @@ class ExpenseListTile extends StatelessWidget {
         if (trailing != null || showDisclosure) const SizedBox(width: 10),
         if (showDisclosure && trailing == null)
           Icon(
-            Icons.chevron_right_rounded,
+            // Point toward the trailing edge in both LTR and RTL.
+            Directionality.of(context) == TextDirection.rtl
+                ? Icons.chevron_left_rounded
+                : Icons.chevron_right_rounded,
             size: 20,
             color: colorScheme.onSurfaceVariant,
           ),

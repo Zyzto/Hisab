@@ -1,24 +1,28 @@
-import 'dart:ui' as ui;
-
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:easy_localization/easy_localization.dart';
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/motion/app_motion.dart';
+import '../../../core/navigation/decorative_route.dart';
+import '../../../core/navigation/nav_back.dart';
 import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/user_text.dart';
-import '../../../core/widgets/user_text.dart';
 import '../../../domain/domain.dart';
 import '../../balance/providers/balance_provider.dart';
 import '../../groups/providers/groups_provider.dart';
-import '../providers/expense_navigation_direction.dart';
+import '../widgets/expense_detail_body.dart';
 
-/// Shell for expense detail: fixed app bar and body that slides by direction.
+/// Shell for expense detail: fixed app bar and interactive prev/next paging.
+///
+/// Adjacent expenses are built in a [PageView] so the swipe gesture reveals the
+/// next/previous expense live (not a velocity-only jump). The address bar is
+/// updated via [syncDecorativeRoutePath] without remounting this shell.
 class ExpenseDetailShell extends ConsumerStatefulWidget {
   final String groupId;
   final String expenseId;
@@ -41,43 +45,60 @@ class ExpenseDetailShell extends ConsumerStatefulWidget {
 
 class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
     with TickerProviderStateMixin {
-  late Widget _displayedChild;
-  String? _displayedExpenseId;
-  AnimationController? _controller;
-  Animation<Offset>? _incomingSlide;
-  Animation<double>? _incomingFade;
+  PageController? _pageController;
+  List<String> _pageIds = const [];
+  String? _viewingExpenseId;
+
+  AnimationController? _enterController;
+  Animation<Offset>? _enterSlide;
+  Animation<double>? _enterFade;
   bool _pendingEnter = true;
   bool _hasPlayedEnter = false;
+
+  /// True while [onPageChanged] is syncing URL — skip remount reactions.
+  bool _syncingFromPageView = false;
 
   @override
   void initState() {
     super.initState();
-    _displayedChild = widget.child;
-    _displayedExpenseId = widget.expenseId;
-  }
-
-  /// Next (1) enters from the end edge; prev from the start. Flipped in RTL.
-  double _slideDxForDirection(int direction) {
-    final isRtl = Directionality.of(context) == ui.TextDirection.rtl;
-    var dx = direction == 1 ? 1.0 : -1.0;
-    if (isRtl) dx = -dx;
-    return dx;
-  }
-
-  double _subtleEnterDx() {
-    final isRtl = Directionality.of(context) == ui.TextDirection.rtl;
-    return isRtl ? -AppMotion.pageSlideFraction : AppMotion.pageSlideFraction;
-  }
-
-  void _clearDirectionProvider() {
+    _viewingExpenseId = widget.expenseId;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        ref.read(expenseNavigationDirectionProvider.notifier).state = null;
-      }
+      if (!mounted) return;
+      final parent = widget.readOnlyPreview && widget.previewToken != null
+          ? RoutePaths.invitePreviewExpenses(widget.previewToken!)
+          : RoutePaths.groupExpenses(widget.groupId);
+      seedParentHistoryForBrowserBack(
+        context: context,
+        parentPath: parent,
+        currentPath: _pathForExpense(_activeExpenseId),
+      );
     });
   }
 
-  /// Dispose [controller] only after the tree has dropped its listeners.
+  @override
+  void dispose() {
+    _pageController?.dispose();
+    _enterController?.dispose();
+    super.dispose();
+  }
+
+  String get _activeExpenseId => _viewingExpenseId ?? widget.expenseId;
+
+  String _pathForExpense(String expenseId) {
+    if (widget.readOnlyPreview && widget.previewToken != null) {
+      return RoutePaths.invitePreviewExpenseDetail(
+        widget.previewToken!,
+        expenseId,
+      );
+    }
+    return RoutePaths.groupExpenseDetail(widget.groupId, expenseId);
+  }
+
+  double _subtleEnterDx() {
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
+    return isRtl ? -AppMotion.pageSlideFraction : AppMotion.pageSlideFraction;
+  }
+
   void _disposeControllerAfterFrame(AnimationController? controller) {
     if (controller == null) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -85,20 +106,16 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
     });
   }
 
-  void _runMotion({
-    required double beginDx,
-    required bool withFade,
-  }) {
-    final previous = _controller;
-    // Detach old animations from fields first so the next build drops listeners.
-    _incomingSlide = null;
-    _incomingFade = null;
+  void _runEnterMotion({required double beginDx, required bool withFade}) {
+    final previous = _enterController;
+    _enterSlide = null;
+    _enterFade = null;
 
     final next = AnimationController(vsync: this, duration: AppMotion.page);
-    _controller = next;
+    _enterController = next;
     final curved = next.drive(CurveTween(curve: AppMotion.enterCurve));
-    _incomingFade = withFade ? curved : null;
-    _incomingSlide = Tween<Offset>(
+    _enterFade = withFade ? curved : null;
+    _enterSlide = Tween<Offset>(
       begin: Offset(beginDx, 0),
       end: Offset.zero,
     ).animate(curved);
@@ -106,147 +123,171 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
     _disposeControllerAfterFrame(previous);
 
     next.forward().then((_) {
-      if (!mounted || !identical(_controller, next)) return;
+      if (!mounted || !identical(_enterController, next)) return;
       setState(() {
-        _incomingSlide = null;
-        _incomingFade = null;
-        _controller = null;
+        _enterSlide = null;
+        _enterFade = null;
+        _enterController = null;
       });
       _disposeControllerAfterFrame(next);
     });
   }
 
-  /// First paint of ready body: subtle enter, or full paging slide when this
-  /// shell was remounted via invite `pushReplacement` with a direction set.
   void _startEnterIfNeeded() {
     if (!_pendingEnter || _hasPlayedEnter) return;
     _pendingEnter = false;
     _hasPlayedEnter = true;
-    final direction = ref.read(expenseNavigationDirectionProvider);
-    if (direction != null) {
-      _clearDirectionProvider();
-      _runMotion(beginDx: _slideDxForDirection(direction), withFade: false);
-    } else {
-      _runMotion(beginDx: _subtleEnterDx(), withFade: true);
-    }
+    _runEnterMotion(beginDx: _subtleEnterDx(), withFade: true);
     setState(() {});
   }
 
-  void _startPagingMotion(int? direction) {
-    _clearDirectionProvider();
-    if (direction == null) {
-      // Unknown direction — subtle fade+slide, not a fake "prev" full slide.
-      _runMotion(beginDx: _subtleEnterDx(), withFade: true);
+  void _ensurePageController(List<Expense> sorted, int index) {
+    final ids = [for (final e in sorted) e.id];
+    final clamped = index.clamp(0, sorted.length - 1);
+    if (_pageController == null || !listEquals(_pageIds, ids)) {
+      final old = _pageController;
+      _pageController = PageController(initialPage: clamped);
+      _pageIds = ids;
+      if (old != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => old.dispose());
+      }
       return;
     }
-    _runMotion(beginDx: _slideDxForDirection(direction), withFade: false);
+    final controller = _pageController!;
+    if (!controller.hasClients) return;
+    final current = controller.page?.round() ?? controller.initialPage;
+    if (current != clamped) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _pageController != controller) return;
+        if (!controller.hasClients) return;
+        final now = controller.page?.round() ?? controller.initialPage;
+        if (now != clamped) controller.jumpToPage(clamped);
+      });
+    }
+  }
+
+  void _onPageChanged(int index, List<Expense> sorted) {
+    if (index < 0 || index >= sorted.length) return;
+    final id = sorted[index].id;
+    if (id == _activeExpenseId) return;
+    _syncingFromPageView = true;
+    setState(() => _viewingExpenseId = id);
+    syncDecorativeRoutePath(context, _pathForExpense(id));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncingFromPageView = false;
+    });
+  }
+
+  void _goToAdjacent({
+    required bool next,
+    required int index,
+    required int length,
+  }) {
+    final controller = _pageController;
+    if (controller == null || !controller.hasClients) return;
+    final target = next ? index + 1 : index - 1;
+    if (target < 0 || target >= length) return;
+    controller.animateToPage(
+      target,
+      duration: AppMotion.page,
+      curve: AppMotion.enterCurve,
+    );
   }
 
   @override
   void didUpdateWidget(ExpenseDetailShell oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.expenseId != _displayedExpenseId) {
-      final direction = ref.read(expenseNavigationDirectionProvider);
-      _displayedChild = widget.child;
-      _displayedExpenseId = widget.expenseId;
-      _startPagingMotion(direction);
-      setState(() {});
-    } else if (widget.child != oldWidget.child) {
-      _displayedChild = widget.child;
+    if (widget.expenseId != oldWidget.expenseId && !_syncingFromPageView) {
+      _viewingExpenseId = widget.expenseId;
     }
-  }
-
-  @override
-  void dispose() {
-    _controller?.dispose();
-    super.dispose();
   }
 
   bool get _awaitingEnter => _pendingEnter && !_hasPlayedEnter;
 
-  Widget _animatedBody(Widget child) {
-    // Hold transparent until first enter starts (avoids a full-opacity flash).
+  bool get _isEnterAnimating => _enterController?.isAnimating == true;
+
+  bool get _blockInteraction => _awaitingEnter || _isEnterAnimating;
+
+  Widget _wrapEnter(Widget child) {
     if (_awaitingEnter) {
       return IgnorePointer(
         child: Opacity(opacity: 0, child: child),
       );
     }
     Widget result = child;
-    if (_incomingSlide != null && _controller != null) {
-      result = SlideTransition(position: _incomingSlide!, child: result);
+    if (_enterSlide != null && _enterController != null) {
+      result = SlideTransition(position: _enterSlide!, child: result);
     }
-    if (_incomingFade != null && _controller != null) {
-      result = FadeTransition(opacity: _incomingFade!, child: result);
+    if (_enterFade != null && _enterController != null) {
+      result = FadeTransition(opacity: _enterFade!, child: result);
     }
     return ClipRect(child: result);
   }
 
-  bool get _isAnimating => _controller?.isAnimating == true;
-
-  bool get _blockInteraction => _awaitingEnter || _isAnimating;
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final expenseAsync = ref.watch(futureExpenseProvider(widget.expenseId));
-    final participantsAsync = ref.watch(
-      participantsByGroupProvider(widget.groupId),
-    );
+    final activeId = _activeExpenseId;
+    // One group-scoped watch for paging + app bar actions — no per-page
+    // watchById (avoids N web poll streams while swiping).
     final expensesAsync = ref.watch(expensesByGroupProvider(widget.groupId));
 
-    // Resolve prev/next and expense for app bar; null when loading or invalid.
-    final expense = expenseAsync.when(
-      data: (e) => e,
-      loading: () => null,
-      error: (_, _) => null,
-    );
-    final hasValidExpense =
-        expense != null && expense.groupId == widget.groupId;
-    final participants = participantsAsync.when(
-      data: (p) => p,
-      loading: () => null,
-      error: (_, _) => null,
-    );
     final expensesList = expensesAsync.when(
       data: (l) => l,
       loading: () => null,
       error: (_, _) => null,
     );
-    String? prevId;
-    String? nextId;
-    if (hasValidExpense && participants != null && expensesList != null) {
-      final sorted = List<Expense>.from(expensesList)
+
+    List<Expense>? sorted;
+    var index = -1;
+    if (expensesList != null) {
+      sorted = List<Expense>.from(expensesList)
         ..sort((a, b) => b.date.compareTo(a.date));
-      final index = sorted.indexWhere((e) => e.id == expense.id);
-      if (index > 0) prevId = sorted[index - 1].id;
-      if (index >= 0 && index < sorted.length - 1) {
-        nextId = sorted[index + 1].id;
+      index = sorted.indexWhere((e) => e.id == activeId);
+      if (index < 0) {
+        index = sorted.indexWhere((e) => e.id == widget.expenseId);
+      }
+      if (index >= 0) {
+        _ensurePageController(sorted, index);
       }
     }
 
+    final Expense? expense =
+        sorted != null &&
+            index >= 0 &&
+            sorted[index].groupId == widget.groupId
+        ? sorted[index]
+        : null;
+
+    final prevId = sorted != null && index > 0 ? sorted[index - 1].id : null;
+    final nextId = sorted != null &&
+            index >= 0 &&
+            index < sorted.length - 1
+        ? sorted[index + 1].id
+        : null;
+
+    final pages = sorted;
+    final pageController = _pageController;
+    final pagingReady =
+        pages != null && index >= 0 && pageController != null;
+
     void goPrev() {
-      final id = prevId;
-      if (id == null) return;
-      _navigateToExpense(context, id, direction: -1);
+      if (pages == null) return;
+      _goToAdjacent(next: false, index: index, length: pages.length);
     }
 
     void goNext() {
-      final id = nextId;
-      if (id == null) return;
-      _navigateToExpense(context, id, direction: 1);
+      if (pages == null) return;
+      _goToAdjacent(next: true, index: index, length: pages.length);
     }
 
+    final parentPath = widget.readOnlyPreview && widget.previewToken != null
+        ? RoutePaths.invitePreviewExpenses(widget.previewToken!)
+        : RoutePaths.groupExpenses(widget.groupId);
     final appBarLeading = IconButton(
       icon: const Icon(Icons.arrow_back),
-      onPressed: () => context.pop(),
+      onPressed: () => popOrGo(context, parentPath),
     );
-    final appBarTitle = expense != null
-        ? UserText(
-            expense.title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          )
-        : const SizedBox.shrink();
     final appBarActions = <Widget>[
       IconButton(
         icon: const Icon(Icons.chevron_left),
@@ -265,13 +306,18 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
               ? (value) async {
                   if (value == 'edit') {
                     await context.push(
-                      RoutePaths.groupExpenseEdit(widget.groupId, widget.expenseId),
+                      RoutePaths.groupExpenseEdit(
+                        widget.groupId,
+                        activeId,
+                      ),
                     );
                     if (context.mounted) {
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         if (context.mounted) {
-                          ref.invalidate(futureExpenseProvider(widget.expenseId));
-                          ref.invalidate(expensesByGroupProvider(widget.groupId));
+                          ref.invalidate(futureExpenseProvider(activeId));
+                          ref.invalidate(
+                            expensesByGroupProvider(widget.groupId),
+                          );
                         }
                       });
                     }
@@ -301,82 +347,64 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
         ),
     ];
 
-    final bodyReady = expenseAsync.maybeWhen(
-      data: (e) =>
-          e != null &&
-          e.groupId == widget.groupId &&
-          participantsAsync.hasValue &&
-          expensesAsync.hasValue,
-      orElse: () => false,
-    );
+    final bodyReady = pagingReady || expense != null;
 
-    // Keep sliding the previous/current child while the next id loads so the
-    // enter/paging animation is not replaced by a spinner mid-flight.
+    if (bodyReady && _pendingEnter && !_hasPlayedEnter) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _startEnterIfNeeded();
+      });
+    }
+
     final Widget body;
-    if (bodyReady) {
-      if (_pendingEnter && !_hasPlayedEnter) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _startEnterIfNeeded();
-        });
-      }
-      body = _animatedBody(_displayedChild);
-    } else if (_isAnimating || _hasPlayedEnter) {
-      body = _animatedBody(_displayedChild);
+    if (pagingReady) {
+      body = _wrapEnter(
+        PageView.builder(
+          controller: pageController,
+          itemCount: pages.length,
+          // Prefetch neighbors for live swipe feedback. Bodies share
+          // expensesByGroupProvider — do not keepAlive (that retained
+          // visited pages and their work indefinitely).
+          allowImplicitScrolling: true,
+          onPageChanged: (i) => _onPageChanged(i, pages),
+          itemBuilder: (context, i) {
+            final id = pages[i].id;
+            return ExpenseDetailBody(
+              key: ValueKey<String>('expense_page_$id'),
+              groupId: widget.groupId,
+              expenseId: id,
+            );
+          },
+        ),
+      );
+    } else if (bodyReady || _hasPlayedEnter) {
+      body = _wrapEnter(widget.child);
     } else {
       body = const Center(child: CircularProgressIndicator());
     }
 
-    return LayoutBuilder(
-      builder: (context, layoutConstraints) => Scaffold(
-        appBar: ContentAlignedAppBar(
-          contentAreaWidth: layoutConstraints.maxWidth,
-          leading: appBarLeading,
-          title: appBarTitle,
-          actions: appBarActions,
-        ),
-        body: ConstrainedContent(
-          child: IgnorePointer(
-            ignoring: _blockInteraction,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onHorizontalDragEnd: (details) {
-                final velocity = details.primaryVelocity ?? 0;
-                if (velocity.abs() < 250) return;
-                // easy_localization exports intl, which shadows Flutter's
-                // TextDirection (intl uses .RTL; Flutter uses .rtl).
-                final isRtl =
-                    Directionality.of(context) == ui.TextDirection.rtl;
-                // LTR: swipe left → next, swipe right → prev. RTL flips.
-                final toNext = isRtl ? velocity > 0 : velocity < 0;
-                if (toNext) {
-                  goNext();
-                } else {
-                  goPrev();
-                }
-              },
+    final canPop = routerCanPop(context);
+    return PopScope(
+      canPop: canPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) popOrGo(context, parentPath);
+      },
+      child: LayoutBuilder(
+        builder: (context, layoutConstraints) => Scaffold(
+          appBar: ContentAlignedAppBar(
+            contentAreaWidth: layoutConstraints.maxWidth,
+            leading: appBarLeading,
+            title: const SizedBox.shrink(),
+            actions: appBarActions,
+          ),
+          body: ConstrainedContent(
+            child: IgnorePointer(
+              ignoring: _blockInteraction,
               child: body,
             ),
           ),
         ),
       ),
     );
-  }
-
-  void _navigateToExpense(
-    BuildContext context,
-    String expenseId, {
-    required int direction,
-  }) {
-    ref.read(expenseNavigationDirectionProvider.notifier).state = direction;
-    if (widget.readOnlyPreview && widget.previewToken != null) {
-      context.pushReplacement(
-        RoutePaths.invitePreviewExpenseDetail(widget.previewToken!, expenseId),
-      );
-    } else {
-      context.pushReplacement(
-        RoutePaths.groupExpenseDetail(widget.groupId, expenseId),
-      );
-    }
   }
 
   Future<void> _confirmDelete(
@@ -398,9 +426,12 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
       ref.invalidate(futureExpenseProvider(expense.id));
       ref.invalidate(expensesByGroupProvider(widget.groupId));
       ref.invalidate(groupBalanceProvider(widget.groupId));
-      // ExpenseDetailBody also pops when the provider yields null — guard so
-      // the second caller does not throw GoError on web.
-      if (context.mounted && context.canPop()) context.pop();
+      if (context.mounted) {
+        final parent = widget.readOnlyPreview && widget.previewToken != null
+            ? RoutePaths.invitePreviewExpenses(widget.previewToken!)
+            : RoutePaths.groupExpenses(widget.groupId);
+        popOrGo(context, parent);
+      }
     }
   }
 }

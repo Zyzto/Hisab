@@ -1,9 +1,19 @@
 import 'dart:convert';
 
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:powersync/powersync.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'sync_backend.dart';
+
+/// Tables allowed in [pending_writes] before calling [SyncBackend].
+const Set<String> kPendingWritesAllowedTables = {
+  'groups',
+  'group_members',
+  'participants',
+  'expenses',
+  'expense_tags',
+};
 
 /// Testable sync operations: full fetch from Supabase into local DB,
 /// and push of pending_writes to Supabase. Used by [DataSyncService].
@@ -19,36 +29,75 @@ class SyncEngine {
   /// Push queued offline writes using [SyncBackend]. Used for testing.
   Future<void> pushPendingWritesWithBackend(
     PowerSyncDatabase db,
-    SyncBackend backend,
-  ) async {
+    SyncBackend backend, {
+    Future<void> Function(bool active)? setNotifySuppress,
+  }) async {
     final rows = await db.getAll(
       'SELECT * FROM pending_writes ORDER BY created_at ASC',
     );
     if (rows.isEmpty) return;
 
-    for (final row in rows) {
-      final tableName = row['table_name'] as String;
-      final operation = row['operation'] as String;
-      final rowId = row['row_id'] as String;
-      final dataJson = row['data_json'] as String?;
-      final data = dataJson != null
-          ? jsonDecode(dataJson) as Map<String, dynamic>
-          : null;
-
-      switch (operation) {
-        case 'insert':
-          if (data != null) await backend.upsert(tableName, data);
-          break;
-        case 'update':
-          if (data != null) await backend.update(tableName, data, rowId);
-          break;
-        case 'delete':
-          await backend.delete(tableName, rowId);
-          break;
-      }
-
-      await db.execute('DELETE FROM pending_writes WHERE id = ?', [row['id']]);
+    final hasSilent = rows.any((row) => _isSilent(row['silent']));
+    if (hasSilent && setNotifySuppress != null) {
+      await setNotifySuppress(true);
     }
+
+    try {
+      for (final row in rows) {
+        final tableName = row['table_name'] as String;
+        if (!kPendingWritesAllowedTables.contains(tableName)) {
+          Log.warning(
+            'SyncEngine: rejecting pending_writes for unknown table=$tableName',
+          );
+          await db.execute('DELETE FROM pending_writes WHERE id = ?', [
+            row['id'],
+          ]);
+          continue;
+        }
+
+        final operation = row['operation'] as String;
+        final rowId = row['row_id'] as String;
+        final dataJson = row['data_json'] as String?;
+        final data = dataJson != null
+            ? jsonDecode(dataJson) as Map<String, dynamic>
+            : null;
+
+        switch (operation) {
+          case 'insert':
+            if (data != null) await backend.upsert(tableName, data);
+            break;
+          case 'update':
+            if (data != null) await backend.update(tableName, data, rowId);
+            break;
+          case 'delete':
+            await backend.delete(tableName, rowId);
+            break;
+        }
+
+        await db.execute('DELETE FROM pending_writes WHERE id = ?', [
+          row['id'],
+        ]);
+      }
+    } finally {
+      if (hasSilent && setNotifySuppress != null) {
+        try {
+          await setNotifySuppress(false);
+        } catch (e, st) {
+          Log.warning(
+            'SyncEngine: failed to clear notify suppress',
+            error: e,
+            stackTrace: st,
+          );
+        }
+      }
+    }
+  }
+
+  static bool _isSilent(Object? value) {
+    if (value == null) return false;
+    if (value is int) return value != 0;
+    if (value is bool) return value;
+    return value.toString() == '1' || value.toString() == 'true';
   }
 
   /// Full fetch from Supabase into local DB. Replaces local cache for
@@ -298,4 +347,9 @@ class SyncEngine {
       ],
     );
   }
+}
+
+/// Calls Supabase RPC [set_notify_suppress].
+Future<void> setNotifySuppressRpc(SupabaseClient client, bool active) async {
+  await client.rpc('set_notify_suppress', params: {'p_active': active});
 }

@@ -15,6 +15,7 @@ import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/navigation/invite_auth_helpers.dart';
 import '../../../core/navigation/invite_nav_redirect.dart';
+import '../../../core/navigation/nav_back.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/utils/error_report_helper.dart';
 import '../../../core/widgets/error_content.dart';
@@ -93,7 +94,15 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _prepareInviteEntry());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _prepareInviteEntry();
+      if (!mounted || widget.token.isEmpty) return;
+      seedParentHistoryForBrowserBack(
+        context: context,
+        parentPath: RoutePaths.home,
+        currentPath: RoutePaths.inviteAccept(widget.token),
+      );
+    });
   }
 
   void _prepareInviteEntry() {

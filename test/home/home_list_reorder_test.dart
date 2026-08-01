@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hisab/domain/domain.dart';
 import 'package:hisab/features/home/utils/home_list_reorder.dart';
+import 'package:hisab/features/home/widgets/home_reorderable_groups_sliver.dart';
 
 Group _g(String id, {bool personal = false}) {
   final now = DateTime(2025, 1, 1);
@@ -91,6 +92,53 @@ void main() {
         isPinned: (_) => false,
       );
       expect(next.map((g) => g.id).toList(), ['a', 'b', 'c']);
+    });
+  });
+
+  group('insertIndexForGlobalY', () {
+    // Top zone ends at 100; three 100px rows; list bottom at 450.
+    const listTop = 52.0;
+    const tops = [100.0, 200.0, 300.0];
+    const bottoms = [200.0, 300.0, 400.0];
+    const listBottom = 450.0;
+
+    test('past top / over header clamps to start', () {
+      expect(
+        insertIndexForGlobalY(
+          globalY: 20,
+          rowTops: tops,
+          rowBottoms: bottoms,
+          listTop: listTop,
+          listBottom: listBottom,
+        ),
+        0,
+      );
+    });
+
+    test('past bottom clamps to end', () {
+      expect(
+        insertIndexForGlobalY(
+          globalY: 500,
+          rowTops: tops,
+          rowBottoms: bottoms,
+          listTop: listTop,
+          listBottom: listBottom,
+        ),
+        3,
+      );
+    });
+
+    test('between rows picks the slot', () {
+      expect(
+        insertIndexForGlobalY(
+          globalY: 250,
+          rowTops: tops,
+          rowBottoms: bottoms,
+          listTop: listTop,
+          listBottom: listBottom,
+        ),
+        2,
+      );
     });
   });
 }

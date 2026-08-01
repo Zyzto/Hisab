@@ -28,6 +28,7 @@ Sources: [Flutter Wasm docs](https://docs.flutter.dev/platform-integration/web/w
 | Disable chart touch tooltips (bar/line) | yes | yes (mobile) | no | no | no |
 | Skip legend `Opacity` / progress tweens | yes | yes (mobile) | no | no | no |
 | Onboarding: no chrome demo timers / lazy steps | yes | no | no | no | no |
+| Cheap home list drag feedback (no dual-blur / Opacity) | yes (`UiPerf`) | no | no | no | no |
 | Network image decode caps (`cacheWidth`) | capped 1280px | display×DPR | display×DPR | display×DPR | display×DPR |
 | Sliver home group list + `RepaintBoundary` | yes | yes | yes | yes | yes |
 | Lazy group-detail `PageView.builder` + keepAlive | yes | yes | yes | yes | yes |

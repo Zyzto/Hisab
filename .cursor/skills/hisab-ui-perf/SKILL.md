@@ -45,6 +45,7 @@ Perf task:
 | `preferInstantShellTabs` | yes | no | no | no |
 | `preferFadeOnlyPageTransitions` | yes | no | no | no |
 | `preferReducedChromeMotion` | yes | no | no | no |
+| `preferCheapListDrag` (home reorder feedback) | yes | no | no | no |
 | `preferCheapCharts` (bar/line touch) | yes | yes (mobile) | no | no |
 | Slivers / `RepaintBoundary` / `cacheWidth` | yes | yes | yes | yes |
 | Lazy `PageView.builder` + keepAlive | yes | yes | yes | yes |

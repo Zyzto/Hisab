@@ -397,17 +397,36 @@ InviteUsage _inviteUsageFromRow(Map<String, dynamic> row) => InviteUsage(
 
 String _nowIso() => DateTime.now().toUtc().toIso8601String();
 
+/// When true, new [pending_writes] rows are marked silent (import/restore).
+bool _enqueueSilentDefault = false;
+
+/// Runs [fn] so any queued writes are marked `silent=1` for notify-suppress push.
+Future<T> runWithSilentPendingWrites<T>(Future<T> Function() fn) async {
+  final prev = _enqueueSilentDefault;
+  _enqueueSilentDefault = true;
+  try {
+    return await fn();
+  } finally {
+    _enqueueSilentDefault = prev;
+  }
+}
+
 /// Enqueue an offline write for later push.
+///
+/// When [silent] is true (or [runWithSilentPendingWrites] is active), SyncEngine
+/// pushes under notify-suppress.
 Future<void> _enqueue(
   PowerSyncDatabase db, {
   required String tableName,
   required String operation,
   required String rowId,
   Map<String, dynamic>? data,
+  bool? silent,
 }) async {
+  final isSilent = silent ?? _enqueueSilentDefault;
   final id = _uuid.v4();
   await db.execute(
-    'INSERT INTO pending_writes (id, table_name, operation, row_id, data_json, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    'INSERT INTO pending_writes (id, table_name, operation, row_id, data_json, created_at, silent) VALUES (?, ?, ?, ?, ?, ?, ?)',
     [
       id,
       tableName,
@@ -415,9 +434,12 @@ Future<void> _enqueue(
       rowId,
       data != null ? jsonEncode(data) : null,
       _nowIso(),
+      isSilent ? 1 : 0,
     ],
   );
-  Log.debug('Queued pending write: $operation on $tableName/$rowId');
+  Log.debug(
+    'Queued pending write: $operation on $tableName/$rowId silent=$isSilent',
+  );
 }
 
 bool _shouldQueueOffline({required bool isLocalOnly, required bool isOnline}) =>

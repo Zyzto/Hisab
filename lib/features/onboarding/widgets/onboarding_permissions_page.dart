@@ -8,7 +8,6 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import '../../../core/pwa/pwa_capabilities.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/widgets/toast.dart';
-import '../../../core/theme/theme_config.dart';
 import '../../settings/settings_definitions.dart';
 import 'onboarding_shared.dart';
 
@@ -34,29 +33,15 @@ class OnboardingPermissionsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final colorScheme = Theme.of(context).colorScheme;
     return onboardingPageBodyWithFixedTitle(
       context,
       contentAlignment: Alignment.topCenter,
-      title: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'onboarding_permissions_title'.tr(),
-            style: Theme.of(
-              context,
-            ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: ThemeConfig.spacingS),
-          Text(
-            'onboarding_permissions_desc'.tr(),
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              height: 1.4,
-            ),
-          ),
-        ],
+      title: OnboardingStepEnter(
+        slidePx: 12,
+        child: OnboardingTitleBlock(
+          title: 'onboarding_permissions_title'.tr(),
+          subtitle: Text('onboarding_permissions_desc'.tr()),
+        ),
       ),
       content: OnboardingStepEnter(
         child: FutureBuilder<({bool camera, bool notification})>(

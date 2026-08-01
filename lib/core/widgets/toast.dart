@@ -149,6 +149,70 @@ extension ToastContext on BuildContext {
     );
   }
 
+  /// Info toast with a single primary action (e.g. screenshot → report prompt).
+  void showPromptWithAction(
+    String message, {
+    required String actionLabel,
+    required VoidCallback onAction,
+    Duration? duration,
+  }) {
+    if (!mounted) return;
+    toastification.showCustom(
+      context: this,
+      alignment: Alignment.bottomCenter,
+      autoCloseDuration: duration ?? const Duration(seconds: 8),
+      builder: (context, holder) {
+        final theme = Theme.of(context);
+        final colorScheme = theme.colorScheme;
+        return Material(
+          color: colorScheme.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.screenshot_outlined,
+                      size: 24,
+                      color: colorScheme.primary,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: UserText(
+                        message,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurface,
+                        ),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: FilledButton(
+                    onPressed: () {
+                      toastification.dismiss(holder);
+                      onAction();
+                    },
+                    child: Text(actionLabel),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   /// Dismisses all visible toasts. Use before showing a replacement (e.g. sync status).
   void dismissAllToasts() {
     if (!mounted) return;

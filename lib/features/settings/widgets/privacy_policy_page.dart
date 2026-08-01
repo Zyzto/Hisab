@@ -4,109 +4,136 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/constrained_content.dart';
+import '../../../core/navigation/nav_back.dart';
+import '../../../core/navigation/route_paths.dart';
 import '../../../core/theme/theme_config.dart';
 
-class PrivacyPolicyPage extends StatelessWidget {
+class PrivacyPolicyPage extends StatefulWidget {
   const PrivacyPolicyPage({super.key});
+
+  @override
+  State<PrivacyPolicyPage> createState() => _PrivacyPolicyPageState();
+}
+
+class _PrivacyPolicyPageState extends State<PrivacyPolicyPage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      seedParentHistoryForBrowserBack(
+        context: context,
+        parentPath: RoutePaths.settings,
+        currentPath: RoutePaths.privacyPolicy,
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final canPop = routerCanPop(context);
 
-    return LayoutBuilder(
-      builder: (context, layoutConstraints) {
-        return Scaffold(
-          appBar: ContentAlignedAppBar(
-            contentAreaWidth: layoutConstraints.maxWidth,
-            title: Text('privacy_policy'.tr()),
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => context.pop(),
-            ),
-          ),
-          body: ConstrainedContent(
-            child: ListView(
-              padding: const EdgeInsets.all(ThemeConfig.spacingM),
-              children: [
-                Text(
-                  'privacy_policy_last_updated'.tr(),
-                  style: textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: ThemeConfig.spacingL),
-                _buildSection(
-                  context,
-                  title: 'privacy_policy_intro_title'.tr(),
-                  body: 'privacy_policy_intro_body'.tr(),
-                ),
-                _buildSection(
-                  context,
-                  title: 'privacy_policy_permissions_title'.tr(),
-                  body: 'privacy_policy_permissions_body'.tr(),
-                ),
-                _buildSection(
-                  context,
-                  title: 'privacy_policy_data_collection_title'.tr(),
-                  body: 'privacy_policy_data_collection_body'.tr(),
-                ),
-                _buildSection(
-                  context,
-                  title: 'privacy_policy_data_storage_title'.tr(),
-                  body: 'privacy_policy_data_storage_body'.tr(),
-                ),
-                _buildSection(
-                  context,
-                  title: 'privacy_policy_data_usage_title'.tr(),
-                  body: 'privacy_policy_data_usage_body'.tr(),
-                ),
-                _buildSection(
-                  context,
-                  title: 'privacy_policy_third_party_title'.tr(),
-                  body: 'privacy_policy_third_party_body'.tr(),
-                ),
-                _buildSection(
-                  context,
-                  title: 'privacy_policy_data_sharing_title'.tr(),
-                  body: 'privacy_policy_data_sharing_body'.tr(),
-                ),
-                _buildSection(
-                  context,
-                  title: 'privacy_policy_data_security_title'.tr(),
-                  body: 'privacy_policy_data_security_body'.tr(),
-                ),
-                _buildSection(
-                  context,
-                  title: 'privacy_policy_user_rights_title'.tr(),
-                  body: 'privacy_policy_user_rights_body'.tr(),
-                ),
-                _buildSection(
-                  context,
-                  title: 'privacy_policy_data_retention_title'.tr(),
-                  body: 'privacy_policy_data_retention_body'.tr(),
-                ),
-                _buildSection(
-                  context,
-                  title: 'privacy_policy_children_title'.tr(),
-                  body: 'privacy_policy_children_body'.tr(),
-                ),
-                _buildSection(
-                  context,
-                  title: 'privacy_policy_changes_title'.tr(),
-                  body: 'privacy_policy_changes_body'.tr(),
-                ),
-                _buildSection(
-                  context,
-                  title: 'privacy_policy_contact_title'.tr(),
-                  body: 'privacy_policy_contact_body'.tr(),
-                ),
-                const SizedBox(height: ThemeConfig.spacingXL),
-              ],
-            ),
-          ),
-        );
+    return PopScope(
+      canPop: canPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) popOrGo(context, RoutePaths.settings);
       },
+      child: LayoutBuilder(
+        builder: (context, layoutConstraints) {
+          return Scaffold(
+            appBar: ContentAlignedAppBar(
+              contentAreaWidth: layoutConstraints.maxWidth,
+              title: Text('privacy_policy'.tr()),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => popOrGo(context, RoutePaths.settings),
+              ),
+            ),
+            body: ConstrainedContent(
+              child: ListView(
+                padding: const EdgeInsets.all(ThemeConfig.spacingM),
+                children: [
+                  Text(
+                    'privacy_policy_last_updated'.tr(),
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: ThemeConfig.spacingL),
+                  _buildSection(
+                    context,
+                    title: 'privacy_policy_intro_title'.tr(),
+                    body: 'privacy_policy_intro_body'.tr(),
+                  ),
+                  _buildSection(
+                    context,
+                    title: 'privacy_policy_permissions_title'.tr(),
+                    body: 'privacy_policy_permissions_body'.tr(),
+                  ),
+                  _buildSection(
+                    context,
+                    title: 'privacy_policy_data_collection_title'.tr(),
+                    body: 'privacy_policy_data_collection_body'.tr(),
+                  ),
+                  _buildSection(
+                    context,
+                    title: 'privacy_policy_data_storage_title'.tr(),
+                    body: 'privacy_policy_data_storage_body'.tr(),
+                  ),
+                  _buildSection(
+                    context,
+                    title: 'privacy_policy_data_usage_title'.tr(),
+                    body: 'privacy_policy_data_usage_body'.tr(),
+                  ),
+                  _buildSection(
+                    context,
+                    title: 'privacy_policy_third_party_title'.tr(),
+                    body: 'privacy_policy_third_party_body'.tr(),
+                  ),
+                  _buildSection(
+                    context,
+                    title: 'privacy_policy_data_sharing_title'.tr(),
+                    body: 'privacy_policy_data_sharing_body'.tr(),
+                  ),
+                  _buildSection(
+                    context,
+                    title: 'privacy_policy_data_security_title'.tr(),
+                    body: 'privacy_policy_data_security_body'.tr(),
+                  ),
+                  _buildSection(
+                    context,
+                    title: 'privacy_policy_user_rights_title'.tr(),
+                    body: 'privacy_policy_user_rights_body'.tr(),
+                  ),
+                  _buildSection(
+                    context,
+                    title: 'privacy_policy_data_retention_title'.tr(),
+                    body: 'privacy_policy_data_retention_body'.tr(),
+                  ),
+                  _buildSection(
+                    context,
+                    title: 'privacy_policy_children_title'.tr(),
+                    body: 'privacy_policy_children_body'.tr(),
+                  ),
+                  _buildSection(
+                    context,
+                    title: 'privacy_policy_changes_title'.tr(),
+                    body: 'privacy_policy_changes_body'.tr(),
+                  ),
+                  _buildSection(
+                    context,
+                    title: 'privacy_policy_contact_title'.tr(),
+                    body: 'privacy_policy_contact_body'.tr(),
+                  ),
+                  const SizedBox(height: ThemeConfig.spacingXL),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 

@@ -170,9 +170,12 @@ class InvitePreviewExpenseDetailPage extends ConsumerWidget {
         return ProviderScope(
           overrides: [
             ..._buildPreviewOverrides(preview),
-            futureExpenseProvider(
-              expenseId,
-            ).overrideWith((ref) => Stream.value(previewExpense)),
+            // Override every preview expense so interactive PageView neighbors
+            // do not hit the real repository and pop on null.
+            for (final e in preview.expenses)
+              futureExpenseProvider(
+                e.id,
+              ).overrideWith((ref) => Stream.value(e)),
           ],
           child: ExpenseDetailShell(
             groupId: groupId,

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
@@ -14,7 +13,9 @@ import '../../../core/database/database_providers.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../core/constants/supabase_config.dart';
 import '../../../core/layout/constrained_content.dart';
+import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/motion/app_motion.dart';
+import '../../../core/navigation/decorative_route.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/platform/ui_perf.dart';
 import '../../../core/services/permission_service.dart';
@@ -26,7 +27,18 @@ import '../../settings/settings_definitions.dart';
 import '../widgets/onboarding_connect_page.dart';
 import '../widgets/onboarding_permissions_page.dart';
 import '../widgets/onboarding_preferences_page.dart';
+import '../widgets/onboarding_sky_backdrop.dart';
 import '../widgets/onboarding_welcome_page.dart';
+
+/// Maps an onboarding location path to a step index, or null if unmatched.
+@visibleForTesting
+int? onboardingStepFromPath(String path) {
+  if (path == RoutePaths.onboardingWelcome) return 0;
+  if (path == RoutePaths.onboardingPreferences) return 1;
+  if (path == RoutePaths.onboardingPermissions) return 2;
+  if (path == RoutePaths.onboardingConnect) return 3;
+  return null;
+}
 
 class OnboardingPage extends ConsumerStatefulWidget {
   const OnboardingPage({
@@ -93,17 +105,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
   /// Updates the address bar to match the wizard step without [context.go],
   /// so this [State] (PageView, timers, etc.) is not disposed mid-flow.
   void _syncDecorativeUrlToPage(int page) {
-    final router = GoRouter.maybeOf(context);
-    if (router == null) return;
-    final targetPath = _routeForPage(page);
-    final currentPath =
-        router.routerDelegate.currentConfiguration.uri.path;
-    if (currentPath != targetPath) {
-      SystemNavigator.routeInformationUpdated(
-        uri: Uri.parse(targetPath),
-        replace: true,
-      );
-    }
+    syncDecorativeRoutePath(context, _routeForPage(page));
   }
 
   void _ensurePermissionStatusLoaded() {
@@ -179,13 +181,22 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
     }
   }
 
+  int _resolveInitialPage() {
+    final browserPath = webVisibleAppRoutePath();
+    if (browserPath != null) {
+      final fromPath = onboardingStepFromPath(browserPath);
+      if (fromPath != null) return fromPath.clamp(0, _lastPageIndex);
+    }
+    return widget.initialPage.clamp(0, _lastPageIndex);
+  }
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _isCompleting = widget.forceBusyForTest;
-    _currentPage = widget.initialPage;
-    _pageController = PageController(initialPage: widget.initialPage);
+    _currentPage = _resolveInitialPage();
+    _pageController = PageController(initialPage: _currentPage);
     // Deep-link / cold start on Permissions never fires [onPageChanged].
     _ensurePermissionStatusLoaded();
     _languagePulseController = AnimationController(
@@ -295,15 +306,19 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
+      // Keep theme scaffold fill under transparent grass/nav so parent
+      // routes can't flash white through the meadow.
       body: Stack(
         children: [
+          const OnboardingSkyBackdrop(),
           SafeArea(
             child: AbsorbPointer(
               absorbing: _isCompleting,
-              child: ConstrainedContent(
-                child: Column(
-                  children: [
-                    Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: ConstrainedContent(
                       child: PageView.builder(
                         controller: _pageController,
                         itemCount: 4,
@@ -359,10 +374,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                         },
                       ),
                     ),
-                    _buildPageIndicator(context),
-                    _buildNavigationBar(context, colorScheme, settings),
-                  ],
-                ),
+                  ),
+                  _buildFooter(context, colorScheme, settings),
+                ],
               ),
             ),
           ),
@@ -401,6 +415,58 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
     );
   }
 
+  /// Step dots + nav row, washed over the grass band so their labels stay
+  /// readable.
+  ///
+  /// The scrim is full-bleed while the chrome inside stays in the content
+  /// band, otherwise wide screens would show a floating panel edge.
+  Widget _buildFooter(
+    BuildContext context,
+    ColorScheme colorScheme,
+    SettingsProviders settings,
+  ) {
+    final surface = colorScheme.surface;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            surface.withValues(alpha: 0),
+            surface.withValues(alpha: 0.76),
+            surface.withValues(alpha: 0.92),
+          ],
+          // Ramps early: the step dots sit near the top of this band and the
+          // grass underneath is at full saturation there.
+          stops: const [0.0, 0.26, 1.0],
+        ),
+      ),
+      // Not [ConstrainedContent]: it stretches its Row cross-axis, which needs
+      // a bounded height, and the footer sizes to its content.
+      child: Align(
+        alignment: Alignment.topCenter,
+        heightFactor: 1,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: LayoutBreakpoints.contentMaxWidth(context),
+          ),
+          // Head start for the gradient, so the dots aren't sitting on the
+          // untouched top edge of the wash.
+          child: Padding(
+            padding: const EdgeInsets.only(top: ThemeConfig.spacingM),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildPageIndicator(context),
+                _buildNavigationBar(context, colorScheme, settings),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildPageIndicator(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Padding(
@@ -423,7 +489,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
               borderRadius: BorderRadius.circular(ThemeConfig.radiusS),
               color: isActive
                   ? colorScheme.primary
-                  : colorScheme.outlineVariant.withValues(alpha: 0.55),
+                  : colorScheme.outline.withValues(alpha: 0.7),
             ),
           );
         }),
@@ -648,37 +714,10 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
     ColorScheme colorScheme,
     SettingsProviders settings,
   ) {
-    final scaffoldBg = Theme.of(context).scaffoldBackgroundColor;
-    final decoration = UiPerf.preferCheapShadows
-        ? BoxDecoration(
-            color: scaffoldBg,
-            border: Border(
-              top: BorderSide(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.55),
-              ),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: colorScheme.shadow.withValues(alpha: 0.08),
-                blurRadius: 2,
-                offset: const Offset(0, -1),
-              ),
-            ],
-          )
-        : BoxDecoration(
-            color: scaffoldBg,
-            boxShadow: [
-              BoxShadow(
-                color: colorScheme.shadow.withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, -2),
-              ),
-            ],
-          );
-
+    // Transparent so the meadow parallax shows through under chrome.
     return Container(
       padding: const EdgeInsets.all(ThemeConfig.spacingM),
-      decoration: decoration,
+      color: Colors.transparent,
       child: Semantics(
         container: true,
         explicitChildNodes: true,
@@ -755,8 +794,9 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                 _hintLanguageKeys[_hintLocaleIndex].tr(),
                 key: ValueKey<int>(_hintLocaleIndex),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  fontStyle: FontStyle.italic,
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.9),
+                  letterSpacing: 0.1,
+                  height: 1.35,
                 ),
                 textAlign: TextAlign.center,
               ),

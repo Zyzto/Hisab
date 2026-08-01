@@ -1,16 +1,19 @@
 import 'package:currency_picker/currency_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
+import '../../../core/celebration/celebration_controller.dart';
+import '../../../core/celebration/celebration_kind.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/motion/app_motion.dart';
 import '../../../core/repository/repository_providers.dart';
+import '../../../core/navigation/decorative_route.dart';
+import '../../../core/navigation/nav_back.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/platform/ui_perf.dart';
 import '../../../core/telemetry/telemetry_service.dart';
@@ -33,6 +36,24 @@ import '../widgets/group_color_picker.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 // Wizard entry point (keeps the same class name for router compatibility)
 // ─────────────────────────────────────────────────────────────────────────────
+
+/// Maps a create-wizard location path to a step index, or null if unmatched.
+@visibleForTesting
+int? groupCreateStepFromPath(String path, {required bool isPersonal}) {
+  if (isPersonal) {
+    if (path == RoutePaths.groupCreatePersonalDetails) return 0;
+    if (path == RoutePaths.groupCreatePersonalStyle) return 1;
+    if (path == RoutePaths.groupCreatePersonalReview) return 2;
+    if (path == RoutePaths.groupCreatePersonal) return 0;
+    return null;
+  }
+  if (path == RoutePaths.groupCreateDetails) return 0;
+  if (path == RoutePaths.groupCreateParticipants) return 1;
+  if (path == RoutePaths.groupCreateStyle) return 2;
+  if (path == RoutePaths.groupCreateReview) return 3;
+  if (path == RoutePaths.groupCreate) return 0;
+  return null;
+}
 
 class GroupCreatePage extends ConsumerStatefulWidget {
   final bool isPersonal;
@@ -117,29 +138,38 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
   /// Address bar only — canonical route stays [RoutePaths.groupCreate] /
   /// [RoutePaths.groupCreatePersonal] so this [State] is not recreated per step.
   void _syncDecorativeUrlToPage(int page) {
-    final router = GoRouter.maybeOf(context);
-    if (router == null) return;
-    final targetPath = _decorativePathForPage(page);
-    final currentPath =
-        router.routerDelegate.currentConfiguration.uri.path;
-    if (currentPath != targetPath) {
-      SystemNavigator.routeInformationUpdated(
-        uri: Uri.parse(targetPath),
-        replace: true,
+    syncDecorativeRoutePath(context, _decorativePathForPage(page));
+  }
+
+  int _resolveInitialStep() {
+    // Prefer browser path on web so reload / remount stays aligned with the
+    // decorative step URL even if GoRouter still matched the canonical route.
+    final browserPath = webVisibleAppRoutePath();
+    if (browserPath != null) {
+      final fromPath = groupCreateStepFromPath(
+        browserPath,
+        isPersonal: widget.isPersonal,
       );
+      if (fromPath != null) return fromPath.clamp(0, _pageCount - 1);
     }
+    return widget.initialStep.clamp(0, _pageCount - 1);
   }
 
   @override
   void initState() {
     super.initState();
-    _currentPage = widget.initialStep.clamp(0, _pageCount - 1);
+    _currentPage = _resolveInitialStep();
     _pageController = PageController(initialPage: _currentPage);
     _selectedCurrency = CurrencyHelpers.defaultCurrency();
     _addParticipantButtonFocusNode = FocusNode(canRequestFocus: false);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _syncDecorativeUrlToPage(_currentPage);
+      seedParentHistoryForBrowserBack(
+        context: context,
+        parentPath: RoutePaths.home,
+        currentPath: _decorativePathForPage(_currentPage),
+      );
     });
   }
 
@@ -219,7 +249,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
         );
       }
     } else {
-      context.pop();
+      popOrGo(context, RoutePaths.home);
     }
   }
 
@@ -317,6 +347,13 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
           'hasIcon': _selectedIcon != null,
         }, enabled: ref.read(telemetryEnabledProvider));
       } catch (_) {}
+      await fireCelebration(
+        ref,
+        widget.isPersonal
+            ? CelebrationKind.newPersonalList
+            : CelebrationKind.newGroup,
+        dedupeKey: CelebrationKeys.groupCreated(id),
+      );
       if (mounted) context.go(RoutePaths.groupDetail(id));
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -367,9 +404,14 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
     return LayoutBuilder(
       builder: (context, layoutConstraints) {
         return PopScope(
-          canPop: _currentPage == 0,
+          canPop: _currentPage == 0 && routerCanPop(context),
           onPopInvokedWithResult: (didPop, result) {
-            if (!didPop && _currentPage > 0) _goBack();
+            if (didPop) return;
+            if (_currentPage > 0) {
+              _goBack();
+            } else {
+              popOrGo(context, RoutePaths.home);
+            }
           },
           child: Scaffold(
             // Keep fields above the keyboard on mobile / mobile web.

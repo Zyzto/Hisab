@@ -15,6 +15,7 @@ class ContentAlignedAppBar extends StatelessWidget
     this.leadingWidth,
     required this.title,
     this.actions,
+    this.centerTitle = true,
   });
 
   final double contentAreaWidth;
@@ -26,6 +27,11 @@ class ContentAlignedAppBar extends StatelessWidget
 
   final Widget title;
   final List<Widget>? actions;
+
+  /// When true (default), the title is centered in the content band with
+  /// symmetric insets. When false, the title is start-aligned (LTR/RTL) and
+  /// can use the full space between leading and actions before truncating.
+  final bool centerTitle;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -45,20 +51,29 @@ class ContentAlignedAppBar extends StatelessWidget
         ) ??
         (theme.textTheme.titleLarge ?? theme.textTheme.bodyLarge!);
 
-    // Reserve horizontal space symmetrically so the title stays centered in
-    // the content band (not shifted by leading/actions width differences).
     final leadingReservedWidth = leading != null
         ? (leadingWidth ?? kToolbarHeight)
         : 0.0;
     final actionsReservedWidth =
         (actions?.length ?? 0) * kToolbarHeight.toDouble();
     const titleButtonGap = 8.0;
-    final symmetricInset =
-        (leadingReservedWidth > actionsReservedWidth
-                ? leadingReservedWidth
-                : actionsReservedWidth) +
-        titleButtonGap;
-    final titleInset = symmetricInset.clamp(0.0, bandWidth / 2).toDouble();
+
+    final double titleStartInset;
+    final double titleEndInset;
+    if (centerTitle) {
+      // Symmetric insets keep the title centered despite leading/actions skew.
+      final symmetricInset =
+          (leadingReservedWidth > actionsReservedWidth
+                  ? leadingReservedWidth
+                  : actionsReservedWidth) +
+              titleButtonGap;
+      final inset = symmetricInset.clamp(0.0, bandWidth / 2).toDouble();
+      titleStartInset = inset;
+      titleEndInset = inset;
+    } else {
+      titleStartInset = leadingReservedWidth + titleButtonGap;
+      titleEndInset = actionsReservedWidth + titleButtonGap;
+    }
 
     // Keep toolbar controls off the screen edges (esp. next to a nav rail).
     const edgePadding = 12.0;
@@ -110,18 +125,22 @@ class ContentAlignedAppBar extends StatelessWidget
                 top: 0,
                 bottom: 0,
                 width: bandWidth,
-                child: Center(
-                  child: Padding(
-                    padding: EdgeInsetsDirectional.only(
-                      start: titleInset,
-                      end: titleInset,
-                    ),
-                    child: DefaultTextStyle(
-                      style: titleStyle,
-                      // Do not scale titles down (hurts readability on phones).
-                      // Titles get the band max width; use ellipsis / elision in the title widget.
-                      child: title,
-                    ),
+                child: Padding(
+                  padding: EdgeInsetsDirectional.only(
+                    start: titleStartInset,
+                    end: titleEndInset,
+                  ),
+                  child: DefaultTextStyle(
+                    style: titleStyle,
+                    // Do not scale titles down (hurts readability on phones).
+                    // Titles get the band max width; use ellipsis / elision in
+                    // the title widget.
+                    child: centerTitle
+                        ? Center(child: title)
+                        : Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: title,
+                          ),
                   ),
                 ),
               ),

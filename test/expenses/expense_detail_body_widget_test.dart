@@ -58,12 +58,15 @@ void main() {
     );
   });
 
-  testWidgets('ExpenseDetailBody shows header without duplicate title', (
+  testWidgets('ExpenseDetailBody shows title in header card', (
     tester,
   ) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          expensesByGroupProvider(groupId).overrideWithValue(
+            AsyncValue.data([testExpense]),
+          ),
           futureExpenseProvider(
             expenseId,
           ).overrideWithValue(AsyncValue.data(testExpense)),
@@ -92,7 +95,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Test expense'), findsNothing);
+    expect(find.text('Test expense'), findsOneWidget);
     expect(find.byType(ExpenseDetailBodyHeader), findsOneWidget);
     expect(find.text('Receipt notes'), findsOneWidget);
     expect(find.text('Sandwich'), findsOneWidget);
@@ -122,6 +125,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          expensesByGroupProvider(groupId).overrideWithValue(
+            AsyncValue.data([multiExpense]),
+          ),
           futureExpenseProvider(
             expenseId,
           ).overrideWithValue(AsyncValue.data(multiExpense)),
@@ -166,6 +172,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          expensesByGroupProvider(groupId).overrideWithValue(
+            AsyncValue.data([income]),
+          ),
           futureExpenseProvider(
             expenseId,
           ).overrideWithValue(AsyncValue.data(income)),
@@ -222,6 +231,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          expensesByGroupProvider(groupId).overrideWithValue(
+            AsyncValue.data([transfer]),
+          ),
           futureExpenseProvider(
             expenseId,
           ).overrideWithValue(AsyncValue.data(transfer)),
@@ -258,6 +270,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          expensesByGroupProvider(groupId).overrideWithValue(
+            AsyncValue.data([testExpense]),
+          ),
           futureExpenseProvider(
             expenseId,
           ).overrideWithValue(AsyncValue.data(testExpense)),
@@ -300,6 +315,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          expensesByGroupProvider(groupId).overrideWithValue(
+            AsyncValue.data([testExpense]),
+          ),
           futureExpenseProvider(
             expenseId,
           ).overrideWithValue(AsyncValue.data(testExpense)),

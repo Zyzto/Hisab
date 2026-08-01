@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
+import '../../../core/navigation/nav_back.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../domain/domain.dart';
@@ -31,6 +32,14 @@ class _ProfileExpensesPageState extends ConsumerState<ProfileExpensesPage> {
     _searchController = TextEditingController(
       text: ref.read(profileExpensesFilterProvider).query,
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      seedParentHistoryForBrowserBack(
+        context: context,
+        parentPath: RoutePaths.profile,
+        currentPath: RoutePaths.profileExpenses,
+      );
+    });
   }
 
   @override
@@ -50,7 +59,13 @@ class _ProfileExpensesPageState extends ConsumerState<ProfileExpensesPage> {
 
     final allItems = allAsync.asData?.value ?? const <ProfileExpenseItem>[];
 
-    return LayoutBuilder(
+    final canPop = routerCanPop(context);
+    return PopScope(
+      canPop: canPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) popOrGo(context, RoutePaths.profile);
+      },
+      child: LayoutBuilder(
       builder: (context, layoutConstraints) {
         return Scaffold(
           appBar: ContentAlignedAppBar(
@@ -58,13 +73,7 @@ class _ProfileExpensesPageState extends ConsumerState<ProfileExpensesPage> {
             title: Text('profile_all_expenses_title'.tr()),
             leading: IconButton(
               icon: const Icon(Icons.arrow_back),
-              onPressed: () {
-                if (context.canPop()) {
-                  context.pop();
-                } else {
-                  context.go(RoutePaths.profile);
-                }
-              },
+              onPressed: () => popOrGo(context, RoutePaths.profile),
             ),
             actions: [
               // Always reserve the slot so showing/hiding clear doesn't shift the bar.
@@ -220,6 +229,7 @@ class _ProfileExpensesPageState extends ConsumerState<ProfileExpensesPage> {
           ),
         );
       },
+    ),
     );
   }
 

@@ -7,6 +7,7 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/platform/screenshot_report_support.dart';
 import '../../../core/pwa/pwa_capabilities.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/widgets/toast.dart';
@@ -78,6 +79,13 @@ List<Widget> buildPrivacySectionTiles(
             );
           }
         },
+      ),
+    if (supportsScreenshotReportPrompt)
+      buildBoolSettingTile(
+        ref,
+        settings,
+        screenshotReportPromptEnabledSettingDef,
+        anchors: anchors,
       ),
   ];
 }

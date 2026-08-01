@@ -11,6 +11,10 @@ class AsyncValueBuilder<T> extends StatelessWidget {
   final Widget Function(BuildContext context)? loading;
   final Widget Function(BuildContext context)? empty;
 
+  /// When true, keep showing the previous [data] while a reload is in flight
+  /// instead of swapping to [loading] (avoids disposing child [State]).
+  final bool skipLoadingOnReload;
+
   const AsyncValueBuilder({
     super.key,
     required this.value,
@@ -18,11 +22,13 @@ class AsyncValueBuilder<T> extends StatelessWidget {
     this.error,
     this.loading,
     this.empty,
+    this.skipLoadingOnReload = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return value.when(
+      skipLoadingOnReload: skipLoadingOnReload,
       data: (data) {
         if (data == null && empty != null) {
           return empty!(context);
