@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
+import 'package:go_router/go_router.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 
 import '../../../core/constants/supabase_config.dart';
@@ -11,10 +12,13 @@ import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/content_aligned_fab_location.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/layout/responsive_sheet.dart';
+import '../../../core/navigation/nav_back.dart';
+import '../../../core/navigation/route_paths.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/error_report_helper.dart';
+import '../../../core/widgets/app_fab.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/toast.dart';
@@ -40,6 +44,19 @@ class _InviteManagementPageState extends ConsumerState<InviteManagementPage> {
   InviteStatus? _filter;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      seedParentHistoryForBrowserBack(
+        context: context,
+        parentPath: RoutePaths.groupSettings(widget.groupId),
+        currentPath: RoutePaths.groupInvites(widget.groupId),
+      );
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final invitesAsync = ref.watch(invitesByGroupProvider(widget.groupId));
@@ -47,8 +64,15 @@ class _InviteManagementPageState extends ConsumerState<InviteManagementPage> {
     final myRoleAsync = localOnly
         ? const AsyncValue<GroupRole?>.data(null)
         : ref.watch(myRoleInGroupProvider(widget.groupId));
+    final settingsPath = RoutePaths.groupSettings(widget.groupId);
+    final canPop = routerCanPop(context);
 
-    return LayoutBuilder(
+    return PopScope(
+      canPop: canPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) popOrGo(context, settingsPath);
+      },
+      child: LayoutBuilder(
       builder: (context, layoutConstraints) {
         return Scaffold(
           floatingActionButtonLocation: ContentAlignedFabLocation.of(
@@ -60,14 +84,14 @@ class _InviteManagementPageState extends ConsumerState<InviteManagementPage> {
             title: Text('invite_links'.tr()),
             leading: IconButton(
               icon: const Icon(Icons.arrow_back),
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => popOrGo(context, settingsPath),
             ),
           ),
-          floatingActionButton: FloatingActionButton(
+          floatingActionButton: AppFab(
+            icon: Icons.add,
+            tooltip: 'create_invite'.tr(),
             onPressed: () =>
                 showCreateInviteSheet(context, ref, widget.groupId),
-            tooltip: 'create_invite'.tr(),
-            child: const Icon(Icons.add),
           ),
           body: myRoleAsync.when(
             data: (myRole) {
@@ -238,6 +262,7 @@ class _InviteManagementPageState extends ConsumerState<InviteManagementPage> {
           ),
         );
       },
+    ),
     );
   }
 }

@@ -8,6 +8,7 @@ import '../../../core/layout/content_aligned_fab_location.dart';
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/theme/accent_style.dart';
+import '../../../core/widgets/app_fab.dart';
 import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/user_text.dart';
 import '../domain/sender_rule.dart';
@@ -45,9 +46,9 @@ class SenderRulesPage extends ConsumerWidget {
                   : _buildList(context, ref, rules),
             ),
           ),
-          floatingActionButton: FloatingActionButton(
+          floatingActionButton: AppFab(
+            icon: Icons.add,
             onPressed: () => _showAddDialog(context, ref),
-            child: const Icon(Icons.add),
           ),
         );
       },

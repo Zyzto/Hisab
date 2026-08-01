@@ -28,7 +28,9 @@ void _show(String title, String body, String? groupId) {
     notification.close();
     web.window.focus();
     if (groupId != null && groupId.isNotEmpty) {
-      web.window.location.href = '/groups/$groupId';
+      // Hash URL strategy: never write the app route into pathname
+      // (`/groups/...` alone creates `/groups/...#/...` hybrids).
+      web.window.location.href = '/#/groups/$groupId/expenses';
     }
   }.toJS;
 }

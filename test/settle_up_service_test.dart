@@ -575,6 +575,63 @@ void main() {
     });
   });
 
+  group('participantShareContributionCents', () {
+    test('adds expense share even when someone else paid', () {
+      final expense = Expense(
+        id: 'e1',
+        groupId: 'g1',
+        payerParticipantId: 'p-a',
+        amountCents: 3000,
+        currencyCode: 'USD',
+        title: 'Dinner',
+        date: now,
+        splitType: SplitType.equal,
+        splitShares: {'p-a': 1000, 'p-b': 1000, 'p-c': 1000},
+        createdAt: now,
+        updatedAt: now,
+      );
+      expect(participantShareContributionCents(expense, 'p-b'), 1000);
+      expect(participantShareContributionCents(expense, 'p-a'), 1000);
+    });
+
+    test('income share offsets the total', () {
+      final income = Expense(
+        id: 'e1',
+        groupId: 'g1',
+        payerParticipantId: 'p-a',
+        amountCents: 2000,
+        currencyCode: 'USD',
+        title: 'Refund',
+        date: now,
+        transactionType: TransactionType.income,
+        splitType: SplitType.equal,
+        splitShares: {'p-a': 1000, 'p-b': 1000},
+        createdAt: now,
+        updatedAt: now,
+      );
+      expect(participantShareContributionCents(income, 'p-b'), -1000);
+    });
+
+    test('transfers contribute zero', () {
+      final expense = Expense(
+        id: 'e1',
+        groupId: 'g1',
+        payerParticipantId: 'p-a',
+        toParticipantId: 'p-b',
+        amountCents: 500,
+        currencyCode: 'USD',
+        title: 'Settle',
+        date: now,
+        transactionType: TransactionType.transfer,
+        splitType: SplitType.equal,
+        splitShares: const {},
+        createdAt: now,
+        updatedAt: now,
+      );
+      expect(participantShareContributionCents(expense, 'p-b'), 0);
+    });
+  });
+
   group('computeSettleUp legacy alias', () {
     test('matches computeSettleUpGreedy', () {
       final balances = [

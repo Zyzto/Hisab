@@ -1,23 +1,34 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart';
+import 'package:feedback/feedback.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:upgrader/upgrader.dart';
 
+import '../../features/settings/feedback_handler.dart';
+import '../../features/settings/providers/settings_framework_providers.dart';
+import '../../features/settings/settings_definitions.dart';
+import '../celebration/celebration_controller.dart';
+import '../celebration/celebration_dedupe.dart';
+import '../celebration/celebration_kind.dart';
 import '../database/database_providers.dart';
 import '../layout/responsive_sheet.dart';
 import '../navigation/route_paths.dart';
+import '../platform/screenshot_report_support.dart';
+import '../platform/ui_perf.dart';
+import '../services/connectivity_service.dart';
+import '../widgets/app_fab.dart';
 import '../widgets/error_content.dart';
 import '../widgets/sheet_helpers.dart';
-import '../services/connectivity_service.dart';
-import '../../features/settings/providers/settings_framework_providers.dart';
-import '../../features/settings/settings_definitions.dart';
+import '../widgets/toast.dart';
+import 'integration_test_mode.dart';
 
-/// Resolves to true when the running package name contains `.debug`
-/// (i.e. the Android debug variant with applicationIdSuffix = ".debug").
-/// Returns false on release / profile builds or web.
-final isDebugBuildProvider = FutureProvider<bool>((ref) async {
+/// Async package-name check (Android `.debug` suffix) for non-`kDebugMode` builds.
+final packageIsDebugBuildProvider = FutureProvider<bool>((ref) async {
   try {
     final info = await PackageInfo.fromPlatform();
     return info.packageName.contains('.debug');
@@ -26,34 +37,34 @@ final isDebugBuildProvider = FutureProvider<bool>((ref) async {
   }
 });
 
+/// Whether the debug menu FAB should be shown.
+///
+/// Synchronous for `kDebugMode` so the first frame is not blank while a
+/// [FutureProvider] loads (important on web-server).
+final showDebugMenuProvider = Provider<bool>((ref) {
+  if (isIntegrationTestMode) return false;
+  if (kDebugMode) return true;
+  return ref.watch(packageIsDebugBuildProvider).asData?.value ?? false;
+});
+
 /// Small floating bug-icon button shown only on debug builds.
-/// Tap it to open [_DebugMenuSheet].
 ///
-/// [navigatorContext] must be a context that has a [Navigator] ancestor
-/// (e.g. [GoRouterState.navigatorKey.currentContext]). The FAB is built
-/// in the app builder, which is not under the router's Navigator.
+/// [navigatorKey] is resolved on press so a null [BuildContext] on the first
+/// frames (before the navigator mounts) does not permanently disable the menu.
 ///
-/// [localeContext] must be a context that has [EasyLocalization] (e.g. the
-/// MaterialApp.router builder context). The modal sheet is built in the
-/// navigator overlay, which may not see EasyLocalization; wrapping the
-/// sheet in EasyLocalization with this context's locale avoids
-/// "Localization not found for current context".
-///
-/// [onBeforeOpen] is called when the FAB is tapped, before showing the sheet
-/// (e.g. to hide the FAB). [whenSheetClosed] is called when the sheet is
-/// dismissed (e.g. to show the FAB again).
+/// [localeContext] must have [EasyLocalization] (e.g. MaterialApp builder).
 class DebugMenuFab extends ConsumerWidget {
   const DebugMenuFab({
     super.key,
     required this.upgrader,
-    required this.navigatorContext,
+    required this.navigatorKey,
     required this.localeContext,
     this.onBeforeOpen,
     this.whenSheetClosed,
   });
 
   final Upgrader upgrader;
-  final BuildContext? navigatorContext;
+  final GlobalKey<NavigatorState> navigatorKey;
   final BuildContext? localeContext;
   final VoidCallback? onBeforeOpen;
   final VoidCallback? whenSheetClosed;
@@ -68,27 +79,31 @@ class DebugMenuFab extends ConsumerWidget {
       ).colorScheme.errorContainer.withValues(alpha: 0.9),
       foregroundColor: Theme.of(context).colorScheme.onErrorContainer,
       onPressed: () {
-        final navContext = navigatorContext;
+        final navContext = navigatorKey.currentContext;
         final locContext = localeContext;
-        if (navContext != null &&
-            navContext.mounted &&
-            locContext != null &&
-            locContext.mounted) {
-          onBeforeOpen?.call();
-          showResponsiveSheet<void>(
-            context: navContext,
-            title: 'debug_menu_title'.tr(),
-            isScrollControlled: true,
-            centerInFullViewport: false,
-            child: EasyLocalization(
-              supportedLocales: const [Locale('en'), Locale('ar')],
-              path: 'assets/translations',
-              fallbackLocale: const Locale('en'),
-              startLocale: locContext.locale,
-              child: _DebugMenuSheet(upgrader: upgrader),
-            ),
-          ).then((_) => whenSheetClosed?.call());
+        if (navContext == null ||
+            !navContext.mounted ||
+            locContext == null ||
+            !locContext.mounted) {
+          return;
         }
+        onBeforeOpen?.call();
+        showResponsiveSheet<void>(
+          context: navContext,
+          title: 'debug_menu_title'.tr(),
+          isScrollControlled: true,
+          centerInFullViewport: false,
+          child: EasyLocalization(
+            supportedLocales: const [Locale('en'), Locale('ar')],
+            path: 'assets/translations',
+            fallbackLocale: const Locale('en'),
+            startLocale: locContext.locale,
+            child: _DebugMenuSheet(
+              upgrader: upgrader,
+              hostContext: navContext,
+            ),
+          ),
+        ).whenComplete(() => whenSheetClosed?.call());
       },
       child: const Icon(Icons.bug_report_outlined, size: 20),
     );
@@ -96,9 +111,16 @@ class DebugMenuFab extends ConsumerWidget {
 }
 
 class _DebugMenuSheet extends ConsumerStatefulWidget {
-  const _DebugMenuSheet({required this.upgrader});
+  const _DebugMenuSheet({
+    required this.upgrader,
+    required this.hostContext,
+  });
 
   final Upgrader upgrader;
+
+  /// Navigator context outside this sheet — used after the sheet closes so
+  /// celebrations / toasts still have a mounted Overlay.
+  final BuildContext hostContext;
 
   @override
   ConsumerState<_DebugMenuSheet> createState() => _DebugMenuSheetState();
@@ -106,9 +128,35 @@ class _DebugMenuSheet extends ConsumerStatefulWidget {
 
 class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
   String? _statusMessage;
+  Future<PackageInfo>? _packageInfoFuture;
+
+  static const _celebrationLabels = <CelebrationKind, String>{
+    CelebrationKind.firstExpense: 'Forest — first expense',
+    CelebrationKind.newExpense: 'Plants — new expense',
+    CelebrationKind.settlement: 'Sea — settlement',
+    CelebrationKind.personJoined: 'Jungle — person joined',
+    CelebrationKind.personLeft: 'Sky — person left',
+    CelebrationKind.newGroup: 'Grove — new group',
+    CelebrationKind.newPersonalList: 'Dusk — personal list',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _packageInfoFuture = PackageInfo.fromPlatform();
+  }
 
   void _setStatus(String msg) {
     if (mounted) setState(() => _statusMessage = msg);
+  }
+
+  /// Pop the sheet, then run [action] with objects captured *before* dispose.
+  Future<void> _closeThen(void Function(BuildContext host) action) async {
+    final host = widget.hostContext;
+    Navigator.of(context, rootNavigator: true).pop();
+    await Future<void>.delayed(const Duration(milliseconds: 240));
+    if (!host.mounted) return;
+    action(host);
   }
 
   Future<void> _forceUpgradeDialog() async {
@@ -116,7 +164,7 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
     widget.upgrader.updateState(
       widget.upgrader.state.copyWith(debugDisplayAlways: true),
     );
-    if (mounted) Navigator.of(context).pop();
+    if (mounted) Navigator.of(context, rootNavigator: true).pop();
   }
 
   Future<void> _triggerSync() async {
@@ -135,9 +183,11 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
       _setStatus('Settings not available');
       return;
     }
-    ref
-        .read(settings.provider(onboardingCompletedSettingDef).notifier)
-        .set(false);
+    unawaited(
+      ref
+          .read(settings.provider(onboardingCompletedSettingDef).notifier)
+          .set(false),
+    );
     _setStatus('Onboarding reset — restart the app');
   }
 
@@ -148,7 +198,12 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
       hint: 'Paste invite token',
     );
     if (token != null && token.isNotEmpty && mounted) {
-      context.go(RoutePaths.inviteAccept(token));
+      final host = widget.hostContext;
+      Navigator.of(context, rootNavigator: true).pop();
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      if (host.mounted) {
+        GoRouter.of(host).go(RoutePaths.inviteAccept(token));
+      }
     }
   }
 
@@ -171,52 +226,153 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
     );
   }
 
+  Future<void> _waitForCelebrationIdle(CelebrationController bus) async {
+    if (bus.active == null) return;
+    final completer = Completer<void>();
+    void listener() {
+      if (bus.active == null && !completer.isCompleted) {
+        bus.removeListener(listener);
+        completer.complete();
+      }
+    }
+
+    bus.addListener(listener);
+    try {
+      await completer.future.timeout(const Duration(seconds: 10));
+    } on TimeoutException {
+      bus.removeListener(listener);
+    }
+  }
+
+  Future<void> _playCelebration(CelebrationKind kind) async {
+    // Capture before pop — sheet State (and [ref]) is disposed after close.
+    final bus = ref.read(celebrationControllerProvider);
+    await _closeThen((_) => bus.request(kind));
+  }
+
+  Future<void> _playAllCelebrations() async {
+    final bus = ref.read(celebrationControllerProvider);
+    final host = widget.hostContext;
+    Navigator.of(context, rootNavigator: true).pop();
+    await Future<void>.delayed(const Duration(milliseconds: 240));
+    if (!host.mounted) return;
+
+    // Play one-by-one: production queue only keeps ~2 pending items.
+    for (final kind in CelebrationKind.values) {
+      if (!host.mounted) return;
+      bus.request(kind);
+      await _waitForCelebrationIdle(bus);
+      await Future<void>.delayed(const Duration(milliseconds: 180));
+    }
+  }
+
+  Future<void> _clearCelebrationDedupe() async {
+    await CelebrationDedupe.instance.debugClearAll();
+    _setStatus('Celebration dedupe cleared');
+  }
+
+  Future<void> _setExtraAnimations(bool enabled) async {
+    final settings = ref.read(hisabSettingsProvidersProvider);
+    if (settings == null) {
+      _setStatus('Settings not available');
+      return;
+    }
+    await ref
+        .read(settings.provider(extraAnimationsEnabledSettingDef).notifier)
+        .set(enabled);
+    _setStatus(enabled ? 'Extra animations ON' : 'Extra animations OFF');
+  }
+
+  Future<void> _setScreenshotPrompt(bool enabled) async {
+    final settings = ref.read(hisabSettingsProvidersProvider);
+    if (settings == null) {
+      _setStatus('Settings not available');
+      return;
+    }
+    await ref
+        .read(
+          settings.provider(screenshotReportPromptEnabledSettingDef).notifier,
+        )
+        .set(enabled);
+    _setStatus(
+      enabled ? 'Screenshot report prompt ON' : 'Screenshot report prompt OFF',
+    );
+  }
+
+  Future<void> _simulateScreenshotPrompt() async {
+    final settings = ref.read(hisabSettingsProvidersProvider);
+    if (supportsScreenshotReportPrompt &&
+        settings != null &&
+        !ref.read(screenshotReportPromptEnabledProvider)) {
+      await ref
+          .read(
+            settings
+                .provider(screenshotReportPromptEnabledSettingDef)
+                .notifier,
+          )
+          .set(true);
+    }
+    final message = 'screenshot_report_prompt_message'.tr();
+    final actionLabel = 'report_issue'.tr();
+    await _closeThen((host) {
+      host.showPromptWithAction(
+        message,
+        actionLabel: actionLabel,
+        onAction: () {
+          if (!host.mounted) return;
+          try {
+            BetterFeedback.of(host).hide();
+            BetterFeedback.of(host).show(
+              (feedback) => handleFeedback(host, feedback: feedback),
+            );
+          } catch (_) {}
+        },
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final extrasOn = ref.watch(extraAnimationsEnabledProvider);
+    final screenshotOn = ref.watch(screenshotReportPromptEnabledProvider);
+    final reduced = UiPerf.preferReducedChromeMotion;
+    final syncOverride = ref.watch(debugSyncStatusOverrideProvider);
 
     return SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(
           16,
-          12,
+          8,
           16,
           MediaQuery.of(context).padding.bottom + 24,
         ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.bug_report_outlined,
-                  color: colorScheme.error,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'debug_menu_title'.tr(),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: colorScheme.error,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // App info
             FutureBuilder<PackageInfo>(
-              future: PackageInfo.fromPlatform(),
+              future: _packageInfoFuture,
               builder: (context, snap) {
-                if (!snap.hasData) return const SizedBox.shrink();
+                if (!snap.hasData) {
+                  return Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      kDebugMode ? 'debug' : 'profile/release',
+                      style: textTheme.bodySmall,
+                    ),
+                  );
+                }
                 final info = snap.data!;
                 return Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -226,24 +382,135 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
                         label: 'Version',
                         value: '${info.version} (${info.buildNumber})',
                       ),
+                      const _InfoRow(
+                        label: 'Mode',
+                        value: kDebugMode ? 'debug' : 'profile/release',
+                      ),
+                      _InfoRow(
+                        label: 'Reduced motion',
+                        value: reduced ? 'yes (UiPerf)' : 'no',
+                      ),
                     ],
                   ),
                 );
               },
             ),
-            const SizedBox(height: 16),
 
-            // Actions
+            const _SectionHeader('Celebrations'),
+            Text(
+              'Closes the menu, then plays the biome overlay. Bypasses the Extra animations setting.',
+              style: textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final kind in CelebrationKind.values)
+                  ActionChip(
+                    avatar: Icon(_iconForCelebration(kind), size: 16),
+                    label: Text(_celebrationLabels[kind] ?? kind.name),
+                    onPressed: () => unawaited(_playCelebration(kind)),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 8,
+              children: [
+                TextButton.icon(
+                  onPressed: () => unawaited(_playAllCelebrations()),
+                  icon: const Icon(Icons.playlist_play, size: 18),
+                  label: const Text('Play all'),
+                ),
+                TextButton.icon(
+                  onPressed: () => unawaited(_clearCelebrationDedupe()),
+                  icon: const Icon(Icons.cleaning_services_outlined, size: 18),
+                  label: const Text('Clear join/leave dedupe'),
+                ),
+              ],
+            ),
+
+            const _SectionHeader('Animations'),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              secondary: const Icon(Icons.animation, size: 22),
+              title: const Text('Extra animations'),
+              subtitle: Text(
+                extrasOn
+                    ? 'ON — FAB nature + event celebrations'
+                    : 'OFF — press scale only',
+              ),
+              value: extrasOn,
+              onChanged: (v) => unawaited(_setExtraAnimations(v)),
+            ),
+            if (reduced)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  'UiPerf reduced motion is on (e.g. iOS Safari) — FAB extras stay muted in-app; celebration chips still preview.',
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.tertiary,
+                  ),
+                ),
+              ),
+            Text(
+              extrasOn
+                  ? 'FAB playground — tap for leaf burst; plant bloom starts quickly.'
+                  : 'Turn on Extra animations above to preview FAB nature effects.',
+              style: textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Center(
+              child: AppFab(
+                icon: Icons.add,
+                tooltip: 'Debug FAB',
+                heroTag: 'debugMenuAppFabPreview',
+                previewAmbientBloom: true,
+                onPressed: () => _setStatus('FAB pressed (leaf burst)'),
+              ),
+            ),
+
+            const _SectionHeader('Screenshot report'),
+            if (!supportsScreenshotReportPrompt)
+              Text(
+                'OS screenshot detection is iOS/Android only. You can still simulate the prompt toast below.',
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            if (supportsScreenshotReportPrompt)
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                secondary: const Icon(Icons.screenshot_monitor, size: 22),
+                title: const Text('Screenshot → report prompt'),
+                value: screenshotOn,
+                onChanged: (v) => unawaited(_setScreenshotPrompt(v)),
+              ),
+            _DebugAction(
+              icon: Icons.notification_important_outlined,
+              label: 'Simulate screenshot prompt',
+              subtitle: supportsScreenshotReportPrompt
+                  ? 'Shows the toast + Report action (enables setting)'
+                  : 'Shows the toast UI (OS capture N/A on this platform)',
+              onTap: () => unawaited(_simulateScreenshotPrompt()),
+            ),
+
+            const _SectionHeader('Tools'),
             _DebugAction(
               icon: Icons.system_update_outlined,
               label: 'Force upgrade dialog',
               subtitle: 'Clears stored timestamps, sets displayAlways=true',
-              onTap: _forceUpgradeDialog,
+              onTap: () => unawaited(_forceUpgradeDialog()),
             ),
             _DebugAction(
               icon: Icons.sync,
               label: 'Trigger data sync',
-              onTap: _triggerSync,
+              onTap: () => unawaited(_triggerSync()),
             ),
             _DebugAction(
               icon: Icons.restart_alt,
@@ -254,65 +521,48 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
             _DebugAction(
               icon: Icons.link,
               label: 'Open invite by token',
-              subtitle: 'Paste token to test invite flow in debug',
-              onTap: _openInviteByToken,
+              subtitle: 'Paste token to test invite flow',
+              onTap: () => unawaited(_openInviteByToken()),
             ),
             _DebugAction(
               icon: Icons.error_outline,
               label: 'Show error UI',
-              subtitle: 'Opens error content (Share/Report) for testing',
+              subtitle: 'Opens error content (Share/Report)',
               onTap: _showErrorUI,
             ),
 
-            // Sync status override (for testing chip/banner)
-            const SizedBox(height: 8),
-            Text(
-              'debug_sync_status_override'.tr(),
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 6),
+            _SectionHeader('debug_sync_status_override'.tr()),
             Wrap(
               spacing: 8,
               runSpacing: 6,
               children: [
-                _SyncStatusChip(
-                  label: 'Connected',
-                  onTap: () =>
+                for (final entry in const [
+                  (SyncStatus.connected, 'Connected'),
+                  (SyncStatus.syncing, 'Syncing'),
+                  (SyncStatus.offline, 'Offline'),
+                  (SyncStatus.localOnly, 'Local only'),
+                ])
+                  FilterChip(
+                    label: Text(entry.$2),
+                    selected: syncOverride == entry.$1,
+                    onSelected: (_) {
                       ref.read(debugSyncStatusOverrideProvider.notifier).state =
-                          SyncStatus.connected,
-                ),
-                _SyncStatusChip(
-                  label: 'Syncing',
-                  onTap: () =>
-                      ref.read(debugSyncStatusOverrideProvider.notifier).state =
-                          SyncStatus.syncing,
-                ),
-                _SyncStatusChip(
-                  label: 'Offline',
-                  onTap: () =>
-                      ref.read(debugSyncStatusOverrideProvider.notifier).state =
-                          SyncStatus.offline,
-                ),
-                _SyncStatusChip(
-                  label: 'Local only',
-                  onTap: () =>
-                      ref.read(debugSyncStatusOverrideProvider.notifier).state =
-                          SyncStatus.localOnly,
-                ),
-                _SyncStatusChip(
-                  label: 'Clear',
-                  onTap: () =>
-                      ref.read(debugSyncStatusOverrideProvider.notifier).state =
-                          null,
+                          entry.$1;
+                    },
+                  ),
+                FilterChip(
+                  label: const Text('Clear'),
+                  selected: syncOverride == null,
+                  onSelected: (_) {
+                    ref.read(debugSyncStatusOverrideProvider.notifier).state =
+                        null;
+                  },
                 ),
               ],
             ),
 
-            // Status feedback
             if (_statusMessage != null) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -320,17 +570,50 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
                 ),
                 decoration: BoxDecoration(
                   color: colorScheme.secondaryContainer,
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   _statusMessage!,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  style: textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSecondaryContainer,
                   ),
                 ),
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+
+  IconData _iconForCelebration(CelebrationKind kind) {
+    return switch (kind) {
+      CelebrationKind.firstExpense => Icons.park_outlined,
+      CelebrationKind.newExpense => Icons.eco_outlined,
+      CelebrationKind.settlement => Icons.water_drop_outlined,
+      CelebrationKind.personJoined => Icons.spa_outlined,
+      CelebrationKind.personLeft => Icons.cloud_outlined,
+      CelebrationKind.newGroup => Icons.groups_outlined,
+      CelebrationKind.newPersonalList => Icons.dark_mode_outlined,
+    };
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader(this.title);
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 20, bottom: 8),
+      child: Text(
+        title,
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+          color: colorScheme.primary,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
@@ -352,7 +635,7 @@ class _InfoRow extends StatelessWidget {
       child: Row(
         children: [
           SizedBox(
-            width: 72,
+            width: 110,
             child: Text(
               label,
               style: textTheme.bodySmall?.copyWith(
@@ -394,22 +677,6 @@ class _DebugAction extends StatelessWidget {
       dense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 4),
       onTap: onTap,
-    );
-  }
-}
-
-class _SyncStatusChip extends StatelessWidget {
-  const _SyncStatusChip({required this.label, required this.onTap});
-
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return FilterChip(
-      label: Text(label),
-      selected: false,
-      onSelected: (_) => onTap(),
     );
   }
 }

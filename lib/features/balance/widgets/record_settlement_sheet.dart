@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:easy_localization/easy_localization.dart';
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 
+import '../../../core/celebration/celebration_controller.dart';
+import '../../../core/celebration/celebration_kind.dart';
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/repository/repository_providers.dart';
@@ -10,6 +12,7 @@ import '../../../core/services/settle_up_service.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/user_text.dart';
+import '../../../core/widgets/amount_text.dart';
 import '../../../core/widgets/participant_avatar.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../core/widgets/user_text.dart';
@@ -88,6 +91,7 @@ Future<bool> showRecordSettlementSheet(
       Log.info(
         'Settlement recorded: $fromName -> $toName for ${settlement.amountCents} cents',
       );
+      await fireCelebration(ref, CelebrationKind.settlement);
       return true;
     } catch (e, st) {
       Log.error('Failed to record settlement', error: e, stackTrace: st);
@@ -179,38 +183,40 @@ class _RecordSettlementSheet extends ConsumerWidget {
               subtle: context.subtleAccents,
             ),
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(12, 16, 12, 16),
               child: Column(
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
                         child: _SheetPerson(
                           name: fromName,
                           avatarId: fromAvatarId,
+                          roleLabel: 'settlement_flow_pays'.tr(),
+                          roleColor: cs.error,
                         ),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: Text(
-                          '\u200E\u2192\u200E',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            color: cs.primary,
-                            fontWeight: FontWeight.w700,
-                          ),
+                      const Padding(
+                        padding: EdgeInsetsDirectional.only(
+                          start: 4,
+                          end: 4,
+                          top: 10,
                         ),
+                        child: _PaymentFlowArrow(),
                       ),
                       Expanded(
                         child: _SheetPerson(
                           name: toName,
                           avatarId: toAvatarId,
-                          alignEnd: true,
+                          roleLabel: 'settlement_flow_receives'.tr(),
+                          roleColor: cs.primary,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 14),
-                  Text(
+                  AmountText(
                     formattedAmount,
                     style: theme.textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w800,
@@ -326,7 +332,7 @@ class _RecordSettlementSheet extends ConsumerWidget {
                                     ),
                                   ),
                                 ),
-                                Text(
+                                AmountText(
                                   CurrencyFormatter.formatCents(
                                     settlement.amountCents,
                                     currencyCode,
@@ -376,52 +382,84 @@ class _RecordSettlementSheet extends ConsumerWidget {
   }
 }
 
+/// Centered payer/payee column so RTL/LTR never splits avatar from name.
 class _SheetPerson extends StatelessWidget {
   final String name;
   final String? avatarId;
-  final bool alignEnd;
+  final String roleLabel;
+  final Color roleColor;
 
   const _SheetPerson({
     required this.name,
     this.avatarId,
-    this.alignEnd = false,
+    required this.roleLabel,
+    required this.roleColor,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final avatar = ParticipantAvatar(
-      name: name,
-      avatarId: avatarId,
-      radius: 16,
-      backgroundColor: cs.primary.withValues(alpha: 0.12),
-      foregroundColor: cs.primary,
-      textStyle: theme.textTheme.labelMedium,
+    return Column(
+      children: [
+        ParticipantAvatar(
+          name: name,
+          avatarId: avatarId,
+          radius: 22,
+          backgroundColor: roleColor.withValues(alpha: 0.14),
+          foregroundColor: roleColor,
+          textStyle: theme.textTheme.titleSmall,
+        ),
+        const SizedBox(height: 8),
+        UserText(
+          name,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          roleLabel,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: roleColor,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
     );
-    final label = UserText(
-      name,
-      maxLines: 2,
-      overflow: TextOverflow.ellipsis,
-      textAlign: alignEnd ? TextAlign.end : TextAlign.start,
-      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+  }
+}
+
+/// Arrow from payer → payee; flips with [TextDirection] so RTL stays correct.
+class _PaymentFlowArrow extends StatelessWidget {
+  const _PaymentFlowArrow();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    // Explicit flip: arrow_forward_rounded is not always matchTextDirection.
+    final pointsForward = Directionality.of(context) != TextDirection.rtl;
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: cs.primary.withValues(alpha: 0.14),
+        shape: BoxShape.circle,
+        border: Border.all(color: cs.primary.withValues(alpha: 0.28)),
+      ),
+      alignment: Alignment.center,
+      child: Icon(
+        pointsForward
+            ? Icons.arrow_forward_rounded
+            : Icons.arrow_back_rounded,
+        color: cs.primary,
+        size: 22,
+      ),
     );
-    return alignEnd
-        ? Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Flexible(child: label),
-              const SizedBox(width: 8),
-              avatar,
-            ],
-          )
-        : Row(
-            children: [
-              avatar,
-              const SizedBox(width: 8),
-              Flexible(child: label),
-            ],
-          );
   }
 }
 
@@ -478,7 +516,7 @@ class _BreakdownLine extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Text(
+          AmountText(
             '$prefix$amount',
             style: theme.textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w600,

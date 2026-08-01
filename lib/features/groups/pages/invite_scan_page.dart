@@ -7,12 +7,13 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/navigation/invite_link_handler.dart';
+import '../../../core/navigation/nav_back.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/services/permission_service.dart';
 
 /// Full-screen QR scanner to join a group via an invite QR code.
 /// Requests camera permission, then shows [MobileScanner]. On a valid
-/// invite URL/token, stops the camera, then pops and navigates to the invite accept page.
+/// invite URL/token, stops the camera and navigates to the invite accept page.
 class InviteScanPage extends StatefulWidget {
   const InviteScanPage({super.key});
 
@@ -30,7 +31,17 @@ class _InviteScanPageState extends State<InviteScanPage> {
   void initState() {
     super.initState();
     _requestPermission();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      seedParentHistoryForBrowserBack(
+        context: context,
+        parentPath: RoutePaths.home,
+        currentPath: RoutePaths.scanInvite,
+      );
+    });
   }
+
+  void _close() => popOrGo(context, RoutePaths.home);
 
   @override
   void dispose() {
@@ -57,8 +68,10 @@ class _InviteScanPageState extends State<InviteScanPage> {
 
   @override
   Widget build(BuildContext context) {
+    final canPop = routerCanPop(context);
+    Widget body;
     if (!_permissionChecked) {
-      return LayoutBuilder(
+      body = LayoutBuilder(
         builder: (context, layoutConstraints) {
           return Scaffold(
             appBar: ContentAlignedAppBar(
@@ -69,10 +82,8 @@ class _InviteScanPageState extends State<InviteScanPage> {
           );
         },
       );
-    }
-
-    if (!_permissionGranted) {
-      return LayoutBuilder(
+    } else if (!_permissionGranted) {
+      body = LayoutBuilder(
         builder: (context, layoutConstraints) {
           return Scaffold(
             appBar: ContentAlignedAppBar(
@@ -80,7 +91,7 @@ class _InviteScanPageState extends State<InviteScanPage> {
               title: Text('scan_invite_title'.tr()),
               leading: IconButton(
                 icon: const Icon(Icons.close),
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: _close,
               ),
             ),
             body: Center(
@@ -96,92 +107,100 @@ class _InviteScanPageState extends State<InviteScanPage> {
           );
         },
       );
+    } else {
+      body = LayoutBuilder(
+        builder: (context, layoutConstraints) {
+          return Scaffold(
+            appBar: ContentAlignedAppBar(
+              contentAreaWidth: layoutConstraints.maxWidth,
+              title: Text('scan_invite_title'.tr()),
+              leading: IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: _close,
+              ),
+            ),
+            body: ConstrainedContent(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  MobileScanner(
+                    controller: _controller,
+                    onDetect: (capture) async {
+                      if (_handled) return;
+                      final barcodes = capture.barcodes;
+                      for (final barcode in barcodes) {
+                        final raw = barcode.rawValue;
+                        if (raw == null || raw.isEmpty) continue;
+                        final uri = Uri.tryParse(raw);
+                        final token = extractInviteTokenFromUri(uri);
+                        if (token != null && mounted) {
+                          _handled = true;
+                          await _controller.stop();
+                          if (!context.mounted) return;
+                          context.go(RoutePaths.inviteAccept(token));
+                          return;
+                        }
+                      }
+                    },
+                    errorBuilder: (context, error) => Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            size: 64,
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                          const SizedBox(height: 16),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            child: Text(
+                              error.errorDetails?.message ??
+                                  '${error.errorCode}',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodyLarge,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 24,
+                    right: 24,
+                    bottom: 32,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surface.withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'scan_invite_hint'.tr(),
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
     }
 
-    return LayoutBuilder(
-      builder: (context, layoutConstraints) {
-        return Scaffold(
-          appBar: ContentAlignedAppBar(
-            contentAreaWidth: layoutConstraints.maxWidth,
-            title: Text('scan_invite_title'.tr()),
-            leading: IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ),
-          body: ConstrainedContent(
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                MobileScanner(
-                  controller: _controller,
-                  onDetect: (capture) async {
-                    if (_handled) return;
-                    final barcodes = capture.barcodes;
-                    for (final barcode in barcodes) {
-                      final raw = barcode.rawValue;
-                      if (raw == null || raw.isEmpty) continue;
-                      final uri = Uri.tryParse(raw);
-                      final token = extractInviteTokenFromUri(uri);
-                      if (token != null && mounted) {
-                        _handled = true;
-                        await _controller.stop();
-                        if (!context.mounted) return;
-                        Navigator.of(context).pop();
-                        context.go(RoutePaths.inviteAccept(token));
-                        return;
-                      }
-                    }
-                  },
-                  errorBuilder: (context, error) => Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          size: 64,
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                        const SizedBox(height: 16),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: Text(
-                            error.errorDetails?.message ?? '${error.errorCode}',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.bodyLarge,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                Positioned(
-                  left: 24,
-                  right: 24,
-                  bottom: 32,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.surface.withValues(alpha: 0.9),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      'scan_invite_hint'.tr(),
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
+    return PopScope(
+      canPop: canPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _close();
       },
+      child: body,
     );
   }
 }

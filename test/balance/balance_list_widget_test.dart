@@ -343,13 +343,15 @@ void main() {
     await tester.pumpAndSettle();
 
     // EasyLocalization falls back to keys in this widget-test harness.
-    expect(find.text('your_balance'), findsOneWidget);
-    expect(find.text('you_owe'), findsOneWidget);
+    // Hero + settle overlay total chip both use you_owe.
+    expect(find.text('you_owe'), findsWidgets);
     expect(find.text('everyone_else'), findsOneWidget);
     expect(find.text('Alice'), findsWidgets);
     expect(find.text('balance_is_owed'), findsOneWidget);
-    // Bob appears in the hero and settlement title, not as an everyone-else card.
+    // Bob is implied in "your balance" — not listed under everyone else.
     expect(find.text('balance_owes'), findsNothing);
+    // Sticky overlay peeks the counterparty (not the current user name).
+    expect(find.text('settle_pay'), findsOneWidget);
   });
 
   testWidgets('BalanceList shows You are owed hero for creditor', (
@@ -370,7 +372,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('you_are_owed'), findsOneWidget);
+    // Hero + settle overlay total chip both use you_are_owed.
+    expect(find.text('you_are_owed'), findsWidgets);
     expect(find.text('everyone_else'), findsOneWidget);
     expect(find.text('Bob'), findsWidgets);
     expect(find.text('balance_owes'), findsOneWidget);
@@ -458,7 +461,8 @@ void main() {
 
     expect(find.text('you_are_even'), findsOneWidget);
     expect(find.text('everyone_else'), findsOneWidget);
-    expect(find.text('Alice'), findsOneWidget);
+    // Alice is even and not named in the hero; she also has no settle row.
+    expect(find.text('Alice'), findsNothing);
     expect(find.text('Bob'), findsWidgets);
     expect(find.text('Carol'), findsWidgets);
   });
@@ -599,7 +603,7 @@ void main() {
           updatedAt: now,
         ),
       ],
-      // Zero nets so names only appear in settle-up rows (plus Alice in hero).
+      // Zero nets so names only appear in settle-up rows.
       balances: const [
         ParticipantBalance(
           participantId: 'p-a',
@@ -657,6 +661,13 @@ void main() {
       tester,
       myMemberOverride: AsyncValue.data(memberAsAlice),
       myRoleOverride: const AsyncValue.data(GroupRole.owner),
+    );
+    await tester.pumpAndSettle();
+
+    // Scroll settle-up above the sticky overlay so filter chips are tappable.
+    await tester.drag(
+      find.byKey(const ValueKey<String>('balance_list_scroll')),
+      const Offset(0, -500),
     );
     await tester.pumpAndSettle();
 

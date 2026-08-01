@@ -31,4 +31,8 @@ class UiPerfPolicy {
   /// Skip looping chrome demos (language pulse, theme cycle, hint ticker).
   /// iOS WebKit only — those timers force rebuilds every few seconds.
   bool get preferReducedChromeMotion => isWebIos;
+
+  /// Home custom-order drag: skip dual-blur feedback, rotate/scale, and
+  /// Opacity placeholders that jank CanvasKit on iOS WebKit.
+  bool get preferCheapListDrag => isWebIos;
 }

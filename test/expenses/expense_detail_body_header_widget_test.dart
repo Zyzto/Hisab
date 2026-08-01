@@ -42,7 +42,9 @@ void main() {
     );
   }
 
-  testWidgets('ExpenseDetailBodyHeader shows amount and date', (tester) async {
+  testWidgets('ExpenseDetailBodyHeader shows title, amount and date', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       wrap(
         ExpenseDetailBodyHeader(
@@ -54,6 +56,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    expect(find.text('Coffee'), findsOneWidget);
     expect(find.textContaining('2025'), findsOneWidget);
     expect(find.textContaining('50'), findsWidgets);
   });

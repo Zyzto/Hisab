@@ -343,6 +343,25 @@ int? participantSplitShareCents(Expense expense, String participantId) {
   return share;
 }
 
+/// Signed contribution of [participantId]'s share toward a "your share" total.
+/// Expenses add the share, income subtracts it, transfers are 0.
+/// Independent of whether balances are settled.
+int participantShareContributionCents(
+  Expense expense,
+  String participantId,
+) {
+  final share = participantSplitShareCents(expense, participantId);
+  if (share == null) return 0;
+  switch (expense.transactionType) {
+    case TransactionType.expense:
+      return share;
+    case TransactionType.income:
+      return -share;
+    case TransactionType.transfer:
+      return 0;
+  }
+}
+
 /// Expense legs between two people that explain (or contextualize) a settle-up
 /// transfer from [fromParticipantId] to [toParticipantId].
 ///

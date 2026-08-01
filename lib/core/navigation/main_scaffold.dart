@@ -7,8 +7,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 import '../../features/home/pages/home_page.dart';
+import '../../features/home/routes.dart';
 import '../../features/settings/pages/settings_page.dart';
+import '../../features/settings/providers/settings_framework_providers.dart';
+import '../../features/settings/settings_definitions.dart';
 import '../layout/layout_breakpoints.dart';
 import '../motion/app_motion.dart';
 import '../platform/ui_perf.dart';
@@ -73,6 +77,11 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
       _ensureSettingsMounted();
     }
     _restoreDesktopNavCollapsed();
+    // Defer: settings providers may not be ready during the first frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _syncHomeListDisplayFromRoute(widget.location);
+    });
   }
 
   Future<void> _restoreDesktopNavCollapsed() async {
@@ -177,6 +186,29 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     if (widget.location == RoutePaths.settings) {
       _ensureSettingsMounted();
     }
+    if (oldWidget.location != widget.location) {
+      _syncHomeListDisplayFromRoute(widget.location);
+    }
+  }
+
+  /// Deep link / browser back: keep `home_list_display` aligned with `/home/:mode`.
+  /// Home UI reads the setting; [HomePage] writes it before syncing the URL.
+  void _syncHomeListDisplayFromRoute(String location) {
+    final fromPath = homeListDisplayFromPath(location);
+    if (fromPath == null) return;
+    final settings = ref.read(hisabSettingsProvidersProvider);
+    if (settings == null) return;
+    final current = ref.read(settings.provider(homeListDisplaySettingDef));
+    final normalized = switch (current) {
+      'separate' => 'list_separate',
+      'combined' => 'list_combined',
+      _ => current,
+    };
+    if (normalized == fromPath) return;
+    ref.read(settings.provider(homeListDisplaySettingDef).notifier).set(fromPath);
+    Log.info(
+      'Setting changed: ${homeListDisplaySettingDef.key}=$fromPath (from route)',
+    );
   }
 
   bool _shouldShowNavBar() {

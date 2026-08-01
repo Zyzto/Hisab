@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
@@ -387,6 +388,22 @@ bool subtleAccents(Ref ref) {
 }
 
 @riverpod
+bool extraAnimationsEnabled(Ref ref) {
+  try {
+    final settings = ref.watch(hisabSettingsProvidersProvider);
+    if (settings == null) return true;
+    return ref.watch(settings.provider(extraAnimationsEnabledSettingDef));
+  } catch (e, stackTrace) {
+    Log.warning(
+      'extraAnimationsEnabled read failed, defaulting to true',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return true;
+  }
+}
+
+@riverpod
 Future<AuthUserProfile?> authUserProfile(Ref ref) async {
   final localOnly = ref.watch(effectiveLocalOnlyProvider);
   if (localOnly) return null;
@@ -427,6 +444,22 @@ bool notificationsEnabled(Ref ref) {
     return true;
   }
 }
+
+/// Opt-in OS screenshot → report prompt (iOS / Android 14+).
+final screenshotReportPromptEnabledProvider = Provider<bool>((ref) {
+  try {
+    final settings = ref.watch(hisabSettingsProvidersProvider);
+    if (settings == null) return false;
+    return ref.watch(settings.provider(screenshotReportPromptEnabledSettingDef));
+  } catch (e, stackTrace) {
+    Log.warning(
+      'screenshotReportPromptEnabled read failed, defaulting to false',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return false;
+  }
+});
 
 @riverpod
 bool expenseFormFullFeatures(Ref ref) {

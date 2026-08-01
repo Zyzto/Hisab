@@ -164,5 +164,7 @@ const schema = Schema([
     Column.text('row_id'),
     Column.text('data_json'),
     Column.text('created_at'),
+    /// 1 = push under notify-suppress (import/restore); 0/null = normal.
+    Column.integer('silent'),
   ]),
 ]);

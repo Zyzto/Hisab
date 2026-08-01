@@ -11,7 +11,9 @@ class RoutePaths {
   static const String onboardingConnect = '/onboarding/connect';
   static const String privacyPolicy = '/privacy-policy';
 
-  static String groupDetail(String groupId) => '/groups/$groupId';
+  /// Canonical group entry URL (expenses tab). Prefer this over bare `/groups/:id`
+  /// so the address bar updates without relying on a redirect.
+  static String groupDetail(String groupId) => groupExpenses(groupId);
   static String groupExpenses(String groupId) => '/groups/$groupId/expenses';
   static String groupPeople(String groupId) => '/groups/$groupId/people';
   static String groupExpenseAdd(String groupId) =>

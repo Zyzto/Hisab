@@ -26,6 +26,15 @@ TextDirection? resolveUserTextDirection(String text) {
       : TextDirection.ltr;
 }
 
+/// Align UGC to the ambient UI start edge (right in RTL, left in LTR).
+///
+/// Content [TextDirection] still controls glyph order / ellipsis; this only
+/// picks which side of the box the line sits on — so Latin names stay next to
+/// leading avatars in Arabic UI instead of jumping to the far edge.
+TextAlign resolveUiStartTextAlign(TextDirection uiDirection) {
+  return uiDirection == TextDirection.rtl ? TextAlign.right : TextAlign.left;
+}
+
 bool _hasStrongDirectional(String text) {
   for (final unit in text.runes) {
     // Arabic, Hebrew, and other RTL blocks commonly used in Hisab UGC.

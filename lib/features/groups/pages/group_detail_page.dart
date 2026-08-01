@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:custom_sliding_segmented_control/custom_sliding_segmented_control.dart';
+import '../../../core/celebration/celebration_controller.dart';
+import '../../../core/celebration/celebration_kind.dart';
+import '../../../core/celebration/membership_celebration_binder.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/content_aligned_fab_location.dart';
 import '../../../core/layout/constrained_content.dart';
@@ -17,15 +19,20 @@ import '../widgets/create_invite_sheet.dart';
 import '../widgets/group_section_header.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/repository/repository_providers.dart';
+import '../../../core/navigation/decorative_route.dart';
+import '../../../core/navigation/nav_back.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/widgets/missing_route_page.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/error_report_helper.dart';
+import '../../../core/services/settle_up_service.dart';
 import '../../../core/utils/expense_totals.dart';
 import '../../../core/utils/form_validators.dart';
 import '../../../core/utils/user_text.dart';
 import '../../../core/widgets/amount_with_secondary_display.dart';
+import '../../../core/widgets/app_fab.dart';
 import '../../../core/widgets/async_value_builder.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/participant_avatar.dart';
@@ -44,12 +51,32 @@ import '../utils/group_icon_utils.dart';
 
 const double _kTabFabBottomClearance = 96.0;
 
-/// Grapheme-safe cap before adding an ellipsis; pixel overflow still handled by [UserText].
-const int _kGroupDetailAppBarTitleMaxGraphemes = 40;
-
 const double _kTabListBottomSpacing = 16.0;
 
 enum GroupDetailTab { expenses, balance, people }
+
+/// Maps a location path to the group-detail tab index (0 expenses / 1 balance /
+/// 2 people), or null when the path is not a tab URL for this group/preview.
+@visibleForTesting
+int? groupDetailTabIndexFromPath({
+  required String path,
+  required String groupId,
+  bool readOnlyPreview = false,
+  String? previewToken,
+}) {
+  if (readOnlyPreview) {
+    final token = previewToken ?? '';
+    if (token.isEmpty) return null;
+    if (path == RoutePaths.invitePreviewBalance(token)) return 1;
+    if (path == RoutePaths.invitePreviewPeople(token)) return 2;
+    if (path == RoutePaths.invitePreviewExpenses(token)) return 0;
+    return null;
+  }
+  if (path == RoutePaths.groupBalance(groupId)) return 1;
+  if (path == RoutePaths.groupPeople(groupId)) return 2;
+  if (path == RoutePaths.groupExpenses(groupId)) return 0;
+  return null;
+}
 
 /// Keeps a [PageView.builder] child alive after first visit (scroll position).
 class _KeepAliveTab extends StatefulWidget {
@@ -101,6 +128,8 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
     final groupAsync = ref.watch(futureGroupProvider(widget.groupId));
     return AsyncValueBuilder<Group?>(
       value: groupAsync,
+      // Keep tab PageView / segment state across refresh/sync reloads.
+      skipLoadingOnReload: true,
       data: (context, group) {
         if (group == null) {
           if (!_nullRetryDone) {
@@ -116,16 +145,10 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
               body: Center(child: CircularProgressIndicator()),
             );
           }
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (context.mounted) {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go(RoutePaths.home);
-              }
-            }
-          });
-          return const SizedBox.shrink();
+          return const MissingRoutePage(
+            titleKey: 'group_not_found',
+            messageKey: 'group_not_found_message',
+          );
         }
         return _GroupDetailContent(
           group: group,
@@ -163,6 +186,11 @@ class _GroupDetailContent extends ConsumerStatefulWidget {
 
 class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
   int _selectedTabIndex = 0;
+  /// Stable seed for [CustomSlidingSegmentedControl.initialValue]. The package
+  /// ignores [CustomSegmentedController]'s constructor value and defaults the
+  /// thumb to the first segment unless [initialValue] is set; keep this fixed
+  /// after init so later tab changes do not re-trigger [didUpdateWidget] resets.
+  late final int _initialTabIndex;
   late ValueNotifier<int> _tabIndexNotifier;
   late PageController _pageController;
   late CustomSegmentedController<int> _segmentController;
@@ -172,6 +200,11 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
   int? _programmaticTargetPage;
 
   int _tabIndexFromInitialTab() {
+    // Decorative hash updates can leave GoRouter on the originally matched
+    // tab while the address bar shows another. Prefer the browser path on web
+    // so remounts stay aligned with the location.
+    final fromBrowser = _tabIndexFromBrowserPath();
+    if (fromBrowser != null) return fromBrowser;
     switch (widget.initialTab) {
       case GroupDetailTab.expenses:
         return 0;
@@ -180,6 +213,17 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
       case GroupDetailTab.people:
         return 2;
     }
+  }
+
+  int? _tabIndexFromBrowserPath() {
+    final path = webVisibleAppRoutePath();
+    if (path == null) return null;
+    return groupDetailTabIndexFromPath(
+      path: path,
+      groupId: widget.group.id,
+      readOnlyPreview: widget.readOnlyPreview,
+      previewToken: widget.previewToken,
+    );
   }
 
   String _targetPathForTabIndex(int index) {
@@ -211,24 +255,44 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
   /// a GoRouter navigation (which would destroy and recreate this widget,
   /// killing any in-progress PageView animation).
   void _syncUrlToTab(int index) {
-    final targetPath = _targetPathForTabIndex(index);
-    final currentPath =
-        GoRouter.of(context).routerDelegate.currentConfiguration.uri.path;
-    if (currentPath != targetPath) {
-      SystemNavigator.routeInformationUpdated(
-        uri: Uri.parse(targetPath),
-        replace: true,
-      );
-    }
+    syncDecorativeRoutePath(context, _targetPathForTabIndex(index));
   }
 
   @override
   void initState() {
     super.initState();
-    _selectedTabIndex = _tabIndexFromInitialTab();
+    _initialTabIndex = _tabIndexFromInitialTab();
+    _selectedTabIndex = _initialTabIndex;
     _tabIndexNotifier = ValueNotifier<int>(_selectedTabIndex);
     _pageController = PageController(initialPage: _selectedTabIndex);
     _segmentController = CustomSegmentedController<int>(value: _selectedTabIndex);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      seedParentHistoryForBrowserBack(
+        context: context,
+        parentPath: RoutePaths.home,
+        currentPath: _targetPathForTabIndex(_selectedTabIndex),
+      );
+    });
+  }
+
+  void _navigateBack() {
+    // Preview Join may have set pending invite; clear on dismiss so
+    // home is not redirected straight back to /invite.
+    if (widget.readOnlyPreview) {
+      final settings = ref.read(hisabSettingsProvidersProvider);
+      if (settings != null) {
+        ref
+            .read(settings.provider(pendingInviteTokenSettingDef).notifier)
+            .set('');
+        ref
+            .read(
+              settings.provider(pendingInviteAutoJoinSettingDef).notifier,
+            )
+            .set(false);
+      }
+    }
+    popOrGo(context, RoutePaths.home);
   }
 
   @override
@@ -262,11 +326,6 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
   Widget _buildAppBarTitle(BuildContext context) {
     final theme = Theme.of(context);
     final fullName = widget.group.name;
-    final displayName = elideGraphemes(
-      fullName,
-      maxGraphemes: _kGroupDetailAppBarTitleMaxGraphemes,
-    );
-    final wasElided = displayName != fullName.trim();
     final groupColor = widget.group.color != null
         ? Color(widget.group.color!)
         : theme.colorScheme.surfaceContainerHighest;
@@ -279,8 +338,9 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
     final letter = fullName.trim().isNotEmpty
         ? fullName.trim().characters.first.toUpperCase()
         : '?';
+    // Fill the start-aligned title slot so the name can use space up to the
+    // actions before ellipsis (LTR start=left, RTL start=right).
     final titleRow = Row(
-      mainAxisSize: MainAxisSize.min,
       children: [
         CircleAvatar(
           radius: 18,
@@ -296,9 +356,9 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
                 ),
         ),
         const SizedBox(width: 10),
-        Flexible(
+        Expanded(
           child: UserText(
-            displayName,
+            fullName,
             key: const Key('group_detail_title'),
             style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
@@ -312,9 +372,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
     );
     return Semantics(
       label: fullName,
-      child: wasElided
-          ? Tooltip(message: fullName, child: titleRow)
-          : titleRow,
+      child: Tooltip(message: fullName, child: titleRow),
     );
   }
 
@@ -354,7 +412,6 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
     bool localOnly,
   ) {
     if (widget.readOnlyPreview) return null;
-    final theme = Theme.of(context);
     final isOwnerOrAdmin =
         localOnly || myRole == GroupRole.owner || myRole == GroupRole.admin;
     final canAddExpense = isOwnerOrAdmin || widget.group.allowMemberAddExpense;
@@ -363,20 +420,21 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
       if (widget.group.isArchived || widget.group.isSettlementFrozen || !canAddExpense) {
         return null;
       }
-      return _FABWithLabel(
+      return AppFab(
         icon: Icons.add,
         label: 'add_expense'.tr(),
-        theme: theme,
-        onTap: () => context.push(RoutePaths.groupExpenseAdd(widget.group.id)),
+        tooltip: 'add_expense'.tr(),
+        onPressed: () =>
+            context.push(RoutePaths.groupExpenseAdd(widget.group.id)),
       );
     }
     if (index == 2) {
       if (widget.group.isPersonal || !isOwnerOrAdmin) return null;
-      return _FABWithLabel(
+      return AppFab(
         icon: Icons.person_add,
         label: 'add_participant'.tr(),
-        theme: theme,
-        onTap: () => _showAddParticipant(
+        tooltip: 'add_participant'.tr(),
+        onPressed: () => _showAddParticipant(
           context,
           ref,
           widget.group.id,
@@ -455,7 +513,15 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
         : ref.watch(myRoleInGroupProvider(widget.group.id));
     final myRole = myRoleAsync.value;
 
-    return LayoutBuilder(
+    final canPop = routerCanPop(context);
+    return MembershipCelebrationBinder(
+      groupId: widget.group.id,
+      child: PopScope(
+      canPop: canPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _navigateBack();
+      },
+      child: LayoutBuilder(
       builder: (context, layoutConstraints) {
         return Scaffold(
           floatingActionButtonLocation: ContentAlignedFabLocation.of(
@@ -464,36 +530,10 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
           ),
           appBar: ContentAlignedAppBar(
             contentAreaWidth: layoutConstraints.maxWidth,
+            centerTitle: false,
             leading: IconButton(
               icon: const Icon(Icons.arrow_back),
-              onPressed: () {
-                // Preview Join may have set pending invite; clear on dismiss so
-                // home is not redirected straight back to /invite.
-                if (widget.readOnlyPreview) {
-                  final settings = ref.read(hisabSettingsProvidersProvider);
-                  if (settings != null) {
-                    ref
-                        .read(
-                          settings
-                              .provider(pendingInviteTokenSettingDef)
-                              .notifier,
-                        )
-                        .set('');
-                    ref
-                        .read(
-                          settings
-                              .provider(pendingInviteAutoJoinSettingDef)
-                              .notifier,
-                        )
-                        .set(false);
-                  }
-                }
-                if (context.canPop()) {
-                  context.pop();
-                } else {
-                  context.go(RoutePaths.home);
-                }
-              },
+              onPressed: _navigateBack,
             ),
             title: _buildAppBarTitle(context),
             actions: [
@@ -556,6 +596,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
                             final colorScheme = theme.colorScheme;
                             return CustomSlidingSegmentedControl<int>(
                               controller: _segmentController,
+                              initialValue: _initialTabIndex,
                               children: {
                                 0: Padding(
                                   padding: const EdgeInsets.symmetric(
@@ -734,6 +775,8 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
           bottomNavigationBar: _buildPreviewJoinBar(context),
         );
       },
+    ),
+    ),
     );
   }
 }
@@ -883,15 +926,21 @@ class _ExpensesTab extends ConsumerWidget {
             final sorted = List<Expense>.from(expenses)
               ..sort((a, b) => b.date.compareTo(a.date));
             final byDate = <DateTime, List<Expense>>{};
-            int myExpensesCents = 0;
+            int myShareCents = 0;
+            int youPaidCents = 0;
             int totalCents = 0;
             for (final e in sorted) {
               final key = _dateOnly(e.date.isUtc ? e.date.toLocal() : e.date);
               byDate.putIfAbsent(key, () => []).add(e);
               totalCents += contributionToExpenseTotal(e);
-              if (currentUserParticipantId != null &&
-                  e.payerParticipantId == currentUserParticipantId) {
-                myExpensesCents += contributionToExpenseTotal(e);
+              if (currentUserParticipantId != null) {
+                myShareCents += participantShareContributionCents(
+                  e,
+                  currentUserParticipantId,
+                );
+                if (e.payerParticipantId == currentUserParticipantId) {
+                  youPaidCents += contributionToExpenseTotal(e);
+                }
               }
             }
             final dateKeys = byDate.keys.toList()
@@ -906,7 +955,8 @@ class _ExpensesTab extends ConsumerWidget {
             final flattenedItems = <_ExpenseListItem>[
               if (!group.isPersonal)
                 _ExpenseListSummaryItem(
-                  myExpensesCents: myExpensesCents,
+                  myShareCents: myShareCents,
+                  youPaidCents: youPaidCents,
                   totalCents: totalCents,
                 ),
             ];
@@ -948,31 +998,52 @@ class _ExpensesTab extends ConsumerWidget {
                                   groupCurrencyCode: currencyCode,
                                 ),
                               )
-                            : Row(
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  Expanded(
-                                    child: _ExpenseSummaryCard(
-                                      label: 'my_expenses'.tr(),
-                                      value:
-                                          '${CurrencyFormatter.formatCompactCents(item.myExpensesCents)} $currencyCode',
-                                      theme: theme,
-                                      valueWidget: AmountWithSecondaryDisplay(
-                                        amountCents: item.myExpensesCents,
-                                        groupCurrencyCode: currencyCode,
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: _ExpenseSummaryCard(
+                                          label: 'your_share'.tr(),
+                                          value:
+                                              '${CurrencyFormatter.formatCompactCents(item.myShareCents)} $currencyCode',
+                                          theme: theme,
+                                          valueWidget:
+                                              AmountWithSecondaryDisplay(
+                                            amountCents: item.myShareCents,
+                                            groupCurrencyCode: currencyCode,
+                                            showSecondary: false,
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: _ExpenseSummaryCard(
+                                          label: 'you_paid'.tr(),
+                                          value:
+                                              '${CurrencyFormatter.formatCompactCents(item.youPaidCents)} $currencyCode',
+                                          theme: theme,
+                                          valueWidget:
+                                              AmountWithSecondaryDisplay(
+                                            amountCents: item.youPaidCents,
+                                            groupCurrencyCode: currencyCode,
+                                            showSecondary: false,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: _ExpenseSummaryCard(
-                                      label: 'total_expenses'.tr(),
-                                      value:
-                                          '${CurrencyFormatter.formatCompactCents(item.totalCents)} $currencyCode',
-                                      theme: theme,
-                                      valueWidget: AmountWithSecondaryDisplay(
-                                        amountCents: item.totalCents,
-                                        groupCurrencyCode: currencyCode,
-                                      ),
+                                  const SizedBox(height: 8),
+                                  _ExpenseSummaryCard(
+                                    label: 'total_expenses'.tr(),
+                                    value:
+                                        '${CurrencyFormatter.formatCompactCents(item.totalCents)} $currencyCode',
+                                    theme: theme,
+                                    valueWidget: AmountWithSecondaryDisplay(
+                                      amountCents: item.totalCents,
+                                      groupCurrencyCode: currencyCode,
+                                      showSecondary: false,
                                     ),
                                   ),
                                 ],
@@ -1559,6 +1630,11 @@ class _PeopleTab extends ConsumerWidget {
         if (!ref.read(effectiveLocalOnlyProvider)) {
           await ref.read(dataSyncServiceProvider.notifier).syncNow();
         }
+        await fireCelebration(
+          ref,
+          CelebrationKind.personLeft,
+          dedupeKey: CelebrationKeys.personLeft(groupId, participant.id),
+        );
         if (context.mounted) {
           context.showSuccess('archive_participant'.tr());
         }
@@ -1673,12 +1749,22 @@ class _PeopleTab extends ConsumerWidget {
           if (!ref.read(effectiveLocalOnlyProvider)) {
             await ref.read(dataSyncServiceProvider.notifier).syncNow();
           }
+          await fireCelebration(
+            ref,
+            CelebrationKind.personLeft,
+            dedupeKey: CelebrationKeys.personLeft(groupId, participant.id),
+          );
           if (context.mounted) {
             context.showSuccess('archive_participant'.tr());
           }
         } else {
           await ref.read(participantRepositoryProvider).delete(participant.id);
           ref.invalidate(participantsByGroupProvider(groupId));
+          await fireCelebration(
+            ref,
+            CelebrationKind.personLeft,
+            dedupeKey: CelebrationKeys.personLeft(groupId, participant.id),
+          );
         }
       } catch (e, st) {
         Log.warning('Delete participant failed', error: e, stackTrace: st);
@@ -1917,6 +2003,15 @@ class _PeopleTab extends ConsumerWidget {
         ref.invalidate(membersByGroupProvider(groupId));
         ref.invalidate(participantsByGroupProvider(groupId));
         ref.invalidate(activeParticipantsByGroupProvider(groupId));
+        final participantId = member.participantId;
+        if (participantId != null) {
+          await fireCelebration(
+            ref,
+            CelebrationKind.personLeft,
+            dedupeKey: CelebrationKeys.personLeft(groupId, participantId),
+          );
+        }
+        if (!context.mounted) return;
         context.showSuccess('kick_member'.tr());
       } catch (e, st) {
         Log.warning('Kick failed', error: e, stackTrace: st);
@@ -2027,10 +2122,12 @@ class _PeoplePersonCard extends StatelessWidget {
 }
 
 class _ExpenseListSummaryItem extends _ExpenseListItem {
-  final int myExpensesCents;
+  final int myShareCents;
+  final int youPaidCents;
   final int totalCents;
   _ExpenseListSummaryItem({
-    required this.myExpensesCents,
+    required this.myShareCents,
+    required this.youPaidCents,
     required this.totalCents,
   }) : super();
 }
@@ -2066,86 +2163,45 @@ class _ExpenseSummaryCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
       decoration: AccentSurfaces.panel(
         colorScheme,
         subtle: context.subtleAccents,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
+      child: Row(
         children: [
-          Text(
-            label,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w600,
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
-          const SizedBox(height: 6),
-          valueWidget ??
-              Text(
-                value,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: DefaultTextStyle.merge(
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
               ),
+              textAlign: TextAlign.end,
+              child: valueWidget ??
+                  Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+            ),
+          ),
         ],
       ),
-    );
-  }
-}
-
-/// FAB with label below (add expense / add participant).
-class _FABWithLabel extends StatelessWidget {
-  const _FABWithLabel({
-    required this.icon,
-    required this.label,
-    required this.theme,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final ThemeData theme;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Semantics(
-          label: label,
-          button: true,
-          child: Material(
-            color: theme.colorScheme.primary,
-            borderRadius: BorderRadius.circular(16),
-            clipBehavior: Clip.antiAlias,
-            elevation: 4,
-            shadowColor: theme.colorScheme.shadow,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(16),
-              splashColor: Colors.transparent,
-              highlightColor: Colors.transparent,
-              onTap: onTap,
-              child: SizedBox(
-                width: 56,
-                height: 56,
-                child: Icon(icon, color: theme.colorScheme.onPrimary, size: 28),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          label,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurface,
-          ),
-        ),
-      ],
     );
   }
 }
@@ -2171,16 +2227,21 @@ Future<void> _showAddParticipant(
     // _dependents.isEmpty when the Directionality is deactivated while the
     // overlay still has dependents. Deferring keeps tests and production
     // consistent.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!context.mounted) return;
-      ref
-          .read(participantRepositoryProvider)
-          .create(groupId, name, currentCount)
-          .catchError((Object e, StackTrace st) {
-            Log.warning('Add participant failed', error: e, stackTrace: st);
-            if (context.mounted) context.showError('generic_error'.tr());
-            throw e;
-          });
+      try {
+        final id = await ref
+            .read(participantRepositoryProvider)
+            .create(groupId, name, currentCount);
+        await fireCelebration(
+          ref,
+          CelebrationKind.personJoined,
+          dedupeKey: CelebrationKeys.personJoined(groupId, id),
+        );
+      } catch (e, st) {
+        Log.warning('Add participant failed', error: e, stackTrace: st);
+        if (context.mounted) context.showError('generic_error'.tr());
+      }
     });
   }
 }

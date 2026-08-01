@@ -5,7 +5,10 @@ import '../../../domain/domain.dart';
 import '../../groups/providers/groups_provider.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 
-/// Ordered list of groups for the home page. Pinned always first; order comes from customOrder (when sort is custom) or date sort (created_at/updated_at).
+/// Ordered list of groups for the home page.
+///
+/// Custom sort uses [customOrderRaw] only (pinning is disabled).
+/// Date sorts put pinned groups first, then order by created/updated.
 /// Home page uses [homeListDisplayProvider] to show one list or Personal + Groups sections.
 List<Group> orderedGroupsForHome(
   List<Group> groups, {
@@ -43,24 +46,10 @@ List<Group> orderedGroupsForHome(
 
   final List<String> orderedIds;
   if (sortMode == 'custom') {
-    // Order from customOrder: pinned first (in customOrder order), then unpinned (in customOrder order).
-    final pinnedOrdered = customOrderList.where(pinnedSet.contains).toList();
-    final unpinnedOrdered = customOrderList
-        .where((id) => !pinnedSet.contains(id))
-        .toList();
-    // Any group not in customOrder: append at end (pinned first, then unpinned, by date).
-    final notInCustom = groupIds.difference(customOrderSet).toList();
-    notInCustom.sort(compareBySort);
-    final notInCustomPinned = notInCustom.where(pinnedSet.contains).toList();
-    final notInCustomUnpinned = notInCustom
-        .where((id) => !pinnedSet.contains(id))
-        .toList();
-    orderedIds = [
-      ...pinnedOrdered,
-      ...unpinnedOrdered,
-      ...notInCustomPinned,
-      ...notInCustomUnpinned,
-    ];
+    // Pure custom order — pinning does not apply.
+    final notInCustom = groupIds.difference(customOrderSet).toList()
+      ..sort(compareBySort);
+    orderedIds = [...customOrderList, ...notInCustom];
   } else {
     // Date sort: sort all by date, then partition so pinned first (same order within each half).
     final allIds = groupIds.toList()..sort(compareBySort);

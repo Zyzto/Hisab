@@ -11,6 +11,7 @@ import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/theme/theme_providers.dart';
+import '../../../core/widgets/app_fab.dart';
 import '../../../core/widgets/async_value_builder.dart';
 import '../../../core/widgets/sheet_option_tile.dart';
 import '../../../core/widgets/shell_menu_button.dart';
@@ -24,6 +25,7 @@ import '../../groups/widgets/group_card.dart';
 import '../../groups/widgets/group_section_header.dart';
 import '../../transaction_scanner/providers/scanner_providers.dart';
 import '../providers/home_list_provider.dart';
+import '../routes.dart';
 import '../utils/home_list_reorder.dart';
 import '../widgets/home_reorderable_groups_sliver.dart';
 import '../../../domain/domain.dart';
@@ -38,13 +40,6 @@ class HomePage extends ConsumerWidget {
       'list_combined' => 'combined',
       _ => 'separate',
     };
-  }
-
-  static String? _displayModeFromPath(String path) {
-    if (!path.startsWith('${RoutePaths.homeModeBase}/')) return null;
-    if (path.endsWith('/combined')) return 'list_combined';
-    if (path.endsWith('/separate')) return 'list_separate';
-    return null;
   }
 
   Future<void> _onRefresh(WidgetRef ref) async {
@@ -103,6 +98,7 @@ class HomePage extends ConsumerWidget {
     final settings = ref.read(hisabSettingsProvidersProvider);
     if (settings == null) return;
 
+    final router = GoRouter.of(context);
     showResponsiveSheet<void>(
       context: context,
       title: 'home_list_options'.tr(),
@@ -122,27 +118,22 @@ class HomePage extends ConsumerWidget {
           final sort = ref.watch(homeListSortProvider);
           final showCreatedAt = ref.watch(homeListShowCreatedAtProvider);
 
+          // Persist only — keep the sheet open for every option change.
           void setDisplay(String value) {
-            final router = GoRouter.of(context);
-            final path = RoutePaths.homeMode(_modePathForDisplay(value));
             ref
                 .read(settings.provider(homeListDisplaySettingDef).notifier)
                 .set(value);
             Log.info(
               'Setting changed: ${homeListDisplaySettingDef.key}=$value',
             );
-            // Pop the sheet before navigating — go() under an open root dialog
-            // replaces HomePage and leaves the options sheet stuck/unresponsive.
-            final nav = Navigator.of(context, rootNavigator: true);
-            if (nav.canPop()) {
-              nav.pop();
-            }
-            router.go(path);
           }
 
           void setSort(String value) {
             if (value != 'custom') {
               ref.read(homeListPendingOrderIdsProvider.notifier).state = null;
+            } else {
+              // Pinning is disabled in custom order — drop any selection.
+              ref.read(selectedGroupIdsProvider.notifier).state = {};
             }
             ref
                 .read(settings.provider(homeListSortSettingDef).notifier)
@@ -278,7 +269,23 @@ class HomePage extends ConsumerWidget {
           );
         },
       ),
-    );
+    ).whenComplete(() {
+      // Sync `/home/:mode` after dismiss so option taps never navigate away.
+      if (!context.mounted) return;
+      const validDisplays = {'list_separate', 'list_combined'};
+      final raw = ref.read(homeListDisplayProvider);
+      final display = validDisplays.contains(raw) ? raw : 'list_separate';
+      final current = router.routerDelegate.currentConfiguration.uri.path;
+      final isHome =
+          current == RoutePaths.home ||
+          current.startsWith('${RoutePaths.homeModeBase}/');
+      if (!isHome) return;
+      final pathMode = homeListDisplayFromPath(current);
+      if (pathMode == display) return;
+      // Keep bare `/` when display is separate; only push a mode path when needed.
+      if (pathMode == null && display == 'list_separate') return;
+      router.go(RoutePaths.homeMode(_modePathForDisplay(display)));
+    });
   }
 
   @override
@@ -293,15 +300,13 @@ class HomePage extends ConsumerWidget {
     final localOnly = ref.watch(effectiveLocalOnlyProvider);
     final rawDisplay = ref.watch(homeListDisplayProvider);
     const validDisplays = {'list_separate', 'list_combined'};
-    final router = GoRouter.maybeOf(context);
-    final routeDisplay =
-        _displayModeFromPath(
-          router?.routerDelegate.currentConfiguration.uri.path ?? '',
-        ) ??
-        routeDisplayMode;
-    final display = validDisplays.contains(routeDisplay)
-        ? routeDisplay!
-        : (validDisplays.contains(rawDisplay) ? rawDisplay : 'list_separate');
+    // Setting is the UI source of truth so list-option taps apply immediately.
+    // `/home/:mode` stays in sync via setDisplay + router redirect.
+    final display = validDisplays.contains(rawDisplay)
+        ? rawDisplay
+        : (validDisplays.contains(routeDisplayMode)
+              ? routeDisplayMode!
+              : 'list_separate');
     final displaySeparate = display == 'list_separate';
     final sortCustom = ref.watch(homeListSortProvider) == 'custom';
     final showCreatedAt = ref.watch(homeListShowCreatedAtProvider);
@@ -374,10 +379,14 @@ class HomePage extends ConsumerWidget {
       clearSelection();
     }
 
+    // Selection/pin only for date sorts; custom order uses hold-to-drag only.
+    final pinningEnabled = !sortCustom;
+    final effectiveSelectionMode = pinningEnabled && inSelectionMode;
+
     return PopScope(
-      canPop: !inSelectionMode,
+      canPop: !effectiveSelectionMode,
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop && inSelectionMode) clearSelection();
+        if (!didPop && effectiveSelectionMode) clearSelection();
       },
       child: LayoutBuilder(
         builder: (context, layoutConstraints) {
@@ -391,14 +400,14 @@ class HomePage extends ConsumerWidget {
             appBar: ContentAlignedAppBar(
               contentAreaWidth: contentAreaWidth,
               leadingWidth: ShellAppBarLeading.widthFor(context),
-              leading: inSelectionMode
+              leading: effectiveSelectionMode
                   ? IconButton(
                       icon: const Icon(Icons.close),
                       onPressed: clearSelection,
                       tooltip: 'cancel'.tr(),
                     )
                   : const ShellAppBarLeading(fallback: SyncStatusChip()),
-              title: inSelectionMode
+              title: effectiveSelectionMode
                   ? (selectedGroups.length == 1
                         ? UserText(
                             selectedGroups.first.name,
@@ -414,7 +423,7 @@ class HomePage extends ConsumerWidget {
                             overflow: TextOverflow.ellipsis,
                           ))
                   : _ExperimentTitle(),
-              actions: inSelectionMode
+              actions: effectiveSelectionMode
                   ? [
                       IconButton(
                         icon: const Icon(Icons.push_pin),
@@ -460,7 +469,7 @@ class HomePage extends ConsumerWidget {
                   final isEmpty = ordered.isEmpty;
 
                   Widget wrapRefresh(Widget child) {
-                    if (inSelectionMode) return child;
+                    if (effectiveSelectionMode) return child;
                     return RefreshIndicator(
                       onRefresh: () => _onRefresh(ref),
                       child: child,
@@ -547,31 +556,33 @@ class HomePage extends ConsumerWidget {
                       : 0;
 
                   Widget buildCard(Group group, {bool keyed = true}) {
-                    // Custom sort: hold-to-drag only.
+                    // Custom sort: hold-to-drag only (pinning disabled).
                     // Other sorts: hold to select, then pin from the app bar.
-                    final holdToReorder = sortCustom && !inSelectionMode;
                     return RepaintBoundary(
                       key: keyed ? ValueKey(group.id) : null,
                       child: GroupCard(
                         group: group,
                         experimentStyleIndex: experimentStyleIndex,
-                        isSelected: selectedIds.contains(group.id),
+                        isSelected: effectiveSelectionMode &&
+                            selectedIds.contains(group.id),
                         badgeCount: group.isPersonal ? scannerBadge : 0,
                         onTap: () {
-                          final cur = ref.read(selectedGroupIdsProvider);
-                          if (cur.isNotEmpty) {
-                            toggleSelection(group.id);
-                          } else {
-                            context.push(RoutePaths.groupDetail(group.id));
+                          if (pinningEnabled) {
+                            final cur = ref.read(selectedGroupIdsProvider);
+                            if (cur.isNotEmpty) {
+                              toggleSelection(group.id);
+                              return;
+                            }
                           }
+                          context.push(RoutePaths.groupDetail(group.id));
                         },
                         createdDateLabel:
                             formatCreatedDateLabel(group.createdAt),
-                        isPinned: pinnedSet.contains(group.id),
+                        isPinned:
+                            pinningEnabled && pinnedSet.contains(group.id),
                         onPinToggle: null,
-                        onLongPress: holdToReorder
-                            ? null
-                            : () {
+                        onLongPress: pinningEnabled
+                            ? () {
                                 final cur = ref.read(selectedGroupIdsProvider);
                                 if (cur.isEmpty) {
                                   ref
@@ -580,7 +591,8 @@ class HomePage extends ConsumerWidget {
                                 } else {
                                   toggleSelection(group.id);
                                 }
-                              },
+                              }
+                            : null,
                       ),
                     );
                   }
@@ -624,7 +636,7 @@ class HomePage extends ConsumerWidget {
                   }
 
                   // Custom sort: hold a card to drag; list stays put until drop.
-                  final canReorder = sortCustom && !inSelectionMode;
+                  final canReorder = sortCustom;
 
                   Widget buildReorderSliver(
                     List<Group> list, {
@@ -632,7 +644,8 @@ class HomePage extends ConsumerWidget {
                   }) {
                     return HomeReorderableGroupsSliver(
                       groups: list,
-                      pinnedIds: pinnedSet,
+                      // Pinning is off in custom order — free reorder anywhere.
+                      pinnedIds: const <String>{},
                       itemBuilder: (context, group) =>
                           buildCard(group, keyed: false),
                       onReorderComplete: onSectionReorder,
@@ -782,24 +795,23 @@ class _HomeFabCluster extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final createFab = Semantics(
-      label: 'create_group'.tr(),
-      button: true,
-      child: GestureDetector(
-        onLongPress: onCreate,
-        child: FloatingActionButton(
-          heroTag: 'create_group',
-          onPressed: onCreate,
-          child: const Icon(Icons.add),
-        ),
-      ),
+    // With two FABs, only the top scan FAB idles; create keeps press motion.
+    // In local-only mode create is alone, so it keeps idle motion.
+    final createFab = AppFab(
+      icon: Icons.add,
+      heroTag: 'create_group',
+      semanticsLabel: 'create_group'.tr(),
+      tooltip: 'create_group'.tr(),
+      onPressed: onCreate,
+      onLongPress: onCreate,
+      playIdleMotion: localOnly,
     );
 
     if (localOnly) return createFab;
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        const fabHeight = 56.0;
+        const fabHeight = AppFab.size;
         const twoFabHeight = fabHeight * 2;
         final spacing = (constraints.maxHeight >= twoFabHeight + 12)
             ? 12.0
@@ -808,14 +820,12 @@ class _HomeFabCluster extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Semantics(
-              label: 'scan_invite'.tr(),
-              button: true,
-              child: FloatingActionButton(
-                heroTag: 'scan_invite',
-                onPressed: onScan,
-                child: const Icon(Icons.qr_code_scanner),
-              ),
+            AppFab(
+              icon: Icons.qr_code_scanner,
+              heroTag: 'scan_invite',
+              semanticsLabel: 'scan_invite'.tr(),
+              tooltip: 'scan_invite'.tr(),
+              onPressed: onScan,
             ),
             SizedBox(height: spacing),
             createFab,

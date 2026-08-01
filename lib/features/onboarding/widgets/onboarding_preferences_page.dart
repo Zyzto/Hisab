@@ -37,25 +37,12 @@ class OnboardingPreferencesPage extends ConsumerWidget {
     return onboardingPageBodyWithFixedTitle(
       context,
       contentAlignment: Alignment.topCenter,
-      title: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'onboarding_preferences'.tr(),
-            style: Theme.of(
-              context,
-            ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: ThemeConfig.spacingS),
-          Text(
-            'onboarding_preferences_desc'.tr(),
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              height: 1.4,
-            ),
-          ),
-        ],
+      title: OnboardingStepEnter(
+        slidePx: 12,
+        child: OnboardingTitleBlock(
+          title: 'onboarding_preferences'.tr(),
+          subtitle: Text('onboarding_preferences_desc'.tr()),
+        ),
       ),
       content: OnboardingStepEnter(
         child: Column(

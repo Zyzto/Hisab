@@ -1,36 +1,227 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/accent_style.dart';
+import '../../../core/platform/ui_perf.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/widgets/wizard_step_enter.dart';
+import 'onboarding_ambient.dart';
 
 /// Alias for call sites that still import [OnboardingStepEnter] from this file.
 typedef OnboardingStepEnter = WizardStepEnter;
 
-/// Shared scroll + padding wrapper for all onboarding page bodies.
-/// Keeps title at top and content vertically balanced in the viewport.
-/// Horizontal sizing is handled by the parent onboarding shell via
-/// `ConstrainedContent` so onboarding matches main-page sizing.
-Widget onboardingPageBody(BuildContext context, Widget child) {
-  const padding = ThemeConfig.spacingM;
-  return LayoutBuilder(
-    builder: (context, constraints) {
-      final minHeight = constraints.maxHeight - 2 * padding;
-      return SingleChildScrollView(
-        padding: const EdgeInsets.all(padding),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: minHeight),
-          child: Center(child: child),
-        ),
-      );
-    },
-  );
+/// Flattens a translucent theme fill onto the scaffold surface.
+///
+/// Onboarding paints over the live meadow, so a fill like
+/// `primaryContainer.withValues(alpha: 0.35)` would let sky and grass show
+/// through the card and wreck the contrast of the text sitting on it.
+Color onboardingOpaqueFill(ColorScheme colorScheme, Color fill) {
+  return Color.alphaBlend(fill, colorScheme.surface);
 }
 
-/// For pages 2, 3, 4: screen in three thirds — top third ends at title/desc,
-/// bottom two thirds are the content area (content can use both, centered when short).
-/// [contentAlignment] defaults to center; use [Alignment.topCenter] so content stays
-/// at top (e.g. Connect page: toggle remains in place when info/warning boxes show).
+/// Soft glass panel for footnotes / privacy that still need a wash.
+///
+/// Titles sit bare on the meadow — see [onboardingSkyInk].
+class OnboardingPlaque extends StatelessWidget {
+  const OnboardingPlaque({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+    this.radius = 20,
+  });
+
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final double radius;
+
+  /// Compact variant for footnotes.
+  const OnboardingPlaque.compact({
+    super.key,
+    required this.child,
+  })  : padding = const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        radius = 14;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final dark = colorScheme.brightness == Brightness.dark;
+    return Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: colorScheme.surface.withValues(alpha: dark ? 0.78 : 0.84),
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: dark ? 0.22 : 0.28),
+        ),
+        boxShadow: UiPerf.preferCheapShadows
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: dark ? 0.28 : 0.07),
+                  blurRadius: 18,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+      ),
+      child: child,
+    );
+  }
+}
+
+/// Whether the meadow behind titles is the dark (night) wallpaper.
+///
+/// Matches [OnboardingSkyBackdrop]: night when the theme is dark.
+bool onboardingSkyIsNight(BuildContext context) =>
+    Theme.of(context).brightness == Brightness.dark;
+
+/// Translucent ink for type painted straight onto the sky band.
+///
+/// Night → soft white. Day → deep green-black. Soft halo keeps either
+/// readable when the sun/motes wash the sky.
+Color onboardingSkyInkForBrightness(
+  Brightness brightness, {
+  double alpha = 0.94,
+}) {
+  final night = brightness == Brightness.dark;
+  final base = night ? Colors.white : const Color(0xFF0E1A14);
+  return base.withValues(alpha: alpha);
+}
+
+Color onboardingSkyInk(BuildContext context, {double alpha = 0.94}) =>
+    onboardingSkyInkForBrightness(
+      Theme.of(context).brightness,
+      alpha: alpha,
+    );
+
+/// Wide, heavily faded halo opposite the ink — a soft wash, not a hard rim.
+List<Shadow> onboardingSkyTextShadowsForBrightness(Brightness brightness) {
+  final night = brightness == Brightness.dark;
+  final wash = night ? Colors.black : Colors.white;
+  return [
+    // Tight core: barely there, just keeps letter edges from vanishing.
+    Shadow(
+      color: wash.withValues(alpha: night ? 0.22 : 0.28),
+      blurRadius: 18,
+      offset: const Offset(0, 1),
+    ),
+    // Mid bloom.
+    Shadow(
+      color: wash.withValues(alpha: night ? 0.12 : 0.16),
+      blurRadius: 40,
+    ),
+    // Far, very faded glow.
+    Shadow(
+      color: wash.withValues(alpha: night ? 0.06 : 0.08),
+      blurRadius: 72,
+    ),
+  ];
+}
+
+List<Shadow> onboardingSkyTextShadows(BuildContext context) =>
+    onboardingSkyTextShadowsForBrightness(Theme.of(context).brightness);
+
+/// Shared title + optional supporting line for every onboarding step.
+///
+/// No plaque — sits on the sky with adaptive translucent ink.
+class OnboardingTitleBlock extends StatelessWidget {
+  const OnboardingTitleBlock({
+    super.key,
+    required this.title,
+    this.subtitle,
+  });
+
+  final String title;
+  final Widget? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final ink = onboardingSkyInk(context);
+    final muted = onboardingSkyInk(context, alpha: 0.78);
+    final shadows = onboardingSkyTextShadows(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.4,
+            height: 1.15,
+            color: ink,
+            shadows: shadows,
+          ),
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(height: ThemeConfig.spacingS),
+          DefaultTextStyle(
+            style: (theme.textTheme.bodyMedium ?? const TextStyle()).copyWith(
+              color: muted,
+              height: 1.45,
+              shadows: shadows,
+            ),
+            child: subtitle!,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Soft section label painted on the meadow (no card).
+class OnboardingSectionLabel extends StatelessWidget {
+  const OnboardingSectionLabel(this.label, {super.key});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final ink = onboardingSkyInk(context);
+    final shadows = onboardingSkyTextShadows(context);
+    final bar = onboardingSkyIsNight(context)
+        ? Colors.white.withValues(alpha: 0.85)
+        : Theme.of(context).colorScheme.primary;
+    return Row(
+      children: [
+        Container(
+          width: 3,
+          height: 14,
+          decoration: BoxDecoration(
+            color: bar,
+            borderRadius: BorderRadius.circular(2),
+            boxShadow: [
+              BoxShadow(
+                color: shadows.first.color,
+                blurRadius: 8,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            label,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.1,
+              color: ink,
+              shadows: shadows,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Onboarding body with title locked to the top third of the viewport.
+///
+/// All onboarding steps use this so the title baseline stays consistent when
+/// paging. [contentAlignment] defaults to center; use [Alignment.topCenter]
+/// when content should stay at the top of the lower two thirds (e.g. Connect).
+///
+/// Horizontal sizing is handled by the parent onboarding shell via
+/// `ConstrainedContent`.
 Widget onboardingPageBodyWithFixedTitle(
   BuildContext context, {
   required Widget title,
@@ -40,7 +231,7 @@ Widget onboardingPageBodyWithFixedTitle(
   const padding = ThemeConfig.spacingM;
   return LayoutBuilder(
     builder: (context, constraints) {
-      const titleContentGap = ThemeConfig.spacingXL;
+      const titleContentGap = ThemeConfig.spacingL;
       final viewportHeight = constraints.maxHeight - 2 * padding;
       final topThirdHeight = viewportHeight / 3;
       final contentAreaHeight = viewportHeight * 2 / 3 - titleContentGap;
@@ -54,11 +245,13 @@ Widget onboardingPageBodyWithFixedTitle(
             children: [
               SizedBox(
                 height: topThirdHeight,
-                child: Center(
-                  child: Align(
-                    alignment: AlignmentDirectional.bottomStart,
-                    child: title,
-                  ),
+                width: double.infinity,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Spacer(),
+                    title,
+                  ],
                 ),
               ),
               const SizedBox(height: titleContentGap),
@@ -89,27 +282,33 @@ class OnboardingListCardIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Container(
-      width: 40,
-      height: 40,
+      width: 42,
+      height: 42,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: usePrimaryContainer
-            ? colorScheme.primaryContainer.withValues(alpha: 0.55)
+            ? onboardingOpaqueFill(
+                colorScheme,
+                colorScheme.primaryContainer.withValues(alpha: 0.55),
+              )
             : colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(ThemeConfig.radiusM),
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: Icon(
-        icon,
-        size: 22,
-        color: usePrimaryContainer
-            ? colorScheme.onPrimaryContainer
-            : colorScheme.onSurfaceVariant,
+      child: OnboardingIconPulse(
+        phase: icon.codePoint % 17 / 17,
+        child: Icon(
+          icon,
+          size: 22,
+          color: usePrimaryContainer
+              ? colorScheme.onPrimaryContainer
+              : colorScheme.onSurfaceVariant,
+        ),
       ),
     );
   }
 }
 
-/// Flat-panel list row for onboarding preferences / permissions.
+/// Soft list row for onboarding preferences / permissions.
 class OnboardingListCard extends StatelessWidget {
   const OnboardingListCard({
     super.key,
@@ -126,18 +325,19 @@ class OnboardingListCard extends StatelessWidget {
   final Widget? trailing;
   final VoidCallback? onTap;
 
-  static const double _radius = 14;
+  static const double _radius = 16;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final content = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           leading,
-          const SizedBox(width: ThemeConfig.spacingS),
+          const SizedBox(width: ThemeConfig.spacingM),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -145,12 +345,20 @@ class OnboardingListCard extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
+                    letterSpacing: -0.1,
                   ),
                 ),
-                const SizedBox(height: ThemeConfig.spacingXS),
-                subtitle,
+                const SizedBox(height: 4),
+                DefaultTextStyle(
+                  style: (theme.textTheme.bodySmall ?? const TextStyle())
+                      .copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    height: 1.35,
+                  ),
+                  child: subtitle,
+                ),
               ],
             ),
           ),
@@ -171,7 +379,12 @@ class OnboardingListCard extends StatelessWidget {
     );
 
     final panel = Ink(
-      decoration: AccentSurfaces.flatPanel(colorScheme, radius: _radius),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(_radius),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.38),
+        ),
+      ),
       child: content,
     );
 
@@ -180,6 +393,7 @@ class OnboardingListCard extends StatelessWidget {
       child: Material(
         color: colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(_radius),
+        clipBehavior: Clip.antiAlias,
         child: onTap != null
             ? InkWell(
                 onTap: onTap,

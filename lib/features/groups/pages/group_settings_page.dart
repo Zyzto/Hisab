@@ -13,12 +13,16 @@ import '../widgets/create_invite_sheet.dart';
 import '../widgets/group_color_picker.dart';
 import '../widgets/group_section_header.dart';
 import '../utils/group_icon_utils.dart';
+import '../../../core/celebration/celebration_controller.dart';
+import '../../../core/celebration/celebration_kind.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
+import '../../../core/navigation/nav_back.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/widgets/missing_route_page.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/services/settle_up_service.dart';
 import '../../../core/telemetry/telemetry_service.dart';
@@ -46,6 +50,19 @@ class GroupSettingsPage extends ConsumerStatefulWidget {
 }
 
 class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      seedParentHistoryForBrowserBack(
+        context: context,
+        parentPath: RoutePaths.groupDetail(widget.groupId),
+        currentPath: RoutePaths.groupSettings(widget.groupId),
+      );
+    });
+  }
+
   bool _saving = false;
 
   /// Runs [fn] with _saving true; sets _saving false in finally when mounted.
@@ -74,17 +91,9 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     return groupAsync.when(
       data: (group) {
         if (group == null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (context.mounted) {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go('/');
-              }
-            }
-          });
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+          return const MissingRoutePage(
+            titleKey: 'group_not_found',
+            messageKey: 'group_not_found_message',
           );
         }
         final myRole = myRoleAsync.asData?.value;
@@ -92,32 +101,33 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
             localOnly || myRole == GroupRole.owner || myRole == GroupRole.admin;
         final canEditSettings =
             isOwnerOrAdmin || group.allowMemberChangeSettings;
+        final groupPath = RoutePaths.groupDetail(widget.groupId);
         return LayoutBuilder(
           builder: (context, layoutConstraints) {
-            return Scaffold(
-              appBar: ContentAlignedAppBar(
-                contentAreaWidth: layoutConstraints.maxWidth,
-                leading: IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () {
-                    if (context.canPop()) {
-                      context.pop();
-                    } else {
-                      context.go('/');
-                    }
-                  },
-                ),
-                title: Text(
-                  (group.isPersonal ? 'list_settings' : 'group_settings').tr(),
-                ),
-              ),
-              body: ConstrainedContent(
-                child: ListView(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: ThemeConfig.spacingM,
-                    vertical: ThemeConfig.spacingS,
+            final canPop = routerCanPop(context);
+            return PopScope(
+              canPop: canPop,
+              onPopInvokedWithResult: (didPop, _) {
+                if (!didPop) popOrGo(context, groupPath);
+              },
+              child: Scaffold(
+                appBar: ContentAlignedAppBar(
+                  contentAreaWidth: layoutConstraints.maxWidth,
+                  leading: IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () => popOrGo(context, groupPath),
                   ),
-                  children: [
+                  title: Text(
+                    (group.isPersonal ? 'list_settings' : 'group_settings').tr(),
+                  ),
+                ),
+                body: ConstrainedContent(
+                  child: ListView(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: ThemeConfig.spacingM,
+                      vertical: ThemeConfig.spacingS,
+                    ),
+                    children: [
                     // ── Group Profile Header ──
                     _buildProfileHeader(
                       context,
@@ -324,6 +334,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                   ],
                 ),
               ),
+            ),
             );
           },
         );
@@ -344,7 +355,8 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                 title: Text('list_settings'.tr()),
                 leading: IconButton(
                   icon: const Icon(Icons.arrow_back),
-                  onPressed: () => context.pop(),
+                  onPressed: () =>
+                      popOrGo(context, RoutePaths.groupDetail(widget.groupId)),
                 ),
               ),
               body: Center(
@@ -1897,7 +1909,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
           context.showSuccess(
             (isPersonal ? 'list_archived' : 'group_archived').tr(),
           );
-          context.pop();
+          popOrGo(context, RoutePaths.home);
         }
       });
     } catch (e, st) {
@@ -1950,7 +1962,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
         Log.info('Group setting: hide_from_list groupId=${widget.groupId}');
         if (context.mounted) {
           context.showSuccess('group_hidden_from_list'.tr());
-          context.pop();
+          popOrGo(context, RoutePaths.home);
         }
       });
     } catch (e, st) {
@@ -2048,6 +2060,8 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
         }, enabled: ref.read(telemetryEnabledProvider));
         // Trigger immediate sync so the groups list reflects the change
         await ref.read(dataSyncServiceProvider.notifier).syncNow();
+        // Farewell overlay on the way home (no participant id on this path).
+        await fireCelebration(ref, CelebrationKind.personLeft);
         if (context.mounted) context.go(RoutePaths.home);
       });
     } catch (e, st) {

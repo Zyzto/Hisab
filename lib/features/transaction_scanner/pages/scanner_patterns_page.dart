@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/layout/content_aligned_fab_location.dart';
+import '../../../core/widgets/app_fab.dart';
 import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/user_text.dart';
 import '../domain/scanner_pattern.dart';
@@ -43,9 +44,9 @@ class ScannerPatternsPage extends ConsumerWidget {
                   : _buildList(context, ref, patterns),
             ),
           ),
-          floatingActionButton: FloatingActionButton(
+          floatingActionButton: AppFab(
+            icon: Icons.add,
             onPressed: () => _openEditor(context, ref, null),
-            child: const Icon(Icons.add),
           ),
         );
       },

@@ -63,4 +63,11 @@ void main() {
       expect(resolveUserTextDirection('   '), isNull);
     });
   });
+
+  group('resolveUiStartTextAlign', () {
+    test('uses right in RTL UI and left in LTR UI', () {
+      expect(resolveUiStartTextAlign(TextDirection.rtl), TextAlign.right);
+      expect(resolveUiStartTextAlign(TextDirection.ltr), TextAlign.left);
+    });
+  });
 }

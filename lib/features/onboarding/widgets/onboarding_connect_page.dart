@@ -35,19 +35,12 @@ class OnboardingConnectPage extends ConsumerWidget {
 
     return onboardingPageBodyWithFixedTitle(
       context,
-      title: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'onboarding_connect'.tr(),
-            style: Theme.of(
-              context,
-            ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: ThemeConfig.spacingS),
-          _ModeDescSwitcher(modeDesc: modeDesc, colorScheme: colorScheme),
-        ],
+      title: OnboardingStepEnter(
+        slidePx: 12,
+        child: OnboardingTitleBlock(
+          title: 'onboarding_connect'.tr(),
+          subtitle: _ModeDescSwitcher(modeDesc: modeDesc),
+        ),
       ),
       contentAlignment: Alignment.topCenter,
       content: OnboardingStepEnter(
@@ -96,9 +89,12 @@ class OnboardingConnectPage extends ConsumerWidget {
                     _InfoPanel(
                       icon: Icons.info_outline_rounded,
                       message: 'onboarding_online_requires_sign_in'.tr(),
-                      fill: AccentSurfaces.emphasizedFill(
+                      fill: onboardingOpaqueFill(
                         colorScheme,
-                        subtle: subtle,
+                        AccentSurfaces.emphasizedFill(
+                          colorScheme,
+                          subtle: subtle,
+                        ),
                       ),
                       border: AccentSurfaces.emphasizedBorder(
                         colorScheme,
@@ -111,7 +107,10 @@ class OnboardingConnectPage extends ConsumerWidget {
                     _InfoPanel(
                       icon: Icons.warning_amber_rounded,
                       message: 'onboarding_online_disclaimer'.tr(),
-                      fill: colorScheme.errorContainer.withValues(alpha: 0.45),
+                      fill: onboardingOpaqueFill(
+                        colorScheme,
+                        colorScheme.errorContainer.withValues(alpha: 0.45),
+                      ),
                       border: colorScheme.error.withValues(alpha: 0.22),
                       iconColor: colorScheme.onErrorContainer,
                       textColor: colorScheme.onErrorContainer,
@@ -154,26 +153,28 @@ class OnboardingConnectPage extends ConsumerWidget {
               ),
             ],
             const SizedBox(height: ThemeConfig.spacingL),
-            GestureDetector(
-              onTap: () => context.push(RoutePaths.privacyPolicy),
-              child: Text.rich(
-                TextSpan(
-                  text: 'onboarding_privacy_agree_prefix'.tr(),
-                  children: [
-                    TextSpan(
-                      text: 'privacy_policy'.tr(),
-                      style: TextStyle(
-                        color: colorScheme.primary,
-                        fontWeight: FontWeight.w600,
-                        decoration: TextDecoration.underline,
+            OnboardingPlaque.compact(
+              child: GestureDetector(
+                onTap: () => context.push(RoutePaths.privacyPolicy),
+                child: Text.rich(
+                  TextSpan(
+                    text: 'onboarding_privacy_agree_prefix'.tr(),
+                    children: [
+                      TextSpan(
+                        text: 'privacy_policy'.tr(),
+                        style: TextStyle(
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                          decoration: TextDecoration.underline,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-                textAlign: TextAlign.center,
               ),
             ),
           ],
@@ -185,13 +186,9 @@ class OnboardingConnectPage extends ConsumerWidget {
 
 /// Crossfade (+ light slide) for the Connect page supporting line.
 class _ModeDescSwitcher extends StatelessWidget {
-  const _ModeDescSwitcher({
-    required this.modeDesc,
-    required this.colorScheme,
-  });
+  const _ModeDescSwitcher({required this.modeDesc});
 
   final String modeDesc;
-  final ColorScheme colorScheme;
 
   @override
   Widget build(BuildContext context) {
@@ -229,10 +226,8 @@ class _ModeDescSwitcher extends StatelessWidget {
         child: Text(
           modeDesc,
           key: ValueKey<String>(modeDesc),
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-            height: 1.4,
-          ),
+          // Inherit the sky ink + halo from [OnboardingTitleBlock].
+          style: DefaultTextStyle.of(context).style,
         ),
       ),
     );
@@ -305,7 +300,10 @@ class _ModeTile extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final subtle = context.subtleAccents;
     final fill = selected
-        ? AccentSurfaces.emphasizedFill(colorScheme, subtle: subtle)
+        ? onboardingOpaqueFill(
+            colorScheme,
+            AccentSurfaces.emphasizedFill(colorScheme, subtle: subtle),
+          )
         : colorScheme.surfaceContainerLow;
     final border = selected
         ? AccentSurfaces.emphasizedBorder(colorScheme, subtle: subtle)
@@ -328,18 +326,18 @@ class _ModeTile extends StatelessWidget {
         curve: AppMotion.enterCurve,
         decoration: BoxDecoration(
           color: fill,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: border,
-            width: selected ? 2 : 1,
+            width: selected ? 1.75 : 1,
           ),
         ),
         child: Material(
           color: Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(18),
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(18),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               child: Row(
@@ -347,12 +345,12 @@ class _ModeTile extends StatelessWidget {
                   AnimatedContainer(
                     duration: anim,
                     curve: AppMotion.enterCurve,
-                    width: 44,
-                    height: 44,
+                    width: 46,
+                    height: 46,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: iconWell,
-                      borderRadius: BorderRadius.circular(ThemeConfig.radiusM),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(icon, size: 24, color: iconColor),
                   ),
@@ -365,6 +363,7 @@ class _ModeTile extends StatelessWidget {
                           title,
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w700,
+                            letterSpacing: -0.15,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -374,7 +373,7 @@ class _ModeTile extends StatelessWidget {
                           subtitle,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
-                            height: 1.35,
+                            height: 1.4,
                           ),
                           maxLines: 3,
                           overflow: TextOverflow.ellipsis,
@@ -436,7 +435,7 @@ class _InfoPanel extends StatelessWidget {
       padding: const EdgeInsets.all(ThemeConfig.spacingM),
       decoration: BoxDecoration(
         color: fill,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: border),
       ),
       child: Row(
@@ -453,7 +452,7 @@ class _InfoPanel extends StatelessWidget {
                   ?.copyWith(
                     color: textColor,
                     fontWeight: bodySmall ? null : FontWeight.w500,
-                    height: 1.4,
+                    height: 1.45,
                   ),
             ),
           ),

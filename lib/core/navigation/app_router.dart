@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'app_page.dart';
+import 'decorative_route.dart';
 import 'invite_nav_redirect.dart';
 import 'navigation_trace.dart';
 import 'route_paths.dart';
@@ -371,34 +373,57 @@ GoRouter router(Ref ref) {
           child: const GroupCreatePage(isPersonal: true),
         ),
       ),
-      // Legacy per-step URLs (bookmarks / old links) → canonical wizard routes.
+      // Per-step URLs for bookmarks / reload. In-wizard step changes still use
+      // decorative hash sync on the canonical route so PageView state is not
+      // disposed; these builders only matter on cold start / F5.
       GoRoute(
         path: RoutePaths.groupCreateDetails,
-        redirect: (context, state) => RoutePaths.groupCreate,
+        pageBuilder: (context, state) => appFadeSlidePage(
+          key: state.pageKey,
+          child: const GroupCreatePage(isPersonal: false, initialStep: 0),
+        ),
       ),
       GoRoute(
         path: RoutePaths.groupCreateParticipants,
-        redirect: (context, state) => RoutePaths.groupCreate,
+        pageBuilder: (context, state) => appFadeSlidePage(
+          key: state.pageKey,
+          child: const GroupCreatePage(isPersonal: false, initialStep: 1),
+        ),
       ),
       GoRoute(
         path: RoutePaths.groupCreateStyle,
-        redirect: (context, state) => RoutePaths.groupCreate,
+        pageBuilder: (context, state) => appFadeSlidePage(
+          key: state.pageKey,
+          child: const GroupCreatePage(isPersonal: false, initialStep: 2),
+        ),
       ),
       GoRoute(
         path: RoutePaths.groupCreateReview,
-        redirect: (context, state) => RoutePaths.groupCreate,
+        pageBuilder: (context, state) => appFadeSlidePage(
+          key: state.pageKey,
+          child: const GroupCreatePage(isPersonal: false, initialStep: 3),
+        ),
       ),
       GoRoute(
         path: RoutePaths.groupCreatePersonalDetails,
-        redirect: (context, state) => RoutePaths.groupCreatePersonal,
+        pageBuilder: (context, state) => appFadeSlidePage(
+          key: state.pageKey,
+          child: const GroupCreatePage(isPersonal: true, initialStep: 0),
+        ),
       ),
       GoRoute(
         path: RoutePaths.groupCreatePersonalStyle,
-        redirect: (context, state) => RoutePaths.groupCreatePersonal,
+        pageBuilder: (context, state) => appFadeSlidePage(
+          key: state.pageKey,
+          child: const GroupCreatePage(isPersonal: true, initialStep: 1),
+        ),
       ),
       GoRoute(
         path: RoutePaths.groupCreatePersonalReview,
-        redirect: (context, state) => RoutePaths.groupCreatePersonal,
+        pageBuilder: (context, state) => appFadeSlidePage(
+          key: state.pageKey,
+          child: const GroupCreatePage(isPersonal: true, initialStep: 2),
+        ),
       ),
       GoRoute(
         path: '/groups/:id',
@@ -543,5 +568,18 @@ GoRouter router(Ref ref) {
 
   traceListener();
   router.routerDelegate.addListener(traceListener);
+  if (kIsWeb) {
+    sanitizeHashStrategyBrowserUrl();
+    void syncBrowserUrl() => syncBrowserUrlToGoRouter(router);
+    // Ensure group/expense/settings/analytics pushes update the hash even if
+    // Flutter's own routeInformation pipeline was previously disrupted.
+    router.routerDelegate.addListener(syncBrowserUrl);
+    // Sync the route that is already matched at creation time.
+    syncBrowserUrl();
+    ref.onDispose(() {
+      router.routerDelegate.removeListener(syncBrowserUrl);
+    });
+  }
+
   return router;
 }

@@ -20,6 +20,8 @@ import '../../../core/platform_utils.dart';
 import '../../../core/services/connectivity_service.dart';
 import '../../../core/services/permission_service.dart';
 import '../../../core/auth/auth_providers.dart';
+import '../../../core/celebration/celebration_controller.dart';
+import '../../../core/celebration/celebration_kind.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/services/exchange_rate_service.dart';
 import '../../../core/telemetry/telemetry_service.dart';
@@ -27,6 +29,7 @@ import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
+import '../../../core/navigation/nav_back.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/utils/currency_helpers.dart';
@@ -83,6 +86,10 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   String? _toParticipantId;
   SplitType _splitType = SplitType.equal;
   TransactionType _transactionType = TransactionType.expense;
+  /// Stable seed for [CustomSlidingSegmentedControl.initialValue]. The package
+  /// ignores the controller's constructor value and defaults the thumb to the
+  /// first segment unless [initialValue] is set.
+  late TransactionType _transactionTypeSegmentInitial;
   late final CustomSegmentedController<TransactionType>
   _transactionTypeSegmentController;
   bool _saving = false;
@@ -137,9 +144,28 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   /// Photos: pending bytes (before upload) or stored URL. Max [_kMaxExpenseImages].
   final List<_ExpenseImageItem> _expenseImages = [];
 
+  String get _formBackPath {
+    final expenseId = widget.expenseId;
+    if (expenseId != null) {
+      return RoutePaths.groupExpenseDetail(widget.groupId, expenseId);
+    }
+    return RoutePaths.groupExpenses(widget.groupId);
+  }
+
+  String get _formRoutePath {
+    final expenseId = widget.expenseId;
+    if (expenseId != null) {
+      return RoutePaths.groupExpenseEdit(widget.groupId, expenseId);
+    }
+    return RoutePaths.groupExpenseAdd(widget.groupId);
+  }
+
+  void _popForm() => popOrGo(context, _formBackPath);
+
   @override
   void initState() {
     super.initState();
+    _transactionTypeSegmentInitial = _transactionType;
     _transactionTypeSegmentController =
         CustomSegmentedController<TransactionType>(value: _transactionType);
     _amountListener = () {
@@ -154,6 +180,14 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     if (widget.expenseId != null) {
       _loadExpenseForEdit();
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      seedParentHistoryForBrowserBack(
+        context: context,
+        parentPath: _formBackPath,
+        currentPath: _formRoutePath,
+      );
+    });
   }
 
   Future<void> _loadExpenseForEdit() async {
@@ -192,6 +226,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
               expense.transactionType == TransactionType.transfer)
           ? TransactionType.expense
           : expense.transactionType;
+      _transactionTypeSegmentInitial = _transactionType;
       _transactionTypeSegmentController.value = _transactionType;
       _splitType = expense.splitType;
       _toParticipantId = expense.toParticipantId;
@@ -586,6 +621,17 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           'Expense updated: id=${expense.id} title="${expense.title}" amountCents=${expense.amountCents}',
         );
       } else {
+        final isTransferExpense =
+            effectiveTransactionType == TransactionType.transfer;
+        var isFirstExpense = false;
+        if (!isTransferExpense) {
+          final existing = await ref
+              .read(expenseRepositoryProvider)
+              .getByGroupId(widget.groupId);
+          isFirstExpense = existing.every(
+            (e) => e.transactionType == TransactionType.transfer,
+          );
+        }
         final id = await ref.read(expenseRepositoryProvider).create(expense);
         final createdUrls = <String>[];
         for (final item in _expenseImages) {
@@ -628,11 +674,19 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
             'amountCents': expense.amountCents,
           }, enabled: ref.read(telemetryEnabledProvider));
         } catch (_) {}
+        if (!isTransferExpense) {
+          await fireCelebration(
+            ref,
+            isFirstExpense
+                ? CelebrationKind.firstExpense
+                : CelebrationKind.newExpense,
+          );
+        }
       }
       ref.invalidate(expensesByGroupProvider(widget.groupId));
       ref.invalidate(groupBalanceProvider(widget.groupId));
       if (!mounted) return;
-      context.pop();
+      _popForm();
       didPop = true;
     } catch (e, st) {
       Log.warning('Expense save failed', error: e, stackTrace: st);
@@ -906,7 +960,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       data: (group) {
         if (group == null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) context.pop();
+            if (mounted) _popForm();
           });
           return const SizedBox.shrink();
         }
@@ -918,7 +972,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                   contentAreaWidth: layoutConstraints.maxWidth,
                   leading: IconButton(
                     icon: const Icon(Icons.arrow_back),
-                    onPressed: () => context.pop(),
+                    onPressed: _popForm,
                   ),
                   title: Text('add_expense'.tr()),
                 ),
@@ -944,7 +998,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                         ),
                         const SizedBox(height: 24),
                         FilledButton(
-                          onPressed: () => context.pop(),
+                          onPressed: _popForm,
                           child: Text('done'.tr()),
                         ),
                       ],
@@ -975,7 +1029,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       contentAreaWidth: layoutConstraints.maxWidth,
                       leading: IconButton(
                         icon: const Icon(Icons.arrow_back),
-                        onPressed: () => context.pop(),
+                        onPressed: _popForm,
                       ),
                       title: Text('edit_expense'.tr()),
                     ),
@@ -998,7 +1052,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       ),
                       leading: IconButton(
                         icon: const Icon(Icons.arrow_back),
-                        onPressed: () => context.pop(),
+                        onPressed: _popForm,
                       ),
                     ),
                     body: Center(child: Text('add_participants_first'.tr())),
@@ -1112,7 +1166,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                     contentAreaWidth: layoutConstraints.maxWidth,
                     leading: IconButton(
                       icon: const Icon(Icons.arrow_back),
-                      onPressed: _saving ? null : () => context.pop(),
+                      onPressed: _saving ? null : _popForm,
                     ),
                     title: Text(
                       (widget.expenseId != null
@@ -1175,6 +1229,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                               if (mounted) {
                                                 setState(() {
                                                   _transactionType =
+                                                      TransactionType.expense;
+                                                  _transactionTypeSegmentInitial =
                                                       TransactionType.expense;
                                                   _transactionTypeSegmentController
                                                           .value =
@@ -1257,11 +1313,20 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                                           ),
                                         );
                                       }
+                                      // Package indexes [initialValue] into
+                                      // children; missing keys throw on -1.
+                                      final segmentInitial =
+                                          segmentChildren.containsKey(
+                                            _transactionTypeSegmentInitial,
+                                          )
+                                          ? _transactionTypeSegmentInitial
+                                          : segmentChildren.keys.first;
                                       return CustomSlidingSegmentedControl<
                                         TransactionType
                                       >(
                                         controller:
                                             _transactionTypeSegmentController,
+                                        initialValue: segmentInitial,
                                         children: segmentChildren,
                                         height: 52,
                                         padding: 16,

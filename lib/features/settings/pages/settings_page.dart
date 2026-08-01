@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:currency_picker/currency_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, listEquals;
 import 'package:flutter/material.dart';
@@ -8,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
@@ -26,14 +24,14 @@ import '../../../core/constants/supabase_config.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/platform/network_image_decode.dart';
-import '../../../core/repository/repository_providers.dart';
 import '../../../core/update/update_check_providers.dart';
 import '../../../core/services/delete_my_data_service.dart';
 import '../../../core/services/github_user_client.dart';
 import '../../../core/utils/currency_helpers.dart';
 import '../settings_definitions.dart';
 import '../providers/settings_framework_providers.dart';
-import '../backup_helper.dart';
+import '../backup_ui.dart';
+import '../backup_wipe.dart';
 import '../feedback_handler.dart';
 import '../widgets/logs_viewer_dialog.dart';
 import '../../../core/theme/flex_theme_builder.dart'
@@ -484,6 +482,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           subtleAccentsSettingDef,
           anchors: _anchors,
         ),
+        buildBoolSettingTile(
+          ref,
+          settings,
+          extraAnimationsEnabledSettingDef,
+          anchors: _anchors,
+        ),
         _anchors.wrap(
           fontSizeScaleSettingDef.key,
           _fontSizeTile(context, ref, settings),
@@ -528,8 +532,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             localOnlySettingDef.key,
             _buildLocalOnlyTile(context, ref, settings),
           ),
-          onExport: () => _exportData(context, ref),
-          onImport: () => _importData(context, ref),
+          onExport: () => runBackupExportFlow(context, ref),
+          onImport: () => runBackupImportFlow(context, ref),
           anchors: _anchors,
         ),
       ),
@@ -771,16 +775,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (confirmed == true && context.mounted) {
       try {
         final db = ref.read(powerSyncDatabaseProvider);
-        await db.execute('DELETE FROM expenses');
-        await db.execute('DELETE FROM expense_tags');
-        await db.execute('DELETE FROM participants');
-        await db.execute('DELETE FROM group_members');
-        await db.execute('DELETE FROM group_invites');
-        await db.execute('DELETE FROM groups');
-        await db.execute('DELETE FROM pending_writes');
+        await wipeLocalDataTables(db);
+        final settings = ref.read(hisabSettingsProvidersProvider);
+        if (settings != null) {
+          await ref
+              .read(settings.provider(homeListCustomOrderSettingDef).notifier)
+              .set('');
+          await ref
+              .read(settings.provider(homeListPinnedIdsSettingDef).notifier)
+              .set('');
+        }
         Log.info('Local data deleted');
         if (context.mounted) {
-          final settings = ref.read(hisabSettingsProvidersProvider);
           if (settings != null) {
             ref
                 .read(settings.provider(onboardingCompletedSettingDef).notifier)
@@ -869,15 +875,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       if (!context.mounted) return;
       if (alsoDeleteLocal) {
         final db = ref.read(powerSyncDatabaseProvider);
-        await db.execute('DELETE FROM expenses');
-        await db.execute('DELETE FROM expense_tags');
-        await db.execute('DELETE FROM participants');
-        await db.execute('DELETE FROM group_members');
-        await db.execute('DELETE FROM group_invites');
-        await db.execute('DELETE FROM groups');
-        await db.execute('DELETE FROM pending_writes');
+        await wipeLocalDataTables(db);
         final settings = ref.read(hisabSettingsProvidersProvider);
         if (settings != null) {
+          await ref
+              .read(settings.provider(homeListCustomOrderSettingDef).notifier)
+              .set('');
+          await ref
+              .read(settings.provider(homeListPinnedIdsSettingDef).notifier)
+              .set('');
           ref
               .read(settings.provider(onboardingCompletedSettingDef).notifier)
               .set(false);
@@ -1632,156 +1638,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       Log.warning('Report issue / copy logs failed', error: e, stackTrace: st);
       if (scaffoldContext.mounted) {
         scaffoldContext.showToast('logs_not_available'.tr());
-      }
-    }
-  }
-
-  static Future<void> _exportData(BuildContext context, WidgetRef ref) async {
-    try {
-      final data = await exportDataToJson(
-        groupRepo: ref.read(groupRepositoryProvider),
-        participantRepo: ref.read(participantRepositoryProvider),
-        expenseRepo: ref.read(expenseRepositoryProvider),
-        tagRepo: ref.read(tagRepositoryProvider),
-      );
-      final jsonString = const JsonEncoder.withIndent('  ').convert(data);
-      final result = await FilePicker.platform.saveFile(
-        dialogTitle: 'export_data'.tr(),
-        fileName:
-            'hisab_backup_${DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first}.json',
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-        bytes: Uint8List.fromList(utf8.encode(jsonString)),
-      );
-      if (context.mounted) {
-        if (result != null && result.isNotEmpty) {
-          Log.info('Backup exported to $result');
-          context.showSuccess('export_success'.tr());
-        } else {
-          context.showToast('export_cancelled'.tr());
-        }
-      }
-    } catch (e, st) {
-      Log.warning('Backup export failed', error: e, stackTrace: st);
-      if (context.mounted) {
-        context.showError('export_failed'.tr());
-      }
-    }
-  }
-
-  static Future<void> _importData(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showConfirmSheet(
-      context,
-      title: 'import_data'.tr(),
-      content: 'import_confirm'.tr(),
-      confirmLabel: 'import_data'.tr(),
-      centerInFullViewport: false,
-    );
-    if (confirmed != true || !context.mounted) return;
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-        withData: true,
-      );
-      if (result == null || result.files.isEmpty || !context.mounted) return;
-      final bytes = result.files.single.bytes;
-      if (bytes == null) {
-        context.showError('import_failed'.tr());
-        return;
-      }
-      final jsonString = utf8.decode(bytes);
-      final parseResult = parseBackupJson(jsonString);
-      if (parseResult.data == null) {
-        if (context.mounted) {
-          final message =
-              parseResult.errorMessageKey?.tr() ?? 'import_invalid_file'.tr();
-          context.showError(message);
-        }
-        return;
-      }
-      final backup = parseResult.data!;
-      final groupRepo = ref.read(groupRepositoryProvider);
-      final participantRepo = ref.read(participantRepositoryProvider);
-      final expenseRepo = ref.read(expenseRepositoryProvider);
-      final tagRepo = ref.read(tagRepositoryProvider);
-      final idMap = <String, String>{};
-      for (final g in backup.groups) {
-        final newId = await groupRepo.create(
-          g.name,
-          g.currencyCode,
-          icon: g.icon,
-          color: g.color,
-          isPersonal: g.isPersonal,
-          budgetAmountCents: g.budgetAmountCents,
-        );
-        idMap[g.id] = newId;
-      }
-      final participantIds = <String, String>{};
-      for (final g in backup.groups) {
-        final newGroupId = idMap[g.id]!;
-        final oldParticipants = backup.participants
-            .where((e) => e.groupId == g.id)
-            .toList();
-        for (final p in oldParticipants) {
-          final newId = await participantRepo.create(
-            newGroupId,
-            p.name,
-            p.order,
-          );
-          participantIds[p.id] = newId;
-        }
-      }
-      for (final e in backup.expenses) {
-        final newGroupId = idMap[e.groupId];
-        final newPayerId = participantIds[e.payerParticipantId];
-        if (newGroupId != null && newPayerId != null) {
-          final toId = e.toParticipantId != null
-              ? participantIds[e.toParticipantId!]
-              : null;
-          final expense = Expense(
-            id: '',
-            groupId: newGroupId,
-            payerParticipantId: newPayerId,
-            amountCents: e.amountCents,
-            currencyCode: e.currencyCode,
-            title: e.title,
-            description: e.description,
-            date: e.date,
-            splitType: e.splitType,
-            splitShares: e.splitShares,
-            createdAt: e.createdAt,
-            updatedAt: e.updatedAt,
-            transactionType: e.transactionType,
-            toParticipantId: toId,
-            tag: e.tag,
-            lineItems: e.lineItems,
-            imagePath: e.imagePath,
-            imagePaths: e.imagePaths,
-          );
-          await expenseRepo.create(expense);
-        }
-      }
-      for (final t in backup.expenseTags) {
-        final newGroupId = idMap[t.groupId];
-        if (newGroupId != null) {
-          await tagRepo.create(newGroupId, t.label, t.iconName);
-        }
-      }
-      for (final oldId in backup.localArchivedGroupIds) {
-        final newId = idMap[oldId];
-        if (newId != null) {
-          await groupRepo.setLocalArchived(newId);
-        }
-      }
-      Log.info('Backup import completed');
-      if (context.mounted) {
-        context.showSuccess('import_success'.tr());
-      }
-    } catch (e, st) {
-      Log.warning('Backup import failed', error: e, stackTrace: st);
-      if (context.mounted) {
-        context.showError('import_failed'.tr());
       }
     }
   }

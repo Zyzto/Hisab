@@ -766,6 +766,48 @@ final class SubtleAccentsProvider
 
 String _$subtleAccentsHash() => r'9c4f2e1a0b7d6c5e8f3a2b1c0d9e8f7a6b5c4d3e';
 
+@ProviderFor(extraAnimationsEnabled)
+final extraAnimationsEnabledProvider = ExtraAnimationsEnabledProvider._();
+
+final class ExtraAnimationsEnabledProvider
+    extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  ExtraAnimationsEnabledProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'extraAnimationsEnabledProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$extraAnimationsEnabledHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return extraAnimationsEnabled(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$extraAnimationsEnabledHash() =>
+    r'a1b2c3d4e5f60718293a4b5c6d7e8f901234abcd';
+
 @ProviderFor(authUserProfile)
 final authUserProfileProvider = AuthUserProfileProvider._();
 

@@ -4,6 +4,7 @@ import '../utils/currency_formatter.dart';
 import '../utils/currency_helpers.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
 import '../../features/settings/providers/display_currency_rate_provider.dart';
+import 'amount_text.dart';
 
 /// Shows a primary amount in [groupCurrencyCode] and, when [displayCurrency] is set and rate is available,
 /// a smaller secondary line "(X displayCurrency)".
@@ -102,7 +103,7 @@ class AmountWithSecondaryDisplay extends ConsumerWidget {
       amountCents,
       groupCurrencyCode,
     );
-    final primaryWidget = Text(
+    final primaryWidget = AmountText(
       isNegative ? '- $primaryFormatted' : primaryFormatted,
       style: primaryStyle,
     );
@@ -131,7 +132,7 @@ class AmountWithSecondaryDisplay extends ConsumerWidget {
     final secondaryText = isNegative
         ? '(- $displayFormatted)'
         : '($displayFormatted)';
-    final secondaryWidget = Text(
+    final secondaryWidget = AmountText(
       secondaryText,
       style:
           secondaryStyle?.copyWith(height: 1.0) ??
@@ -142,11 +143,15 @@ class AmountWithSecondaryDisplay extends ConsumerWidget {
     );
 
     if (secondaryOnSameRow) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
-        children: [primaryWidget, const SizedBox(width: 8), secondaryWidget],
+      // Keep primary → secondary order in RTL shells (don't flip the money row).
+      return Directionality(
+        textDirection: TextDirection.ltr,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [primaryWidget, const SizedBox(width: 8), secondaryWidget],
+        ),
       );
     }
     return Column(
@@ -211,7 +216,7 @@ class SecondaryAmountLine extends ConsumerWidget {
     return Center(
       child: Padding(
         padding: const EdgeInsets.only(top: 2),
-        child: Text(secondaryText, style: style),
+        child: AmountText(secondaryText, style: style),
       ),
     );
   }

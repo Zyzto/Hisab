@@ -8,6 +8,7 @@ import '../auth/auth_providers.dart';
 import '../constants/supabase_config.dart';
 import '../services/connectivity_service.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
+import 'sync_backend.dart';
 import 'sync_engine.dart';
 import 'sync_errors.dart';
 
@@ -37,9 +38,29 @@ class DataSyncService extends _$DataSyncService {
   Timer? _refreshTimer;
   Timer? _debounceTimer;
   bool _isSyncing = false;
+  int _pauseCount = 0;
 
   /// Coalesce auth/connectivity rebuilds so we don't stack full fetches.
   static const _syncDebounce = Duration(milliseconds: 800);
+
+  bool get isPaused => _pauseCount > 0;
+
+  /// Pause auto/manual sync (e.g. during backup import). Nestable.
+  void pause() {
+    _pauseCount++;
+    _refreshTimer?.cancel();
+    _debounceTimer?.cancel();
+    Log.debug('DataSyncService: paused (count=$_pauseCount)');
+  }
+
+  /// Resume after [pause]. Restarts timers when fully unpaused and active.
+  void resume() {
+    if (_pauseCount > 0) _pauseCount--;
+    Log.debug('DataSyncService: resume (count=$_pauseCount)');
+    if (_pauseCount == 0) {
+      ref.invalidateSelf();
+    }
+  }
 
   @override
   void build() {
@@ -61,11 +82,18 @@ class DataSyncService extends _$DataSyncService {
       return;
     }
 
+    if (_pauseCount > 0) {
+      _refreshTimer?.cancel();
+      _debounceTimer?.cancel();
+      Log.debug('DataSyncService: inactive (paused)');
+      return;
+    }
+
     if (hasNetwork) {
       // Defer + debounce: connectivity flaps must not hammer Supabase.
       _debounceTimer?.cancel();
       _debounceTimer = Timer(_syncDebounce, () {
-        if (!_isSyncing) {
+        if (!_isSyncing && _pauseCount == 0) {
           unawaited(_syncNow());
         }
       });
@@ -95,7 +123,7 @@ class DataSyncService extends _$DataSyncService {
   static const Duration _initialRetryDelay = Duration(seconds: 1);
 
   Future<void> _syncNow() async {
-    if (_isSyncing) return;
+    if (_isSyncing || _pauseCount > 0) return;
     _isSyncing = true;
 
     final syncStatusNotifier = ref.read(syncStatusProvider.notifier);
@@ -122,7 +150,11 @@ class DataSyncService extends _$DataSyncService {
               'DataSyncService: pushing ${pendingRows.length} pending writes',
             );
           }
-          await engine.pushPendingWrites(db, client);
+          await engine.pushPendingWritesWithBackend(
+            db,
+            SupabaseSyncBackend(client),
+            setNotifySuppress: (active) => setNotifySuppressRpc(client, active),
+          );
           await engine.fetchAll(db, client);
           Log.info('DataSyncService: sync complete');
           syncStatusNotifier.setSynced();

@@ -108,7 +108,7 @@ void main() {
       // Exercises the manual add-participant flow (FAB → sheet → name → Done).
       // The deferred create() in group_detail_page avoids the _dependents.isEmpty
       // race so this path behaves consistently in tests and production.
-      // Group detail uses _FABWithLabel (Icon in Material/InkWell), not FloatingActionButton.
+      // Group detail uses AppFab (find by Icons.person_add / Icons.add).
       await stage('add participant manually via sheet', () async {
         await waitForWidget(tester, find.byIcon(Icons.person_add));
         await tester.ensureVisible(find.byIcon(Icons.person_add).first);

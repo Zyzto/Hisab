@@ -16,6 +16,7 @@ void main() {
       expect(p.preferCheapCharts, isTrue);
       expect(p.preferFadeOnlyPageTransitions, isTrue);
       expect(p.preferReducedChromeMotion, isTrue);
+      expect(p.preferCheapListDrag, isTrue);
     });
 
     test('Android web keeps polish but cheap charts on mobile', () {
@@ -31,6 +32,7 @@ void main() {
       expect(p.preferCheapCharts, isTrue);
       expect(p.preferFadeOnlyPageTransitions, isFalse);
       expect(p.preferReducedChromeMotion, isFalse);
+      expect(p.preferCheapListDrag, isFalse);
     });
 
     test('desktop web keeps full polish', () {
@@ -46,6 +48,7 @@ void main() {
       expect(p.preferCheapCharts, isFalse);
       expect(p.preferFadeOnlyPageTransitions, isFalse);
       expect(p.preferReducedChromeMotion, isFalse);
+      expect(p.preferCheapListDrag, isFalse);
     });
 
     test('native iOS/Android keep full polish', () {
@@ -69,6 +72,7 @@ void main() {
         expect(p.preferCheapCharts, isFalse);
         expect(p.preferFadeOnlyPageTransitions, isFalse);
         expect(p.preferReducedChromeMotion, isFalse);
+        expect(p.preferCheapListDrag, isFalse);
       }
     });
   });
