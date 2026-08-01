@@ -2,15 +2,20 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../../core/debug/integration_test_mode.dart';
 import '../../../core/platform/ui_perf.dart';
 
 /// Whether onboarding may run soft looping chrome (logo float, icon pulse).
 ///
 /// Off on iOS web (`preferReducedChromeMotion`) where timers + transforms on
-/// chrome were historically janky. Also off under widget / integration test
-/// bindings so [pumpAndSettle] can finish (repeat animations never settle).
+/// chrome were historically janky. Also off in integration tests (and when the
+/// binding name still reveals a test harness) so [pumpAndSettle] can finish.
 bool get onboardingAmbientAllowed {
-  if (UiPerf.preferReducedChromeMotion) return false;
+  if (UiPerf.preferReducedChromeMotion || isIntegrationTestMode) {
+    return false;
+  }
+  // VM widget tests: class name is not minified. Release web integration
+  // tests rely on [isIntegrationTestMode] instead.
   final name = WidgetsBinding.instance.runtimeType.toString();
   if (name.contains('TestWidgetsFlutterBinding')) return false;
   return true;

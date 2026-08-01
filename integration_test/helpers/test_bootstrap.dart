@@ -11,6 +11,7 @@ import 'package:hisab/app.dart';
 import 'package:hisab/core/database/database_providers.dart';
 import 'package:hisab/core/debug/integration_test_mode.dart';
 import 'package:hisab/core/database/powersync_schema.dart' as ps;
+import 'package:hisab/core/widgets/app_fab.dart';
 import 'package:hisab/features/settings/providers/settings_framework_providers.dart';
 import 'package:hisab/features/settings/settings_definitions.dart';
 
@@ -93,6 +94,8 @@ Future<bool> runIntegrationTestApp({bool skipOnboarding = true}) async {
       : const Locale('en');
 
   isIntegrationTestMode = true;
+  // Looping FAB blooms / Flame scenes prevent pumpAndSettle on web release.
+  AppFab.enableAmbientNature = false;
   final appWidget = EasyLocalization(
     supportedLocales: const [Locale('en'), Locale('ar')],
     path: 'assets/translations',

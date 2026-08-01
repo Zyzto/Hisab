@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/auth/sign_in_sheet.dart';
 import '../../../core/database/database_providers.dart';
+import '../../../core/debug/integration_test_mode.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../core/constants/supabase_config.dart';
 import '../../../core/layout/constrained_content.dart';
@@ -209,9 +210,11 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
     );
 
     // Integration/widget tests use pumpAndSettle; skip looping chrome/timers.
-    final underTestBinding = WidgetsBinding.instance.runtimeType
-        .toString()
-        .contains('TestWidgetsFlutterBinding');
+    // Release web minifies binding type names — prefer [isIntegrationTestMode].
+    final underTestBinding = isIntegrationTestMode ||
+        WidgetsBinding.instance.runtimeType
+            .toString()
+            .contains('TestWidgetsFlutterBinding');
     final reduceChrome =
         UiPerf.preferReducedChromeMotion || underTestBinding;
     if (reduceChrome) {

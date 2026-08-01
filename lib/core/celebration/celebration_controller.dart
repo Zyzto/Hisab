@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/settings/providers/settings_framework_providers.dart';
+import '../debug/integration_test_mode.dart';
 import '../platform/ui_perf.dart';
 import 'celebration_dedupe.dart';
 import 'celebration_kind.dart';
@@ -49,6 +50,8 @@ Future<void> fireCelebration(
   CelebrationKind kind, {
   String? dedupeKey,
 }) async {
+  // Flame game ticks forever; skip in integration tests so pumpAndSettle works.
+  if (isIntegrationTestMode) return;
   if (UiPerf.preferReducedChromeMotion) return;
   if (!ref.read(extraAnimationsEnabledProvider)) return;
   if (dedupeKey != null) {
