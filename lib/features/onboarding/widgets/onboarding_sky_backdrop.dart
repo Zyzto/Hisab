@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/debug/integration_test_mode.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 import 'onboarding_ambient.dart';
 import 'onboarding_sky_game.dart';
@@ -10,11 +11,13 @@ import 'onboarding_sky_game.dart';
 /// Flame meadow behind onboarding via image [ParallaxComponent] layers.
 ///
 /// Skipped when Extra animations are off, UiPerf reduced chrome motion (iOS
-/// web), or under widget tests.
+/// web), integration tests, or VM widget tests.
 class OnboardingSkyBackdrop extends ConsumerWidget {
   const OnboardingSkyBackdrop({super.key});
 
   static bool get _testBinding {
+    if (isIntegrationTestMode) return true;
+    // Release web minifies type names; prefer [isIntegrationTestMode] there.
     final name = WidgetsBinding.instance.runtimeType.toString();
     return name.contains('TestWidgetsFlutterBinding');
   }
