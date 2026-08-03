@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/settings/providers/settings_framework_providers.dart';
+import '../debug/integration_test_mode.dart';
 import '../platform/ui_perf.dart';
 import '../theme/theme_config.dart';
 import 'app_fab_nature.dart';
@@ -244,7 +245,9 @@ class _AppFabState extends ConsumerState<AppFab>
         !mounted) {
       return false;
     }
-    // Unit + integration bindings treat pending Timers as test failures.
+    // Release-web integration minifies binding type names, so string checks
+    // miss TestWidgetsFlutterBinding — prefer the explicit test flag.
+    if (isIntegrationTestMode) return false;
     final binding = WidgetsBinding.instance.runtimeType.toString();
     if (binding.contains('TestWidgetsFlutterBinding')) return false;
     return true;
@@ -285,7 +288,9 @@ class _AppFabState extends ConsumerState<AppFab>
     if (cb == null) return;
     _burstLeaves();
     _actionTimer?.cancel();
-    if (!_extras) {
+    // Integration / reduced-motion: invoke immediately so tests and a11y
+    // paths do not depend on a wall-clock Timer after the press animation.
+    if (!_extras || isIntegrationTestMode) {
       cb();
       return;
     }

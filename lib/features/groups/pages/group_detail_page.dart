@@ -422,6 +422,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
     if (index == 2) {
       if (widget.group.isPersonal || !isOwnerOrAdmin) return null;
       return AppFab(
+        key: const Key('group_add_participant_fab'),
         icon: Icons.person_add,
         label: 'add_participant'.tr(),
         tooltip: 'add_participant'.tr(),
