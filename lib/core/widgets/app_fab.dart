@@ -451,11 +451,18 @@ class _AppFabState extends ConsumerState<AppFab>
                         borderRadius: radius,
                         splashColor: Colors.transparent,
                         highlightColor: Colors.transparent,
+                        // Visual press on down/up; invoke via onTap so
+                        // tester.tap / semantics activation always fire.
                         onTapDown:
                             widget.onPressed == null ? null : _onTapDown,
-                        onTapUp: widget.onPressed == null ? null : _onTapUp,
+                        onTapUp: widget.onPressed == null
+                            ? null
+                            : (_) => _finishPress(invoke: false),
                         onTapCancel:
                             widget.onPressed == null ? null : _onTapCancel,
+                        onTap: widget.onPressed == null
+                            ? null
+                            : _queuePressed,
                         onLongPress: widget.onLongPress == null
                             ? null
                             : _onLongPress,
