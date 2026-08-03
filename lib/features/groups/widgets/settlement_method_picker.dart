@@ -481,7 +481,7 @@ class SettlementMethodPickerButton extends StatelessWidget {
   final bool enabled;
 
   const SettlementMethodPickerButton({
-    super.key,
+    super.key = const Key('settlement_method_picker_button'),
     required this.method,
     this.onChanged,
     this.enabled = true,

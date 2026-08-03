@@ -251,23 +251,22 @@ void main() {
 
       // ── Stage: change settlement method ──
       await stage('change settlement method', () async {
-        // Default is Greedy; open the shared picker and switch to Pairwise.
-        await scrollUntilVisible(tester, find.text('Settlement Method'));
-        final greedyLabel = find.text('Greedy');
-        if (greedyLabel.evaluate().isNotEmpty) {
-          await tapAndPump(tester, greedyLabel.first, pumps: 10);
-          await waitForCondition(
-            tester,
-            condition: isResponsiveSheetVisible,
-            timeout: const Duration(seconds: 10),
-            reason: 'Settlement method picker did not open',
-          );
-          final pairwiseOption = find.text('Pairwise');
-          if (pairwiseOption.evaluate().isNotEmpty) {
-            await tapAndPump(tester, pairwiseOption.first, pumps: 10);
-            await waitForResponsiveSheetClosed(tester);
-          }
-        }
+        // Section title is "Settlement"; picker shows "Fewest payments" by default.
+        await scrollUntilVisible(tester, find.text('Settlement'));
+        final picker = find.byKey(const Key('settlement_method_picker_button'));
+        await waitForWidget(tester, picker);
+        await tester.ensureVisible(picker);
+        await tapAndPump(tester, picker, pumps: 10);
+        await waitForCondition(
+          tester,
+          condition: isResponsiveSheetVisible,
+          timeout: const Duration(seconds: 10),
+          reason: 'Settlement method picker did not open',
+        );
+        final pairwiseOption = find.text('Shared pairs');
+        await waitForWidget(tester, pairwiseOption);
+        await tapAndPump(tester, pairwiseOption.first, pumps: 10);
+        await waitForResponsiveSheetClosed(tester);
       });
 
       // ── Stage: verify permission toggles in settings (online only) ──
