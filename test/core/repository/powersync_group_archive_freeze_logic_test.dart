@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hisab/core/repository/powersync_repository.dart';
+import 'package:hisab/domain/domain.dart';
 
 void main() {
   test('archive auto-freezes only when group was not frozen', () {

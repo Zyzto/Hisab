@@ -21,6 +21,10 @@ abstract class IGroupRepository {
     bool allowMemberChangeSettings = true,
     bool allowExpenseAsOtherParticipant = true,
     bool allowMemberSettleForOthers = false,
+
+    /// When [settlementMethod] is treasurer: `null` = owner participant;
+    /// otherwise a name from [initialParticipants].
+    String? treasurerInitialParticipantName,
   });
   Future<void> update(Group group);
   Future<void> delete(String id);

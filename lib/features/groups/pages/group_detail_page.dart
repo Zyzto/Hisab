@@ -1055,6 +1055,9 @@ class _ExpensesTab extends ConsumerWidget {
                         payerName:
                             nameOf[expense.payerParticipantId] ??
                             expense.payerParticipantId,
+                        toParticipantName: expense.toParticipantId == null
+                            ? null
+                            : nameOf[expense.toParticipantId!],
                         icon: iconForExpenseTag(expense.tag, customTags),
                         showPaidBy: !group.isPersonal,
                         groupCurrencyCode: group.currencyCode,

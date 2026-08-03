@@ -63,6 +63,15 @@ void main() {
         'settlement_frozen',
         'settlement_frozen_hint',
         'unfreeze_settlement',
+        'settlement_method_greedy',
+        'settlement_method_pairwise',
+        'settlement_live_plan_chip_reshuffle',
+        'settlement_picker_footer',
+        'settlement_guide_live_line_reshuffle',
+        'settle_up_explainer_title',
+        'settle_up_explainer_one_at_a_time',
+        'settle_up_how_it_works',
+        'settle_up_hint_greedy',
       ];
       for (final key in critical) {
         expect(en.containsKey(key), true, reason: 'Missing key: $key');
@@ -90,6 +99,15 @@ void main() {
         'settlement_frozen',
         'settlement_frozen_hint',
         'unfreeze_settlement',
+        'settlement_method_greedy',
+        'settlement_method_pairwise',
+        'settlement_live_plan_chip_reshuffle',
+        'settlement_picker_footer',
+        'settlement_guide_live_line_reshuffle',
+        'settle_up_explainer_title',
+        'settle_up_explainer_one_at_a_time',
+        'settle_up_how_it_works',
+        'settle_up_hint_greedy',
       ];
       for (final key in critical) {
         expect(ar.containsKey(key), true, reason: 'Missing key: $key');

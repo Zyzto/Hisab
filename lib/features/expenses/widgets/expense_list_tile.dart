@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import '../../../domain/domain.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/expense_display_title.dart';
 import '../../../core/utils/user_text.dart';
 import '../../../core/widgets/amount_text.dart';
 import '../../../core/widgets/user_text.dart';
@@ -11,6 +12,9 @@ import '../category_icons.dart';
 class ExpenseListTile extends StatelessWidget {
   final Expense expense;
   final String payerName;
+
+  /// Payee name for transfers; used to localize the title at display time.
+  final String? toParticipantName;
 
   /// Icon for the expense (e.g. from [iconForExpenseTag]). When null, uses [defaultExpenseIcon].
   final IconData? icon;
@@ -47,6 +51,7 @@ class ExpenseListTile extends StatelessWidget {
     super.key,
     required this.expense,
     required this.payerName,
+    this.toParticipantName,
     this.icon,
     this.showPaidBy = true,
     this.groupCurrencyCode,
@@ -111,7 +116,11 @@ class ExpenseListTile extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               UserText(
-                expense.title,
+                expenseDisplayTitle(
+                  expense,
+                  fromName: payerName,
+                  toName: toParticipantName,
+                ),
                 style: theme.textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),

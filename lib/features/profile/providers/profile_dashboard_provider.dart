@@ -96,19 +96,43 @@ List<ParticipantBalance> _balancesForGroup(
   List<Participant> participants,
   List<Expense> expenses,
 ) {
+  final snapshotJson = group.settlementSnapshotJson;
+  final isArchiveAutoFreeze =
+      group.isSettlementFrozen &&
+      snapshotJson == archiveAutoFreezeSnapshotMarker;
+
   if (group.isSettlementFrozen &&
-      group.settlementSnapshotJson != null &&
-      group.settlementSnapshotJson!.isNotEmpty) {
+      snapshotJson != null &&
+      snapshotJson.isNotEmpty &&
+      !isArchiveAutoFreeze) {
     try {
-      return SettlementSnapshot.fromJsonString(
-        group.settlementSnapshotJson!,
-      ).balances;
+      return SettlementSnapshot.fromJsonString(snapshotJson).balances;
     } catch (e) {
       Log.warning(
-        'Profile dashboard: snapshot parse failed, using live computation',
+        'Profile dashboard: snapshot parse failed; omitting live fallback',
         error: e,
       );
+      // Keep frozen numbers stable: zeros so the row is skipped (no shifting live net).
+      return [
+        for (final p in participants)
+          ParticipantBalance(
+            participantId: p.id,
+            balanceCents: 0,
+            currencyCode: group.currencyCode,
+          ),
+      ];
     }
+  }
+  if (group.isSettlementFrozen &&
+      (snapshotJson == null || snapshotJson.isEmpty)) {
+    return [
+      for (final p in participants)
+        ParticipantBalance(
+          participantId: p.id,
+          balanceCents: 0,
+          currencyCode: group.currencyCode,
+        ),
+    ];
   }
   return computeBalances(participants, expenses, group.currencyCode);
 }

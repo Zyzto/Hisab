@@ -2,11 +2,13 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:hisab/domain/domain.dart';
 import 'package:hisab/features/balance/providers/balance_provider.dart';
 import 'package:hisab/features/balance/widgets/balance_list.dart';
 import 'package:hisab/features/groups/providers/group_member_provider.dart';
+import 'package:hisab/features/groups/widgets/settlement_method_picker.dart';
 import '../widget_test_helpers.dart';
 
 void main() {
@@ -18,6 +20,10 @@ void main() {
   setUpAll(() {
     // Reduce console noise from Easy Localization (same as main.dart).
     EasyLocalization.logger.enableBuildModes = [];
+    // Avoid first-visit settle explainer covering Balance tests.
+    SharedPreferences.setMockInitialValues({
+      balanceSettleExplainerSeenKey: true,
+    });
   });
 
   setUp(() {

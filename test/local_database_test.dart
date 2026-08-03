@@ -80,6 +80,31 @@ void main() {
       expect(all.first.name, 'Test Group');
     });
 
+    test('create with treasurer method sets treasurer_participant_id', () async {
+      if (!powerSyncAvailable) return;
+      final r = repo();
+      final id = await r.create(
+        'Treasurer Trip',
+        'USD',
+        initialParticipants: const ['Alice', 'Bob'],
+        settlementMethod: SettlementMethod.treasurer,
+        treasurerInitialParticipantName: 'Bob',
+      );
+      final group = await r.getById(id);
+      expect(group, isNotNull);
+      expect(group!.settlementMethod, SettlementMethod.treasurer);
+      expect(group.treasurerParticipantId, isNotNull);
+
+      final participants = await PowerSyncParticipantRepository(
+        db!,
+        client: null,
+        isOnline: false,
+        isLocalOnly: true,
+      ).getByGroupId(id);
+      final bob = participants.firstWhere((p) => p.name == 'Bob');
+      expect(group.treasurerParticipantId, bob.id);
+    });
+
     test('update persists to local DB', () async {
       if (!powerSyncAvailable) return;
       final r = repo();

@@ -12,6 +12,7 @@ import '../providers/group_invite_provider.dart';
 import '../widgets/create_invite_sheet.dart';
 import '../widgets/group_color_picker.dart';
 import '../widgets/group_section_header.dart';
+import '../widgets/settlement_method_picker.dart';
 import '../utils/group_icon_utils.dart';
 import '../../../core/celebration/celebration_controller.dart';
 import '../../../core/celebration/celebration_kind.dart';
@@ -34,7 +35,6 @@ import '../../../core/utils/error_report_helper.dart';
 import '../../../core/utils/form_validators.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/sheet_helpers.dart';
-import '../../../core/widgets/sheet_option_tile.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../core/widgets/user_text.dart';
 import '../../../domain/domain.dart';
@@ -174,13 +174,18 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                     if (!group.isPersonal)
                       _buildSection(
                         context,
-                        title: 'settlement_method'.tr(),
+                        title: 'settlement_settings'.tr(),
                         children: [
-                          _buildSettlementMethodContent(
-                            context,
-                            group,
-                            ref,
-                            canEditSettings: canEditSettings,
+                          SettlementMethodPickerButton(
+                            method: group.settlementMethod,
+                            enabled: canEditSettings && !_saving,
+                            onChanged: (method) =>
+                                _onMethodChanged(ref, group, method),
+                          ),
+                          const SizedBox(height: ThemeConfig.spacingM),
+                          SettlementMethodGuideCard(
+                            method: group.settlementMethod,
+                            showExample: true,
                           ),
                           if (group.settlementMethod ==
                               SettlementMethod.treasurer)
@@ -777,121 +782,6 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
         }
       },
     );
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Settlement Method
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  Widget _buildSettlementMethodContent(
-    BuildContext context,
-    Group group,
-    WidgetRef ref, {
-    required bool canEditSettings,
-  }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: _saving || !canEditSettings
-            ? null
-            : () => _showSettlementMethodPicker(context, group, ref),
-        borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            border: Border.all(color: colorScheme.outline),
-            borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _methodLabel(group.settlementMethod),
-                      style: theme.textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _methodDescription(group.settlementMethod),
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.arrow_drop_down, color: colorScheme.onSurfaceVariant),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _showSettlementMethodPicker(
-    BuildContext context,
-    Group group,
-    WidgetRef ref,
-  ) async {
-    final theme = Theme.of(context);
-
-    final chosen = await showResponsiveSheet<SettlementMethod>(
-      context: context,
-      title: 'settlement_method'.tr(),
-      maxHeight: MediaQuery.of(context).size.height * 0.75,
-      isScrollControlled: true,
-      centerInFullViewport: true,
-      child: Builder(
-        builder: (ctx) => SafeArea(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.only(
-                bottom:
-                    MediaQuery.of(ctx).padding.bottom + ThemeConfig.spacingM,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (!LayoutBreakpoints.isTabletOrWider(context))
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                      child: Text(
-                        'settlement_method'.tr(),
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  SheetOptionList(
-                    children: [
-                      for (final method in SettlementMethod.values)
-                        SheetOptionTile(
-                          title: _methodLabel(method),
-                          subtitle: _methodDescription(method),
-                          selected: method == group.settlementMethod,
-                          onTap: () => Navigator.pop(ctx, method),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: ThemeConfig.spacingM),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    if (chosen != null && chosen != group.settlementMethod) {
-      _onMethodChanged(ref, group, chosen);
-    }
   }
 
   Widget _buildTreasurerContent(
@@ -1589,32 +1479,6 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
   // ═══════════════════════════════════════════════════════════════════════════
   // Helpers (unchanged logic from previous version)
   // ═══════════════════════════════════════════════════════════════════════════
-
-  String _methodLabel(SettlementMethod m) {
-    switch (m) {
-      case SettlementMethod.pairwise:
-        return 'settlement_method_pairwise'.tr();
-      case SettlementMethod.greedy:
-        return 'settlement_method_greedy'.tr();
-      case SettlementMethod.consolidated:
-        return 'settlement_method_consolidated'.tr();
-      case SettlementMethod.treasurer:
-        return 'settlement_method_treasurer'.tr();
-    }
-  }
-
-  String _methodDescription(SettlementMethod m) {
-    switch (m) {
-      case SettlementMethod.pairwise:
-        return 'settlement_method_pairwise_desc'.tr();
-      case SettlementMethod.greedy:
-        return 'settlement_method_greedy_desc'.tr();
-      case SettlementMethod.consolidated:
-        return 'settlement_method_consolidated_desc'.tr();
-      case SettlementMethod.treasurer:
-        return 'settlement_method_treasurer_desc'.tr();
-    }
-  }
 
   Future<void> _onMethodChanged(
     WidgetRef ref,

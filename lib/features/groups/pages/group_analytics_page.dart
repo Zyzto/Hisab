@@ -618,6 +618,9 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
           return FilteredExpenseRow(
             expense: expense,
             payerName: payerName,
+            toParticipantName: expense.toParticipantId == null
+                ? null
+                : participantNames[expense.toParticipantId!],
             groupId: data.group.id,
             groupCurrencyCode: data.group.currencyCode,
             detailLine: subtitleFor(expense, participantNames),

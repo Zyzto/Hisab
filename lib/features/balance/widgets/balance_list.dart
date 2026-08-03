@@ -13,6 +13,7 @@ import '../../../core/widgets/user_text.dart';
 import '../../../domain/domain.dart';
 import '../../groups/providers/group_member_provider.dart';
 import '../../groups/widgets/group_section_header.dart';
+import '../../groups/widgets/settlement_method_picker.dart';
 import '../providers/balance_provider.dart';
 import 'record_settlement_sheet.dart';
 
@@ -116,6 +117,8 @@ class BalanceList extends ConsumerWidget {
           nameOf: nameOf,
           avatarOf: avatarOf,
           hasFrozen: hasFrozen,
+          snapshotCorrupt: result.snapshotCorrupt,
+          isPersonal: group.isPersonal,
           readOnlyMode: readOnlyMode,
           onRefresh: onRefresh,
           canRecordSettlement: canRecordSettlement,
@@ -154,6 +157,8 @@ class _BalanceListBody extends StatefulWidget {
   final Map<String, String> nameOf;
   final Map<String, String?> avatarOf;
   final bool hasFrozen;
+  final bool snapshotCorrupt;
+  final bool isPersonal;
   final bool readOnlyMode;
   final Future<void> Function()? onRefresh;
   final bool Function(SettlementTransaction) canRecordSettlement;
@@ -171,6 +176,8 @@ class _BalanceListBody extends StatefulWidget {
     required this.nameOf,
     required this.avatarOf,
     required this.hasFrozen,
+    required this.snapshotCorrupt,
+    required this.isPersonal,
     required this.readOnlyMode,
     required this.onRefresh,
     required this.canRecordSettlement,
@@ -187,12 +194,31 @@ class _BalanceListBodyState extends State<_BalanceListBody> {
   final GlobalKey _overlayKey = GlobalKey();
   final ValueNotifier<double> _handoff = ValueNotifier<double>(0);
   double _overlayHeight = 0;
+  bool _explainerCheckScheduled = false;
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_updateHandoff);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _updateHandoff());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _updateHandoff();
+      _maybeShowSettleExplainer();
+    });
+  }
+
+  Future<void> _maybeShowSettleExplainer() async {
+    if (_explainerCheckScheduled || !mounted) return;
+    _explainerCheckScheduled = true;
+    final seen = await isSettleExplainerSeen();
+    if (!mounted) return;
+    if (!shouldShowSettleExplainer(
+      seen: seen,
+      readOnlyMode: widget.readOnlyMode,
+      isPersonal: widget.isPersonal,
+    )) {
+      return;
+    }
+    await showSettleUpExplainerSheet(context, markSeenOnDismiss: true);
   }
 
   @override
@@ -307,6 +333,7 @@ class _BalanceListBodyState extends State<_BalanceListBody> {
           padding: const EdgeInsets.only(bottom: 16),
           child: _FrozenBanner(
             readOnlyMode: widget.readOnlyMode,
+            snapshotCorrupt: widget.snapshotCorrupt,
             onUnfreeze: widget.onUnfreeze,
           ),
         ),
@@ -884,10 +911,12 @@ class _YourBalanceHero extends StatelessWidget {
 
 class _FrozenBanner extends StatelessWidget {
   final bool readOnlyMode;
+  final bool snapshotCorrupt;
   final VoidCallback onUnfreeze;
 
   const _FrozenBanner({
     required this.readOnlyMode,
+    required this.snapshotCorrupt,
     required this.onUnfreeze,
   });
 
@@ -895,6 +924,11 @@ class _FrozenBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final titleKey =
+        snapshotCorrupt ? 'settlement_snapshot_corrupt' : 'settlement_frozen';
+    final hintKey = snapshotCorrupt
+        ? 'settlement_snapshot_corrupt_hint'
+        : 'settlement_frozen_hint';
     return Container(
       width: double.infinity,
       padding: const EdgeInsetsDirectional.fromSTEB(14, 14, 12, 14),
@@ -916,7 +950,9 @@ class _FrozenBanner extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  Icons.pause_circle_filled_rounded,
+                  snapshotCorrupt
+                      ? Icons.warning_amber_rounded
+                      : Icons.pause_circle_filled_rounded,
                   color: colorScheme.primary,
                 ),
               ),
@@ -926,14 +962,14 @@ class _FrozenBanner extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'settlement_frozen'.tr(),
+                      titleKey.tr(),
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'settlement_frozen_hint'.tr(),
+                      hintKey.tr(),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
@@ -1124,17 +1160,12 @@ class _SettleUpSectionState extends ConsumerState<_SettleUpSection> {
     }
   }
 
-  static String _methodHint(SettlementMethod method) {
-    switch (method) {
-      case SettlementMethod.greedy:
-        return 'settle_up_hint_greedy'.tr();
-      case SettlementMethod.pairwise:
-        return 'settle_up_hint_pairwise'.tr();
-      case SettlementMethod.consolidated:
-        return 'settle_up_hint_consolidated'.tr();
-      case SettlementMethod.treasurer:
-        return 'settle_up_hint_treasurer'.tr();
+  static String? _methodHint(SettlementMethod method) {
+    // Only Fewest payments needs a live-plan caveat on Balance.
+    if (method == SettlementMethod.greedy) {
+      return 'settle_up_hint_greedy'.tr();
     }
+    return null;
   }
 
   List<SettlementTransaction> _sorted(List<SettlementTransaction> input) {
@@ -1173,7 +1204,9 @@ class _SettleUpSectionState extends ConsumerState<_SettleUpSection> {
     final canFilterMe = widget.myParticipantId != null;
     final sorted = _sorted(widget.settlements);
     final visible = _filtered(sorted);
-    final showHint = widget.settlements.isNotEmpty;
+    final methodHint = widget.settlements.isNotEmpty
+        ? _methodHint(widget.settlementMethod)
+        : null;
 
     final showFilter = canFilterMe && widget.settlements.isNotEmpty;
 
@@ -1182,31 +1215,44 @@ class _SettleUpSectionState extends ConsumerState<_SettleUpSection> {
       children: [
         GroupSectionHeader(
           label: 'settle_up'.tr(),
-          trailing: showFilter
-              ? Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _SettleFilterChip(
-                      label: 'settle_filter_me'.tr(),
-                      selected: _filter == _SettleFilter.me,
-                      onSelected: () =>
-                          setState(() => _filter = _SettleFilter.me),
-                    ),
-                    const SizedBox(width: 6),
-                    _SettleFilterChip(
-                      label: 'settle_filter_all'.tr(),
-                      selected: _filter == _SettleFilter.all,
-                      onSelected: () =>
-                          setState(() => _filter = _SettleFilter.all),
-                    ),
-                  ],
-                )
-              : null,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (showFilter) ...[
+                _SettleFilterChip(
+                  label: 'settle_filter_me'.tr(),
+                  selected: _filter == _SettleFilter.me,
+                  onSelected: () =>
+                      setState(() => _filter = _SettleFilter.me),
+                ),
+                const SizedBox(width: 6),
+                _SettleFilterChip(
+                  label: 'settle_filter_all'.tr(),
+                  selected: _filter == _SettleFilter.all,
+                  onSelected: () =>
+                      setState(() => _filter = _SettleFilter.all),
+                ),
+                const SizedBox(width: 4),
+              ],
+              IconButton(
+                tooltip: 'settle_up_how_it_works'.tr(),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                onPressed: () => showSettleUpExplainerSheet(context),
+                icon: Icon(
+                  Icons.help_outline_rounded,
+                  size: 20,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
         ),
-        if (showHint) ...[
+        if (methodHint != null) ...[
           const SizedBox(height: 6),
           Text(
-            _methodHint(widget.settlementMethod),
+            methodHint,
             style: theme.textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),

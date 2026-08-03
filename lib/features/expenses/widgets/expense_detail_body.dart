@@ -10,6 +10,7 @@ import '../../../core/widgets/amount_with_secondary_display.dart';
 import '../../../core/widgets/participant_avatar.dart';
 import '../../../features/settings/providers/settings_framework_providers.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/expense_display_title.dart';
 import '../../../core/widgets/missing_route_page.dart';
 import '../../../core/widgets/user_text.dart';
 import '../../../domain/domain.dart';
@@ -127,6 +128,10 @@ class ExpenseDetailBody extends ConsumerWidget {
               amountCents: totalCents,
               displayCurrencyCode: displayCurrencyCode,
               showOriginalCurrency: useGroupCurrency,
+              fromName: nameOf[expense.payerParticipantId],
+              toName: expense.toParticipantId == null
+                  ? null
+                  : nameOf[expense.toParticipantId!],
             );
 
             final children = <Widget>[
@@ -346,6 +351,8 @@ class ExpenseDetailBodyHeader extends StatelessWidget {
   final int? amountCents;
   final String? displayCurrencyCode;
   final bool showOriginalCurrency;
+  final String? fromName;
+  final String? toName;
 
   const ExpenseDetailBodyHeader({
     super.key,
@@ -355,6 +362,8 @@ class ExpenseDetailBodyHeader extends StatelessWidget {
     this.amountCents,
     this.displayCurrencyCode,
     this.showOriginalCurrency = false,
+    this.fromName,
+    this.toName,
   });
 
   @override
@@ -449,7 +458,11 @@ class ExpenseDetailBodyHeader extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     UserText(
-                      expense.title,
+                      expenseDisplayTitle(
+                        expense,
+                        fromName: fromName,
+                        toName: toName,
+                      ),
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.headlineSmall?.copyWith(
