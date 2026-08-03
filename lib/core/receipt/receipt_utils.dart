@@ -10,6 +10,3 @@ bool isImageUrl(String? path) {
 
 /// Alias used by backup import strip logic.
 bool isNetworkImagePath(String? path) => isImageUrl(path);
-
-@Deprecated('Use isImageUrl instead.')
-bool isReceiptImageUrl(String? path) => isImageUrl(path);

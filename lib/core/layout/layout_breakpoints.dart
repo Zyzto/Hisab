@@ -26,32 +26,8 @@ class LayoutBreakpoints {
   /// Collapsed (icons-only) permanent sidenav width on desktop.
   static const double shellNavWidthCompact = 72.0;
 
-  /// Alias for [shellNavWidth] (historical name used by sheet centering).
-  static const double navigationRailWidth = shellNavWidth;
-
-  /// Former compact rail width; mid band no longer reserves space (temporary drawer).
-  @Deprecated(
-    'Use shellNavWidthCompact for desktop collapse; mid band reserves 0.',
-  )
-  static const double navigationRailWidthCompact = shellNavWidthCompact;
-
   /// Duration for shell sidenav width morph (mid↔desktop, expand/collapse).
   static const Duration shellNavMorphDuration = Duration(milliseconds: 280);
-
-  /// Returns the reserved shell nav width for layout / dialog centering.
-  ///
-  /// Prefer [ShellNavLayout.reservedWidth] when set by the shell (tracks
-  /// collapse). Fallback: full width on desktop, **0** below desktop.
-  static double navigationRailWidthFor(BuildContext context) {
-    return shellNavWidthFor(context);
-  }
-
-  /// Same as [navigationRailWidthFor].
-  static double shellNavWidthFor(BuildContext context) {
-    // Imported lazily via callback in responsive_sheet to avoid cycles;
-    // callers that need live width should read ShellNavLayout.reservedWidth.
-    return isDesktopOrWider(context) ? shellNavWidth : 0.0;
-  }
 
   /// True when width >= [breakpointTablet] (tablet layouts, sheet-as-dialog, etc.).
   static bool isTabletOrWider(BuildContext context) {

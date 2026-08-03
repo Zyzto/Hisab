@@ -119,4 +119,22 @@ void main() {
     );
     expect(scrim, findsOneWidget);
   });
+
+  testWidgets('footer content inset clears chrome plus home indicator', (
+    tester,
+  ) async {
+    late double inset;
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(padding: EdgeInsets.only(bottom: 34)),
+        child: Builder(
+          builder: (context) {
+            inset = onboardingFooterContentInset(context);
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
+    expect(inset, kOnboardingFooterChromeHeight + 34);
+  });
 }

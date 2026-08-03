@@ -153,23 +153,6 @@ Widget buildExpenseImageView(
   );
 }
 
-@Deprecated('Use showExpenseImageFullScreen instead.')
-void showReceiptImageFullScreen(BuildContext context, String imagePath) =>
-    showExpenseImageFullScreen(context, imagePath);
-
-@Deprecated('Use buildExpenseImageView instead.')
-Widget buildReceiptImageView(
-  BuildContext context,
-  String? imagePath, {
-  double? maxHeight,
-  BoxFit fit = BoxFit.cover,
-}) => buildExpenseImageView(
-  context,
-  imagePath,
-  maxHeight: maxHeight,
-  fit: fit,
-);
-
 Widget _buildImageLoadingSkeleton(BuildContext context) {
   final colorScheme = Theme.of(context).colorScheme;
   return DecoratedBox(

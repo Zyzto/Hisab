@@ -41,4 +41,13 @@ void main() {
     body.render(Canvas(recorder));
     recorder.endRecording().dispose();
   });
+
+  test('contentStartY sits just below the disc for a phone viewport', () {
+    const screen = Size(390, 844);
+    final start = OnboardingCelestial.contentStartY(screen);
+    // Disc radius = min*0.075 = 29.25; center at max(0.15*H, halo*0.9).
+    expect(start, greaterThan(screen.height * 0.15));
+    expect(start, lessThan(screen.height * 0.28));
+    expect(OnboardingCelestial.contentStartY(Size.zero), 0);
+  });
 }

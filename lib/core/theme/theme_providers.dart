@@ -1,17 +1,26 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart' show Provider;
 import 'package:flutter_riverpod/legacy.dart' show StateProvider;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'accent_style.dart';
 import 'experiment_styles.dart';
 import 'flex_theme_builder.dart';
+import '../debug/debug_menu.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
 
 part 'theme_providers.g.dart';
 
 /// Experiment: cycle through 6 app styles (Default + 5 Material 3). In memory only.
+/// Active only when [showDebugMenuProvider] is true (debug / Hisab Debug).
 final experimentStyleIndexProvider = StateProvider<int>((ref) => 0);
+
+/// Effective style index: always 0 outside debug / Hisab Debug builds.
+final effectiveExperimentStyleIndexProvider = Provider<int>((ref) {
+  if (!ref.watch(showDebugMenuProvider)) return 0;
+  return ref.watch(experimentStyleIndexProvider);
+});
 
 const _experimentStyleKeys = [
   'theme_style_default',
@@ -42,7 +51,7 @@ class AppThemes {
 /// fontSizeScale, subtleAccents, or experiment style index change.
 @riverpod
 AppThemes appThemes(Ref ref) {
-  final experimentIndex = ref.watch(experimentStyleIndexProvider);
+  final experimentIndex = ref.watch(effectiveExperimentStyleIndexProvider);
   final themeModeValue = ref.watch(themeModeProvider);
   final themeSchemeValue = ref.watch(themeSchemeProvider);
   final themeColorValue = ref.watch(themeColorProvider);

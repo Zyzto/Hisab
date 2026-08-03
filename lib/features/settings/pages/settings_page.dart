@@ -24,6 +24,7 @@ import '../../../core/constants/supabase_config.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/platform/network_image_decode.dart';
+import '../../../core/receipt/receipt_scan_capability.dart';
 import '../../../core/update/update_check_providers.dart';
 import '../../../core/services/delete_my_data_service.dart';
 import '../../../core/services/github_user_client.dart';
@@ -203,7 +204,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (!mounted || token != _scrollGeneration) return;
 
     _captureVisibleOffsets(_indexEntries(
-      showReceiptAi: !kIsWeb,
+      showReceiptAi: ReceiptScanCapability.showReceiptAiSettings,
       showScanner: scannerAvailable,
     ));
     // Hold scroll-spy until ensureVisible settles so the index doesn't flash.
@@ -256,6 +257,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     'scanner_notify_on_capture': 'action_scanner_hub',
     'gemini_api_key': 'receipt_ai_provider',
     'openai_api_key': 'receipt_ai_provider',
+    'receipt_ai_provider': 'receipt_scan_mode',
   };
 
   bool _includeSearchResult(SearchResult result) {
@@ -264,7 +266,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       return false;
     }
     if (section == 'home_list') return false;
-    if (section == 'receipt_ai' && kIsWeb) return false;
+    if (section == 'receipt_ai' &&
+        !ReceiptScanCapability.showReceiptAiSettings) {
+      return false;
+    }
     if (section == 'scanner' && !scannerAvailable) return false;
     return true;
   }
@@ -359,7 +364,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       );
     }
 
-    final showReceiptAi = !kIsWeb;
+    final showReceiptAi = ReceiptScanCapability.showReceiptAiSettings;
     final showScanner = scannerAvailable;
     final entries = _indexEntries(
       showReceiptAi: showReceiptAi,

@@ -43,12 +43,22 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="io.supabase.hisab" android:host="invite"/>
             </intent-filter>
-            <!-- OAuth callback: io.supabase.hisab://callback (Google/GitHub sign-in return) -->
+            <!-- OAuth / magic-link callback: io.supabase.hisab://callback -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="io.supabase.hisab" android:host="callback"/>
+            </intent-filter>
+            <!-- HTTPS App Links: https://hisab.shenepoy.com/invite/... -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="https"
+                    android:host="hisab.shenepoy.com"
+                    android:pathPrefix="/invite"/>
             </intent-filter>
         </activity>
         <!-- Transaction notification scanner (opt-in, disabled by default).

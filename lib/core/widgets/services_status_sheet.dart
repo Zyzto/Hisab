@@ -59,12 +59,13 @@ class _ServicesStatusSheetState extends ConsumerState<_ServicesStatusSheet> {
   @override
   Widget build(BuildContext context) {
     final syncStatus = ref.watch(syncStatusForDisplayProvider);
-    final aiEnabled = !kIsWeb && ref.watch(receiptAiEnabledProvider);
+    final scanMode = ref.watch(receiptScanModeProvider);
+    final cloudAi = !kIsWeb && scanMode == 'cloud';
     final aiProvider = ref.watch(receiptAiProviderProvider);
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final showGemini = aiEnabled && (aiProvider == 'gemini');
-    final showOpenAI = aiEnabled && (aiProvider == 'openai');
+    final showGemini = cloudAi && (aiProvider == 'gemini');
+    final showOpenAI = cloudAi && (aiProvider == 'openai');
 
     return DraggableScrollableSheet(
       initialChildSize: 0.5,

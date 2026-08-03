@@ -344,7 +344,7 @@ class _InviteResultViewState extends State<_InviteResultView> {
         ? inviteLinkBaseUrl.substring(0, inviteLinkBaseUrl.length - 1)
         : inviteLinkBaseUrl;
     final url = supabaseConfigAvailable
-        ? '$base/functions/v1/invite-redirect?token=${widget.token}'
+        ? '$base/functions/v1/invite-redirect?token=${Uri.encodeQueryComponent(widget.token)}'
         : '';
 
     if (url.isEmpty) {

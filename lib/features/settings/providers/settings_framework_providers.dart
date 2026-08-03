@@ -98,6 +98,64 @@ Future<void> runThemeSchemeTealMigration(SettingsProviders settings) async {
   }
 }
 
+/// Derive [receipt_scan_mode] from legacy OCR/AI toggles (one-time).
+String receiptScanModeFromLegacy({
+  required bool ocrEnabled,
+  required bool aiEnabled,
+  required String provider,
+}) {
+  final p = provider.trim();
+  if (aiEnabled && (p == 'gemini' || p == 'openai')) {
+    return 'cloud';
+  }
+  if (aiEnabled) {
+    return ocrEnabled ? 'local' : 'off';
+  }
+  if (ocrEnabled) return 'local';
+  return 'off';
+}
+
+/// One-time migration: OCR/AI bools → receipt_scan_mode.
+Future<void> runReceiptScanModeMigration(SettingsProviders settings) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('receipt_scan_mode_migrated') == true) return;
+
+    // If user already has the new key (fresh install after upgrade path), skip derive.
+    final existing = prefs.getString('receipt_scan_mode');
+    if (existing == null || existing.isEmpty) {
+      final ocr = prefs.getBool('receipt_ocr_enabled') ?? false;
+      final ai = prefs.getBool('receipt_ai_enabled') ?? false;
+      final provider = prefs.getString('receipt_ai_provider') ?? 'none';
+      final mode = receiptScanModeFromLegacy(
+        ocrEnabled: ocr,
+        aiEnabled: ai,
+        provider: provider,
+      );
+      settings.controller.set(receiptScanModeSettingDef, mode);
+      Log.info(
+        'Setting changed: ${receiptScanModeSettingDef.key}=$mode (migration)',
+      );
+    }
+
+    // Coerce legacy provider "none" to gemini.
+    final provider = prefs.getString('receipt_ai_provider');
+    if (provider == null || provider == 'none' || provider.isEmpty) {
+      settings.controller.set(receiptAiProviderSettingDef, 'gemini');
+    }
+
+    await prefs.remove('receipt_ocr_enabled');
+    await prefs.remove('receipt_ai_enabled');
+    await prefs.setBool('receipt_scan_mode_migrated', true);
+  } catch (e, stackTrace) {
+    Log.warning(
+      'receipt_scan_mode migration failed',
+      error: e,
+      stackTrace: stackTrace,
+    );
+  }
+}
+
 Future<SettingsProviders?> initializeHisabSettings() async {
   try {
     final registry = createHisabSettingsRegistry();
@@ -112,6 +170,7 @@ Future<SettingsProviders?> initializeHisabSettings() async {
     if (providers != null) {
       await runThemeSchemeMigration(providers);
       await runThemeSchemeTealMigration(providers);
+      await runReceiptScanModeMigration(providers);
     }
     return providers;
   } catch (e, stackTrace) {
@@ -164,34 +223,18 @@ bool effectiveLocalOnly(Ref ref) {
 }
 
 @riverpod
-bool receiptOcrEnabled(Ref ref) {
+String receiptScanMode(Ref ref) {
   try {
     final settings = ref.watch(hisabSettingsProvidersProvider);
-    if (settings == null) return false;
-    return ref.watch(settings.provider(receiptOcrEnabledSettingDef));
+    if (settings == null) return 'off';
+    return ref.watch(settings.provider(receiptScanModeSettingDef));
   } catch (e, stackTrace) {
     Log.warning(
-      'receiptOcrEnabled read failed, defaulting to false',
+      'receiptScanMode read failed, defaulting to off',
       error: e,
       stackTrace: stackTrace,
     );
-    return false;
-  }
-}
-
-@riverpod
-bool receiptAiEnabled(Ref ref) {
-  try {
-    final settings = ref.watch(hisabSettingsProvidersProvider);
-    if (settings == null) return false;
-    return ref.watch(settings.provider(receiptAiEnabledSettingDef));
-  } catch (e, stackTrace) {
-    Log.warning(
-      'receiptAiEnabled read failed, defaulting to false',
-      error: e,
-      stackTrace: stackTrace,
-    );
-    return false;
+    return 'off';
   }
 }
 
@@ -199,15 +242,17 @@ bool receiptAiEnabled(Ref ref) {
 String receiptAiProvider(Ref ref) {
   try {
     final settings = ref.watch(hisabSettingsProvidersProvider);
-    if (settings == null) return 'none';
-    return ref.watch(settings.provider(receiptAiProviderSettingDef));
+    if (settings == null) return 'gemini';
+    final value = ref.watch(settings.provider(receiptAiProviderSettingDef));
+    if (value == 'none' || value.isEmpty) return 'gemini';
+    return value;
   } catch (e, stackTrace) {
     Log.warning(
-      'receiptAiProvider read failed, defaulting to none',
+      'receiptAiProvider read failed, defaulting to gemini',
       error: e,
       stackTrace: stackTrace,
     );
-    return 'none';
+    return 'gemini';
   }
 }
 

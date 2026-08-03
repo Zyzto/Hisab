@@ -28,6 +28,7 @@ import '../../settings/settings_definitions.dart';
 import '../widgets/onboarding_connect_page.dart';
 import '../widgets/onboarding_permissions_page.dart';
 import '../widgets/onboarding_preferences_page.dart';
+import '../widgets/onboarding_shared.dart';
 import '../widgets/onboarding_sky_backdrop.dart';
 import '../widgets/onboarding_welcome_page.dart';
 
@@ -316,76 +317,99 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
     return Scaffold(
       // Keep theme scaffold fill under transparent grass/nav so parent
       // routes can't flash white through the meadow.
+      // expand: in widget tests the sky is a zero-size shrink, and every
+      // other child is Positioned — without expand the stack collapses to 0.
       body: Stack(
+        fit: StackFit.expand,
         children: [
           const OnboardingSkyBackdrop(),
-          SafeArea(
-            child: AbsorbPointer(
-              absorbing: _isCompleting,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(
-                    child: ConstrainedContent(
-                      child: PageView.builder(
-                        controller: _pageController,
-                        itemCount: 4,
-                        physics: _isCompleting
-                            ? const NeverScrollableScrollPhysics()
-                            : null,
-                        onPageChanged: (i) {
-                          setState(() {
-                            _currentPage = i;
-                            _ensurePermissionStatusLoaded();
-                          });
-                          _syncDecorativeUrlToPage(i);
-                        },
-                        itemBuilder: (context, index) {
-                          return _KeepAliveOnboardingStep(
-                            child: RepaintBoundary(
-                              child: switch (index) {
-                                0 => const OnboardingWelcomePage(),
-                                1 => const OnboardingPreferencesPage(),
-                                2 => OnboardingPermissionsPage(
-                                  settings: settings,
-                                  onlineAvailable: onlineAvailable,
-                                  cameraGranted: _cameraGranted,
-                                  notificationGranted: _notificationGranted,
-                                  permissionStatusFuture:
-                                      _permissionStatusFuture,
-                                  onRequestCamera: () async {
-                                    final result = await PermissionService
-                                        .requestCameraPermission(context);
-                                    if (mounted) {
-                                      setState(() => _cameraGranted = result);
-                                    }
-                                  },
-                                  onRequestNotification: () async {
-                                    final result = await PermissionService
-                                        .requestNotificationPermission(
-                                          context,
+          // Steps fill under the footer so list rows can peek through the
+          // soft wash (scroll affordance without a chevron). Column+Expanded
+          // keeps [ConstrainedContent]'s tablet Row height-bounded.
+          Positioned.fill(
+            child: SafeArea(
+              bottom: false,
+              child: AbsorbPointer(
+                absorbing: _isCompleting,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: ConstrainedContent(
+                        child: PageView.builder(
+                          controller: _pageController,
+                          itemCount: 4,
+                          physics: _isCompleting
+                              ? const NeverScrollableScrollPhysics()
+                              : null,
+                          onPageChanged: (i) {
+                            setState(() {
+                              _currentPage = i;
+                              _ensurePermissionStatusLoaded();
+                            });
+                            _syncDecorativeUrlToPage(i);
+                          },
+                          itemBuilder: (context, index) {
+                            return _KeepAliveOnboardingStep(
+                              child: RepaintBoundary(
+                                child: switch (index) {
+                                  0 => const OnboardingWelcomePage(),
+                                  1 => const OnboardingPreferencesPage(),
+                                  2 => OnboardingPermissionsPage(
+                                    settings: settings,
+                                    onlineAvailable: onlineAvailable,
+                                    cameraGranted: _cameraGranted,
+                                    notificationGranted: _notificationGranted,
+                                    permissionStatusFuture:
+                                        _permissionStatusFuture,
+                                    onRequestCamera: () async {
+                                      final result = await PermissionService
+                                          .requestCameraPermission(context);
+                                      if (mounted) {
+                                        setState(
+                                          () => _cameraGranted = result,
                                         );
-                                    if (mounted) {
-                                      setState(
-                                        () => _notificationGranted = result,
-                                      );
-                                    }
-                                  },
-                                ),
-                                _ => OnboardingConnectPage(
-                                  settings: settings,
-                                  onlineAvailable: onlineAvailable,
-                                ),
-                              },
-                            ),
-                          );
-                        },
+                                      }
+                                    },
+                                    onRequestNotification: () async {
+                                      final result =
+                                          await PermissionService
+                                              .requestNotificationPermission(
+                                                context,
+                                              );
+                                      if (mounted) {
+                                        setState(
+                                          () =>
+                                              _notificationGranted = result,
+                                        );
+                                      }
+                                    },
+                                  ),
+                                  _ => OnboardingConnectPage(
+                                    settings: settings,
+                                    onlineAvailable: onlineAvailable,
+                                  ),
+                                },
+                              ),
+                            );
+                          },
+                        ),
                       ),
                     ),
-                  ),
-                  _buildFooter(context, colorScheme, settings),
-                ],
+                  ],
+                ),
               ),
+            ),
+          ),
+          // Full-bleed to the physical bottom so the home-indicator gap
+          // never shows a clear triangle of meadow under the scrim.
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: AbsorbPointer(
+              absorbing: _isCompleting,
+              child: _buildFooter(context, colorScheme, settings),
             ),
           ),
           if (_isCompleting)
@@ -426,52 +450,74 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
   /// Step dots + nav row, washed over the grass band so their labels stay
   /// readable.
   ///
-  /// The scrim is full-bleed while the chrome inside stays in the content
-  /// band, otherwise wide screens would show a floating panel edge.
+  /// Layout (bottom → top):
+  /// - chrome band + home-indicator inset (hit-testable)
+  /// - soft fade extension above it ([kOnboardingFooterFadeExtension]),
+  ///   non-hit-testable so the step list can scroll/show through
+  ///
+  /// The scrim is full-bleed to the screen bottom; chrome stays content-width.
   Widget _buildFooter(
     BuildContext context,
     ColorScheme colorScheme,
     SettingsProviders settings,
   ) {
     final surface = colorScheme.surface;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            surface.withValues(alpha: 0),
-            surface.withValues(alpha: 0.76),
-            surface.withValues(alpha: 0.92),
-          ],
-          // Ramps early: the step dots sit near the top of this band and the
-          // grass underneath is at full saturation there.
-          stops: const [0.0, 0.26, 1.0],
-        ),
-      ),
-      // Not [ConstrainedContent]: it stretches its Row cross-axis, which needs
-      // a bounded height, and the footer sizes to its content.
-      child: Align(
-        alignment: Alignment.topCenter,
-        heightFactor: 1,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: LayoutBreakpoints.contentMaxWidth(context),
-          ),
-          // Head start for the gradient, so the dots aren't sitting on the
-          // untouched top edge of the wash.
-          child: Padding(
-            padding: const EdgeInsets.only(top: ThemeConfig.spacingM),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildPageIndicator(context),
-                _buildNavigationBar(context, colorScheme, settings),
-              ],
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IgnorePointer(
+          child: SizedBox(
+            height: kOnboardingFooterFadeExtension,
+            width: double.infinity,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    surface.withValues(alpha: 0),
+                    surface.withValues(alpha: 0.40),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
-      ),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                surface.withValues(alpha: 0.40),
+                surface.withValues(alpha: 0.88),
+                surface.withValues(alpha: 0.97),
+              ],
+              stops: const [0.0, 0.42, 1.0],
+            ),
+          ),
+          child: Padding(
+            // Paint under the OS home indicator so no meadow triangle leaks.
+            padding: EdgeInsets.only(bottom: bottomInset),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: LayoutBreakpoints.contentMaxWidth(context),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildPageIndicator(context),
+                    _buildNavigationBar(context, colorScheme, settings),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -843,6 +889,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
               await ref.read(dataSyncServiceProvider.notifier).syncNow();
               break;
             case SignInResult.pendingRedirect:
+            case SignInResult.pendingEmailLink:
               ref
                   .read(
                     settings
@@ -851,7 +898,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                   )
                   .set(true);
               Log.info(
-                'Setting changed: ${onboardingOnlinePendingSettingDef.key}=true',
+                'Setting changed: ${onboardingOnlinePendingSettingDef.key}=true '
+                '(${result.name})',
               );
               return;
             case SignInResult.cancelled:

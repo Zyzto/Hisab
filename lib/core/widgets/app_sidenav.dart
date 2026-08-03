@@ -90,13 +90,13 @@ class AppSidenav extends ConsumerWidget {
                 collapsed: collapsed,
                 onToggleCompact: asDrawer ? null : onToggleCompact,
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 8),
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: asDrawer ? 10 : 0),
+                padding: EdgeInsets.symmetric(horizontal: asDrawer ? 12 : 0),
                 child: Column(
                   children: [
                     for (var i = 0; i < _destinations.length; i++) ...[
-                      if (i > 0) const SizedBox(height: 4),
+                      if (i > 0) const SizedBox(height: 6),
                       _SidenavDestTile(
                         asDrawer: asDrawer,
                         collapsed: collapsed,
@@ -118,9 +118,9 @@ class AppSidenav extends ConsumerWidget {
               const Spacer(),
               Padding(
                 padding: EdgeInsets.fromLTRB(
-                  asDrawer ? 10 : 0,
+                  asDrawer ? 12 : 0,
                   8,
-                  asDrawer ? 10 : 0,
+                  asDrawer ? 12 : 0,
                   4,
                 ),
                 child: _UserBlock(
@@ -272,7 +272,7 @@ class _SidenavDestTile extends StatelessWidget {
       maxLines: 1,
       softWrap: false,
       overflow: TextOverflow.ellipsis,
-      style: theme.textTheme.bodyMedium?.copyWith(
+      style: theme.textTheme.titleSmall?.copyWith(
         color: selected ? cs.onSurface : cs.onSurfaceVariant,
         fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
       ),
@@ -283,28 +283,34 @@ class _SidenavDestTile extends StatelessWidget {
         color: selected
             ? AccentSurfaces.emphasizedFill(cs, subtle: subtle)
             : Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         child: InkWell(
           canRequestFocus: false,
           onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           child: Ink(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: selected
                     ? AccentSurfaces.emphasizedBorder(cs, subtle: subtle)
                     : cs.outlineVariant.withValues(alpha: 0.35),
               ),
             ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              child: Row(
-                children: [
-                  Icon(icon, size: 20, color: fg),
-                  const SizedBox(width: 10),
-                  Expanded(child: labelText),
-                ],
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 52),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                child: Row(
+                  children: [
+                    Icon(icon, size: 24, color: fg),
+                    const SizedBox(width: 14),
+                    Expanded(child: labelText),
+                  ],
+                ),
               ),
             ),
           ),
@@ -322,15 +328,15 @@ class _SidenavDestTile extends StatelessWidget {
         color: selected
             ? AccentSurfaces.emphasizedFill(cs, subtle: subtle)
             : Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           canRequestFocus: false,
           onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           child: Ink(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: selected
                     ? AccentSurfaces.emphasizedBorder(cs, subtle: subtle)
@@ -338,9 +344,9 @@ class _SidenavDestTile extends StatelessWidget {
               ),
             ),
             child: SizedBox(
-              height: 40,
+              height: 48,
               width: iconCol - inset * 2,
-              child: Center(child: Icon(icon, size: 20, color: fg)),
+              child: Center(child: Icon(icon, size: 24, color: fg)),
             ),
           ),
         ),
@@ -354,9 +360,15 @@ class _SidenavDestTile extends StatelessWidget {
           child: GestureDetector(
             onTap: onTap,
             behavior: HitTestBehavior.opaque,
-            child: Padding(
-              padding: const EdgeInsetsDirectional.only(end: 12),
-              child: labelText,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 52),
+              child: Padding(
+                padding: const EdgeInsetsDirectional.only(end: 12),
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: labelText,
+                ),
+              ),
             ),
           ),
         ),
@@ -394,7 +406,7 @@ class _UserBlock extends StatelessWidget {
     final avatar = ParticipantAvatar(
       name: displayName,
       avatarId: avatarId,
-      radius: 18,
+      radius: 20,
       backgroundColor: cs.primaryContainer,
       foregroundColor: cs.onPrimaryContainer,
     );
@@ -408,7 +420,7 @@ class _UserBlock extends StatelessWidget {
           maxLines: 1,
           softWrap: false,
           overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.bodyMedium?.copyWith(
+          style: theme.textTheme.titleSmall?.copyWith(
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -439,23 +451,26 @@ class _UserBlock extends StatelessWidget {
     if (asDrawer) {
       return Material(
         color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            child: Row(
-              children: [
-                avatar,
-                const SizedBox(width: 10),
-                Expanded(child: textColumn),
-                Icon(
-                  signedIn ? Icons.chevron_right : Icons.login,
-                  size: 18,
-                  color: cs.onSurfaceVariant,
-                ),
-              ],
+          borderRadius: BorderRadius.circular(14),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 56),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  avatar,
+                  const SizedBox(width: 14),
+                  Expanded(child: textColumn),
+                  Icon(
+                    signedIn ? Icons.chevron_right : Icons.login,
+                    size: 22,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -468,13 +483,13 @@ class _UserBlock extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: inset, vertical: 4),
       child: Material(
         color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           child: SizedBox(
-            height: 48,
+            height: 56,
             width: iconCol - inset * 2,
             child: Center(child: avatar),
           ),
@@ -489,9 +504,15 @@ class _UserBlock extends StatelessWidget {
           child: GestureDetector(
             onTap: onTap,
             behavior: HitTestBehavior.opaque,
-            child: Padding(
-              padding: const EdgeInsetsDirectional.only(end: 12),
-              child: textColumn,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 56),
+              child: Padding(
+                padding: const EdgeInsetsDirectional.only(end: 12),
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: textColumn,
+                ),
+              ),
             ),
           ),
         ),

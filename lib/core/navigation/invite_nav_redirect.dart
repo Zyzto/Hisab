@@ -24,9 +24,23 @@ String? pendingInviteRedirectTarget({
   // Never yank the user off register/login or privacy.
   // (Cold-start invite links use InviteLinkHandler.go instead of this path.)
   if (onOnboarding || onPrivacyPolicy) return null;
-  // Already on invite/preview — keep token for post-auth auto-join.
-  if (isInviteRoutePath(currentPath)) return null;
+  // Already on the same invite/preview — keep token for post-auth auto-join.
+  if (isInviteRoutePath(currentPath)) {
+    final currentToken = inviteTokenFromPath(currentPath);
+    if (currentToken == null || currentToken == pendingToken) return null;
+    // Warm app received a different invite — navigate to the new token.
+    return '/invite/$pendingToken';
+  }
   return '/invite/$pendingToken';
+}
+
+/// Token segment from `/invite/<token>` or `/invite/<token>/...`; null for bare `/invite`.
+String? inviteTokenFromPath(String path) {
+  if (!isInviteRoutePath(path)) return null;
+  final segments = path.split('/').where((s) => s.isNotEmpty).toList();
+  if (segments.length < 2 || segments.first != 'invite') return null;
+  final token = segments[1].trim();
+  return token.isEmpty ? null : token;
 }
 
 /// Whether a camera/process-kill route restore may run.
@@ -39,7 +53,19 @@ bool shouldRestoreLastRoute({
   if (!onboardingCompleted) return false;
   if (pendingToken.isNotEmpty) return false;
   if (lastPath.isEmpty || lastPath == '/') return false;
+  // Invites are entry flows — never restore them after process kill.
+  if (isInviteRoutePath(lastPath)) return false;
   return true;
+}
+
+/// Whether a pending invite token should still force navigation to /invite.
+/// Without auto-join (or mid-auth), a stale token alone must not bounce home.
+bool shouldRedirectPendingInvite({
+  required String pendingToken,
+  required bool autoJoinFlag,
+}) {
+  if (pendingToken.isEmpty) return false;
+  return autoJoinFlag;
 }
 
 /// After onboarding is marked complete while still on an onboarding route.

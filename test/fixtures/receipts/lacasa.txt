@@ -1,0 +1,20 @@
+For Order & Delivery 012 6779995
+Simplified Tax Invoice
+Order# 68
+Printed At: 2026/01/20 08:15:08 PM
+Check# 159493
+Dine In
+2026/01/20 08:14:05 PM
+Qty Item Price
+1 Special La casa - Large 45.00
+1 Penne Pomodoro 31.00
+Chicken 5.00
+1 Fresh orange juice 13.00
+Subtotal 81.74
+VAT(15.0%) 12.26
+Total 94.00
+Payment - POS 94.00
+Products Count 3
+VAT : 300510597900003
+The Price with VAT Thanks - السعر شامل الضريبة
+La Casa

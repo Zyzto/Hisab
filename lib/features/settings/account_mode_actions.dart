@@ -164,12 +164,13 @@ class AccountModeActions {
         }
         await runMigration(context, ref, settings);
       case SignInResult.pendingRedirect:
+      case SignInResult.pendingEmailLink:
         ref
             .read(settings.provider(settingsOnlinePendingSettingDef).notifier)
             .set(true);
         Log.info(
           'Setting changed: ${settingsOnlinePendingSettingDef.key}=true '
-          '(OAuth redirect pending)',
+          '(${result.name})',
         );
       case SignInResult.cancelled:
         break;

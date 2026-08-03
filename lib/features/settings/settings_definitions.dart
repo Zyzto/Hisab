@@ -284,6 +284,23 @@ final lastRoutePathSettingDef = const StringSetting(
   visible: false,
 );
 
+/// In-flight camera/gallery pick (`attach` / `scan`). Survives process death
+/// and blocks clearing [lastRoutePathSettingDef] during camera resume flicker.
+final pendingImagePickModeSettingDef = const StringSetting(
+  'pending_image_pick_mode',
+  defaultValue: '',
+  titleKey: 'pending_image_pick_mode',
+  icon: Icons.document_scanner_outlined,
+  section: 'appearance',
+  order: -6,
+  visible: false,
+);
+
+abstract final class PendingImagePickMode {
+  static const attach = 'attach';
+  static const scan = 'scan';
+}
+
 /// When true, app uses only local storage (PowerSync SQLite). When false, syncs with Supabase.
 final localOnlySettingDef = const BoolSetting(
   'local_only',
@@ -311,50 +328,45 @@ final localDataFromOnlineUserIdSettingDef = const StringSetting(
   visible: false,
 );
 
-/// When true, run OCR on scanned images (and optionally AI). When false, only attach the picture.
-final receiptOcrEnabledSettingDef = const BoolSetting(
-  'receipt_ocr_enabled',
-  defaultValue: false,
-  titleKey: 'receipt_ocr_enabled',
-  subtitleKey: 'receipt_ocr_enabled_description',
+/// Receipt scan mode: off | local | nano | cloud.
+final receiptScanModeSettingDef = const EnumSetting(
+  'receipt_scan_mode',
+  defaultValue: 'off',
+  titleKey: 'receipt_scan_mode',
+  options: ['off', 'local', 'nano', 'cloud'],
+  optionLabels: {
+    'off': 'receipt_scan_mode_off',
+    'local': 'receipt_scan_mode_local',
+    'nano': 'receipt_scan_mode_nano',
+    'cloud': 'receipt_scan_mode_cloud',
+  },
   icon: Icons.document_scanner,
   section: 'receipt_ai',
   order: 0,
   searchTerms: {
-    'en': ['ocr', 'scan', 'receipt'],
-    'ar': ['مسح', 'إيصال'],
+    'en': ['ocr', 'scan', 'receipt', 'nano', 'local', 'cloud', 'ai'],
+    'ar': ['مسح', 'إيصال', 'ذكاء'],
   },
 );
 
-/// When true, use AI (Gemini/OpenAI) to extract receipt details from scanned image.
-final receiptAiEnabledSettingDef = const BoolSetting(
-  'receipt_ai_enabled',
-  defaultValue: false,
-  titleKey: 'receipt_ai_enabled',
-  subtitleKey: 'receipt_ai_enabled_description',
-  icon: Icons.auto_awesome,
-  section: 'receipt_ai',
-  order: 1,
-  searchTerms: {
-    'en': ['ai', 'llm', 'gemini', 'openai'],
-    'ar': ['ذكاء', 'اصطناعي'],
-  },
-);
-
-/// Which LLM provider to use for receipt extraction.
+/// Which cloud LLM provider to use when mode is cloud.
 final receiptAiProviderSettingDef = const EnumSetting(
   'receipt_ai_provider',
-  defaultValue: 'none',
+  defaultValue: 'gemini',
   titleKey: 'receipt_ai_provider',
-  options: ['none', 'gemini', 'openai'],
+  options: ['gemini', 'openai', 'hisab'],
   optionLabels: {
-    'none': 'receipt_ai_provider_none',
     'gemini': 'receipt_ai_provider_gemini',
     'openai': 'receipt_ai_provider_openai',
+    'hisab': 'receipt_ai_provider_hisab',
   },
   icon: Icons.cloud,
   section: 'receipt_ai',
-  order: 2,
+  order: 1,
+  searchTerms: {
+    'en': ['ai', 'llm', 'gemini', 'openai', 'hisab'],
+    'ar': ['ذكاء', 'اصطناعي'],
+  },
 );
 
 /// Gemini API key (Google AI for Developers). Used when provider is gemini.
@@ -364,7 +376,7 @@ final geminiApiKeySettingDef = const StringSetting(
   titleKey: 'gemini_api_key',
   icon: Icons.key,
   section: 'receipt_ai',
-  order: 3,
+  order: 2,
   searchTerms: {
     'en': ['api key', 'google'],
     'ar': ['مفتاح'],
@@ -378,7 +390,7 @@ final openaiApiKeySettingDef = const StringSetting(
   titleKey: 'openai_api_key',
   icon: Icons.key,
   section: 'receipt_ai',
-  order: 4,
+  order: 3,
   searchTerms: {
     'en': ['api key', 'chatgpt'],
     'ar': ['مفتاح'],
@@ -819,6 +831,7 @@ final allSettings = <SettingDefinition>[
   pendingInviteTokenSettingDef,
   pendingInviteAutoJoinSettingDef,
   lastRoutePathSettingDef,
+  pendingImagePickModeSettingDef,
   themeModeSettingDef,
   themeSchemeSettingDef,
   themeColorSettingDef,
@@ -834,8 +847,7 @@ final allSettings = <SettingDefinition>[
   expenseFormExpandBillBreakdownSettingDef,
   localOnlySettingDef,
   localDataFromOnlineUserIdSettingDef,
-  receiptOcrEnabledSettingDef,
-  receiptAiEnabledSettingDef,
+  receiptScanModeSettingDef,
   receiptAiProviderSettingDef,
   geminiApiKeySettingDef,
   openaiApiKeySettingDef,

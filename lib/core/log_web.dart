@@ -32,7 +32,7 @@ void _captureLine(String line) {
 }
 
 /// Captures a line from [print] on web. Used by the Zone in [main] so that
-/// EasyLogger (and any other code using [print]) appears in the View Logs dialog.
+/// print-based loggers appear in the View Logs dialog.
 /// Same filtering and cap as [debugPrint] capture. Call only when [kIsWeb].
 void capturePrintLine(String line) {
   if (line.isEmpty) return;

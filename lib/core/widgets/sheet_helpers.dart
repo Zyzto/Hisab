@@ -98,63 +98,58 @@ Widget buildSheetShell(
   bool showTitleInBody = true,
 }) {
   return SafeArea(
-    child: Align(
-      alignment: Alignment.topCenter,
-      heightFactor: 1,
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: EdgeInsets.only(
-            top: showTitleInBody ? 0 : _kSheetPadding,
-            bottom: MediaQuery.of(ctx).padding.bottom + _kSheetPadding,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (showTitleInBody)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    _kSheetPadding,
-                    _kSheetPadding,
-                    _kSheetPadding,
-                    8,
-                  ),
-                  child: UserText(
-                    title,
-                    style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
+    child: SingleChildScrollView(
+      child: Padding(
+        padding: EdgeInsets.only(
+          top: showTitleInBody ? 0 : _kSheetPadding,
+          bottom: MediaQuery.of(ctx).padding.bottom + _kSheetPadding,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (showTitleInBody)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: _kSheetPadding),
-                child: body,
-              ),
-              if (actions.isNotEmpty) ...[
-                const SizedBox(height: _kSheetBodyActionsGap),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: _kSheetPadding,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      for (int i = 0; i < actions.length; i++) ...[
-                        if (i > 0)
-                          const SizedBox(width: _kSheetActionsSpacing),
-                        Focus(
-                          canRequestFocus: false,
-                          skipTraversal: true,
-                          descendantsAreFocusable: false,
-                          child: actions[i],
-                        ),
-                      ],
-                    ],
+                padding: const EdgeInsets.fromLTRB(
+                  _kSheetPadding,
+                  _kSheetPadding,
+                  _kSheetPadding,
+                  8,
+                ),
+                child: UserText(
+                  title,
+                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-              ],
+              ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: _kSheetPadding),
+              child: body,
+            ),
+            if (actions.isNotEmpty) ...[
+              const SizedBox(height: _kSheetBodyActionsGap),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: _kSheetPadding,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    for (int i = 0; i < actions.length; i++) ...[
+                      if (i > 0) const SizedBox(width: _kSheetActionsSpacing),
+                      Focus(
+                        canRequestFocus: false,
+                        skipTraversal: true,
+                        descendantsAreFocusable: false,
+                        child: actions[i],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ],
-          ),
+          ],
         ),
       ),
     ),

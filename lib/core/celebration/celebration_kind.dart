@@ -3,7 +3,7 @@ enum CelebrationKind {
   /// First non-transfer expense in a group.
   firstExpense,
 
-  /// A new expense (not a settlement transfer).
+  /// Preview / debug only — product flow no longer fires this on every expense.
   newExpense,
 
   /// Settlement / transfer recorded.
@@ -31,8 +31,10 @@ class CelebrationRequest {
   final DateTime at;
 }
 
-/// Stable dedupe keys so join/leave fire once per person per group.
+/// Stable dedupe keys so join/leave/first-expense fire once per event.
 abstract final class CelebrationKeys {
+  static String firstExpense(String groupId) => 'first-expense:$groupId';
+
   static String personJoined(String groupId, String participantId) =>
       'join:$groupId:$participantId';
 

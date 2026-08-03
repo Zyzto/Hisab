@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../constants/supabase_config.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
 import '../../features/settings/settings_definitions.dart';
+import 'invite_nav_redirect.dart';
+import 'last_route_restore.dart';
 
 /// Force online mode for invite flows when Supabase is configured.
 /// Call from post-frame callbacks or button handlers — never during build.
@@ -58,4 +60,31 @@ void persistPendingInviteToken(WidgetRef ref, String token) {
   Log.info(
     'Setting changed: ${pendingInviteTokenSettingDef.key}=(persisted from invite page)',
   );
+}
+
+/// Clear pending invite + auto-join and any invite last-route restore path.
+/// Call on every terminal invite outcome before navigating away.
+void clearInviteFlowState(WidgetRef ref) {
+  final settings = ref.read(hisabSettingsProvidersProvider);
+  if (settings == null) return;
+  final token = ref.read(settings.provider(pendingInviteTokenSettingDef));
+  if (token.isNotEmpty) {
+    ref.read(settings.provider(pendingInviteTokenSettingDef).notifier).set('');
+    Log.info(
+      'Setting changed: ${pendingInviteTokenSettingDef.key}=(cleared terminal)',
+    );
+  }
+  final autoJoin = ref.read(settings.provider(pendingInviteAutoJoinSettingDef));
+  if (autoJoin) {
+    ref
+        .read(settings.provider(pendingInviteAutoJoinSettingDef).notifier)
+        .set(false);
+    Log.info(
+      'Setting changed: ${pendingInviteAutoJoinSettingDef.key}=false (terminal)',
+    );
+  }
+  final lastPath = ref.read(settings.provider(lastRoutePathSettingDef));
+  if (isInviteRoutePath(lastPath)) {
+    clearLastRoutePath(ref);
+  }
 }

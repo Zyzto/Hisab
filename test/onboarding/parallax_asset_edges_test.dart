@@ -23,7 +23,7 @@ void main() {
   ];
 
   Future<(int, int, ByteData)> loadRgba(String name) async {
-    final bytes = await rootBundle.load('assets/images/parallax/$name.png');
+    final bytes = await rootBundle.load('assets/images/parallax/$name.webp');
     final codec = await ui.instantiateImageCodec(
       bytes.buffer.asUint8List(),
     );

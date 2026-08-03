@@ -10,6 +10,7 @@ import '../../../core/layout/constrained_content.dart';
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/debug/debug_menu.dart';
 import '../../../core/theme/theme_providers.dart';
 import '../../../core/widgets/app_fab.dart';
 import '../../../core/widgets/async_value_builder.dart';
@@ -319,7 +320,10 @@ class HomePage extends ConsumerWidget {
     final selectionAllPinned =
         selectedIds.isNotEmpty &&
         selectedIds.every((id) => pinnedSet.contains(id));
-    final experimentStyleIndex = ref.watch(experimentStyleIndexProvider);
+    final showExperimentThemes = ref.watch(showDebugMenuProvider);
+    final experimentStyleIndex = showExperimentThemes
+        ? ref.watch(experimentStyleIndexProvider)
+        : 0;
     final settings = ref.read(hisabSettingsProvidersProvider);
     String? formatCreatedDateLabel(DateTime date) {
       if (!showCreatedAt) return null;
@@ -422,7 +426,13 @@ class HomePage extends ConsumerWidget {
                             ),
                             overflow: TextOverflow.ellipsis,
                           ))
-                  : _ExperimentTitle(),
+                  : showExperimentThemes
+                        ? _ExperimentTitle()
+                        : Text(
+                            'app_name'.tr(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
               actions: effectiveSelectionMode
                   ? [
                       IconButton(

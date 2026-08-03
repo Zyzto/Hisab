@@ -22,6 +22,19 @@ class OnboardingCelestial extends PositionComponent {
   })  : _night = night,
         _rng = rng ?? math.Random(7);
 
+  /// Y (from the top of the full screen) just below the solid sun/moon disc.
+  ///
+  /// Matches [_layout] so onboarding copy can sit tight under the body without
+  /// clearing the whole soft halo.
+  static double contentStartY(Size screen) {
+    if (screen.width <= 0 || screen.height <= 0) return 0;
+    final radius =
+        (math.min(screen.width, screen.height) * 0.075).clamp(22.0, 56.0);
+    final haloRadius = radius * 3.0;
+    final centerY = math.max(screen.height * 0.15, haloRadius * 0.9);
+    return centerY + radius;
+  }
+
   final bool _night;
   final math.Random _rng;
   final List<_Mote> _motes = [];

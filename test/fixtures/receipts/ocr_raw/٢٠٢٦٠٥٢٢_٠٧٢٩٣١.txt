@@ -1,0 +1,34 @@
+the Family
+FamilyMart
+QL Maxincome Sdn
+16A, Jalan Astaka U8/83, Bukit Jelutong
+Shah Alam, Selangor DE
+#0059 FamilyMart Sunway Pyramid
+Sales Invoice
+4000
+21/05/2026 21:17
+#1000740494
+Staff: NURAZLIA BINTY
+Desc Amt (RM)
+Oden Set : Spicy Korean 2.20
+Uden ( Spicy Korean )
+King Crab Chunk 2.20
+Korean Odeng Fish Cake 2.20
+Seafood Tofu Fish Cake 2.20
+Oden Set : Creamy Tom Yun 3.30
+Oden (Creany Ton Yum)
+King Crab Chunk
+2 each @ 2.20 4.40
+Kirin Kocha Milk 500ml ea 10.20
+Chicken Slice + Egg Mayo Sandwi 6.90
+Salted Salwon Onigiri ea 4.90
+KSFRckSgrPear500ml ea 4.20
+Egg Mayo Sandwich ea 4.90
+LovintCrunkyChocoStick54g ea 6.10
+Paper Bag - L 0.50
+SUBTOTAL
+AllDay-Onigiri@3.90 -1.00
+RTE Clearance 25% Timebase -1.73
+ROUNDING -0.02
+TOTAL
+SST 2.73

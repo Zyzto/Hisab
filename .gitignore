@@ -69,7 +69,6 @@ ios/Runner/GoogleService-Info.plist
 .firebase/
 
 # ── Secrets / local defines (never commit) ──────────────────────────────────
-lib/core/constants/app_secrets.dart
 dart_defines_online.json
 dart_defines_local.json
 
@@ -113,3 +112,9 @@ plans/
 
 # Supabase database backups (never commit)
 supabase_backups/
+
+# Local scratch (OCR photos/outputs, tool previews) — never commit
+tmp/
+
+# Test runner logs
+logs/

@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "REPLACE_WITH_APPLE_TEAM_ID.com.shenepoy.hisab",
+        "paths": ["/invite", "/invite/*"]
+      },
+      {
+        "appID": "REPLACE_WITH_APPLE_TEAM_ID.com.shenepoy.hisab.debug",
+        "paths": ["/invite", "/invite/*"]
+      }
+    ]
+  }
+}

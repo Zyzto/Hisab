@@ -234,14 +234,20 @@ class _OnboardingWelcomePageState extends State<OnboardingWelcomePage>
         slidePx: 12,
         child: OnboardingTitleBlock(title: 'onboarding_welcome'.tr()),
       ),
-      content: Column(
+      // Hero + section label stay put; only the feature list scrolls.
+      pinnedBelowTitle: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           animatedHero,
           const SizedBox(height: ThemeConfig.spacingM),
           OnboardingSectionLabel('onboarding_how_it_works'.tr()),
-          const SizedBox(height: ThemeConfig.spacingM),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           for (var i = 0; i < _features.length; i++)
             _StaggeredFeatureRow(
               animation: _featureAnimations[i],

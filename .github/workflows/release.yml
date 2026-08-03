@@ -275,7 +275,10 @@ jobs:
 
       - name: Build APK
         run: |
-          flutter build apk --release \
+          flutter build apk --release --split-per-abi \
+            --obfuscate \
+            --split-debug-info=build/app/outputs/symbols \
+            --tree-shake-icons \
             --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
             --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
             --dart-define=INVITE_BASE_URL=${{ secrets.INVITE_BASE_URL }} \
@@ -284,6 +287,9 @@ jobs:
       - name: Build App Bundle
         run: |
           flutter build appbundle --release \
+            --obfuscate \
+            --split-debug-info=build/app/outputs/symbols \
+            --tree-shake-icons \
             --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
             --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
             --dart-define=INVITE_BASE_URL=${{ secrets.INVITE_BASE_URL }} \
@@ -293,13 +299,22 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: |
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            build/app/outputs/flutter-apk/app-x86_64-release.apk
 
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v7
         with:
           name: release-aab
           path: build/app/outputs/bundle/release/app-release.aab
+
+      - name: Upload Dart symbol maps
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-symbols
+          path: build/app/outputs/symbols/
 
   # ──────────────────────────────────────────────
   # 2. Create GitHub Release (tag pushes only)
@@ -321,7 +336,10 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: app-release.apk
+          files: |
+            app-armeabi-v7a-release.apk
+            app-arm64-v8a-release.apk
+            app-x86_64-release.apk
 
   # ──────────────────────────────────────────────
   # 3. Deploy AAB to Google Play (internal track)
@@ -417,12 +435,38 @@ jobs:
         run: |
           cp -r web/privacy build/web/
           cp -r web/delete-account build/web/
+          cp -r web/.well-known build/web/
           cp web/redirect.html build/web/
           cp web/in_app_browser.js build/web/
           cp web/og-invite.png build/web/
           sed "s|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g" web/invite-redirect-template.html > build/web/invite-redirect.html
           cp web/sqlite3.wasm build/web/ 2>/dev/null || true
           for f in web/*.worker.js; do [ -f "$f" ] && cp "$f" build/web/; done
+
+      # Fill assetlinks / AASA from Actions secrets (values are not readable via gh CLI).
+      - name: Inject App/Universal Link signing into .well-known
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          PLAY_STORE_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON }}
+          PLAY_APP_SIGNING_SHA256: ${{ secrets.PLAY_APP_SIGNING_SHA256 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          python3 -m pip install --quiet google-api-python-client google-auth
+          # Prefer SDK apksigner when present on the runner image.
+          if [ -z "${APKSIGNER:-}" ]; then
+            for ver in 35.0.0 34.0.0 33.0.2; do
+              if [ -x "$ANDROID_HOME/build-tools/$ver/apksigner" ]; then
+                export APKSIGNER="$ANDROID_HOME/build-tools/$ver/apksigner"
+                break
+              fi
+            done
+          fi
+          python3 scripts/inject_well_known_signing.py
+          echo "assetlinks.json:" && cat build/web/.well-known/assetlinks.json
+          echo "apple-app-site-association:" && cat build/web/.well-known/apple-app-site-association
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0

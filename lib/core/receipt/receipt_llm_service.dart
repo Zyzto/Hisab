@@ -12,13 +12,16 @@ final _llmClientCache = <String, dynamic>{};
 
 String _cacheKey(String provider, String apiKey) => '$provider:$apiKey';
 
-/// Extraction prompt sent to the LLM for receipt parsing.
-const String _receiptExtractionPrompt = '''
-Extract the Vendor, Date, and Total from this receipt image.
-Return ONLY a JSON object with keys: vendor, date, total.
-- vendor: string (store or business name)
-- date: string in ISO format (YYYY-MM-DD)
-- total: number (total amount, no currency symbol)
+/// Extraction prompt sent to the LLM (and Nano) for receipt parsing.
+const String receiptExtractionPrompt = '''
+Extract receipt fields from this image.
+Return ONLY a JSON object with keys:
+- vendor: string (store / business name)
+- date: string ISO datetime if time known (YYYY-MM-DDTHH:mm:ss) else YYYY-MM-DD
+- total: number (amount due / grand total including tax)
+- vat: number or null (tax amount)
+- items: array of {description: string, amount: number} line items
+- description: string or null (short notes, e.g. VAT summary)
 Do not include markdown code fences or any text outside the JSON.
 ''';
 
@@ -39,7 +42,7 @@ Future<String> extractReceiptFromImage(
 
   final base64Image = base64Encode(imageBytes);
   final content = ChatMessageContent.multiModal([
-    ChatMessageContent.text(_receiptExtractionPrompt),
+    ChatMessageContent.text(receiptExtractionPrompt),
     ChatMessageContent.image(data: base64Image, mimeType: 'image/jpeg'),
   ]);
   final message = ChatMessage.human(content);

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/navigation/invite_auth_helpers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/services/settle_up_service.dart';
 import '../../../core/widgets/error_content.dart';
@@ -10,23 +11,13 @@ import '../../../domain/domain.dart';
 import '../../balance/providers/balance_provider.dart';
 import '../../expenses/pages/expense_detail_shell.dart';
 import '../../expenses/widgets/expense_detail_body.dart';
-import '../../settings/providers/settings_framework_providers.dart';
-import '../../settings/settings_definitions.dart';
 import '../providers/group_member_provider.dart';
 import '../providers/groups_provider.dart';
 import '../providers/invite_preview_provider.dart';
 import 'group_detail_page.dart';
 
 void _dismissInvitePreview(WidgetRef ref, BuildContext context) {
-  final settings = ref.read(hisabSettingsProvidersProvider);
-  if (settings != null) {
-    ref
-        .read(settings.provider(pendingInviteTokenSettingDef).notifier)
-        .set('');
-    ref
-        .read(settings.provider(pendingInviteAutoJoinSettingDef).notifier)
-        .set(false);
-  }
+  clearInviteFlowState(ref);
   context.go(RoutePaths.home);
 }
 

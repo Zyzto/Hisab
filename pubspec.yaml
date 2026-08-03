@@ -1,7 +1,7 @@
 name: hisab
 description: "Group expense splitting and settle-up app."
 publish_to: 'none'
-version: 0.7.2+72
+version: 0.7.3+73
 
 environment:
   sdk: ^3.11.0
@@ -9,7 +9,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.8
 
   # State management
   flutter_riverpod: ^3.3.1
@@ -39,7 +38,6 @@ dependencies:
   flex_color_scheme: ^8.4.0
   flex_color_picker: ^3.4.0
   google_fonts: ^8.0.2
-  animations: ^2.1.0
   custom_sliding_segmented_control: ^1.8.5
   toastification: ^3.0.3
   fl_chart: ^1.1.1
@@ -48,11 +46,11 @@ dependencies:
   # Date & currency
   intl: ^0.20.2
 
-  # Receipt: camera + OCR
+  # Receipt: camera + OCR (Tesseract Android / Vision iOS via MethodChannel)
   image_picker: ^1.0.7
   image_picker_android: ^0.8.13
   image_picker_platform_interface: ^2.9.0
-  google_mlkit_text_recognition: ^0.16.0
+  google_mlkit_genai_prompt: ^0.2.0
   flutter_image_compress: ^2.3.0
 
   # Receipt AI (LangChain.dart – Gemini + OpenAI vision)
@@ -60,7 +58,6 @@ dependencies:
   langchain_openai: ^0.8.1+1
 
   # Logging
-  easy_logger: ^0.0.2
   flutter_logging_service:
     git:
       url: https://github.com/Zyzto/siglat.git
@@ -88,7 +85,6 @@ dependencies:
   # Log handling and telemetry
   http: ^1.2.0
   url_launcher: ^6.2.5
-  material_symbols_icons: ^4.2906.0
   pretty_qr_code: ^3.6.0
   mobile_scanner: ^7.2.0
   connectivity_plus: ^7.0.0
@@ -145,3 +141,5 @@ flutter:
     - assets/Hisab.png
     - assets/translations/
     - assets/images/parallax/
+    - assets/tessdata/eng.traineddata
+    - assets/tessdata/ara.traineddata

@@ -1,0 +1,23 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.shenepoy.hisab.debug",
+      "sha256_cert_fingerprints": [
+        "97:B5:55:D8:D5:08:91:25:7E:67:33:5B:3B:77:2F:B6:FA:0F:E8:03:57:19:BD:EB:8D:D3:C4:00:E8:F2:75:49"
+      ]
+    }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.shenepoy.hisab",
+      "sha256_cert_fingerprints": [
+        "01:69:2C:71:14:83:A5:A5:87:9C:46:72:5F:72:6A:BE:39:71:9A:26:77:66:38:C0:D6:6E:7D:D9:6B:FD:71:B4",
+        "82:C8:CD:35:E0:96:EB:81:01:00:9F:A1:90:D8:7D:15:B0:D4:80:73:EF:12:58:96:69:BA:14:48:FD:49:D6:FF"
+      ]
+    }
+  }
+]

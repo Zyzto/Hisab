@@ -52,7 +52,8 @@ class GroupCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final int styleIndex =
-        experimentStyleIndex ?? ref.watch(experimentStyleIndexProvider);
+        experimentStyleIndex ??
+        ref.watch(effectiveExperimentStyleIndexProvider);
     final groupColor = group.color != null
         ? Color(group.color!)
         : theme.colorScheme.primary;

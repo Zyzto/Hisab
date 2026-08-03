@@ -30,7 +30,7 @@ flutter test test/settle_up_service_test.dart
 
 ## Run all tests (runner)
 
-A cross-platform Dart runner runs unit/widget tests, then in parallel: Android integration (with optional AVD launch) and web integration (ChromeDriver + `flutter drive`), and prints a summary with log paths.
+A cross-platform Dart runner runs unit/widget tests, then sequentially: Android integration (with optional AVD launch) and web integration (ChromeDriver + `flutter drive`), and prints a summary with log paths.
 
 **From repo root (all platforms):**
 
@@ -55,6 +55,21 @@ Optional wrappers: `./scripts/run_all_tests.sh` (Linux/macOS) or `scripts\run_al
 - **Conventions:** Use `setUpAll` to disable Easy Localization build logging (`EasyLocalization.logger.enableBuildModes = []`). For widgets that depend on providers, wrap in `ProviderScope(overrides: [...])` then EasyLocalization then MaterialApp (see e.g. `test/balance/balance_list_widget_test.dart`, `test/core/sync_status_chip_widget_test.dart`). The balance list test overrides `myMemberInGroupProvider` and `myRoleInGroupProvider` to assert both owner (record enabled) and member-not-debtor (record disabled) behaviour.
 - **Locale:** Key widgets have at least one test with `locale: Locale('ar')` (via `pumpApp` or manual `startLocale: Locale('ar')`) to ensure RTL/translations work.
 - **Edge cases:** Tests cover empty/zero/long content and optional parameters where relevant (e.g. GroupCard empty name, personal group, pin; ExpenseListTile zero amount, long title, income type; ExpandableSection empty `trailingSummary`).
+
+## Receipt OCR fixtures
+
+| Path | Role |
+|------|------|
+| `test/fixtures/receipts/*.txt` | Clean / curated receipt text for CI (`receipt_real_fixtures_test.dart`) |
+| `test/fixtures/receipts/ocr_raw/*.txt` | Noisy Tesseract OCR dumps for extractor regression (`receipt_raw_ocr_score_test.dart`) |
+| `test/support/receipt_ocr_expectations.dart` | Shared 8-sample store/total/VAT expects + `scoreOcrDir` |
+
+Naming: clean fixtures use short names (`texas.txt`); raw OCR keeps sample ids (`texas_simple.txt`). Local scratch photos/OCR outputs live under gitignored `tmp/receipts/` (never commit). Score arbitrary OCR folders:
+
+```bash
+dart run tool/score_ocr_dirs.dart ocr2=tmp/receipts/ocr2
+dart run tool/score_ocr_dirs.dart fixtures=test/fixtures/receipts/ocr_raw
+```
 
 ## Schema alignment
 
@@ -187,9 +202,10 @@ test_driver/
 tool/
   run_all_tests.dart            -- cross-platform runner: unit/widget, then Android + web integration, summary
   run_online_tests.dart         -- cross-platform online test runner (Supabase, ChromeDriver, cleanup)
+  score_ocr_dirs.dart           -- score OCR text dirs against shared receipt expects
 scripts/
   run_all_tests.sh, run_all_tests.bat  -- wrappers for dart run tool/run_all_tests.dart
-  run_online_tests.sh           -- wrapper for dart run tool/run_online_tests.dart (Linux/macOS)
+  run_online_tests.sh           -- thin wrapper: exec dart run tool/run_online_tests.dart
 ```
 
 - **Bootstrap (local):** `integration_test/helpers/test_bootstrap.dart` initializes EasyLocalization, a temp PowerSync DB, and settings (onboarding completed, local-only), then calls `runApp(...)` with the same overrides as production. No Supabase/Firebase or LoggingService. Set `skipOnboarding: false` to exercise the onboarding flow.

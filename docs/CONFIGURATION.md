@@ -73,7 +73,16 @@ Find these values in:
 
 ### Receipt AI (optional)
 
-Receipt scanning can use **Gemini** or **OpenAI** for parsing receipt images (vendor, date, total). API keys are **user-provided** and stored **only on the device** in app settings (via the settings framework). They are not sent to Supabase or committed to the repo. Configure them in the app under Settings → Receipt AI. If no key is set, receipt flow falls back to OCR-only or attach-only.
+Configure under **Settings → Receipt / AI** (hidden on web). Scan mode:
+
+| Mode | Behavior | Platforms |
+|---|---|---|
+| **Off** | Attach photo only | Android, iOS |
+| **On device (OCR)** | Tesseract4Android (Tess 5) / Apple Vision (iOS) + local heuristics (vendor/date/total); bundled `eng`+`ara` tessdata (~5.5MB raw ≈ ~2.7MB packaged) on Android via `ReceiptOcrBridge` | Android, iOS |
+| **Gemini Nano** | On-device Gemini via AI Core; Check device / Download in settings | Android only (AI Core); iOS falls back to OCR |
+| **Cloud** | BYO **Gemini** or **OpenAI** vision; Hisab-managed cloud is reserved for later | Android, iOS |
+
+API keys are **user-provided** and stored **only on the device**. They are not sent to Supabase or committed to the repo. If cloud keys are missing or Nano is unavailable, the app falls back to on-device OCR heuristics. Android `minSdk` is **26** (required for ML Kit GenAI Prompt / Nano).
 
 ---
 
@@ -122,29 +131,16 @@ If you prefer a separate subdomain for invite links without the web app proxy, u
 
 ### VS Code / Cursor
 
-Add to `.vscode/launch.json`:
+Committed [`.vscode/launch.json`](../.vscode/launch.json) already defines the Hisab launch configs (Online, Chrome Web, Local Online, Offline, etc.). Prefer those over hand-written `--dart-define` stubs.
 
-```json
-{
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "name": "Hisab (Online)",
-      "request": "launch",
-      "type": "dart",
-      "args": [
-        "--dart-define=SUPABASE_URL=https://xxxxx.supabase.co",
-        "--dart-define=SUPABASE_ANON_KEY=eyJhbGci..."
-      ]
-    },
-    {
-      "name": "Hisab (Offline Only)",
-      "request": "launch",
-      "type": "dart"
-    }
-  ]
-}
+Typical args use gitignored define files:
+
+```bash
+flutter run --dart-define-from-file=dart_defines_online.json --web-port=8080
+flutter run --dart-define-from-file=dart_defines_local.json --web-port=8080
 ```
+
+Copy `dart_defines_online.example.json` → `dart_defines_online.json` (and/or generate local defines via `./scripts/local_test_env.sh`).
 
 ---
 

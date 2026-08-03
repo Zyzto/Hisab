@@ -3,6 +3,7 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../constants/supabase_config.dart';
+import 'auth_flow_policy.dart';
 import 'auth_user_profile.dart';
 
 /// Unified Supabase auth service. Works on all platforms — `supabase_flutter`
@@ -17,28 +18,17 @@ class AuthService {
       supabaseClientIfConfigured ??
       (throw StateError('Supabase not configured'));
 
-  /// Redirect URL for OAuth: on web use [authRedirectUrl] (SITE_URL); on native use deep link so the app reopens.
+  /// Redirect URL for OAuth and email auth callbacks.
   ///
-  /// If [authRedirectUrl] is mistakenly set to `http://` while the app is on
-  /// `https://` for the same host, upgrade to the current origin so OAuth does
-  /// not bounce through Firebase Hosting's http→https 301. When unset, keep
-  /// the previous behavior (`null` → Supabase Site URL).
-  String? get _oauthRedirectUrl {
-    if (kIsWeb) {
-      final configured = authRedirectUrl.trim();
-      if (configured.isEmpty) return null;
-
-      final configuredUri = Uri.tryParse(configured);
-      if (configuredUri != null &&
-          configuredUri.scheme == 'http' &&
-          Uri.base.origin.startsWith('https://') &&
-          configuredUri.host == Uri.base.host) {
-        return Uri.base.origin;
-      }
-      return configured;
-    }
-    return authOAuthCallbackDeepLink;
-  }
+  /// Web: [authRedirectUrl] (SITE_URL), with http→https upgrade when the app is
+  /// already on https for the same host (avoids Firebase Hosting 301). When
+  /// unset, returns `null` so Supabase falls back to its Site URL.
+  /// Native: [authOAuthCallbackDeepLink] so the app reopens with the PKCE verifier.
+  String? get _authRedirectUrl => resolveAuthRedirectUrl(
+    isWeb: kIsWeb,
+    configuredSiteUrl: authRedirectUrl,
+    webOrigin: kIsWeb ? Uri.base.origin : null,
+  );
 
   // ---------------------------------------------------------------------------
   // Sign-in methods
@@ -77,9 +67,7 @@ class AuthService {
       final response = await _clientOrThrow.auth.signUp(
         email: email,
         password: password,
-        emailRedirectTo: authRedirectUrl.trim().isNotEmpty
-            ? authRedirectUrl.trim()
-            : null,
+        emailRedirectTo: _authRedirectUrl,
         data: data.isNotEmpty ? data : null,
       );
       Log.info('User signed up with email');
@@ -127,9 +115,7 @@ class AuthService {
       await _clientOrThrow.auth.resend(
         type: OtpType.signup,
         email: email,
-        emailRedirectTo: authRedirectUrl.trim().isNotEmpty
-            ? authRedirectUrl.trim()
-            : null,
+        emailRedirectTo: _authRedirectUrl,
       );
       Log.info('Confirmation email resent');
     } catch (e, st) {
@@ -143,9 +129,7 @@ class AuthService {
     try {
       await _clientOrThrow.auth.signInWithOtp(
         email: email,
-        emailRedirectTo: authRedirectUrl.trim().isNotEmpty
-            ? authRedirectUrl.trim()
-            : null,
+        emailRedirectTo: _authRedirectUrl,
       );
       Log.info('Magic link sent');
     } catch (e, st) {
@@ -157,7 +141,7 @@ class AuthService {
   Future<bool> signInWithGoogle() async {
     Log.debug('Signing in with Google OAuth');
     try {
-      final redirectTo = _oauthRedirectUrl;
+      final redirectTo = _authRedirectUrl;
       final ok = await _clientOrThrow.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: redirectTo,
@@ -172,7 +156,7 @@ class AuthService {
   Future<bool> signInWithGithub() async {
     Log.debug('Signing in with GitHub OAuth');
     try {
-      final redirectTo = _oauthRedirectUrl;
+      final redirectTo = _authRedirectUrl;
       final ok = await _clientOrThrow.auth.signInWithOAuth(
         OAuthProvider.github,
         redirectTo: redirectTo,

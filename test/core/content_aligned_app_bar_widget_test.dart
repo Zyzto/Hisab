@@ -205,7 +205,7 @@ void main() {
       const titleKey = Key('app-title');
       const viewportWidth = 1000.0;
       const viewportHeight = 800.0;
-      const railWidth = LayoutBreakpoints.navigationRailWidthCompact;
+      const railWidth = LayoutBreakpoints.shellNavWidthCompact;
       const contentAreaWidth = viewportWidth - railWidth;
 
       final view = tester.view;
