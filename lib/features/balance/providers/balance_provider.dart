@@ -24,36 +24,51 @@ AsyncValue<GroupBalanceResult?> groupBalance(Ref ref, String groupId) {
           data: (expenses) {
             List<ParticipantBalance> balances;
             List<SettlementTransaction> settlements;
+            var snapshotCorrupt = false;
+
+            final snapshotJson = group.settlementSnapshotJson;
+            final isArchiveAutoFreeze =
+                group.isSettlementFrozen &&
+                snapshotJson == archiveAutoFreezeSnapshotMarker;
 
             if (group.isSettlementFrozen &&
-                group.settlementSnapshotJson != null &&
-                group.settlementSnapshotJson!.isNotEmpty) {
+                snapshotJson != null &&
+                snapshotJson.isNotEmpty &&
+                !isArchiveAutoFreeze) {
               try {
-                final snapshot = SettlementSnapshot.fromJsonString(
-                  group.settlementSnapshotJson!,
-                );
+                final snapshot = SettlementSnapshot.fromJsonString(snapshotJson);
                 balances = snapshot.balances;
                 settlements = snapshot.settlements;
               } catch (e) {
                 Log.warning(
-                  'Balance provider: snapshot parse failed, using live computation',
+                  'Balance provider: snapshot parse failed; keeping frozen empty state',
                   error: e,
                 );
-                balances = computeBalances(
-                  participants,
-                  expenses,
-                  group.currencyCode,
-                );
-                settlements = computeSettlements(
-                  group.settlementMethod,
-                  balances,
-                  participants,
-                  expenses,
-                  group.currencyCode,
-                  group.treasurerParticipantId,
-                );
+                snapshotCorrupt = true;
+                balances = [
+                  for (final p in participants)
+                    ParticipantBalance(
+                      participantId: p.id,
+                      balanceCents: 0,
+                      currencyCode: group.currencyCode,
+                    ),
+                ];
+                settlements = const [];
               }
+            } else if (group.isSettlementFrozen &&
+                (snapshotJson == null || snapshotJson.isEmpty)) {
+              snapshotCorrupt = true;
+              balances = [
+                for (final p in participants)
+                  ParticipantBalance(
+                    participantId: p.id,
+                    balanceCents: 0,
+                    currencyCode: group.currencyCode,
+                  ),
+              ];
+              settlements = const [];
             } else {
+              // Live compute: unfrozen, or archive auto-freeze marker.
               balances = computeBalances(
                 participants,
                 expenses,
@@ -75,6 +90,7 @@ AsyncValue<GroupBalanceResult?> groupBalance(Ref ref, String groupId) {
                 participants: participants,
                 balances: balances,
                 settlements: settlements,
+                snapshotCorrupt: snapshotCorrupt,
               ),
             );
           },

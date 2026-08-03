@@ -290,6 +290,7 @@ class _FakeGroupRepository implements IGroupRepository {
     bool allowMemberChangeSettings = true,
     bool allowExpenseAsOtherParticipant = true,
     bool allowMemberSettleForOthers = false,
+    String? treasurerInitialParticipantName,
   }) async => group.id;
 
   @override

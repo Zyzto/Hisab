@@ -1790,7 +1790,7 @@ Adds `image_paths` (TEXT, JSON array of URLs) to `expenses` for up to 5 photos p
 
 ### Migration 19: Groups allow_member_settle_for_others
 
-Adds `allow_member_settle_for_others` to `groups`. When false (default), only the group owner or the debtor (participant who owes) can record a settlement in the app; when true, any member can record any settlement. Enforcement is client-side (UI); recording creates an expense, so existing expense RLS applies.
+Adds `allow_member_settle_for_others` to `groups`. When false (default), only the group owner or the debtor (participant who owes) can record a settlement; when true, any member who can add expenses can record any settlement. Client UI enforces this; server enforcement is in Migration 23 (`20260803140000_expenses_settle_freeze_rls.sql`).
 
 ```sql
 ALTER TABLE public.groups
@@ -1839,6 +1839,19 @@ Adds synced in-app notification history for the Profile activity feed. Run after
 | `20260729010000_user_notifications.sql` | Creates `user_notifications` (RLS: user SELECT/UPDATE own rows; inserts via service role from `send-notification`); extends `get_delete_my_data_preview` / `delete_my_data` to count and delete notification rows |
 
 **Client contract:** SyncEngine fetches rows for `auth.uid()`; Profile marks read via UPDATE. Redeploy `send-notification` after applying so history rows are written on each trigger (including dry-run / no device tokens).
+
+### Migration 23: Expenses settle/freeze RLS
+
+Server-side alignment with Balance tab / expense form gates. Apply `supabase/migrations/20260803140000_expenses_settle_freeze_rls.sql`.
+
+| Rule | Behavior |
+|------|----------|
+| Freeze | `expenses_insert` fails when `groups.settlement_freeze_at IS NOT NULL` (edits/deletes of existing rows still allowed while frozen) |
+| Archive | INSERT/UPDATE/DELETE fail when `groups.archived_at IS NOT NULL` |
+| Transfer settle | For `type = 'transfer'`: caller must be **owner**, or `allow_member_settle_for_others`, or linked active participant = `payer_participant_id` (debtor). Admin alone is not enough (matches client). |
+| Transfer integrity | `amount_cents > 0`, `to_participant_id` set, payer ≠ to, both participants active in the group |
+
+Helpers: `expense_group_allows_insert`, `expense_group_not_archived`, `can_write_group_expense`, `transfer_expense_allowed`. Client UI gates remain required for offline/local writes; RLS applies on sync to Supabase.
 
 ### Post–Migration 20: Invite access mode and read-only preview
 
@@ -2307,7 +2320,7 @@ The "Current schema reference" table above can be re-verified with `list_tables`
 |------|-------------|
 | **Owner** | Full control: CRUD all data, manage members, change settings, delete group, transfer ownership |
 | **Admin** | Manage members, create invites, CRUD expenses/participants/tags, change group settings |
-| **Member** | Conditional: add expenses (if `allow_member_add_expense`), add participants (if `allow_member_add_participant`), change settings (if `allow_member_change_settings`). When `allow_expense_as_other_participant` is false, members may only create/update expenses where they are the payer (payer_participant_id = their own participant). When `allow_member_settle_for_others` is false, only the owner or the debtor can record a settlement (UI enforcement). |
+| **Member** | Conditional: add expenses (if `allow_member_add_expense`), add participants (if `allow_member_add_participant`), change settings (if `allow_member_change_settings`). When `allow_expense_as_other_participant` is false, members may only create/update expenses where they are the payer (payer_participant_id = their own participant) — client-enforced. When `allow_member_settle_for_others` is false, only the owner or the debtor can record a settlement (**client + server** via Migration 23 transfer RLS). |
 
 ### Schema and behavior notes
 

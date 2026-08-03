@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
+import '../../../core/auth/auth_providers.dart';
 import '../../../core/celebration/celebration_controller.dart';
 import '../../../core/celebration/celebration_kind.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
@@ -32,6 +33,7 @@ import '../../../domain/domain.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 import '../utils/group_icon_utils.dart';
 import '../widgets/group_color_picker.dart';
+import '../widgets/settlement_method_picker.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Wizard entry point (keeps the same class name for router compatibility)
@@ -102,6 +104,8 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
 
   // ── Group settings (group create only; not personal) ──
   SettlementMethod _settlementMethod = SettlementMethod.greedy;
+  /// `null` = owner is treasurer; otherwise a name from [_participants].
+  String? _treasurerParticipantName;
   bool _allowMemberAddExpense = true;
   bool _allowMemberChangeSettings = true;
   bool _allowExpenseAsOtherParticipant = true;
@@ -317,6 +321,11 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
           settlementMethod: widget.isPersonal
               ? SettlementMethod.greedy
               : _settlementMethod,
+          treasurerInitialParticipantName: widget.isPersonal
+              ? null
+              : (_settlementMethod == SettlementMethod.treasurer
+                    ? _treasurerParticipantName
+                    : null),
           allowMemberAddExpense: widget.isPersonal
               ? true
               : _allowMemberAddExpense,
@@ -731,7 +740,28 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                       const SizedBox(height: ThemeConfig.spacingL),
                       GroupSectionHeader(label: 'settlement_method'.tr()),
                       const SizedBox(height: ThemeConfig.spacingM),
-                      _buildSettlementMethodPicker(context),
+                      SettlementMethodPickerButton(
+                        method: _settlementMethod,
+                        onChanged: (method) {
+                          setState(() {
+                            _settlementMethod = method;
+                            if (method != SettlementMethod.treasurer) {
+                              _treasurerParticipantName = null;
+                            } else {
+                              _syncTreasurerSelection();
+                            }
+                          });
+                        },
+                      ),
+                      const SizedBox(height: ThemeConfig.spacingM),
+                      SettlementMethodGuideCard(
+                        method: _settlementMethod,
+                        showExample: false,
+                      ),
+                      if (_settlementMethod == SettlementMethod.treasurer) ...[
+                        const SizedBox(height: ThemeConfig.spacingM),
+                        _buildTreasurerPicker(context),
+                      ],
                       const SizedBox(height: ThemeConfig.spacingL),
                       GroupSectionHeader(label: 'group_permissions'.tr()),
                       const SizedBox(height: ThemeConfig.spacingM),
@@ -1189,54 +1219,23 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                   _SummaryRow(
                     icon: Icons.account_balance_outlined,
                     label: 'settlement_method'.tr(),
-                    value: _settlementMethodLabel(_settlementMethod),
+                    value: settlementMethodLabel(_settlementMethod),
                     onEdit: () => _goToPage(0),
                   ),
+                  if (_settlementMethod == SettlementMethod.treasurer) ...[
+                    const SizedBox(height: ThemeConfig.spacingS),
+                    _SummaryRow(
+                      icon: Icons.person_pin_circle_outlined,
+                      label: 'select_treasurer'.tr(),
+                      value: _treasurerDisplayName(),
+                      onEdit: () => _goToPage(0),
+                    ),
+                  ],
                 ],
               ],
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildSettlementMethodPicker(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final label = _settlementMethodLabel(_settlementMethod);
-    final description = _settlementMethodDescription(_settlementMethod);
-    return Semantics(
-      button: true,
-      label: '${'settlement_method'.tr()}: $label',
-      child: _buildSelectableFlatRow(
-        context,
-        onTap: _showSettlementMethodPicker,
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label, style: theme.textTheme.titleMedium),
-                  const SizedBox(height: 2),
-                  Text(
-                    description,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Icons.arrow_drop_down,
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -1291,13 +1290,84 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
     );
   }
 
-  Future<void> _showSettlementMethodPicker() async {
-    // Dismiss keyboard before sheet (same as currency) — critical on mobile web.
-    FocusManager.instance.primaryFocus?.unfocus();
+  /// Owner display name for the treasurer picker (create-time, before save).
+  String _ownerTreasurerLabel() {
+    final user = ref.read(authServiceProvider).currentUser;
+    final raw =
+        user?.userMetadata?['display_name'] as String? ??
+        user?.userMetadata?['full_name'] as String? ??
+        user?.email;
+    final trimmed = raw?.trim();
+    if (trimmed != null && trimmed.isNotEmpty) return trimmed;
+    return 'default_owner_name'.tr();
+  }
+
+  String _treasurerDisplayName() {
+    final selected = _treasurerParticipantName?.trim();
+    if (selected != null &&
+        selected.isNotEmpty &&
+        _participants.contains(selected)) {
+      return selected;
+    }
+    return _ownerTreasurerLabel();
+  }
+
+  void _syncTreasurerSelection() {
+    final selected = _treasurerParticipantName?.trim();
+    if (selected != null &&
+        selected.isNotEmpty &&
+        !_participants.contains(selected)) {
+      _treasurerParticipantName = null;
+    }
+  }
+
+  Widget _buildTreasurerPicker(BuildContext context) {
     final theme = Theme.of(context);
-    final chosen = await showResponsiveSheet<SettlementMethod>(
+    final colorScheme = theme.colorScheme;
+    _syncTreasurerSelection();
+    final valueLabel = _treasurerDisplayName();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'select_treasurer'.tr(),
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: ThemeConfig.spacingS),
+        Semantics(
+          button: true,
+          label: '${'select_treasurer'.tr()}: $valueLabel',
+          child: _buildSelectableFlatRow(
+            context,
+            onTap: _showTreasurerPicker,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(valueLabel, style: theme.textTheme.titleMedium),
+                ),
+                Icon(
+                  Icons.arrow_drop_down,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showTreasurerPicker() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    _syncTreasurerSelection();
+    final theme = Theme.of(context);
+    final ownerLabel = _ownerTreasurerLabel();
+    // Use a wrapper so barrier-dismiss (null) ≠ explicit owner selection.
+    final chosen = await showResponsiveSheet<_TreasurerPick>(
       context: context,
-      title: 'settlement_method'.tr(),
+      title: 'select_treasurer'.tr(),
       maxHeight: MediaQuery.of(context).size.height * 0.75,
       isScrollControlled: true,
       centerInFullViewport: true,
@@ -1317,7 +1387,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                       child: Text(
-                        'settlement_method'.tr(),
+                        'select_treasurer'.tr(),
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
@@ -1325,12 +1395,18 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                     ),
                   SheetOptionList(
                     children: [
-                      for (final method in SettlementMethod.values)
+                      SheetOptionTile(
+                        title: ownerLabel,
+                        selected: _treasurerParticipantName == null,
+                        onTap: () =>
+                            Navigator.pop(ctx, const _TreasurerPick.owner()),
+                      ),
+                      for (final name in _participants)
                         SheetOptionTile(
-                          title: _settlementMethodLabel(method),
-                          subtitle: _settlementMethodDescription(method),
-                          selected: method == _settlementMethod,
-                          onTap: () => Navigator.pop(ctx, method),
+                          title: name,
+                          selected: _treasurerParticipantName == name,
+                          onTap: () =>
+                              Navigator.pop(ctx, _TreasurerPick.named(name)),
                         ),
                     ],
                   ),
@@ -1342,40 +1418,20 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
         ),
       ),
     );
-    if (chosen != null && chosen != _settlementMethod && mounted) {
-      setState(() => _settlementMethod = chosen);
-    }
-  }
-
-  String _settlementMethodLabel(SettlementMethod m) {
-    switch (m) {
-      case SettlementMethod.pairwise:
-        return 'settlement_method_pairwise'.tr();
-      case SettlementMethod.greedy:
-        return 'settlement_method_greedy'.tr();
-      case SettlementMethod.consolidated:
-        return 'settlement_method_consolidated'.tr();
-      case SettlementMethod.treasurer:
-        return 'settlement_method_treasurer'.tr();
-    }
-  }
-
-  String _settlementMethodDescription(SettlementMethod m) {
-    switch (m) {
-      case SettlementMethod.pairwise:
-        return 'settlement_method_pairwise_desc'.tr();
-      case SettlementMethod.greedy:
-        return 'settlement_method_greedy_desc'.tr();
-      case SettlementMethod.consolidated:
-        return 'settlement_method_consolidated_desc'.tr();
-      case SettlementMethod.treasurer:
-        return 'settlement_method_treasurer_desc'.tr();
-    }
+    if (!mounted || chosen == null) return;
+    setState(() => _treasurerParticipantName = chosen.name);
   }
 
   void _goToPage(int page) {
     _animateToPage(page);
   }
+}
+
+/// Sheet result for treasurer picker (distinguishes dismiss from owner pick).
+class _TreasurerPick {
+  final String? name;
+  const _TreasurerPick.owner() : name = null;
+  const _TreasurerPick.named(this.name);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

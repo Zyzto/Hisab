@@ -12,6 +12,7 @@ import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/expense_display_title.dart';
 import '../../../core/utils/user_text.dart';
 import '../../../domain/domain.dart';
 import '../../balance/providers/balance_provider.dart';
@@ -412,11 +413,16 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
     WidgetRef ref,
     Expense expense,
   ) async {
+    final participants =
+        ref.read(participantsByGroupProvider(widget.groupId)).asData?.value ??
+        const <Participant>[];
+    final nameOf = {for (final p in participants) p.id: p.name};
+    final displayTitle = expenseDisplayTitleFromMap(expense, nameOf);
     final ok = await showConfirmSheet(
       context,
       title: 'delete_expense_confirm'.tr(),
       content:
-          '${isolateBidi(expense.title)} – ${CurrencyFormatter.formatCents(expense.amountCents, expense.currencyCode)}',
+          '${isolateBidi(displayTitle)} – ${CurrencyFormatter.formatCents(expense.amountCents, expense.currencyCode)}',
       confirmLabel: 'delete'.tr(),
       isDestructive: true,
       centerInFullViewport: true,

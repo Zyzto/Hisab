@@ -3,6 +3,11 @@ import 'dart:convert';
 import 'participant_balance.dart';
 import 'settlement_transaction.dart';
 
+/// Marker stored in [Group.settlementSnapshotJson] when archive auto-freezes
+/// a group that was not already frozen. Not valid JSON — balance providers
+/// should fall back to live computation (not treat as corrupt).
+const String archiveAutoFreezeSnapshotMarker = '__hisab_archive_auto_freeze__';
+
 /// Immutable snapshot of balances and settlements at freeze time.
 class SettlementSnapshot {
   final DateTime frozenAt;

@@ -14,6 +14,7 @@ class FilteredExpenseRow {
     required this.expense,
     required this.payerName,
     required this.groupId,
+    this.toParticipantName,
     this.groupCurrencyCode,
     this.amountCentsOverride,
     this.detailLine,
@@ -27,6 +28,7 @@ class FilteredExpenseRow {
 
   final Expense expense;
   final String payerName;
+  final String? toParticipantName;
   final String groupId;
   final String? groupCurrencyCode;
   final int? amountCentsOverride;
@@ -54,6 +56,7 @@ Future<void> showFilteredExpensesSheet({
       FilteredExpenseRow(
         expense: row.expense,
         payerName: row.payerName,
+        toParticipantName: row.toParticipantName,
         groupId: row.groupId,
         groupCurrencyCode: row.groupCurrencyCode,
         amountCentsOverride: row.amountCentsOverride,
@@ -142,6 +145,7 @@ class AppExpenseTile extends StatelessWidget {
     return ExpenseListTile(
       expense: row.expense,
       payerName: row.payerName,
+      toParticipantName: row.toParticipantName,
       icon: iconForExpenseTag(row.expense.tag, row.customTags),
       groupCurrencyCode: row.groupCurrencyCode,
       amountCentsOverride: row.amountCentsOverride,

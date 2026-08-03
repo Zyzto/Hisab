@@ -23,6 +23,8 @@ Future<void> pumpApp(
       supportedLocales: testSupportedLocales,
       fallbackLocale: const Locale('en'),
       startLocale: locale,
+      // Do not wire EasyLocalization delegates into MaterialApp — under
+      // flutter_test that leaves `home` blank. startLocale is enough here.
       child: MaterialApp(home: Scaffold(body: child)),
     ),
   );

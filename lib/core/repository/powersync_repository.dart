@@ -20,10 +20,7 @@ import 'group_invite_repository.dart';
 import 'user_notification_repository.dart';
 
 const _uuid = Uuid();
-const _archiveAutoFreezeMarker = '__hisab_archive_auto_freeze__';
-
-@visibleForTesting
-const archiveAutoFreezeSnapshotMarker = _archiveAutoFreezeMarker;
+const _archiveAutoFreezeMarker = archiveAutoFreezeSnapshotMarker;
 
 /// On web, PowerSync/sqlite3_web can emit raw JS objects (LegacyJavaScriptObject)
 /// in update streams instead of Dart UpdateNotification, causing type errors.
@@ -547,6 +544,7 @@ class PowerSyncGroupRepository implements IGroupRepository {
     bool allowMemberChangeSettings = true,
     bool allowExpenseAsOtherParticipant = true,
     bool allowMemberSettleForOthers = false,
+    String? treasurerInitialParticipantName,
   }) async {
     final trimmedName = name.trim();
     if (trimmedName.isEmpty || trimmedName.length > 200) {
@@ -611,6 +609,25 @@ class PowerSyncGroupRepository implements IGroupRepository {
 
     // Auto-create a participant for the owner
     final participantId = _uuid.v4();
+    final String? treasurerParticipantId;
+    if (settlementMethod == SettlementMethod.treasurer) {
+      final wanted = treasurerInitialParticipantName?.trim();
+      String? matchedId;
+      if (wanted != null && wanted.isNotEmpty) {
+        for (final entry in additionalParticipantIds) {
+          if (entry.name == wanted) {
+            matchedId = entry.id;
+            break;
+          }
+        }
+      }
+      treasurerParticipantId = matchedId ?? participantId;
+    } else {
+      treasurerParticipantId = null;
+    }
+    if (treasurerParticipantId != null) {
+      groupData['treasurer_participant_id'] = treasurerParticipantId;
+    }
     final ownerMemberId = ownerId != null ? _uuid.v4() : null;
     // participants.name CHECK is 1–100; clamp auth display names so group
     // create cannot fail after the groups row is already inserted.
@@ -730,17 +747,19 @@ class PowerSyncGroupRepository implements IGroupRepository {
     await _db.execute(
       '''INSERT INTO groups (
         id, name, currency_code, owner_id, settlement_method,
+        treasurer_participant_id,
         allow_member_add_expense, allow_member_change_settings,
         allow_expense_as_other_participant, allow_member_settle_for_others,
         icon, color, archived_at, is_personal, budget_amount_cents,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
       [
         id,
         trimmedName,
         currencyCode,
         ownerId,
         settlementMethod.name,
+        treasurerParticipantId,
         allowMemberAddExpense ? 1 : 0,
         allowMemberChangeSettings ? 1 : 0,
         allowExpenseAsOtherParticipant ? 1 : 0,
