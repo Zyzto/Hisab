@@ -149,37 +149,22 @@ p{color:var(--muted);margin-bottom:20px;font-size:.95rem}
     return;
   }
 
-  // Mobile iOS: browser-first flow (no app button)
-  if (isIOS) {
-    heading.textContent = i18n[locale].heading;
-    message.textContent = i18n[locale].iosMessage;
-    fallback.textContent = i18n[locale].fallback;
-    fallback.style.display = "inline-block";
-    openApp.style.display = "none";
-    spinner.style.display = "none";
-
-    var iosTapHintEl = document.createElement("p");
-    iosTapHintEl.style.cssText = "color:var(--muted);font-size:0.9rem;margin-top:16px";
-    iosTapHintEl.textContent = i18n[locale].iosTapHint;
-    content.appendChild(iosTapHintEl);
-    return;
-  }
-
-  // Mobile Android: auto-open app first, then show fallback controls if still on page.
-  if (isAndroid) {
-    var appUrl = "intent://invite?token=" + encodedToken
-      + "#Intent"
-      + ";scheme=io.supabase.hisab"
-      + ";S.browser_fallback_url=" + encodeURIComponent(webUrl)
-      + ";end";
+  // Mobile (iOS + Android): same dual CTAs — Open in app + Continue in browser.
+  // Android may auto-attempt Intent; iOS relies on user gesture (Safari blocks silent custom-scheme jumps).
+  if (isAndroid || isIOS) {
+    var appUrl = isAndroid
+      ? ("intent://invite?token=" + encodedToken
+        + "#Intent"
+        + ";scheme=io.supabase.hisab"
+        + ";S.browser_fallback_url=" + encodeURIComponent(webUrl)
+        + ";end")
+      : ("io.supabase.hisab://invite?token=" + encodedToken);
 
     openApp.href = appUrl;
     heading.textContent = i18n[locale].heading;
     message.textContent = i18n[locale].message;
     openApp.textContent = i18n[locale].openApp;
     fallback.textContent = i18n[locale].fallback;
-    openApp.style.display = "none";
-    fallback.style.display = "none";
 
     var tapHintEl = document.createElement("p");
     tapHintEl.style.cssText = "color:var(--muted);font-size:0.9rem;margin-bottom:12px;display:none";
@@ -192,22 +177,29 @@ p{color:var(--muted);margin-bottom:20px;font-size:.95rem}
     hintEl.textContent = i18n[locale].hint;
     content.appendChild(hintEl);
 
-    setTimeout(function() {
-      window.location.href = appUrl;
-    }, 120);
-
-    setTimeout(function() {
+    if (isAndroid) {
+      openApp.style.display = "none";
+      fallback.style.display = "none";
+      setTimeout(function() {
+        window.location.href = appUrl;
+      }, 120);
+      setTimeout(function() {
+        spinner.style.display = "none";
+        openApp.style.display = "inline-block";
+        fallback.style.display = "inline-block";
+        tapHintEl.style.display = "block";
+      }, 1200);
+      setTimeout(function() {
+        var h = document.getElementById("hint");
+        if (h) h.style.display = "block";
+      }, 8000);
+    } else {
+      // iOS: show both buttons immediately (Open in app needs a tap).
       spinner.style.display = "none";
       openApp.style.display = "inline-block";
       fallback.style.display = "inline-block";
       tapHintEl.style.display = "block";
-    }, 1200);
-
-    // After 8s, show hint if still on page.
-    setTimeout(function() {
-      var h = document.getElementById("hint");
-      if (h) h.style.display = "block";
-    }, 8000);
+    }
     return;
   }
 

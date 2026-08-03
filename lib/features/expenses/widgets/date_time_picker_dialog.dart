@@ -188,54 +188,47 @@ class _DateTimePickerSheetContentState
                         ? DateFormat.Hm().format(t)
                         : DateFormat.jm().format(t);
                   }(),
-                  readOnly: true,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisSize: MainAxisSize.min,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _TimeColumn<int>(
-                            items: use24h
-                                ? List.generate(24, (i) => i)
-                                : List.generate(12, (i) => i == 0 ? 12 : i),
-                            value: use24h ? _hour24 : _hour12Value,
-                            onChanged: (v) => setState(() {
-                              if (use24h) {
-                                _hour24 = v;
-                              } else {
-                                _hour24 =
-                                    _DateTimePickerSheetContentState._hour24From12h(
-                                      v,
-                                      _isAm,
-                                    );
-                              }
-                            }),
-                            format: (v) => '$v',
-                            semanticLabel: 'hour'.tr(),
-                          ),
-                          const SizedBox(width: 8),
-                          _TimeColumn<int>(
-                            items: List.generate(60, (i) => i),
-                            value: _minute,
-                            onChanged: (v) => setState(() => _minute = v),
-                            format: (v) => v.toString().padLeft(2, '0'),
-                            semanticLabel: 'minute'.tr(),
-                          ),
-                          if (!use24h) ...[
-                            const SizedBox(width: 8),
-                            _TimeColumn<DayPeriod>(
-                              items: const [DayPeriod.am, DayPeriod.pm],
-                              value: _isAm ? DayPeriod.am : DayPeriod.pm,
-                              onChanged: (v) =>
-                                  setState(() => _isAm = v == DayPeriod.am),
-                              format: (v) => v == DayPeriod.am ? 'AM' : 'PM',
-                              semanticLabel: 'period'.tr(),
-                            ),
-                          ],
-                        ],
+                      _TimeColumn<int>(
+                        items: use24h
+                            ? List.generate(24, (i) => i)
+                            : List.generate(12, (i) => i == 0 ? 12 : i),
+                        value: use24h ? _hour24 : _hour12Value,
+                        onChanged: (v) => setState(() {
+                          if (use24h) {
+                            _hour24 = v;
+                          } else {
+                            _hour24 =
+                                _DateTimePickerSheetContentState._hour24From12h(
+                                  v,
+                                  _isAm,
+                                );
+                          }
+                        }),
+                        format: (v) => '$v',
+                        semanticLabel: 'hour'.tr(),
                       ),
+                      const SizedBox(width: 8),
+                      _TimeColumn<int>(
+                        items: List.generate(60, (i) => i),
+                        value: _minute,
+                        onChanged: (v) => setState(() => _minute = v),
+                        format: (v) => v.toString().padLeft(2, '0'),
+                        semanticLabel: 'minute'.tr(),
+                      ),
+                      if (!use24h) ...[
+                        const SizedBox(width: 8),
+                        _TimeColumn<DayPeriod>(
+                          items: const [DayPeriod.am, DayPeriod.pm],
+                          value: _isAm ? DayPeriod.am : DayPeriod.pm,
+                          onChanged: (v) =>
+                              setState(() => _isAm = v == DayPeriod.am),
+                          format: (v) => v == DayPeriod.am ? 'AM' : 'PM',
+                          semanticLabel: 'period'.tr(),
+                        ),
+                      ],
                     ],
                   ),
                 ),

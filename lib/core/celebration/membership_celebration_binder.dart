@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../auth/auth_providers.dart';
 import '../../domain/domain.dart';
 import '../../features/groups/providers/groups_provider.dart';
 import 'celebration_controller.dart';
@@ -11,6 +12,9 @@ import 'celebration_kind.dart';
 
 /// Watches participants for [groupId] and fires join/leave celebrations once
 /// per person. Seeds the first snapshot so cold sync never fireworks.
+///
+/// Join celebrations only fire when another auth-linked member becomes active
+/// (not when you manually add a standalone person, and not for your own join).
 ///
 /// After seeding, IDs that appear from sync but are not recent (by
 /// [Participant.createdAt] / [Participant.leftAt]) are claimed silently so an
@@ -89,10 +93,17 @@ class _MembershipCelebrationBinderState
     _activeIds = active;
     _leftIds = left;
 
+    final myUserId = ref.read(currentUserProvider)?.id;
     for (final id in joined) {
       final key = CelebrationKeys.personJoined(widget.groupId, id);
-      final createdAt = byId[id]?.createdAt;
-      if (_isRecent(createdAt)) {
+      final person = byId[id];
+      final joinedUserId = person?.userId;
+      // Only celebrate a real other member joining via auth/invite — not
+      // manually added standalone participants, and not the current user.
+      final isOtherMemberJoin =
+          joinedUserId != null &&
+          (myUserId == null || joinedUserId != myUserId);
+      if (isOtherMemberJoin && _isRecent(person?.createdAt)) {
         unawaited(
           fireCelebration(
             ref,
@@ -101,7 +112,7 @@ class _MembershipCelebrationBinderState
           ),
         );
       } else {
-        // Late sync of an existing member — mark seen, do not celebrate.
+        // Manual add, self-join, or late sync — mark seen, do not celebrate.
         unawaited(CelebrationDedupe.instance.seed([key]));
       }
     }

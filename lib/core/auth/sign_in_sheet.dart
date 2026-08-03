@@ -7,23 +7,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'auth_flow_policy.dart';
 import 'auth_providers.dart';
 import '../layout/layout_breakpoints.dart';
 import '../layout/responsive_sheet.dart';
 import 'predefined_avatars.dart';
+import 'sign_in_result.dart';
 
-/// Result from the sign-in sheet.
-enum SignInResult {
-  /// Authentication completed successfully.
-  success,
-
-  /// OAuth redirect was launched on web — the page will reload.
-  /// Caller should set a "pending" flag so main.dart can finish the flow.
-  pendingRedirect,
-
-  /// User cancelled.
-  cancelled,
-}
+export 'sign_in_result.dart' show SignInResult;
 
 /// A reusable bottom sheet for Supabase authentication.
 /// Supports email sign-in, sign-up, magic link, Google OAuth, and GitHub OAuth.
@@ -36,20 +27,27 @@ Future<SignInResult> showSignInSheet(
   BuildContext context,
   WidgetRef ref,
 ) async {
+  var emailLinkPending = false;
   final result = await showResponsiveSheet<SignInResult>(
     context: context,
     title: 'sign_in'.tr(),
     isScrollControlled: true,
     useSafeArea: true,
     centerInFullViewport: true,
-    child: _SignInSheet(ref: ref),
+    child: _SignInSheet(
+      ref: ref,
+      onEmailLinkPending: () => emailLinkPending = true,
+    ),
   );
-  return result ?? SignInResult.cancelled;
+  if (result != null) return result;
+  // Barrier/back dismiss after magic link / confirm email must keep pending intent.
+  return resolveSignInSheetDismiss(emailLinkPending: emailLinkPending);
 }
 
 class _SignInSheet extends StatefulWidget {
-  const _SignInSheet({required this.ref});
+  const _SignInSheet({required this.ref, required this.onEmailLinkPending});
   final WidgetRef ref;
+  final VoidCallback onEmailLinkPending;
 
   @override
   State<_SignInSheet> createState() => _SignInSheetState();
@@ -101,6 +99,7 @@ class _SignInSheetState extends State<_SignInSheet> {
         // If email confirmation is required, the user won't have a session yet.
         if (response.session == null) {
           Log.info('Sign-up succeeded — email confirmation required');
+          widget.onEmailLinkPending();
           if (mounted) {
             setState(() {
               _loading = false;
@@ -121,6 +120,7 @@ class _SignInSheetState extends State<_SignInSheet> {
       Log.warning('Email auth failed', error: e);
       if (mounted) {
         final isNotConfirmed = _isEmailNotConfirmedError(e);
+        if (isNotConfirmed) widget.onEmailLinkPending();
         setState(() {
           _loading = false;
           _emailNotConfirmed = isNotConfirmed;
@@ -145,14 +145,55 @@ class _SignInSheetState extends State<_SignInSheet> {
       _error = null;
     });
 
+    final authService = widget.ref.read(authServiceProvider);
+    Completer<bool>? completer;
+    StreamSubscription<AuthState>? sub;
     try {
-      final authService = widget.ref.read(authServiceProvider);
-      await authService.signInWithMagicLink(email);
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          _magicLinkSent = true;
+      // Subscribe before send on native so a fast callback cannot be missed.
+      if (!kIsWeb) {
+        if (authService.isAuthenticated) {
+          widget.onEmailLinkPending();
+          if (mounted) Navigator.pop(context, SignInResult.success);
+          return;
+        }
+        completer = Completer<bool>();
+        sub = authService.onAuthStateChange.listen((state) {
+          if (state.event == AuthChangeEvent.signedIn &&
+              completer != null &&
+              !completer.isCompleted) {
+            completer.complete(true);
+          }
         });
+      }
+
+      await authService.signInWithMagicLink(email);
+      widget.onEmailLinkPending();
+      if (!mounted) return;
+
+      setState(() {
+        _magicLinkSent = true;
+        // Web: idle with Done. Native: keep waiting for deep-link signedIn.
+        _loading = !kIsWeb;
+      });
+
+      if (kIsWeb) return;
+
+      Log.debug('Waiting for magic-link callback (native)');
+      final ok = await completer!.future.timeout(
+        const Duration(minutes: 3),
+        onTimeout: () => false,
+      );
+      if (ok) {
+        Log.info('Magic-link sign-in completed (native)');
+        if (mounted) Navigator.pop(context, SignInResult.success);
+      } else {
+        Log.warning('Magic-link auth timed out');
+        if (mounted) {
+          setState(() {
+            _loading = false;
+            _error = 'auth_oauth_timeout'.tr();
+          });
+        }
       }
     } catch (e) {
       Log.warning('Magic link failed', error: e);
@@ -162,6 +203,8 @@ class _SignInSheetState extends State<_SignInSheet> {
           _error = _parseAuthError(e);
         });
       }
+    } finally {
+      await sub?.cancel();
     }
   }
 
@@ -171,18 +214,26 @@ class _SignInSheetState extends State<_SignInSheet> {
       _error = null;
     });
 
+    final authService = widget.ref.read(authServiceProvider);
+    final providerName = provider == OAuthProvider.google ? 'Google' : 'GitHub';
+    Completer<bool>? completer;
+    StreamSubscription<AuthState>? sub;
     try {
-      final authService = widget.ref.read(authServiceProvider);
-      final providerName = provider == OAuthProvider.google
-          ? 'Google'
-          : 'GitHub';
-
-      bool launched;
-      if (provider == OAuthProvider.google) {
-        launched = await authService.signInWithGoogle();
-      } else {
-        launched = await authService.signInWithGithub();
+      // Subscribe before launch on native so a fast callback cannot be missed.
+      if (!kIsWeb) {
+        completer = Completer<bool>();
+        sub = authService.onAuthStateChange.listen((state) {
+          if (state.event == AuthChangeEvent.signedIn &&
+              completer != null &&
+              !completer.isCompleted) {
+            completer.complete(true);
+          }
+        });
       }
+
+      final launched = provider == OAuthProvider.google
+          ? await authService.signInWithGoogle()
+          : await authService.signInWithGithub();
 
       if (!launched) {
         if (mounted) {
@@ -202,37 +253,23 @@ class _SignInSheetState extends State<_SignInSheet> {
         return;
       }
 
-      // On native, wait for the auth state change after the browser callback.
       Log.debug('Waiting for $providerName OAuth callback (native)');
-      final completer = Completer<bool>();
-      final sub = authService.onAuthStateChange.listen((state) {
-        if (state.event == AuthChangeEvent.signedIn && !completer.isCompleted) {
-          completer.complete(true);
-        }
-      });
+      final ok = await completer!.future.timeout(
+        const Duration(minutes: 3),
+        onTimeout: () => false,
+      );
 
-      try {
-        final ok = await completer.future.timeout(
-          const Duration(minutes: 3),
-          onTimeout: () => false,
-        );
-        sub.cancel();
-
-        if (ok) {
-          Log.info('$providerName OAuth sign-in completed (native)');
-          if (mounted) Navigator.pop(context, SignInResult.success);
-        } else {
-          Log.warning('$providerName OAuth timed out');
-          if (mounted) {
-            setState(() {
-              _loading = false;
-              _error = 'auth_oauth_timeout'.tr();
-            });
-          }
+      if (ok) {
+        Log.info('$providerName OAuth sign-in completed (native)');
+        if (mounted) Navigator.pop(context, SignInResult.success);
+      } else {
+        Log.warning('$providerName OAuth timed out');
+        if (mounted) {
+          setState(() {
+            _loading = false;
+            _error = 'auth_oauth_timeout'.tr();
+          });
         }
-      } catch (e) {
-        sub.cancel();
-        rethrow;
       }
     } catch (e) {
       Log.warning('OAuth sign-in failed', error: e);
@@ -242,6 +279,8 @@ class _SignInSheetState extends State<_SignInSheet> {
           _error = _parseAuthError(e);
         });
       }
+    } finally {
+      await sub?.cancel();
     }
   }
 
@@ -338,7 +377,8 @@ class _SignInSheetState extends State<_SignInSheet> {
     final textTheme = Theme.of(context).textTheme;
 
     return PopScope(
-      canPop: !_loading,
+      // Allow dismiss after magic/confirm email link (returns pendingEmailLink).
+      canPop: !_loading || _magicLinkSent || _emailNotConfirmed,
       child: Padding(
         padding: EdgeInsets.fromLTRB(
           24,
@@ -454,6 +494,19 @@ class _SignInSheetState extends State<_SignInSheet> {
                     ],
                   ),
                 ),
+                const SizedBox(height: 12),
+                _nonFocusableAction(
+                  FilledButton(
+                    onPressed: () => Navigator.pop(
+                      context,
+                      SignInResult.pendingEmailLink,
+                    ),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: Text('done'.tr()),
+                  ),
+                ),
                 const SizedBox(height: 16),
               ],
 
@@ -508,6 +561,22 @@ class _SignInSheetState extends State<_SignInSheet> {
                           ),
                         ),
                       ],
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: _nonFocusableAction(
+                          FilledButton(
+                            onPressed: () => Navigator.pop(
+                              context,
+                              SignInResult.pendingEmailLink,
+                            ),
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            child: Text('done'.tr()),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),

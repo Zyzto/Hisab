@@ -2,6 +2,8 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        // Tesseract4Android (local receipt OCR)
+        maven(url = uri("https://jitpack.io"))
     }
 }
 

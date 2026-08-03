@@ -31,10 +31,13 @@ android {
 
     defaultConfig {
         applicationId = "com.shenepoy.hisab"
-        minSdk = flutter.minSdkVersion
+        // ML Kit GenAI Prompt (Gemini Nano) requires API 26+
+        minSdk = maxOf(flutter.minSdkVersion, 26)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // App ships en + ar only; drop unused dependency locale resources.
+        resourceConfigurations += listOf("en", "ar")
     }
 
     signingConfigs {
@@ -59,6 +62,8 @@ android {
                 // Fall back to debug signing for local development.
                 signingConfigs.getByName("debug")
             }
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -75,6 +80,8 @@ kotlin {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // Tesseract 5 for local receipt OCR (see ReceiptOcrBridge).
+    implementation("cz.adaptech.tesseract4android:tesseract4android:4.9.0")
 }
 
 flutter {

@@ -10,7 +10,7 @@ Script entrypoint: `./scripts/local_test_env.sh` · App defines: `dart_defines_l
 
 | Requirement | Notes |
 |-------------|--------|
-| Flutter SDK ^3.10 | `flutter --version` |
+| Flutter SDK ^3.11.0 | `flutter --version` |
 | **Podman (rootful)** | `sudo systemctl enable --now podman.socket`; user in `podman` group |
 | Supabase CLI | On NixOS: `pkgs.supabase-cli` (not `npx` — dynamic binary fails). Elsewhere: `supabase` or `npx supabase` |
 | Chrome + ChromeDriver | Only for web integration tests |

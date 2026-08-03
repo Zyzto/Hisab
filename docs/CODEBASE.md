@@ -37,7 +37,11 @@ Product and install overview: [../README.md](../README.md). Doc index: [README.m
 | `test/` | Tests mirroring `lib/` layout; see [test/README.md](../test/README.md) |
 | `integration_test/` | Full-app integration tests (local-only + online); see [test/README.md](../test/README.md) |
 | `supabase/` | Local Supabase config, migrations, seed data for online integration tests |
-| `scripts/` | Helper scripts (`run_online_tests.sh` for online tests) |
+| `scripts/` | Helper scripts (`run_online_tests.sh`, `run_all_tests.sh`, `local_test_env.sh`, `verify_*`, etc.) |
+| `tool/` | Dart runners (`run_online_tests.dart`, `run_all_tests.dart`, `score_ocr_dirs.dart`) and debug-icon generator |
+| `assets/tessdata/` | Bundled Tesseract traineddata (`eng`+`ara`) for Android on-device OCR |
+| `assets/images/parallax/` | Onboarding meadow layers (hybrid WebP: lossy sky, lossless alpha) |
+| `tmp/` | Local scratch (gitignored): OCR photos/outputs, tool previews |
 | `.github/workflows/release.yml` | CI/CD for Android builds/releases + web deploy + online integration tests |
 
 ## App Startup Flow
@@ -114,14 +118,15 @@ Shared widgets in `lib/core/widgets/`: **AsyncValueBuilder**, **AppFab** (cartoo
 
 ### Images + Receipt AI (core/receipt)
 
-Expense form **photos**: add up to 5 images (camera or gallery on all platforms, including web). Client-side compression (`receipt_image_compress`) before upload; upload from bytes (`receipt_storage_upload`: `uploadExpenseImageBytesToStorage` in io/stub) so web can upload without file paths. Optional **Scan receipt** (mobile): long-press a photo to run OCR/LLM (`processReceiptBytes` → `receipt_scan_service`). Local image storage helper (`receipt_storage`) is used for scan temp copies. The `core/receipt` package contains generic expense image handling plus scan-specific OCR/LLM flow: **scan** (`receipt_scan_service`), **LLM** (`receipt_llm_service`), **image view** (`receipt_image_view`), **providers** (`receipt_providers`). Used by expense form and settings (Receipt AI). Platform-specific impls in `*_io.dart` / `*_stub.dart`.
+Expense form **photos**: add up to 5 images (camera or gallery on all platforms, including web). Client-side compression (`receipt_image_compress`) before upload; upload from bytes (`receipt_storage_upload`: `uploadExpenseImageBytesToStorage` in io/stub) so web can upload without file paths. Optional **Scan receipt** (Android/iOS when Settings → Receipt scan mode ≠ off): Scan button on thumbnails, long-press, auto-scan after attach, and **Stop** to cancel (`receipt_scan_cancel` + `processReceiptBytes` → `receipt_scan_service`). Modes: **local** (on-device OCR via `receipt_ocr` MethodChannel — native `ReceiptOcrBridge` using Tesseract4Android / Tess 5 on Android with bundled `assets/tessdata/`, Apple Vision on iOS — then `receipt_local_extractor`), **nano** (Gemini Nano / AI Core on Android via `receipt_nano_service` + device Check/Download), **cloud** (BYO Gemini/OpenAI via `receipt_ai_backend` / `receipt_llm_service`). Scan mode / provider prefs live in `settings_framework_providers` (not a separate receipt providers file). Web: attach/upload only; Receipt AI settings hidden. Capability matrix: `receipt_scan_capability.dart`. Other helpers: `receipt_storage`, `receipt_image_view`. Platform-specific impls in `*_io.dart` / `*_stub.dart`.
 
 ## Navigation and Deep Links
 
 - Router: `lib/core/navigation/app_router.dart`
   - onboarding redirect guard
   - shell route for home/settings tabs; `/profile` is a shell child (like `/archived`) opened from the sidenav avatar
-  - group/invite/expense routes
+  - group/invite/expense routes (incl. group analytics)
+  - **Last route restore** (`last_route_restore.dart`): restores the last in-app location after cold start when appropriate
   - **Navigation trace** (`navigation_trace.dart`): `GoRouter`’s `routerDelegate` listener records recent locations (UTC + URI) for **Share / Report issue** payloads (`error_report_helper.dart`). Decorative-only URL updates that do not change the delegate may not appear in the trace.
 - **Group / personal create wizard:** Canonical routes are `/groups/create` and `/groups/create-personal` (each mounts one `GroupCreatePage` so `PageView` state is not disposed between steps). Legacy paths such as `/groups/create/details` **redirect** to the canonical URL (bookmarks still work; refresh on a legacy step URL restarts the wizard at step 0). In-wizard step labels in the address bar use `SystemNavigator.routeInformationUpdated` (decorative), not `context.go`, so state and animations stay intact. Step UI uses 0.6.x flat-panel surfaces (`AccentSurfaces`), `GroupSectionHeader`, living progress dots, `AppMotion` / `UiPerf` chrome, and `WizardStepEnter` (shared with onboarding).
 - **Onboarding wizard:** Per-step routes (`/onboarding/welcome`, …) remain for deep links and cold starts; swiping between steps updates the browser URL the same way (**decorative** `routeInformationUpdated`) so `OnboardingPage` state is not recreated by `go()` on every page.
@@ -220,7 +225,7 @@ Major persisted keys include:
 - appearance: `theme_mode`, `theme_color`, `language`, `font_size_scale`, `favorite_currencies`
 - mode/lifecycle: `local_only`, `onboarding_completed`, pending OAuth flags, pending invite token
 - privacy: `telemetry_enabled`, `notifications_enabled`
-- receipt AI: OCR/AI flags, provider, and API keys
+- receipt AI: `receipt_scan_mode` (off/local/nano/cloud), cloud provider, and BYO API keys
 
 ## Web and PWA
 
@@ -263,18 +268,17 @@ Schema and security/performance can be re-verified via [Supabase MCP](https://su
 
 ## MCP available in the IDE
 
-The following MCP (Model Context Protocol) servers are enabled in this project. Use them for schema checks, Dart/Flutter tooling, browser automation, and Firebase operations.
+MCP servers enabled in Cursor vary by machine/workspace. Common ones for this project:
 
-| Server | Purpose |
-|--------|--------|
-| **Supabase** (`plugin-supabase-supabase`) | Database and project management: `list_tables`, `get_advisors` (security/performance), `execute_sql`, `apply_migration`, `list_migrations`, `list_extensions`, branch ops (`create_branch`, `merge_branch`, etc.), Edge Functions (`list_edge_functions`, `deploy_edge_function`, `get_edge_function`), `generate_typescript_types`, `get_logs`, project/org (`list_projects`, `get_project`, `list_organizations`), `search_docs`, and project lifecycle (`pause_project`, `restore_project`, etc.). |
-| **Dart** (`user-dart`) | Dart/Flutter development: prefer over running tools in a shell. Includes `analyze_files`, `run_tests`, `dart_format`, `dart_fix`, `pub`, `pub_dev_search`, `create_project`; running apps (`launch_app`, `stop_app`, `hot_reload`, `hot_restart`), `list_devices`, `list_running_apps`, `get_app_logs`, `get_runtime_errors`; widget inspector (`get_widget_tree`, `get_selected_widget`, `set_widget_selection_mode`); and daemon/symbols (`connect_dart_tooling_daemon`, `resolve_workspace_symbol`, `hover`, `signature_help`). |
-| **cursor-ide-browser** | Web automation and testing: navigate, lock/unlock tab, snapshot page, click/type/scroll/drag, handle dialogs; `browser_tabs`, `browser_snapshot`, `browser_take_screenshot`, `browser_console_messages`, `browser_network_requests`, `browser_profile_start`/`browser_profile_stop` (CPU profiling). Lock before interactions; unlock when done. |
-| **Firebase** (`project-0-hisab-firebase`) | Firebase project (FCM, Hosting, etc.): developer knowledge docs, Realtime Database get/set, Remote Config, Auth (users, SMS policy), Messaging send, plus prompts/resources for init, deploy, rules, Crashlytics, etc. |
-| **jj** (`user-jj`) | Jujutsu VCS: repo status, log, diff, show; bookmarks (list/create/set/delete/move); commit, describe, edit, new; rebase, squash, split, duplicate, abandon; file list/show; git clone/fetch/push; config; workspace list/add; operation log/undo; resolve. Prefer over running `jj` in a shell when the AI needs to inspect or modify the repo. |
-| **Supabase Author** (`plugin-supabase-author`, if enabled) | Authoring/editorial support for Supabase-related content. |
+| Area | Typical server ids | Purpose |
+|------|-------------------|--------|
+| **Supabase** | `plugin-supabase-supabase` | Schema, advisors, SQL, migrations, Edge Functions, logs |
+| **Firebase** | `plugin-firebase-firebase` / `user-firebase` | FCM, Hosting, Auth, docs |
+| **Browser** | `cursor-ide-browser` | Web automation / screenshots |
+| **Mobile debug** | `user-polyscreen`, `user-Mobile MCP` | Device install, UI snapshot, crashes (Hisab Debug) |
+| **App control** | `cursor-app-control` | Workspace / project helpers |
 
-Tool descriptors (names and parameters) live under `.cursor/projects/.../mcps/<server>/tools/*.json`. Check each tool’s schema before calling.
+Discover live tools with MCP catalog/`GetMcpTools` rather than hard-coding server names — ids drift between Cursor versions.
 
 ### Example: cross-MCP workflow (Supabase → Firebase)
 
@@ -373,7 +377,7 @@ Build-time config is via `--dart-define` in `lib/core/constants/supabase_config.
 - `SITE_URL` (optional auth email redirect)
 - `FCM_VAPID_KEY` (web push)
 
-Secrets template: `lib/core/constants/app_secrets_example.dart`; see `docs/CONFIGURATION.md` for runtime configuration. If Supabase defines are missing, app runs local-only by design. In local mode, no environment variables are required and the app must not crash or throw.
+Non-secret app constants (e.g. `reportIssueUrl`) live in `lib/core/constants/app_config.dart`. Secrets and project URLs come from `--dart-define` / gitignored define files — see `docs/CONFIGURATION.md`. If Supabase defines are missing, app runs local-only by design. In local mode, no environment variables are required and the app must not crash or throw.
 
 ## Platform Permissions
 
@@ -427,19 +431,19 @@ The `test-online` job requires no additional secrets — it uses the local Supab
 
 - **Run all tests:** `flutter test`
 - **Coverage:**
-  - **Unit:** domain, settle-up, sync error classification, backup parse, translations.
-  - **Widget:** Public custom widgets under `test/` mirroring `lib/`: `test/core/` (async_value_builder, back_button_keyboard_dismiss, connection_banner, currency_picker_list, expandable_section, floating_nav_bar, invite_link_handler, pwa_install_banner, pwa_capabilities, sync_status_chip), `test/groups/` (group_card, create_invite_sheet), `test/expenses/` (expense_list_tile, expense_title_section, expense_amount_section, expense_split_section, expense_bill_breakdown_section, expense_detail_body, expense_detail_body_header), `test/settings/` (logs_viewer_dialog, privacy_policy_page), `test/pages/` (main_scaffold, home_page, archived_groups_page), `test/balance/` (balance_list: settlement permission — owner vs member/debtor), `test/onboarding/` (onboarding_page), plus error_content and app. Widget tests use EasyLocalization + MaterialApp; Riverpod widgets use ProviderScope with overrides when needed. See [test/widget_test_helpers.dart](../test/widget_test_helpers.dart) and [test/README.md](../test/README.md).
+  - **Unit:** domain, settle-up, sync error classification, backup parse, translations, receipt local extractor / OCR fixtures (`test/fixtures/receipts/`, `test/fixtures/receipts/ocr_raw/`).
+  - **Widget:** Public custom widgets under `test/` mirroring `lib/`: `test/core/` (async_value_builder, back_button_keyboard_dismiss, connection_banner, currency_picker_list, expandable_section, floating_nav_bar, invite_link_handler, pwa_install_banner, pwa_capabilities, sync_status_chip), `test/groups/` (group_card, create_invite_sheet), `test/expenses/` (expense_list_tile, expense_title_section, expense_amount_section, expense_split_section, expense_bill_breakdown_section, expense_detail_body, expense_detail_body_header), `test/settings/` (logs_viewer_dialog, privacy_policy_page), `test/pages/` (main_scaffold, home_page, archived_groups_page), `test/balance/` (balance_list: settlement permission — owner vs member/debtor), `test/onboarding/` (onboarding_page), plus error_content. Widget tests use EasyLocalization + MaterialApp; Riverpod widgets use ProviderScope with overrides when needed. See [test/widget_test_helpers.dart](../test/widget_test_helpers.dart) and [test/README.md](../test/README.md).
   - **Locale:** Key widgets are tested in both English and Arabic via `test/widget_test_helpers.dart`: `pumpApp(tester, child: ..., locale: Locale('ar'))` and `testSupportedLocales`. Edge cases (empty/zero/long content, optional params) are covered where relevant. Translation file parity: `test/translations_test.dart` (see [I18N.md](I18N.md)).
   - **Integration-style:** Local PowerSync DB, sync engine with fake backend. See [test/README.md](../test/README.md) for PowerSync native binary requirements and coverage (`flutter test --coverage`).
   - **Integration (local-only):** Full-app flows in `integration_test/` — smoke, onboarding, group, personal, expense (tags, photos, currencies, bill breakdown), balance (settlements, freeze), settings. Run with `flutter drive` on web or `flutter test integration_test/ -d <device>`. See [test/README.md](../test/README.md).
   - **Integration (online):** Full end-to-end tests against a **local Supabase instance** (Docker) — auth (sign-in/out), data sync (create group/expense → verify in Supabase DB), and multi-user invite flow. Run with `./scripts/run_online_tests.sh` or manually via `supabase start` + `flutter drive`. See [test/README.md](../test/README.md) for full setup.
 - **Widget test helper:** `test/widget_test_helpers.dart` provides `pumpApp(tester, child, locale?, pumpAndSettle?)` to wrap the widget in EasyLocalization + MaterialApp; use for presentational widgets. For widgets that depend on Riverpod, build ProviderScope + EasyLocalization + MaterialApp inline with overrides (see e.g. `test/balance/balance_list_widget_test.dart`).
-- **Generated code:** Run `dart run build_runner build` (or `watch`) to regenerate `.g.dart` files before running tests or when changing providers/settings.
+- **Generated code:** Run `flutter pub run build_runner build --delete-conflicting-outputs` (or `watch`) to regenerate `.g.dart` files before running tests or when changing providers/settings.
 
 ## Development
 
-- **Codegen:** Use `dart run build_runner build` after changing Riverpod providers, settings, or other annotated code so `.g.dart` files stay in sync.
-- **Tooling:** Prefer the Dart, Supabase, and jj MCP servers (see “MCP available in the IDE” above) for analysis, format, schema checks, migrations, and version control (status, log, commit, bookmarks) instead of running CLI tools manually.
+- **Codegen:** Use `flutter pub run build_runner build --delete-conflicting-outputs` after changing Riverpod providers, settings, or other annotated code so `.g.dart` files stay in sync.
+- **Tooling:** Prefer available MCP servers (see “MCP available in the IDE” above) for schema checks, device debug, and browser automation when they are enabled in the workspace.
 
 ## Recent improvements (documented changes)
 

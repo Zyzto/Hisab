@@ -10,6 +10,7 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:upgrader/upgrader.dart';
 import 'package:version/version.dart';
+import 'core/auth/auth_pending_finalize.dart';
 import 'core/auth/auth_providers.dart';
 import 'core/auth/oauth_callback_state.dart';
 import 'core/database/database_providers.dart';
@@ -21,13 +22,13 @@ import 'core/update/hisab_upgrader.dart';
 import 'core/update/update_check_providers.dart';
 import 'core/update/upgrader_messages.dart';
 import 'features/settings/providers/settings_framework_providers.dart';
-import 'features/settings/settings_definitions.dart';
 import 'core/theme/app_scroll_behavior.dart';
 import 'core/theme/theme_providers.dart';
 import 'package:toastification/toastification.dart';
 import 'core/layout/layout_breakpoints.dart';
 import 'core/navigation/app_router.dart';
 import 'core/navigation/invite_link_handler.dart';
+import 'core/navigation/last_route_restore.dart';
 import 'core/services/connectivity_service.dart';
 import 'core/celebration/celebration_host.dart';
 import 'core/services/screenshot_report_prompt_host.dart';
@@ -146,11 +147,17 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
         state == AppLifecycleState.resumed) {
       _dismissKeyboardIfVisible();
     }
-    if (state == AppLifecycleState.paused ||
+    // Also pin on inactive: Android often kills the process under the system
+    // camera before paused/detached is delivered.
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       _saveCurrentRoute();
     } else if (state == AppLifecycleState.resumed) {
-      _clearSavedRoute();
+      // Skip while camera/gallery pick is in flight (inactive→resumed flicker).
+      if (!hasPendingImagePick(ref)) {
+        _clearSavedRoute();
+      }
     }
   }
 
@@ -188,25 +195,12 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
         .currentConfiguration
         .uri
         .path;
-    if (path.isEmpty || path == '/') return;
-    final settings = ref.read(hisabSettingsProvidersProvider);
-    if (settings != null) {
-      final current = ref.read(settings.provider(lastRoutePathSettingDef));
-      if (current == path) return;
-      ref.read(settings.provider(lastRoutePathSettingDef).notifier).set(path);
-      Log.info('Setting changed: ${lastRoutePathSettingDef.key}=$path');
-    }
+    persistLastRoutePath(ref, path);
   }
 
   void _clearSavedRoute() {
     if (!mounted) return;
-    final settings = ref.read(hisabSettingsProvidersProvider);
-    if (settings != null) {
-      final current = ref.read(settings.provider(lastRoutePathSettingDef));
-      if (current.isEmpty) return;
-      ref.read(settings.provider(lastRoutePathSettingDef).notifier).set('');
-      Log.info('Setting changed: ${lastRoutePathSettingDef.key}=(cleared)');
-    }
+    clearLastRoutePath(ref);
   }
 
   void _registerAuthListener() {
@@ -217,6 +211,14 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
     ) {
       if (!mounted) return;
       if (isAuth && prev != true) {
+        // Native warm resume after magic link / OAuth — main() does not re-run.
+        final settings = ref.read(hisabSettingsProvidersProvider);
+        if (settings != null) {
+          finalizePendingOnlineAuth(
+            controller: settings.controller,
+            hasSession: true,
+          );
+        }
         if (ref.read(notificationsEnabledProvider)) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;

@@ -4,6 +4,7 @@ import '../../../core/platform/ui_perf.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/widgets/wizard_step_enter.dart';
 import 'onboarding_ambient.dart';
+import 'onboarding_celestial.dart';
 
 /// Alias for call sites that still import [OnboardingStepEnter] from this file.
 typedef OnboardingStepEnter = WizardStepEnter;
@@ -214,56 +215,87 @@ class OnboardingSectionLabel extends StatelessWidget {
   }
 }
 
-/// Onboarding body with title locked to the top third of the viewport.
+/// Soft wash above the footer chrome where step content peeks through.
 ///
-/// All onboarding steps use this so the title baseline stays consistent when
-/// paging. [contentAlignment] defaults to center; use [Alignment.topCenter]
-/// when content should stay at the top of the lower two thirds (e.g. Connect).
+/// Painted by the shell footer and marked non-hit-testable so the list can
+/// still scroll underneath.
+const double kOnboardingFooterFadeExtension = 96;
+
+/// Footer chrome height (dots + nav + hint), excluding safe inset and the
+/// fade extension above it.
+const double kOnboardingFooterChromeHeight = 152;
+
+/// Bottom inset so scroll content can clear the interactive footer chrome
+/// (safe area included). Content is intentionally allowed under the soft
+/// fade extension so the next rows peek through.
+double onboardingFooterContentInset(BuildContext context) {
+  return kOnboardingFooterChromeHeight +
+      MediaQuery.paddingOf(context).bottom;
+}
+
+/// Onboarding body with title (+ optional pinned header) fixed, content
+/// scrolling only when it overflows.
 ///
-/// Horizontal sizing is handled by the parent onboarding shell via
-/// `ConstrainedContent`.
+/// Copy starts just below the sun/moon disc (see
+/// [OnboardingCelestial.contentStartY]). Title and [pinnedBelowTitle] stay
+/// put; only [content] scrolls. Extra bottom padding clears the overlaid
+/// footer chrome.
+///
+/// [contentAlignment] defaults to center; use [Alignment.topCenter] when
+/// short content should stay at the top of the scroll band.
 Widget onboardingPageBodyWithFixedTitle(
   BuildContext context, {
   required Widget title,
   required Widget content,
+  Widget? pinnedBelowTitle,
   AlignmentGeometry contentAlignment = Alignment.center,
 }) {
   const padding = ThemeConfig.spacingM;
-  return LayoutBuilder(
-    builder: (context, constraints) {
-      const titleContentGap = ThemeConfig.spacingL;
-      final viewportHeight = constraints.maxHeight - 2 * padding;
-      final topThirdHeight = viewportHeight / 3;
-      final contentAreaHeight = viewportHeight * 2 / 3 - titleContentGap;
-      return SingleChildScrollView(
-        padding: const EdgeInsets.all(padding),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: viewportHeight),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(
-                height: topThirdHeight,
-                width: double.infinity,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Spacer(),
-                    title,
-                  ],
+  const titleContentGap = ThemeConfig.spacingL;
+  final footerInset = onboardingFooterContentInset(context);
+  final media = MediaQuery.of(context);
+  // Celestial is painted in full-screen coords; this body already sits under
+  // the top safe inset, so subtract that (+ our top padding) from the spacer.
+  final belowCelestial =
+      (OnboardingCelestial.contentStartY(media.size) -
+              media.padding.top -
+              padding +
+              ThemeConfig.spacingS)
+          .clamp(0.0, media.size.height);
+  return Padding(
+    padding: const EdgeInsets.fromLTRB(padding, padding, padding, 0),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(height: belowCelestial),
+        title,
+        if (pinnedBelowTitle != null) ...[
+          const SizedBox(height: titleContentGap),
+          pinnedBelowTitle,
+        ],
+        const SizedBox(height: titleContentGap),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, scrollConstraints) {
+              final minBody = scrollConstraints.maxHeight.isFinite
+                  ? (scrollConstraints.maxHeight - footerInset)
+                        .clamp(0.0, scrollConstraints.maxHeight)
+                  : 0.0;
+              return SingleChildScrollView(
+                padding: EdgeInsets.only(bottom: footerInset + padding),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: minBody),
+                  child: Align(
+                    alignment: contentAlignment,
+                    child: content,
+                  ),
                 ),
-              ),
-              const SizedBox(height: titleContentGap),
-              ConstrainedBox(
-                constraints: BoxConstraints(minHeight: contentAreaHeight),
-                child: Align(alignment: contentAlignment, child: content),
-              ),
-            ],
+              );
+            },
           ),
         ),
-      );
-    },
+      ],
+    ),
   );
 }
 

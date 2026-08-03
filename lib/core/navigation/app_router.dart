@@ -3,10 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'app_page.dart';
 import 'decorative_route.dart';
 import 'invite_nav_redirect.dart';
+import 'last_route_restore.dart';
 import 'navigation_trace.dart';
 import 'route_paths.dart';
 import '../../features/home/routes.dart';
@@ -152,38 +152,70 @@ GoRouter router(Ref ref) {
         final pendingToken = ref.read(
           settings.provider(pendingInviteTokenSettingDef),
         );
-        final pendingTarget = pendingInviteRedirectTarget(
-          pendingToken: pendingToken,
-          currentPath: state.uri.path,
-          onOnboarding: onOnboarding,
-          onPrivacyPolicy: onPrivacyPolicy,
+        final autoJoinFlag = ref.read(
+          settings.provider(pendingInviteAutoJoinSettingDef),
         );
+        // Stale invite last-route must never restore.
+        final lastPath = ref.read(settings.provider(lastRoutePathSettingDef));
+        if (isInviteRoutePath(lastPath)) {
+          scheduleClearLastRouteSettings(
+            ref,
+            clearLastRoute: true,
+            lastRouteLog: '(cleared invite last-route)',
+          );
+        }
+        // Only force /invite while join is still intended (mid-auth / auto-join).
+        final pendingTarget =
+            shouldRedirectPendingInvite(
+              pendingToken: pendingToken,
+              autoJoinFlag: autoJoinFlag,
+            )
+            ? pendingInviteRedirectTarget(
+                pendingToken: pendingToken,
+                currentPath: state.uri.path,
+                onOnboarding: onOnboarding,
+                onPrivacyPolicy: onPrivacyPolicy,
+              )
+            : null;
         if (pendingTarget != null) {
-          ref
-              .read(settings.provider(pendingInviteTokenSettingDef).notifier)
-              .set('');
-          // Drop stale restore so it cannot override invite on the next refresh.
-          final lastPath = ref.read(settings.provider(lastRoutePathSettingDef));
-          if (lastPath.isNotEmpty) {
-            ref
-                .read(settings.provider(lastRoutePathSettingDef).notifier)
-                .set('');
-          }
-          Log.info(
-            'Setting changed: ${pendingInviteTokenSettingDef.key}=(cleared for redirect)',
+          // Keep pending token through auth return; only clear last-route.
+          scheduleClearLastRouteSettings(
+            ref,
+            clearLastRoute: true,
+            lastRouteLog: '(cleared for invite redirect)',
           );
           return pendingTarget;
         }
+        // Drop stale pending token that has no join intent and is not the
+        // current invite route (page may still persist token for auth resume).
+        if (pendingToken.isNotEmpty &&
+            !autoJoinFlag &&
+            !isInviteRoutePath(state.uri.path)) {
+          scheduleClearLastRouteSettings(
+            ref,
+            clearPendingInvite: true,
+            pendingInviteLog: '(cleared stale without auto-join)',
+          );
+        }
         // Restore route after process kill (e.g. returning from camera)
-        final lastPath = ref.read(settings.provider(lastRoutePathSettingDef));
         if (shouldRestoreLastRoute(
           lastPath: lastPath,
           pendingToken: pendingToken,
           onboardingCompleted: onboardingCompleted,
         )) {
-          ref.read(settings.provider(lastRoutePathSettingDef).notifier).set('');
-          Log.info(
-            'Setting changed: ${lastRoutePathSettingDef.key}=(cleared for redirect)',
+          // Already on the restored path (redirect re-entry): just clear.
+          if (state.uri.path == lastPath) {
+            scheduleClearLastRouteSettings(
+              ref,
+              clearLastRoute: true,
+              lastRouteLog: '(cleared for redirect)',
+            );
+            return null;
+          }
+          scheduleClearLastRouteSettings(
+            ref,
+            clearLastRoute: true,
+            lastRouteLog: '(cleared for redirect)',
           );
           return lastPath;
         }
@@ -205,20 +237,7 @@ GoRouter router(Ref ref) {
           onOnboarding: onOnboarding,
           pendingToken: pending,
         );
-        if (afterOnboarding != null &&
-            isInviteRoutePath(afterOnboarding) &&
-            settingsForInvite != null) {
-          ref
-              .read(
-                settingsForInvite
-                    .provider(pendingInviteTokenSettingDef)
-                    .notifier,
-              )
-              .set('');
-          Log.info(
-            'Setting changed: ${pendingInviteTokenSettingDef.key}=(cleared after onboarding)',
-          );
-        }
+        // Keep pending token so InviteAcceptPage can auto-join after onboarding.
         return afterOnboarding;
       }
       return null;

@@ -111,7 +111,7 @@ void main() {
       );
     });
 
-    test('different invite path still counts as invite route → stay', () {
+    test('different invite path → navigate to pending token', () {
       expect(
         pendingInviteRedirectTarget(
           pendingToken: 'tok-a',
@@ -119,7 +119,7 @@ void main() {
           onOnboarding: false,
           onPrivacyPolicy: false,
         ),
-        isNull,
+        '/invite/tok-a',
       );
     });
 
@@ -183,6 +183,60 @@ void main() {
         ),
         isFalse,
       );
+    });
+
+    test('invite last path is never restored', () {
+      expect(
+        shouldRestoreLastRoute(
+          lastPath: '/invite/tok',
+          pendingToken: '',
+          onboardingCompleted: true,
+        ),
+        isFalse,
+      );
+    });
+  });
+
+  group('shouldRedirectPendingInvite', () {
+    test('token + auto-join → true', () {
+      expect(
+        shouldRedirectPendingInvite(
+          pendingToken: 'tok',
+          autoJoinFlag: true,
+        ),
+        isTrue,
+      );
+    });
+
+    test('token without auto-join → false', () {
+      expect(
+        shouldRedirectPendingInvite(
+          pendingToken: 'tok',
+          autoJoinFlag: false,
+        ),
+        isFalse,
+      );
+    });
+
+    test('empty token → false', () {
+      expect(
+        shouldRedirectPendingInvite(
+          pendingToken: '',
+          autoJoinFlag: true,
+        ),
+        isFalse,
+      );
+    });
+  });
+
+  group('inviteTokenFromPath', () {
+    test('extracts token from accept and preview paths', () {
+      expect(inviteTokenFromPath('/invite/tok'), 'tok');
+      expect(inviteTokenFromPath('/invite/tok/preview'), 'tok');
+    });
+
+    test('bare /invite → null', () {
+      expect(inviteTokenFromPath('/invite'), isNull);
     });
   });
 

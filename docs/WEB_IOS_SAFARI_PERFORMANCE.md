@@ -45,7 +45,7 @@ Detection for web OS uses the existing PWA UA helpers (`isPwaIos` / `isPwaAndroi
 - Profile page: `CustomScrollView` section slivers + lazy activity/group lists
 - Home reorder: custom `HomeReorderableGroupsSliver` (long-press drag + insert line; no nested `shrinkWrap`)
 - Settings lazy-mount in shell (created on first visit)
-- Receipt OCR/AI: web stub export (no ML Kit / langchain on web); settings section hidden on web
+- Receipt scan AI: web stub export (no Tesseract/Vision / Nano / cloud scan on web); Settings → Receipt / AI hidden on web; photos attach/upload still work
 
 ## Current project decisions
 

@@ -47,7 +47,7 @@ class OnboardingSkyGame extends FlameGame {
   }
 
   String _path(String name) =>
-      _night ? 'parallax/${name}_night.png' : 'parallax/$name.png';
+      _night ? 'parallax/${name}_night.webp' : 'parallax/$name.webp';
 
   Future<void> _reloadParallax() async {
     if (_loading) return;

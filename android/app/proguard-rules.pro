@@ -1,12 +1,25 @@
-# google_mlkit_text_recognition references optional script-specific recognizers
-# that R8 strips during release builds. Keep them to avoid missing class errors.
--keep class com.google.mlkit.vision.text.chinese.** { *; }
--keep class com.google.mlkit.vision.text.devanagari.** { *; }
--keep class com.google.mlkit.vision.text.japanese.** { *; }
--keep class com.google.mlkit.vision.text.korean.** { *; }
+# Flutter
+-keep class io.flutter.app.** { *; }
+-keep class io.flutter.plugin.** { *; }
+-keep class io.flutter.util.** { *; }
+-keep class io.flutter.view.** { *; }
+-keep class io.flutter.** { *; }
+-keep class io.flutter.plugins.** { *; }
+-dontwarn io.flutter.embedding.**
 
-# Suppress warnings for optional ML Kit classes not included in the build.
--dontwarn com.google.mlkit.vision.text.chinese.**
--dontwarn com.google.mlkit.vision.text.devanagari.**
--dontwarn com.google.mlkit.vision.text.japanese.**
--dontwarn com.google.mlkit.vision.text.korean.**
+# Tesseract4Android / Leptonica — keep JNI entry points used by TessBaseAPI.
+-keep class com.googlecode.tesseract.android.** { *; }
+-keep class com.googlecode.leptonica.android.** { *; }
+-dontwarn com.googlecode.tesseract.android.**
+-dontwarn com.googlecode.leptonica.android.**
+
+# Firebase / Play Services (messaging + related)
+-keep class com.google.firebase.** { *; }
+-keep class com.google.android.gms.** { *; }
+-dontwarn com.google.firebase.**
+-dontwarn com.google.android.gms.**
+
+# Keep native methods
+-keepclasseswithmembernames class * {
+    native <methods>;
+}

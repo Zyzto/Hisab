@@ -106,7 +106,3 @@ class _FullscreenImageDialog extends StatelessWidget {
     );
   }
 }
-
-@Deprecated('Use showImageDialogForUrl instead.')
-void showReceiptImageDialogForUrl(BuildContext context, String url) =>
-    showImageDialogForUrl(context, url);

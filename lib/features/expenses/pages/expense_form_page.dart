@@ -13,6 +13,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../../core/receipt/receipt_image_compress.dart';
 import '../../../core/receipt/receipt_image_cache.dart';
 import '../../../core/receipt/receipt_image_view.dart';
+import '../../../core/receipt/receipt_ocr.dart';
+import '../../../core/receipt/receipt_scan_capability.dart';
 import '../../../core/receipt/receipt_scan_service.dart';
 import '../../../core/receipt/receipt_storage_upload.dart';
 import '../../../core/platform/network_image_decode.dart';
@@ -29,8 +31,10 @@ import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
+import '../../../core/navigation/last_route_restore.dart';
 import '../../../core/navigation/nav_back.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/widgets/missing_route_page.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/utils/currency_helpers.dart';
 import '../../../core/utils/error_report_helper.dart';
@@ -42,6 +46,7 @@ import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../core/widgets/user_text.dart';
 import '../../../features/settings/providers/settings_framework_providers.dart';
+import '../../../features/settings/settings_definitions.dart';
 import '../../balance/providers/balance_provider.dart';
 import '../../groups/providers/group_member_provider.dart';
 import '../../groups/providers/groups_provider.dart';
@@ -61,7 +66,7 @@ const double _kSubmitBarExtraBottomPadding = 20.0;
 /// Max number of photos per expense.
 const int _kMaxExpenseImages = 5;
 
-/// One photo in the form: either pending bytes or stored URL.
+/// One photo in the form: pending bytes and/or stored URL.
 typedef _ExpenseImageItem = ({Uint8List? bytes, String? url});
 
 class ExpenseFormPage extends ConsumerStatefulWidget {
@@ -144,6 +149,21 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   /// Photos: pending bytes (before upload) or stored URL. Max [_kMaxExpenseImages].
   final List<_ExpenseImageItem> _expenseImages = [];
 
+  /// True while OCR/AI scan is running.
+  bool _scanningReceipt = false;
+
+  /// Cooperative cancel for the in-flight receipt scan.
+  ReceiptScanCancelToken? _scanCancel;
+
+  /// One Nano-unavailable toast per form session.
+  bool _nanoFallbackToastShown = false;
+
+  /// One soft retry when group stream briefly yields null (e.g. after camera kill).
+  bool _nullGroupRetryDone = false;
+
+  /// Android may kill the activity under the camera; recover once via retrieveLostData.
+  bool _lostPickerDataChecked = false;
+
   String get _formBackPath {
     final expenseId = widget.expenseId;
     if (expenseId != null) {
@@ -187,6 +207,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         parentPath: _formBackPath,
         currentPath: _formRoutePath,
       );
+      // Camera often kills MainActivity; pickImage never completes — recover here.
+      _recoverLostPickerImage();
     });
   }
 
@@ -274,6 +296,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
 
   @override
   void dispose() {
+    _scanCancel?.cancel();
+    _scanCancel = null;
+    cancelReceiptOcr();
     _amountController.removeListener(_amountListener);
     _titleController.dispose();
     _descriptionController.dispose();
@@ -295,6 +320,37 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     _lineItemControllers.clear();
     _transactionTypeSegmentController.dispose();
     super.dispose();
+  }
+
+  void _stopReceiptScan() {
+    _scanCancel?.cancel();
+    _scanCancel = null;
+    // Ignore: native stop is best-effort.
+    cancelReceiptOcr();
+    if (mounted && _scanningReceipt) {
+      setState(() => _scanningReceipt = false);
+    }
+  }
+
+  void _syncLineItemControllersFromItems() {
+    for (final c in _lineItemControllers) {
+      c.desc.dispose();
+      c.amount.dispose();
+    }
+    _lineItemControllers
+      ..clear()
+      ..addAll(
+        _lineItems.map(
+          (item) => (
+            desc: TextEditingController(text: item.description),
+            amount: TextEditingController(
+              text: item.amountCents > 0
+                  ? (item.amountCents / 100).toStringAsFixed(2)
+                  : '',
+            ),
+          ),
+        ),
+      );
   }
 
   bool get _isDifferentCurrency => _currencyCode != _groupCurrencyCode;
@@ -674,12 +730,11 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
             'amountCents': expense.amountCents,
           }, enabled: ref.read(telemetryEnabledProvider));
         } catch (_) {}
-        if (!isTransferExpense) {
+        if (!isTransferExpense && isFirstExpense) {
           await fireCelebration(
             ref,
-            isFirstExpense
-                ? CelebrationKind.firstExpense
-                : CelebrationKind.newExpense,
+            CelebrationKind.firstExpense,
+            dedupeKey: CelebrationKeys.firstExpense(widget.groupId),
           );
         }
       }
@@ -959,10 +1014,26 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     return groupAsync.when(
       data: (group) {
         if (group == null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) _popForm();
-          });
-          return const SizedBox.shrink();
+          // Do not auto-pop: a brief null after returning from the camera
+          // (process pressure / provider reload) was kicking users to the group page.
+          if (!_nullGroupRetryDone) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted || _nullGroupRetryDone) return;
+              setState(() => _nullGroupRetryDone = true);
+              Future<void>.delayed(const Duration(milliseconds: 300), () {
+                if (!mounted) return;
+                ref.invalidate(futureGroupProvider(widget.groupId));
+              });
+            });
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          return MissingRoutePage(
+            titleKey: 'group_not_found',
+            messageKey: 'group_not_found_message',
+            fallbackPath: _formBackPath,
+          );
         }
         if (group.isSettlementFrozen && widget.expenseId == null) {
           return LayoutBuilder(
@@ -1191,9 +1262,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                           ]
                         : null,
                   ),
-                  body: Stack(
-                    children: [
-                      AbsorbPointer(
+                  body: AbsorbPointer(
                         absorbing: _saving,
                         child: ConstrainedContent(
                           child: Form(
@@ -1207,8 +1276,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                             bottom:
                                 12 +
                                 _kSubmitBarHeight +
-                                _kSubmitBarExtraBottomPadding +
-                                MediaQuery.of(context).padding.bottom,
+                                _kSubmitBarExtraBottomPadding,
                           ),
                           children: [
                             if (!showSimpleForm) ...[
@@ -1409,15 +1477,31 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                             if (!isTransfer) ...[
                               _formPanel(
                                 context,
-                                child: ExpenseTitleSection(
-                                  controller: _titleController,
-                                  selectedTag: _selectedTag,
-                                  customTags: customTags,
-                                  onTagPicker: () =>
-                                      _showTagPicker(customTags),
-                                  onPickImage: _expenseImages.isEmpty
-                                      ? _addPhoto
-                                      : null,
+                                child: Builder(
+                                  builder: (context) {
+                                    final scanEnabled =
+                                        ReceiptScanCapability.scanUiEnabled(
+                                          ref.watch(receiptScanModeProvider),
+                                        );
+                                    final photosEmpty =
+                                        _expenseImages.isEmpty;
+                                    return ExpenseTitleSection(
+                                      controller: _titleController,
+                                      selectedTag: _selectedTag,
+                                      customTags: customTags,
+                                      onTagPicker: () =>
+                                          _showTagPicker(customTags),
+                                      onPickImage: photosEmpty &&
+                                              !_scanningReceipt
+                                          ? () => _addPhoto()
+                                          : null,
+                                      onScanReceipt: photosEmpty &&
+                                              scanEnabled &&
+                                              !_scanningReceipt
+                                          ? _scanReceiptAction
+                                          : null,
+                                    );
+                                  },
                                 ),
                               ),
                               if (_expenseImages.isNotEmpty)
@@ -1682,16 +1766,15 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                       ),
                     ),
                   ),
-                      ),
-                    ],
                   ),
-                  bottomNavigationBar: SizedBox(
-                    height:
-                        _kSubmitBarHeight +
-                        MediaQuery.of(context).padding.bottom,
-                    child: ConstrainedContent(
-                      child: SafeArea(
-                        top: false,
+                  // Bound height before [ConstrainedContent]: its tablet Row uses
+                  // CrossAxisAlignment.stretch and will otherwise expand to the
+                  // Scaffold's loose max height (full screen) in landscape.
+                  bottomNavigationBar: SafeArea(
+                    top: false,
+                    child: SizedBox(
+                      height: _kSubmitBarHeight,
+                      child: ConstrainedContent(
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 16,
@@ -2049,13 +2132,95 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     );
   }
 
-  /// Add photo from camera or gallery (all platforms). Compresses and appends to [_expenseImages].
-  Future<void> _addPhoto() async {
-    _defocusFormInputs();
-    if (_expenseImages.length >= _kMaxExpenseImages) return;
-    final source = await showResponsiveSheet<ImageSource>(
+  /// After Android kills MainActivity under the camera, [pickImage] never
+  /// returns — recover the captured file and ingest it into the form.
+  Future<void> _recoverLostPickerImage() async {
+    if (_lostPickerDataChecked) return;
+    _lostPickerDataChecked = true;
+    if (kIsWeb || !isAndroid) return;
+    if (_expenseImages.length >= _kMaxExpenseImages) {
+      clearPendingImagePick(ref);
+      return;
+    }
+    try {
+      final response = await ImagePicker().retrieveLostData();
+      if (!mounted || response.isEmpty) {
+        clearPendingImagePick(ref);
+        return;
+      }
+      final exception = response.exception;
+      if (exception != null) {
+        Log.warning(
+          'Lost camera/gallery data: ${exception.code} ${exception.message}',
+        );
+        clearPendingImagePick(ref);
+        return;
+      }
+      final file = response.files?.firstOrNull ?? response.file;
+      if (file == null) {
+        clearPendingImagePick(ref);
+        return;
+      }
+      final scanAfter =
+          readPendingImagePickMode(ref) == PendingImagePickMode.scan;
+      Log.info(
+        'Recovered photo after camera activity kill (scanAfter=$scanAfter)',
+      );
+      await _ingestPickedPhoto(file, scanAfter: scanAfter);
+    } catch (e, stack) {
+      Log.warning('retrieveLostData failed', error: e, stackTrace: stack);
+      clearPendingImagePick(ref);
+    }
+  }
+
+  /// Compress, append to [_expenseImages], then optionally OCR.
+  Future<void> _ingestPickedPhoto(XFile file, {bool scanAfter = false}) async {
+    try {
+      final bytes = await file.readAsBytes();
+      final forOcr = await compressReceiptImageForOcr(bytes) ?? bytes;
+      final compressed = await compressReceiptImage(forOcr);
+      if (!mounted) {
+        clearPendingImagePick(ref);
+        return;
+      }
+      final toAdd = compressed ?? forOcr;
+      setState(() {
+        if (_expenseImages.length < _kMaxExpenseImages) {
+          _expenseImages.add((bytes: toAdd, url: null));
+        }
+      });
+      clearPendingImagePick(ref);
+      if (scanAfter && mounted) {
+        await _onScanReceiptFromPhoto(forOcr);
+      }
+    } catch (e, stack) {
+      clearPendingImagePick(ref);
+      if (mounted) {
+        debugPrint('Photo add error: $e');
+        debugPrintStack(stackTrace: stack);
+        context.showError('receipt_scan_error'.tr(args: [e.toString()]));
+      }
+    }
+  }
+
+  Future<void> _scanReceiptAction() async {
+    if (_scanningReceipt) return;
+    if (!ReceiptScanCapability.scanUiEnabled(
+      ref.read(receiptScanModeProvider),
+    )) {
+      return;
+    }
+    if (kIsWeb) {
+      if (mounted) context.showToast('receipt_scan_web_unavailable'.tr());
+      return;
+    }
+    await _addPhoto(scanAfter: true);
+  }
+
+  Future<ImageSource?> _pickImageSource({required bool forScan}) {
+    return showResponsiveSheet<ImageSource>(
       context: context,
-      title: 'add_photo'.tr(),
+      title: (forScan ? 'scan_receipt' : 'add_photo').tr(),
       maxHeight: MediaQuery.of(context).size.height * 0.75,
       isScrollControlled: true,
       centerInFullViewport: true,
@@ -2086,8 +2251,14 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         ),
       ),
     );
-    if (source == null) return;
-    if (!mounted) return;
+  }
+
+  /// Add photo from camera or gallery. [scanAfter] runs OCR after attach.
+  Future<void> _addPhoto({bool scanAfter = false}) async {
+    _defocusFormInputs();
+    if (_expenseImages.length >= _kMaxExpenseImages) return;
+    final source = await _pickImageSource(forScan: scanAfter);
+    if (source == null || !mounted) return;
 
     final bool hasPermission;
     if (source == ImageSource.camera) {
@@ -2099,30 +2270,39 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     }
     if (!hasPermission || !mounted) return;
 
-    final XFile? file = await ImagePicker().pickImage(source: source);
-    if (file == null || !mounted) return;
-    try {
-      final bytes = await file.readAsBytes();
-      final compressed = await compressReceiptImage(bytes);
-      if (!mounted) return;
-      final toAdd = compressed ?? bytes;
-      setState(() {
-        if (_expenseImages.length < _kMaxExpenseImages) {
-          _expenseImages.add((bytes: toAdd, url: null));
-        }
-      });
-    } catch (e, stack) {
-      if (mounted) {
-        debugPrint('Photo add error: $e');
-        debugPrintStack(stackTrace: stack);
-        context.showError('receipt_scan_error'.tr(args: [e.toString()]));
+    persistLastRoutePath(ref, _formRoutePath);
+    setPendingImagePickMode(
+      ref,
+      scanAfter ? PendingImagePickMode.scan : PendingImagePickMode.attach,
+    );
+
+    final XFile? file = await ImagePicker().pickImage(
+      source: source,
+      maxWidth: kReceiptOcrMaxDimension.toDouble(),
+      maxHeight: kReceiptOcrMaxDimension.toDouble(),
+      imageQuality: kReceiptOcrQuality,
+    );
+    if (file == null || !mounted) {
+      if (mounted && isAndroid && !kIsWeb) {
+        _lostPickerDataChecked = false;
+        await _recoverLostPickerImage();
+      } else {
+        clearPendingImagePick(ref);
       }
+      return;
     }
+    await _ingestPickedPhoto(file, scanAfter: scanAfter);
   }
 
   Widget _buildPhotosSection(BuildContext context) {
     final theme = Theme.of(context);
     final count = _expenseImages.length;
+    final scanMode = ref.watch(receiptScanModeProvider);
+    final scanEnabled = ReceiptScanCapability.scanUiEnabled(scanMode);
+    final canScan =
+        scanEnabled &&
+        !_scanningReceipt &&
+        count < _kMaxExpenseImages;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -2143,6 +2323,37 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                 color: theme.colorScheme.primary,
               ),
             ),
+            if (_scanningReceipt) ...[
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  'receipt_scanning'.tr(),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              TextButton(
+                onPressed: _stopReceiptScan,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                ),
+                child: Text('receipt_scan_stop'.tr()),
+              ),
+            ],
           ],
         ),
         const SizedBox(height: 8),
@@ -2155,7 +2366,20 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
               final item = entry.value;
               return _buildPhotoThumbnail(context, item, i);
             }),
-            if (count < _kMaxExpenseImages) _buildAddPhotoChip(context),
+            if (count < _kMaxExpenseImages)
+              _buildPhotoActionChip(
+                context,
+                icon: Icons.add_photo_alternate_outlined,
+                onTap: _scanningReceipt ? null : () => _addPhoto(),
+              ),
+            if (scanEnabled)
+              _buildPhotoActionChip(
+                context,
+                icon: Icons.document_scanner_outlined,
+                label: 'scan_receipt'.tr(),
+                emphasized: canScan,
+                onTap: canScan ? _scanReceiptAction : null,
+              ),
           ],
         ),
         const SizedBox(height: 20),
@@ -2163,18 +2387,54 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     );
   }
 
-  Widget _buildAddPhotoChip(BuildContext context) {
+  Widget _buildPhotoActionChip(
+    BuildContext context, {
+    required IconData icon,
+    String? label,
+    bool emphasized = false,
+    VoidCallback? onTap,
+  }) {
     final theme = Theme.of(context);
+    final enabled = onTap != null;
+    final bg = emphasized && enabled
+        ? theme.colorScheme.primaryContainer
+        : theme.colorScheme.surfaceContainerHighest;
+    final fg = !enabled
+        ? theme.colorScheme.onSurface.withValues(alpha: 0.38)
+        : emphasized
+        ? theme.colorScheme.onPrimaryContainer
+        : theme.colorScheme.onSurfaceVariant;
     return Material(
-      color: theme.colorScheme.surfaceContainerHighest,
+      color: bg,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
-        onTap: _addPhoto,
+        onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        child: const SizedBox(
+        child: SizedBox(
           width: 80,
           height: 80,
-          child: Icon(Icons.add_photo_alternate_outlined, size: 32),
+          child: label == null
+              ? Icon(icon, size: 32, color: fg)
+              : Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, size: 28, color: fg),
+                    const SizedBox(height: 4),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Text(
+                        label,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: fg,
+                          height: 1.1,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
         ),
       ),
     );
@@ -2270,9 +2530,6 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: () => _showPhotoFullScreen(item),
-            onLongPress: !kIsWeb && item.bytes != null
-                ? () => _onScanReceiptFromPhoto(item.bytes!)
-                : null,
             child: SizedBox(width: 80, height: 80, child: image),
           ),
         ),
@@ -2297,11 +2554,37 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     );
   }
 
-  /// Optional: run OCR/LLM on a photo (mobile only). Pre-fills title/date/amount or description.
+  /// Run OCR/AI on a photo (native only). Pre-fills title/date/amount or description.
   Future<void> _onScanReceiptFromPhoto(Uint8List bytes) async {
+    if (_scanningReceipt) return;
+    if (kIsWeb) {
+      context.showToast('receipt_scan_web_unavailable'.tr());
+      return;
+    }
+    final mode = ref.read(receiptScanModeProvider);
+    if (!ReceiptScanCapability.scanUiEnabled(mode)) return;
+
+    final cancel = ReceiptScanCancelToken();
+    _scanCancel = cancel;
+    setState(() => _scanningReceipt = true);
     try {
-      final result = await processReceiptBytes(bytes, ref, _date);
-      if (!mounted) return;
+      if (!_nanoFallbackToastShown &&
+          !cancel.isCancelled &&
+          await nanoNeedsUserAttention(ref)) {
+        cancel.throwIfCancelled();
+        _nanoFallbackToastShown = true;
+        if (mounted) {
+          context.showToast('receipt_nano_unavailable_toast'.tr());
+        }
+      }
+      cancel.throwIfCancelled();
+      final result = await processReceiptBytes(
+        bytes,
+        ref,
+        _date,
+        cancel: cancel,
+      );
+      if (cancel.isCancelled || !mounted) return;
       if (result == null) {
         context.showToast('receipt_no_text'.tr());
         return;
@@ -2312,6 +2595,17 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
             _titleController.text = result.vendor;
             _date = result.date.isUtc ? result.date.toLocal() : result.date;
             _amountController.text = result.total.toStringAsFixed(2);
+            if (result.lineItems != null && result.lineItems!.isNotEmpty) {
+              _lineItems = List<ReceiptLineItem>.from(result.lineItems!);
+              _syncLineItemControllersFromItems();
+            }
+            if (result.description != null &&
+                result.description!.trim().isNotEmpty) {
+              _descriptionController.text = result.description!;
+            } else if (result.vat != null && result.vat! > 0) {
+              _descriptionController.text =
+                  'VAT: ${result.vat!.toStringAsFixed(2)}';
+            }
           });
           context.showSuccess('receipt_scan_applied'.tr());
         case ReceiptScanFallback():
@@ -2323,14 +2617,21 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
               _descriptionController.text = result.ocrText;
             }
           });
-          context.showSuccess('image_attached'.tr());
+          context.showSuccess('receipt_scan_applied'.tr());
       }
+    } on ReceiptScanCancelledException {
+      Log.info('Receipt scan stopped by user');
     } catch (e, stack) {
-      if (mounted) {
+      if (mounted && !cancel.isCancelled) {
         final msg = shortReceiptErrorMessage(e);
         debugPrint('Receipt scan error: $e');
         debugPrintStack(stackTrace: stack);
         context.showError('receipt_scan_error'.tr(args: [msg]));
+      }
+    } finally {
+      if (_scanCancel == cancel) {
+        _scanCancel = null;
+        if (mounted) setState(() => _scanningReceipt = false);
       }
     }
   }

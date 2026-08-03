@@ -313,7 +313,7 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
     final base = inviteLinkBaseUrl.endsWith('/')
         ? inviteLinkBaseUrl.substring(0, inviteLinkBaseUrl.length - 1)
         : inviteLinkBaseUrl;
-    return '$base/functions/v1/invite-redirect?token=$token';
+    return '$base/functions/v1/invite-redirect?token=${Uri.encodeQueryComponent(token)}';
   }
 
   Widget _statusChip(BuildContext context) {

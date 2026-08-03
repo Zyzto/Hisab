@@ -30,6 +30,8 @@ Add these in **GitHub → Your repo → Settings → Secrets and variables → A
 | `SUPABASE_ANON_KEY` | Same as above | Same as above |
 | `INVITE_BASE_URL` | Base URL for invite links (share/QR) | Firebase Hosting custom domain, e.g. `https://hisab.shenepoy.com` |
 | `SITE_URL` | Production web app URL (auth redirects) | Same HTTPS origin, e.g. `https://hisab.shenepoy.com` (not `http://`) |
+| `PLAY_APP_SIGNING_SHA256` | (Optional) Play App Signing cert SHA-256 for Digital Asset Links | Play Console → Setup → App integrity → App signing key certificate → SHA-256. Release deploy also derives the upload-keystore fingerprint from `KEYSTORE_*` and best-effort Play-generated APK signer via `PLAY_STORE_SERVICE_ACCOUNT_JSON`. |
+| `APPLE_TEAM_ID` | (Optional) Apple Team ID for `apple-app-site-association` | Apple Developer → Membership → Team ID (10 chars). Injected into `web/.well-known/apple-app-site-association` on web deploy. |
 | `FCM_VAPID_KEY` | Web push VAPID key for FCM on web | Firebase Console → Project Settings → Cloud Messaging → Web Push certificates |
 | `FIREBASE_API_KEY` | Firebase web API key | Firebase Console → Project Settings → General → Your apps → Web app → API Key |
 | `FIREBASE_AUTH_DOMAIN` | Firebase auth domain | e.g. `hisab-c8eb1.firebaseapp.com` |
@@ -80,3 +82,5 @@ Docker is available by default on GitHub Actions `ubuntu-latest` runners.
 - [ ] `KEY_PASSWORD`
 - [ ] `GOOGLE_SERVICES_JSON` (base64)
 - [ ] `PLAY_STORE_SERVICE_ACCOUNT_JSON` (only if you deploy to Play)
+- [ ] `PLAY_APP_SIGNING_SHA256` (optional; App Links for Play-installed builds)
+- [ ] `APPLE_TEAM_ID` (optional; iOS Universal Links)

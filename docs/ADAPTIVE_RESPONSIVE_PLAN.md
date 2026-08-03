@@ -47,7 +47,7 @@ This plan is based on the [Flutter Adaptive and Responsive Design](https://docs.
 
 - **Content width:** `ConstrainedContent` + `LayoutBreakpoints` limit body width (600/720) and center; no full-width text/boxes on large screens. Aligns with “don’t gobble horizontal space.”
 - **App bar:** **ContentAlignedAppBar** places the title in the same horizontal band as the body (via `contentBandMetrics`); used on all pages with constrained body so the title scales with content. See `lib/core/layout/content_aligned_app_bar.dart` and CODEBASE “Layout (core/layout)”.
-- **Lists:** Home uses **`ListView`** / **`ReorderableListView`**; no **`GridView`** on large screens. Doc and [Android large screen guidelines](https://developer.android.com/docs/quality-guidelines/large-screen-app-quality) suggest considering grid layouts so items don’t stretch to full width.
+- **Lists:** Home uses a **sliver** scroll (`HomeReorderableGroupsSliver` / custom reorderable slivers); no **`GridView`** on large screens. Doc and [Android large screen guidelines](https://developer.android.com/docs/quality-guidelines/large-screen-app-quality) suggest considering grid layouts so items don’t stretch to full width.
 - **Orientation:** No explicit orientation lock found in codebase; good for foldables and multi-window.
 - **Foldables:** No use of **Display** API; doc says use physical display size only when supporting foldables with orientation lock. Not required unless we lock orientation.
 
@@ -64,17 +64,17 @@ This plan is based on the [Flutter Adaptive and Responsive Design](https://docs.
 
 ### Current state
 
-- **Scroll:** ListView/ScrollView used; scroll wheel works by default. No custom scroll-only widgets that would need `Listener` for `PointerScrollEvent`.
-- **Focus:** Some `FocusNode` / `FocusManager.instance.primaryFocus` (e.g. back dismiss, expense form). No app-wide **Shortcuts** or **FocusTraversalGroup**; no **FocusableActionDetector** for custom controls.
-- **Keyboard shortcuts:** None defined (no `Shortcuts` / `Actions` / `HardwareKeyboard` handlers).
-- **Mouse:** Material buttons get default cursor/focus; no **MouseRegion** for custom widgets. No explicit cursor for custom tappable areas.
+- **Scroll:** Sliver / ScrollView used; scroll wheel works by default. No custom scroll-only widgets that would need `Listener` for `PointerScrollEvent`.
+- **Focus:** Some `FocusNode` / `FocusManager.instance.primaryFocus` (e.g. back dismiss, expense form). No app-wide **FocusTraversalGroup**; no **FocusableActionDetector** for custom controls.
+- **Keyboard shortcuts:** Shell has Alt+1 (home) / Alt+2 (settings) via `_ShellWithShortcuts` in `app_router.dart`. Broader action shortcuts (new expense/group, refresh) not yet defined.
+- **Mouse:** Material buttons get default cursor/focus; `GroupCard` and similar use `MouseRegion` with click cursor in places.
 - **VisualDensity:** Used locally (e.g. `VisualDensity.compact` in group create, expense split, group settings); not set at theme level for touch vs pointer.
 
 ### Planned changes
 
 | Priority | Change | Where | Notes |
 |----------|--------|--------|------|
-| Medium | Add **keyboard shortcuts** for main actions (e.g. new expense, new group, refresh, navigate home/settings) using **`Shortcuts`** + **`Actions`** in the shell or app root; ensure focus is on a widget that can receive them (or use scoped Focus). | `MainScaffold` or `App` / router builder | Doc: “keyboard accelerators” for desktop/web; improves accessibility and power users. |
+| Medium | Extend **keyboard shortcuts** for main actions (e.g. new expense, new group, refresh) using **`Shortcuts`** + **`Actions`** beyond existing Alt+1/Alt+2 shell nav. | `MainScaffold` or `App` / router builder | Doc: “keyboard accelerators” for desktop/web; improves accessibility and power users. |
 | Medium | Add **tab traversal**: ensure all interactive elements are focusable; use **FocusTraversalGroup** for forms (e.g. expense form, group create) so Tab order is logical. | Expense form, group create, settings forms | Doc: “tab traversal and focus”; critical for keyboard and assistive tech. |
 | Low | For **custom tappable widgets** (e.g. group cards, custom buttons), add **MouseRegion** with `cursor: SystemMouseCursors.click` and ensure focus/hover states where appropriate. | e.g. `GroupCard`, any custom gesture-only UI | Doc: “Mouse enter, exit, and hover”; Material buttons already handle this. |
 | Low | Consider **theme-level VisualDensity** (e.g. less dense on desktop/mouse) so hit areas and density adapt; keep touch-first. | `app_theme.dart` or theme provider | Doc: “Visual density”; optional polish. |
@@ -97,7 +97,7 @@ This plan is based on the [Flutter Adaptive and Responsive Design](https://docs.
 
 | Priority | Change | Where | Notes |
 |----------|--------|--------|------|
-| Medium | Add **PageStorageKey** to main scrollables (e.g. home `ListView`/`ReorderableListView`, settings `ListView`, group detail content) so scroll position is restored on orientation or window size change. | `home_page.dart`, `settings_page.dart`, `group_detail_page.dart` | Doc: “Restore List state”; Wonderous example. |
+| Medium | Add **PageStorageKey** to main scrollables (e.g. home sliver list, settings `ListView`, group detail content) so scroll position is restored on orientation or window size change. | `home_page.dart`, `settings_page.dart`, `group_detail_page.dart` | Doc: “Restore List state”; Wonderous example. |
 | Low | Continue **refactoring** large pages into smaller widgets for readability and const reuse; no layout change required. | `settings_page.dart`, `expense_form_page.dart`, etc. | Doc: “Break down your widgets.” |
 | Low | Keep **no orientation lock**; if a product requirement forces portrait, use Display API for foldables and document the exception. | N/A | Doc: “Don’t lock the orientation.” |
 
@@ -125,8 +125,8 @@ This plan is based on the [Flutter Adaptive and Responsive Design](https://docs.
 |---------------|---------|--------------------------|
 | **LayoutBreakpoints** | MediaQuery.sizeOf, width-only, 600/840 | No change; already correct. |
 | **ConstrainedContent** | Centers + max width; infers rail from constraints | No change. |
-| **MainScaffold** | Bottom nav / mid temporary drawer / desktop permanent sidenav; IndexedStack for home/settings | Shortcuts/Actions already in `_ShellWithShortcuts`. |
-| **Home page** | ListView / ReorderableListView | Consider GridView on tablet+; add PageStorageKey to list(s). |
+| **MainScaffold** | Bottom nav / mid temporary drawer / desktop permanent sidenav; IndexedStack for home/settings | Alt+1/Alt+2 already in `_ShellWithShortcuts`; extend for more actions. |
+| **Home page** | Sliver / HomeReorderableGroupsSliver | Consider GridView on tablet+; add PageStorageKey to list(s). |
 | **Settings page** | ListView in ConstrainedContent | Add PageStorageKey. |
 | **Sheets / dialogs** | SafeArea, MediaQuery for max height | Keep; optional VisualDensity at theme. |
 | **Forms (expense, group create)** | Focus used locally | FocusTraversalGroup; optional Shortcuts for Save/Cancel. |
@@ -138,7 +138,7 @@ This plan is based on the [Flutter Adaptive and Responsive Design](https://docs.
 ## 8. Suggested implementation order
 
 1. **High impact, low risk:** PageStorageKey on main lists (home, settings, group detail).
-2. **High impact, medium effort:** Keyboard shortcuts (Shortcuts + Actions) for primary actions; FocusTraversalGroup on key forms.
+2. **High impact, medium effort:** Extend keyboard shortcuts beyond Alt+1/Alt+2; FocusTraversalGroup on key forms.
 3. **Medium impact:** GridView (or grid layout) for home on tablet+.
 4. **Polish:** MouseRegion/cursor on custom widgets; theme VisualDensity; refactor large pages.
 5. **Structural:** Capability/Policy classes and replace direct Platform/kIsWeb where it improves clarity and testing.

@@ -41,14 +41,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.3.0"
-  animations:
-    dependency: "direct main"
-    description:
-      name: animations
-      sha256: "9cb469212ea51be27097f23b519d594c01171721347b55df9334fff653659e7f"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.2.0"
   app_links:
     dependency: "direct main"
     description:
@@ -297,14 +289,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.2"
-  cupertino_icons:
-    dependency: "direct main"
-    description:
-      name: cupertino_icons
-      sha256: "41e005c33bd814be4d3096aff55b1908d419fde52ca656c8c47719ec745873cd"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.0.9"
   currency_picker:
     dependency: "direct main"
     description:
@@ -354,7 +338,7 @@ packages:
     source: hosted
     version: "3.0.8"
   easy_logger:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: easy_logger
       sha256: c764a6e024846f33405a2342caf91c62e357c24b02c04dbc712ef232bf30ffb7
@@ -785,14 +769,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.12.0"
-  google_mlkit_text_recognition:
+  google_mlkit_genai_prompt:
     dependency: "direct main"
     description:
-      name: google_mlkit_text_recognition
-      sha256: "8324fdc2628ebeb63568ad06437b984b716d938d87e4ce63ab24dfd3eeebf08a"
+      name: google_mlkit_genai_prompt
+      sha256: c7091b83a799d77f8cec1559d6d93a8aae81ee4c829b9be8c028d1d92f1c3df6
       url: "https://pub.dev"
     source: hosted
-    version: "0.16.0"
+    version: "0.2.0"
   googleai_dart:
     dependency: "direct overridden"
     description:
@@ -1102,14 +1086,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.13.0"
-  material_symbols_icons:
-    dependency: "direct main"
-    description:
-      name: material_symbols_icons
-      sha256: bd513edc2bc9b034108d5518c48cf5cebbb67d0653728cc452368cb27ca80bb0
-      url: "https://pub.dev"
-    source: hosted
-    version: "4.2960.0"
   meta:
     dependency: transitive
     description:

@@ -173,8 +173,14 @@ class _AdaptiveSheetHost extends StatelessWidget {
     final panelWidth = isWide
         ? math.min(dialogMaxWidth, math.max(0.0, availableWidth - 48))
         : availableWidth;
-    final effectiveMaxHeight =
-        maxHeight ?? size.height * (isWide ? 0.85 : 0.92);
+    // Keep the panel above the IME. Wide (centered) dialogs previously only
+    // shrank the body while the panel maxHeight still included keyboard space,
+    // which let header+body Columns overflow by ~10–20px in landscape.
+    final rawMaxHeight = maxHeight ?? size.height * (isWide ? 0.85 : 0.92);
+    final effectiveMaxHeight = math.max(
+      0.0,
+      rawMaxHeight - viewInsets.bottom,
+    );
 
     final showTitle = title != null && title!.isNotEmpty;
     // Wide dialog header: padded title row (was a flush 56px bar).
@@ -182,10 +188,7 @@ class _AdaptiveSheetHost extends StatelessWidget {
     final chromeHeight = isWide
         ? wideHeaderChromeHeight
         : (showDragHandle ? 24.0 : 8.0);
-    final bodyMaxHeight = math.max(
-      0.0,
-      effectiveMaxHeight - chromeHeight - viewInsets.bottom,
-    );
+    final bodyMaxHeight = math.max(0.0, effectiveMaxHeight - chromeHeight);
 
     final BorderRadius radius = isWide
         ? BorderRadius.circular(_kSheetDialogRadius)
@@ -283,26 +286,36 @@ class _AdaptiveSheetHost extends StatelessWidget {
         : const SizedBox(height: 8);
 
     // Custom [sheetShape] replaces the animated box decoration (rare).
-    final Widget panelBody = Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        AnimatedSize(
-          duration: AppMotion.modal,
-          curve: AppMotion.enterCurve,
-          alignment: Alignment.topCenter,
-          child: header,
-        ),
-        ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: bodyMaxHeight),
-          child: FocusScope(
-            autofocus: false,
-            child: contentPadding != null
-                ? Padding(padding: contentPadding!, child: child)
-                : child,
+    // Cap the whole panel, then let the body take remaining height via
+    // [Expanded] so header size drift cannot RenderFlex-overflow the Column.
+    // Short sheets still shrink when the parent only passes a max height and
+    // the body child is shrink-wrapping (most [buildSheetShell] callers).
+    final Widget panelBody = ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: effectiveMaxHeight),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AnimatedSize(
+            duration: AppMotion.modal,
+            curve: AppMotion.enterCurve,
+            alignment: Alignment.topCenter,
+            child: header,
           ),
-        ),
-      ],
+          Flexible(
+            fit: FlexFit.loose,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: bodyMaxHeight),
+              child: FocusScope(
+                autofocus: false,
+                child: contentPadding != null
+                    ? Padding(padding: contentPadding!, child: child)
+                    : child,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
 
     final Widget panel = sheetShape != null

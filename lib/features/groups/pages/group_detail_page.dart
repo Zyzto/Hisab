@@ -20,6 +20,7 @@ import '../widgets/group_section_header.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/navigation/decorative_route.dart';
+import '../../../core/navigation/invite_auth_helpers.dart';
 import '../../../core/navigation/nav_back.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/widgets/missing_route_page.dart';
@@ -280,17 +281,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
     // Preview Join may have set pending invite; clear on dismiss so
     // home is not redirected straight back to /invite.
     if (widget.readOnlyPreview) {
-      final settings = ref.read(hisabSettingsProvidersProvider);
-      if (settings != null) {
-        ref
-            .read(settings.provider(pendingInviteTokenSettingDef).notifier)
-            .set('');
-        ref
-            .read(
-              settings.provider(pendingInviteAutoJoinSettingDef).notifier,
-            )
-            .set(false);
-      }
+      clearInviteFlowState(ref);
     }
     popOrGo(context, RoutePaths.home);
   }
@@ -2230,14 +2221,9 @@ Future<void> _showAddParticipant(
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!context.mounted) return;
       try {
-        final id = await ref
+        await ref
             .read(participantRepositoryProvider)
             .create(groupId, name, currentCount);
-        await fireCelebration(
-          ref,
-          CelebrationKind.personJoined,
-          dedupeKey: CelebrationKeys.personJoined(groupId, id),
-        );
       } catch (e, st) {
         Log.warning('Add participant failed', error: e, stackTrace: st);
         if (context.mounted) context.showError('generic_error'.tr());

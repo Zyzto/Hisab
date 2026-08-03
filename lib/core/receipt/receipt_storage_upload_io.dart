@@ -65,26 +65,6 @@ Future<String?> uploadExpenseImageBytesToStorage(
   }
 }
 
-@Deprecated('Use uploadExpenseImageToStorage instead.')
-Future<String?> uploadReceiptToStorage(
-  String localPath,
-  String groupId,
-  String expenseId,
-) => uploadExpenseImageToStorage(localPath, groupId, expenseId);
-
-@Deprecated('Use uploadExpenseImageBytesToStorage instead.')
-Future<String?> uploadReceiptBytesToStorage(
-  Uint8List bytes,
-  String groupId,
-  String expenseId, {
-  String? fileExt,
-}) => uploadExpenseImageBytesToStorage(
-  bytes,
-  groupId,
-  expenseId,
-  fileExt: fileExt,
-);
-
 String _normalizeImageExt(String ext) {
   switch (ext.toLowerCase()) {
     case 'jpg':

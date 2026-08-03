@@ -26,7 +26,7 @@ class FloatingNavBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final styleIndex = ref.watch(experimentStyleIndexProvider);
+    final styleIndex = ref.watch(effectiveExperimentStyleIndexProvider);
     final colorScheme = theme.colorScheme;
     final active = activeColor ?? colorScheme.primary;
     final inactive = inactiveColor ?? colorScheme.onSurfaceVariant;

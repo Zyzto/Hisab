@@ -1956,7 +1956,12 @@ Hisab uses several Supabase Edge Functions. For the full list and deploy command
 
 ### invite-redirect
 
-Handles invite link redirects -- sends mobile users to the app deep link and desktop users to the web app.
+Handles invite link redirects — validates the token, then 302s to hosted
+`redirect.html?token=…`. That page offers **Open in app** + **Continue in browser**
+on both iOS and Android (custom scheme / Intent). Desktop goes straight to the
+web invite route. Verified HTTPS App/Universal Links for `/invite/*` are configured
+in the native apps; fill Play signing SHA-256 and Apple Team ID in
+`web/.well-known/` before relying on them in production.
 
 **File**: `supabase/functions/invite-redirect/index.ts`
 

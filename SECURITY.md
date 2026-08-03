@@ -24,7 +24,6 @@ This repository is **public**. Treat every commit as visible to the world.
 | Path | Why |
 |------|-----|
 | `dart_defines_local.json` / `dart_defines_online.json` | Project URLs + keys |
-| `lib/core/constants/app_secrets.dart` | App secrets |
 | `secrets/**` (except `README.md` / `.gitkeep`) | FCM SA JSON, etc. |
 | `supabase/.env` / `functions/.env` | Local Edge / redirect env |
 | `android/app/google-services.json` | Firebase Android |

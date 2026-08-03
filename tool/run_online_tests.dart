@@ -145,6 +145,7 @@ Future<void> _run(_OnlineCliOptions options) async {
   Process? chromedriverProcess;
   int exitCode = 1;
   Map<String, String>? supabaseProcessEnv;
+  _CliInvocation? supabaseCli;
 
   void tee(String line) {
     print(line);
@@ -165,26 +166,31 @@ Future<void> _run(_OnlineCliOptions options) async {
       if (dh != null && dh.isNotEmpty) {
         tee('    DOCKER_HOST=$dh (for Supabase CLI)');
       }
+      supabaseCli = await _resolveSupabaseCli();
+      final chromeDriverCli =
+          platform == 'web' ? await _resolveChromeDriver() : null;
       if (!await _checkContainerRuntime(env)) {
         tee(
           'ERROR: No container engine reachable (docker info / podman info failed). '
           'Use Docker, or Podman with: systemctl --user enable --now podman.socket '
           'and see docs/SUPABASE_SETUP.md — Local Supabase with Podman.',
         );
-      } else if (!await _checkSupabaseCli()) {
+      } else if (supabaseCli == null) {
         tee(
-          'ERROR: Supabase CLI not found. Install: https://supabase.com/docs/guides/cli',
+          'ERROR: Supabase CLI not found (supabase, nixpkgs#supabase-cli, or npx). '
+          'Install: https://supabase.com/docs/guides/cli',
         );
-      } else if (platform == 'web' && !await _checkChromeDriver()) {
+      } else if (platform == 'web' && chromeDriverCli == null) {
         tee(
-          'ERROR: ChromeDriver not on PATH (required for web). Version must match Chrome.',
+          'ERROR: ChromeDriver not available (chromedriver on PATH or npx). '
+          'Version must match Chrome.',
         );
       } else {
       // ----- Start Supabase -----
       tee('==> Starting local Supabase...');
       final startExit = await _runProcessTeeWithTimeout(
-        'supabase',
-        ['start'],
+        supabaseCli.executable,
+        supabaseCli.args(['start']),
         workingDirectory: projectRoot,
         tee: tee,
         timeout: _supabaseTimeout,
@@ -198,8 +204,8 @@ Future<void> _run(_OnlineCliOptions options) async {
         // ----- Get credentials -----
         final statusBuffer = StringBuffer();
         final statusExit = await _runProcessTeeWithTimeout(
-          'supabase',
-          ['status', '--output', 'json'],
+          supabaseCli.executable,
+          supabaseCli.args(['status', '--output', 'json']),
           workingDirectory: projectRoot,
           tee: tee,
           timeout: _supabaseStatusTimeout,
@@ -230,8 +236,8 @@ Future<void> _run(_OnlineCliOptions options) async {
             // ----- Reset database -----
             tee('==> Resetting database (migrations + seed)...');
             final resetExit = await _runProcessTeeWithTimeout(
-              'supabase',
-              ['db', 'reset'],
+              supabaseCli.executable,
+              supabaseCli.args(['db', 'reset']),
               workingDirectory: projectRoot,
               tee: tee,
               timeout: _supabaseTimeout,
@@ -243,12 +249,12 @@ Future<void> _run(_OnlineCliOptions options) async {
               tee('ERROR: supabase db reset timed out');
             } else {
               // ----- ChromeDriver for web -----
-              if (platform == 'web') {
+              if (platform == 'web' && chromeDriverCli != null) {
                 final portInUse = await _isPortInUse(4444);
                 if (!portInUse) {
                   chromedriverProcess = await Process.start(
-                    'chromedriver',
-                    ['--port=4444'],
+                    chromeDriverCli.executable,
+                    chromeDriverCli.args(['--port=4444']),
                     workingDirectory: projectRoot,
                     environment: Platform.environment,
                     runInShell: true,
@@ -312,9 +318,10 @@ Future<void> _run(_OnlineCliOptions options) async {
   } finally {
     tee('==> Stopping local Supabase...');
     final stopEnv = supabaseProcessEnv ?? Platform.environment;
+    final stopCli = supabaseCli ?? const _CliInvocation('supabase', []);
     final stopProc = await Process.start(
-      'supabase',
-      ['stop'],
+      stopCli.executable,
+      stopCli.args(['stop']),
       workingDirectory: projectRoot,
       environment: stopEnv,
       runInShell: true,
@@ -353,11 +360,17 @@ String _timestamp() {
       '${now.second.toString().padLeft(2, '0')}';
 }
 
-/// Resolves [DOCKER_HOST] for rootless Podman when unset (Linux user socket).
+/// Resolves [DOCKER_HOST] for Podman when unset (rootful, then rootless sockets).
 Future<Map<String, String>> _supabaseProcessEnvironment() async {
   final env = Map<String, String>.from(Platform.environment);
   final existing = env['DOCKER_HOST']?.trim();
   if (existing != null && existing.isNotEmpty) {
+    return env;
+  }
+  // Prefer rootful Podman (Kong fails under rootless on NixOS), then rootless.
+  const rootfulSock = '/run/podman/podman.sock';
+  if (await File(rootfulSock).exists()) {
+    env['DOCKER_HOST'] = 'unix://$rootfulSock';
     return env;
   }
   final xdg = env['XDG_RUNTIME_DIR'];
@@ -380,6 +393,61 @@ Future<Map<String, String>> _supabaseProcessEnvironment() async {
   return env;
 }
 
+class _CliInvocation {
+  const _CliInvocation(this.executable, this.prefixArgs);
+  final String executable;
+  final List<String> prefixArgs;
+
+  List<String> args(List<String> command) => [...prefixArgs, ...command];
+}
+
+Future<bool> _commandExists(String name) async {
+  final r = await Process.run(name, ['--version'], runInShell: true);
+  return r.exitCode == 0;
+}
+
+Future<bool> _isNixOs() async {
+  if (await File('/etc/NIXOS').exists()) return true;
+  try {
+    final release = await File('/etc/os-release').readAsString();
+    return RegExp(r'^ID=nixos$', multiLine: true).hasMatch(release);
+  } catch (_) {
+    return false;
+  }
+}
+
+/// Resolve supabase CLI: PATH, then NixOS nix shell, then npx.
+Future<_CliInvocation?> _resolveSupabaseCli() async {
+  if (await _commandExists('supabase')) {
+    return const _CliInvocation('supabase', []);
+  }
+  if (await _isNixOs() && await _commandExists('nix')) {
+    return const _CliInvocation('nix', [
+      '--extra-experimental-features',
+      'nix-command flakes',
+      'shell',
+      'nixpkgs#supabase-cli',
+      '-c',
+      'supabase',
+    ]);
+  }
+  if (await _commandExists('npx')) {
+    return const _CliInvocation('npx', ['supabase']);
+  }
+  return null;
+}
+
+/// Resolve ChromeDriver: PATH, then npx chromedriver@latest.
+Future<_CliInvocation?> _resolveChromeDriver() async {
+  if (await _commandExists('chromedriver')) {
+    return const _CliInvocation('chromedriver', []);
+  }
+  if (await _commandExists('npx')) {
+    return const _CliInvocation('npx', ['--yes', 'chromedriver@latest']);
+  }
+  return null;
+}
+
 /// True if `docker info` or `podman info` succeeds with [environment].
 Future<bool> _checkContainerRuntime(Map<String, String> environment) async {
   final docker = await Process.run(
@@ -398,15 +466,6 @@ Future<bool> _checkContainerRuntime(Map<String, String> environment) async {
   return podman.exitCode == 0;
 }
 
-Future<bool> _checkSupabaseCli() async {
-  final r = await Process.run('supabase', ['--version'], runInShell: true);
-  return r.exitCode == 0;
-}
-
-Future<bool> _checkChromeDriver() async {
-  final r = await Process.run('chromedriver', ['--version'], runInShell: true);
-  return r.exitCode == 0;
-}
 
 Future<bool> _isPortInUse(int port) async {
   try {

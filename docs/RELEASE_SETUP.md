@@ -21,6 +21,7 @@ This document covers every manual step needed **outside the codebase** to make t
 7. [Add All Secrets to GitHub](#7-add-all-secrets-to-github)
 8. [First Release Checklist](#8-first-release-checklist)
 9. [Local Development Notes](#9-local-development-notes)
+10. [App size and update load](#10-app-size-and-update-load)
 
 ---
 
@@ -105,14 +106,29 @@ Before the workflow can upload builds, you need to create the app listing manual
    EOF
 
    flutter build appbundle --release \
+     --obfuscate \
+     --split-debug-info=build/app/outputs/symbols \
+     --tree-shake-icons \
      --dart-define=SUPABASE_URL=https://xxxxx.supabase.co \
      --dart-define=SUPABASE_ANON_KEY=eyJhbGci...
    ```
+   Keep `build/app/outputs/symbols/` for crash de-obfuscation (CI uploads it as `release-symbols`).
 2. In Google Play Console, go to **Release > Testing > Internal testing**.
 3. Click **Create new release**, upload `build/app/outputs/bundle/release/app-release.aab`.
 4. Fill in release notes and **Save & review** -> **Start rollout to Internal testing**.
 
 After this first manual upload, the CI workflow can push subsequent builds automatically via the API.
+
+For sideload / GitHub Release APKs (per-ABI, not a fat APK):
+
+```bash
+flutter build apk --release --split-per-abi \
+  --obfuscate \
+  --split-debug-info=build/app/outputs/symbols \
+  --tree-shake-icons \
+  --dart-define=SUPABASE_URL=... \
+  --dart-define=SUPABASE_ANON_KEY=...
+```
 
 ---
 
@@ -308,3 +324,24 @@ This file is gitignored. Without it, release builds fall back to debug signing.
 ### Flutter version
 
 The workflow pins Flutter to a specific version via `FLUTTER_VERSION` in `.github/workflows/release.yml`. When you upgrade locally, update that env var to match so CI and local builds stay in sync.
+
+---
+
+## 10. App size and update load
+
+Release Android builds use R8 minify + resource shrinking, locale `resConfigs` for `en`/`ar`, Dart `--obfuscate` + `--split-debug-info`, and `--tree-shake-icons`. Play gets an AAB (device splits + patch updates). GitHub Release APKs are `--split-per-abi` (not a fat APK). Symbol maps are uploaded as the `release-symbols` CI artifact — keep them to decode crash stacks.
+
+**Biggest asset win:** onboarding parallax under `assets/images/parallax/` is hybrid WebP (lossy q85 for opaque `bg*`, lossless for alpha layers) — about **18.4 MB → ~8.2 MB** in the package (~9 MB saved). Tessdata stays bundled for offline OCR (~5.5 MB raw ≈ **~2.7 MB** gzipped in the APK).
+
+**Expected first-install win (arm64 Play download):** roughly **10–14 MB** vs the pre-optimization baseline (WebP + R8 + split-debug-info). Measure for real:
+
+```bash
+flutter build appbundle --analyze-size \
+  --obfuscate \
+  --split-debug-info=build/app/outputs/symbols \
+  --tree-shake-icons \
+  --dart-define=SUPABASE_URL=... \
+  --dart-define=SUPABASE_ANON_KEY=...
+```
+
+Open the generated `*-code-size-analysis_*.json` in DevTools → App size, and compare Play Console **Android vitals → App size** after upload. Smoke after a size-focused change: onboarding meadow + one local receipt OCR scan.

@@ -16,6 +16,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:powersync/powersync.dart' show PowerSyncDatabase, Schema;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'core/auth/auth_pending_finalize.dart';
 import 'core/auth/oauth_callback_state.dart';
 import 'core/auth/oauth_web_url.dart';
 import 'core/constants/firebase_config.dart';
@@ -58,8 +59,14 @@ void main() {
             return;
           }
           FlutterError.presentError(details);
+          // Include a short stack in the message so logcat (which often omits
+          // the stackTrace field) still shows the overflowing widget tree.
+          final stack = details.stack;
+          final stackHint = stack == null
+              ? ''
+              : '\n${stack.toString().split('\n').take(12).join('\n')}';
           LoggingService.severe(
-            'Flutter framework error: ${details.exception}',
+            'Flutter framework error: ${details.exception}$stackHint',
             component: 'CrashHandler',
             error: details.exception,
             stackTrace: details.stack,
@@ -201,60 +208,12 @@ void main() {
           if (settingsProviders != null) {
             final session = supabaseClientIfConfigured?.auth.currentSession;
 
-            // Handle pending OAuth redirects (web only — page reloaded after redirect)
-            final onboardingPending = settingsProviders.controller.get(
-              onboardingOnlinePendingSettingDef,
+            // Pending OAuth / magic-link redirects (web reload or cold start).
+            finalizePendingOnlineAuth(
+              controller: settingsProviders.controller,
+              hasSession: session != null,
+              clearWhenNoSession: true,
             );
-            final settingsPending = settingsProviders.controller.get(
-              settingsOnlinePendingSettingDef,
-            );
-
-            if (onboardingPending && session != null) {
-              // OAuth completed after onboarding redirect
-              settingsProviders.controller.set(
-                onboardingOnlinePendingSettingDef,
-                false,
-              );
-              settingsProviders.controller.set(localOnlySettingDef, false);
-              settingsProviders.controller.set(
-                onboardingCompletedSettingDef,
-                true,
-              );
-              Log.info(
-                'Setting changed: onboarding OAuth flags and local_only, onboarding_completed=true',
-              );
-            } else if (onboardingPending && session == null) {
-              // OAuth was started but failed/cancelled
-              settingsProviders.controller.set(
-                onboardingOnlinePendingSettingDef,
-                false,
-              );
-              Log.info(
-                'Setting changed: ${onboardingOnlinePendingSettingDef.key}=false',
-              );
-            }
-
-            if (settingsPending && session != null) {
-              // OAuth completed after settings redirect
-              settingsProviders.controller.set(
-                settingsOnlinePendingSettingDef,
-                false,
-              );
-              settingsProviders.controller.set(localOnlySettingDef, false);
-              Log.info(
-                'Setting changed: ${settingsOnlinePendingSettingDef.key}=false, '
-                '${localOnlySettingDef.key}=false',
-              );
-            } else if (settingsPending && session == null) {
-              // OAuth was started but failed/cancelled
-              settingsProviders.controller.set(
-                settingsOnlinePendingSettingDef,
-                false,
-              );
-              Log.info(
-                'Setting changed: ${settingsOnlinePendingSettingDef.key}=false',
-              );
-            }
 
             // If previously online but no session on startup, do NOT force
             // local-only. On web, the session may recover asynchronously after
@@ -465,24 +424,24 @@ Future<void> _finalizeWebOAuthReturn() async {
     return;
   }
 
-  Log.info('main: Stock OAuth recovery left no session; retrying once (web)');
+  Log.info('main: Stock auth recovery left no session; retrying once (web)');
   try {
     await client.auth
         .getSessionFromUrl(uri)
         .timeout(const Duration(seconds: 20));
     if (client.auth.currentSession != null) {
-      Log.info('main: OAuth session recovered on retry');
+      Log.info('main: Auth callback session recovered on retry');
     } else {
-      Log.warning('main: OAuth retry finished without a session');
+      Log.warning('main: Auth callback retry finished without a session');
       pendingWebOAuthCallbackError = 'auth_oauth_callback_failed';
     }
   } on TimeoutException catch (e, st) {
     // .timeout does not cancel the request; only toast if still signed out.
     if (client.auth.currentSession != null) {
-      Log.info('main: OAuth session arrived after retry timeout');
+      Log.info('main: Auth callback session arrived after retry timeout');
     } else {
       Log.warning(
-        'main: OAuth session retry timed out',
+        'main: Auth callback session retry timed out',
         error: e,
         stackTrace: st,
       );
@@ -491,7 +450,7 @@ Future<void> _finalizeWebOAuthReturn() async {
   } on AuthException catch (e, st) {
     if (client.auth.currentSession != null) return;
     Log.warning(
-      'main: OAuth session retry auth error: ${e.message}',
+      'main: Auth callback session retry auth error: ${e.message}',
       error: e,
       stackTrace: st,
     );
@@ -499,7 +458,7 @@ Future<void> _finalizeWebOAuthReturn() async {
   } catch (e, st) {
     if (client.auth.currentSession != null) return;
     Log.warning(
-      'main: OAuth session retry failed',
+      'main: Auth callback session retry failed',
       error: e,
       stackTrace: st,
     );

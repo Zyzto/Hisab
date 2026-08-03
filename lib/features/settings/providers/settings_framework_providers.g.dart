@@ -193,87 +193,46 @@ final class EffectiveLocalOnlyProvider
 String _$effectiveLocalOnlyHash() =>
     r'094d91f85897f4bcffe7e2dd68d0a1d3eacb390d';
 
-@ProviderFor(receiptOcrEnabled)
-final receiptOcrEnabledProvider = ReceiptOcrEnabledProvider._();
+@ProviderFor(receiptScanMode)
+final receiptScanModeProvider = ReceiptScanModeProvider._();
 
-final class ReceiptOcrEnabledProvider
-    extends $FunctionalProvider<bool, bool, bool>
-    with $Provider<bool> {
-  ReceiptOcrEnabledProvider._()
+final class ReceiptScanModeProvider
+    extends $FunctionalProvider<String, String, String>
+    with $Provider<String> {
+  ReceiptScanModeProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'receiptOcrEnabledProvider',
+        name: r'receiptScanModeProvider',
         isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$receiptOcrEnabledHash();
+  String debugGetCreateSourceHash() => _$receiptScanModeHash();
 
   @$internal
   @override
-  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+  $ProviderElement<String> $createElement($ProviderPointer pointer) =>
       $ProviderElement(pointer);
 
   @override
-  bool create(Ref ref) {
-    return receiptOcrEnabled(ref);
+  String create(Ref ref) {
+    return receiptScanMode(ref);
   }
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(bool value) {
+  Override overrideWithValue(String value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<bool>(value),
+      providerOverride: $SyncValueProvider<String>(value),
     );
   }
 }
 
-String _$receiptOcrEnabledHash() => r'b291e2faf65f16d2cd20dd81333d0353c017ba0e';
-
-@ProviderFor(receiptAiEnabled)
-final receiptAiEnabledProvider = ReceiptAiEnabledProvider._();
-
-final class ReceiptAiEnabledProvider
-    extends $FunctionalProvider<bool, bool, bool>
-    with $Provider<bool> {
-  ReceiptAiEnabledProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'receiptAiEnabledProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$receiptAiEnabledHash();
-
-  @$internal
-  @override
-  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
-
-  @override
-  bool create(Ref ref) {
-    return receiptAiEnabled(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(bool value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<bool>(value),
-    );
-  }
-}
-
-String _$receiptAiEnabledHash() => r'9033b46e2c15fa5467a119849e27b7b6b5e71d8b';
+String _$receiptScanModeHash() => r'receipt_scan_mode_manual_gen_001';
 
 @ProviderFor(receiptAiProvider)
 final receiptAiProviderProvider = ReceiptAiProviderProvider._();
@@ -314,7 +273,7 @@ final class ReceiptAiProviderProvider
   }
 }
 
-String _$receiptAiProviderHash() => r'4ad2f49840d7266e15ccceef59b606287e3f81b7';
+String _$receiptAiProviderHash() => r'receipt_ai_provider_manual_gen_001';
 
 @ProviderFor(geminiApiKey)
 final geminiApiKeyProvider = GeminiApiKeyProvider._();

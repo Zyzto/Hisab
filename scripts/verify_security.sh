@@ -58,7 +58,6 @@ echo "==> Security check (static)${SCAN_TREE:+ — tree $SCAN_TREE}"
 must_not_track=(
   "dart_defines_online.json"
   "dart_defines_local.json"
-  "lib/core/constants/app_secrets.dart"
   "android/app/google-services.json"
   "ios/Runner/GoogleService-Info.plist"
   "android/key.properties"

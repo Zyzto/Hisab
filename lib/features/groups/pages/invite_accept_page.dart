@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
@@ -433,8 +432,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                       final shouldAutoPreview = _shouldAutoRedirectToPreview(
                         data.invite.accessMode,
                       );
-                      if (kIsWeb &&
-                          shouldAutoPreview &&
+                      if (shouldAutoPreview &&
                           !_didAttemptWebPreviewRedirect) {
                         WidgetsBinding.instance.addPostFrameCallback((_) {
                           if (!mounted) return;
@@ -474,8 +472,8 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
       );
     }
 
-    // Keep the existing web landing for unauthenticated users only in standard mode.
-    if (kIsWeb && !isAuthenticated) {
+    // Shared signed-out landing for standard invites (web + native).
+    if (!isAuthenticated) {
       return LayoutBuilder(
         builder: (context, layoutConstraints) {
           return Scaffold(
@@ -872,18 +870,9 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
         .set(false);
   }
 
-  /// Clear token + auto-join before leaving /invite/* for a group.
-  /// Otherwise the router still sees pendingInvite and redirects back to invite.
+  /// Clear token + auto-join + invite last-route before leaving /invite/*.
   void _clearPendingInviteState() {
-    final settings = ref.read(hisabSettingsProvidersProvider);
-    if (settings == null) return;
-    final token = ref.read(settings.provider(pendingInviteTokenSettingDef));
-    if (token.isNotEmpty) {
-      ref
-          .read(settings.provider(pendingInviteTokenSettingDef).notifier)
-          .set('');
-    }
-    _clearAutoJoinFlag();
+    clearInviteFlowState(ref);
   }
 
   void _dismissInvite(BuildContext context) {
@@ -908,14 +897,30 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
   /// View+join: after login/register, accept once and open the group.
   /// Must not write providers during [build]; call from a post-frame callback.
   void _maybeAutoJoin(BuildContext context, GroupInvite invite, Group group) {
-    if (_didAttemptAutoJoin || _accepting) return;
-    if (invite.accessMode == InviteAccessMode.readonlyOnly) return;
-    if (!ref.read(isAuthenticatedProvider)) return;
+    if (_didAttemptAutoJoin || _accepting) {
+      // Leave schedule flag alone — another path owns the attempt.
+      return;
+    }
+    if (invite.accessMode == InviteAccessMode.readonlyOnly) {
+      _didScheduleAutoJoin = false;
+      return;
+    }
+    if (!ref.read(isAuthenticatedProvider)) {
+      // Allow rebuild to reschedule once auth arrives (magic-link warm resume).
+      _didScheduleAutoJoin = false;
+      return;
+    }
     if (ref.read(effectiveLocalOnlyProvider)) {
       prepareInviteOnlineMode(ref);
-      if (ref.read(effectiveLocalOnlyProvider)) return;
+      if (ref.read(effectiveLocalOnlyProvider)) {
+        _didScheduleAutoJoin = false;
+        return;
+      }
     }
-    if (!_consumeAutoJoinFlag()) return;
+    if (!_consumeAutoJoinFlag()) {
+      _didScheduleAutoJoin = false;
+      return;
+    }
     _didAttemptAutoJoin = true;
     unawaited(_accept(context, group));
   }
@@ -939,21 +944,27 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
     final result = await showSignInSheet(context, ref);
     switch (result) {
       case SignInResult.success:
+        // Let auto-join own acceptance (single-flight via _accepting).
         markInviteOnboardingDone(ref);
+        prepareInviteJoinPending(ref, widget.token);
+        _didAttemptAutoJoin = false;
+        _didScheduleAutoJoin = false;
         await ref.read(dataSyncServiceProvider.notifier).syncNow();
-        if (!context.mounted) return;
-        final data = await ref.read(
-          inviteByTokenProvider(widget.token).future,
-        );
-        if (data != null && context.mounted) {
-          await _accept(context, data.group);
-        }
+        if (context.mounted) await _maybeAutoJoinFromAuth(context);
         break;
       case SignInResult.pendingRedirect:
+      case SignInResult.pendingEmailLink:
+        // Keep auto-join; allow resume after email/OAuth returns.
         prepareInviteJoinPending(ref, widget.token);
+        _didAttemptAutoJoin = false;
+        _didScheduleAutoJoin = false;
+        _didScheduleUnauthResume = false;
         break;
       case SignInResult.cancelled:
         _clearAutoJoinFlag();
+        _didAttemptAutoJoin = false;
+        _didScheduleAutoJoin = false;
+        _didScheduleUnauthResume = false;
         if (context.mounted) context.showToast('sign_in_required'.tr());
         break;
     }
@@ -965,26 +976,48 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
     switch (result) {
       case SignInResult.success:
         markInviteOnboardingDone(ref);
+        prepareInviteJoinPending(ref, widget.token);
+        _didAttemptAutoJoin = false;
+        _didScheduleAutoJoin = false;
         await ref.read(dataSyncServiceProvider.notifier).syncNow();
-        if (!context.mounted) return;
-        final data = await ref.read(
-          inviteByTokenProvider(widget.token).future,
-        );
-        if (data != null && context.mounted) {
-          await _accept(context, data.group);
-        }
+        if (context.mounted) await _maybeAutoJoinFromAuth(context);
         break;
       case SignInResult.pendingRedirect:
+      case SignInResult.pendingEmailLink:
         prepareInviteJoinPending(ref, widget.token);
+        _didAttemptAutoJoin = false;
+        _didScheduleAutoJoin = false;
+        _didScheduleUnauthResume = false;
         break;
       case SignInResult.cancelled:
         _clearAutoJoinFlag();
+        _didAttemptAutoJoin = false;
+        _didScheduleAutoJoin = false;
+        _didScheduleUnauthResume = false;
         if (context.mounted) context.showToast('sign_in_required'.tr());
         break;
     }
   }
 
+  Future<void> _maybeAutoJoinFromAuth(BuildContext context) async {
+    try {
+      final data = await ref.read(inviteByTokenProvider(widget.token).future);
+      if (!mounted || !context.mounted || data == null) return;
+      _maybeAutoJoin(context, data.invite, data.group);
+    } catch (e, st) {
+      Log.warning(
+        'Invite auto-join after auth failed to load invite',
+        error: e,
+        stackTrace: st,
+      );
+    }
+  }
+
   Future<void> _accept(BuildContext context, Group group) async {
+    if (_accepting) return;
+    _accepting = true;
+    _didAttemptAutoJoin = true;
+
     if (!ref.read(isAuthenticatedProvider)) {
       prepareInviteJoinPending(ref, widget.token);
       final result = await showSignInSheet(context, ref);
@@ -994,10 +1027,20 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
           await ref.read(dataSyncServiceProvider.notifier).syncNow();
           break;
         case SignInResult.pendingRedirect:
+        case SignInResult.pendingEmailLink:
           prepareInviteJoinPending(ref, widget.token);
+          // Allow auto-join / retry after email/OAuth returns.
+          _accepting = false;
+          _didAttemptAutoJoin = false;
+          _didScheduleAutoJoin = false;
+          _didScheduleUnauthResume = false;
           return;
         case SignInResult.cancelled:
           _clearAutoJoinFlag();
+          _accepting = false;
+          _didAttemptAutoJoin = false;
+          _didScheduleAutoJoin = false;
+          _didScheduleUnauthResume = false;
           if (context.mounted) context.showToast('sign_in_required'.tr());
           return;
       }
@@ -1007,16 +1050,25 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
     prepareInviteOnlineMode(ref);
     if (ref.read(effectiveLocalOnlyProvider)) {
       if (mounted) {
-        setState(() => _error = 'invite_requires_online'.tr());
+        setState(() {
+          _accepting = false;
+          _error = 'invite_requires_online'.tr();
+        });
+      } else {
+        _accepting = false;
       }
       return;
     }
 
-    setState(() {
-      _accepting = true;
+    if (mounted) {
+      setState(() {
+        _error = null;
+        _alreadyMemberGroupId = null;
+      });
+    } else {
       _error = null;
       _alreadyMemberGroupId = null;
-    });
+    }
 
     try {
       final profile = ref.read(authServiceProvider).getUserProfile();

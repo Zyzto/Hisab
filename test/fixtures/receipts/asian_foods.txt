@@ -1,0 +1,31 @@
+ASIAN FOODS JEDDAH
+0539067677
+TRN : 310946758200003
+Check## 10-092
+Station : 10
+Server : Abdulaziz 31
+Qty Name Amount
+1 602-Mixed seafood TomYam(Medium) 46.00
+شوربة توم يام مشكل بحرية - وسط
+Unit Price : 40.00
+Spiciness: Spicy x
+2 166-Steamed Rice (CUP) 6.90
+ارز ابيض صغير - كوب
+Unit Price : 3.00
+1 308-BEEF W/Basil leaves 34.50
+لحم بالريحان
+Unit Price : 30.00
+1 501-SHRIMP TEMPURA 40.25
+جمبري مقلي - تمبورا
+Unit Price : 35.00
+1 902-ICE TEA (LARGE) 23.00
+Unit Price : 20.00
+Sub Total : 131.00 SAR
+Total Amount (Excl. Vat) : 131.00 SAR
+VAT 15%: 19.65 SAR
+Total Amount (Incl. Vat) : 150.65 SAR
+AMOUNT DUE : 150.65 SAR
+1/30/2025 8:36:44 PM
+Check in Time : 1/30/2025 7:54:25 PM
+Thank you for visiting
+شكراً لزيارتكم

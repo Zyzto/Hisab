@@ -109,7 +109,8 @@ class _InviteLinkHandlerState extends ConsumerState<InviteLinkHandler> {
         );
         if (!mounted) return;
         prepareInviteOnlineMode(ref);
-        ref.read(routerProvider).refresh();
+        // Navigate even when already on another invite (token switch).
+        ref.read(routerProvider).go(RoutePaths.inviteAccept(token));
       }
     });
   }

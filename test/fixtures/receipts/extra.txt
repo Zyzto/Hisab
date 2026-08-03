@@ -1,0 +1,21 @@
+extra
+New
+120051313217
+WG-MIX-MAY5-MAY31
+WQP15U7635S--Midea Dishwasher, 15 place 1,899.00
+100253752 1 @ 1,899.00
+Supplier Name: Ibrahim Shaker Co,Ltd
+Warranty years : 2
+Order Type: Delivery
+Sparky 250 SAR Play Card 0.00
+100001979 1 @ 250.00
+Deal Discount 100% (250.00)
+VSTD = 0.00 @ 15.000% 0.00
+Order Type: Sale
+Total Discount (250.00)
+Total Amount 1,899.00
+Credit Amount 1,899.00
+Card: SPAN
+RRN: 112813583940
+Auth: Y86180
+Total Tender 1,899.00
