@@ -106,27 +106,36 @@ void main() {
 
       // ── Stage: add participant manually (sheet) ──
       // Exercises the manual add-participant flow (FAB → sheet → name → Done).
-      // The deferred create() in group_detail_page avoids the _dependents.isEmpty
-      // race so this path behaves consistently in tests and production.
-      // Group detail uses AppFab (find by Icons.person_add / Icons.add).
+      // Do not use find.text('Add Participant') — AppFab renders that label under
+      // the button even when the sheet is closed. Wait for the sheet panel key.
       await stage('add participant manually via sheet', () async {
-        await waitForWidget(tester, find.byIcon(Icons.person_add));
-        await tester.ensureVisible(find.byIcon(Icons.person_add).first);
-        await tapAndSettle(tester, find.byIcon(Icons.person_add));
-        await pumpAndSettleWithTimeout(tester);
-
-        await waitForWidget(tester, find.text('Add Participant'));
-        // Sheet body may build after title; wait for the name field (TextField is more reliable than EditableText on some devices)
-        await tester.pump(const Duration(milliseconds: 500));
-        await pumpAndSettleWithTimeout(tester);
+        final fab = find.byKey(const Key('group_add_participant_fab'));
+        await waitForWidget(tester, fab);
+        // Tap the InkWell (not the Column center — label sits below the button).
+        final fabButton = find.descendant(
+          of: fab,
+          matching: find.byType(InkWell),
+        );
+        await tester.ensureVisible(fabButton);
+        await tapAndPump(tester, fabButton, pumps: 12);
+        await waitForCondition(
+          tester,
+          condition: isResponsiveSheetVisible,
+          timeout: const Duration(seconds: 15),
+          reason: 'Add Participant sheet did not open',
+        );
+        final sheetField = find.descendant(
+          of: find.byKey(const ValueKey('responsive_sheet_panel')),
+          matching: find.byType(TextField),
+        );
         await waitForWidget(
           tester,
-          find.byType(TextField),
+          sheetField,
           timeout: const Duration(seconds: 15),
         );
-        await enterTextAndPump(tester, find.byType(TextField).first, 'Diana');
+        await enterTextAndPump(tester, sheetField.first, 'Diana');
         await tapAndSettle(tester, find.text('Done'));
-        await pumpAndSettleWithTimeout(tester);
+        await waitForResponsiveSheetClosed(tester);
         // Participant create is deferred (addPostFrameCallback); allow poll to emit on web.
         await tester.pump(const Duration(milliseconds: 1200));
         await waitForWidget(
@@ -228,20 +237,21 @@ void main() {
 
       // ── Stage: change settlement method ──
       await stage('change settlement method', () async {
-        // Scroll to "Settlement Method" label and tap the "Pairwise" method text
-        // which is the default method shown in the InkWell row.
+        // Default is Greedy; open the shared picker and switch to Pairwise.
         await scrollUntilVisible(tester, find.text('Settlement Method'));
-
-        final pairwiseText = find.text('Pairwise');
-        if (pairwiseText.evaluate().isNotEmpty) {
-          await tapAndSettle(tester, pairwiseText.first);
-          await pumpAndSettleWithTimeout(tester);
-
-          // Select "Greedy" from the picker
-          final greedyOption = find.text('Greedy');
-          if (greedyOption.evaluate().isNotEmpty) {
-            await tapAndSettle(tester, greedyOption.first);
-            await pumpAndSettleWithTimeout(tester);
+        final greedyLabel = find.text('Greedy');
+        if (greedyLabel.evaluate().isNotEmpty) {
+          await tapAndPump(tester, greedyLabel.first, pumps: 10);
+          await waitForCondition(
+            tester,
+            condition: isResponsiveSheetVisible,
+            timeout: const Duration(seconds: 10),
+            reason: 'Settlement method picker did not open',
+          );
+          final pairwiseOption = find.text('Pairwise');
+          if (pairwiseOption.evaluate().isNotEmpty) {
+            await tapAndPump(tester, pairwiseOption.first, pumps: 10);
+            await waitForResponsiveSheetClosed(tester);
           }
         }
       });
