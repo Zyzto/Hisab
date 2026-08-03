@@ -310,10 +310,6 @@ class _AppFabState extends ConsumerState<AppFab>
     HapticFeedback.lightImpact();
   }
 
-  void _onTapUp(TapUpDetails _) {
-    _finishPress(invoke: true);
-  }
-
   void _onTapCancel() {
     _finishPress(invoke: false);
   }
