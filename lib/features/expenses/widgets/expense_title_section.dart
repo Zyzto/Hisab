@@ -1,10 +1,8 @@
-import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../../core/utils/form_validators.dart';
 import '../../../domain/domain.dart';
-import '../category_icons.dart';
-import '../constants/expense_form_constants.dart';
+import 'category_affordance_chip.dart';
 
 /// Title input with category tag and optional add-photo / scan-receipt actions.
 class ExpenseTitleSection extends StatelessWidget {
@@ -30,21 +28,6 @@ class ExpenseTitleSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final preset = selectedTag != null
-        ? presetExpenseTags.where((p) => p.id == selectedTag).firstOrNull
-        : null;
-    final customTag = selectedTag != null
-        ? customTags.where((t) => t.id == selectedTag).firstOrNull
-        : null;
-    final tagLabel = preset != null
-        ? 'category_${preset.id}'.tr()
-        : (customTag != null ? customTag.label : selectedTag);
-    final tagIcon = preset != null
-        ? preset.icon
-        : (customTag != null
-              ? (selectableExpenseIcons[customTag.iconName] ??
-                    Icons.label_outlined)
-              : Icons.label_outlined);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -73,19 +56,10 @@ class ExpenseTitleSection extends StatelessWidget {
             suffixIcon: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                IconButton(
-                  icon: Icon(
-                    tagIcon,
-                    color: selectedTag != null
-                        ? chromeForExpenseTag(
-                            selectedTag,
-                            brightness: theme.brightness,
-                            surface: theme.colorScheme.surface,
-                          ).onSurface
-                        : theme.colorScheme.onSurfaceVariant,
-                  ),
-                  onPressed: onTagPicker,
-                  tooltip: tagLabel ?? 'category'.tr(),
+                CategoryAffordanceChip(
+                  selectedTag: selectedTag,
+                  customTags: customTags,
+                  onTap: onTagPicker,
                 ),
                 if (onPickImage != null)
                   IconButton(

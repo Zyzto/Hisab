@@ -39,10 +39,13 @@ import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/participant_avatar.dart';
 import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/sheet_option_tile.dart';
+import '../../../core/widgets/anchored_dropdown_chip.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../core/widgets/user_text.dart';
+import '../../expenses/widgets/expense_date_range_sheet.dart';
 import '../../expenses/widgets/expense_list_tile.dart';
 import '../../expenses/category_icons.dart';
+import '../providers/group_analytics_provider.dart';
 import '../../balance/widgets/balance_list.dart';
 import '../../profile/widgets/personal_budget_card.dart';
 import '../../settings/providers/settings_framework_providers.dart';
@@ -187,6 +190,7 @@ class _GroupDetailContent extends ConsumerStatefulWidget {
 
 class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
   int _selectedTabIndex = 0;
+
   /// Stable seed for [CustomSlidingSegmentedControl.initialValue]. The package
   /// ignores [CustomSegmentedController]'s constructor value and defaults the
   /// thumb to the first segment unless [initialValue] is set; keep this fixed
@@ -266,7 +270,9 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
     _selectedTabIndex = _initialTabIndex;
     _tabIndexNotifier = ValueNotifier<int>(_selectedTabIndex);
     _pageController = PageController(initialPage: _selectedTabIndex);
-    _segmentController = CustomSegmentedController<int>(value: _selectedTabIndex);
+    _segmentController = CustomSegmentedController<int>(
+      value: _selectedTabIndex,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       seedParentHistoryForBrowserBack(
@@ -408,7 +414,9 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
     final canAddExpense = isOwnerOrAdmin || widget.group.allowMemberAddExpense;
 
     if (index == 0) {
-      if (widget.group.isArchived || widget.group.isSettlementFrozen || !canAddExpense) {
+      if (widget.group.isArchived ||
+          widget.group.isSettlementFrozen ||
+          !canAddExpense) {
         return null;
       }
       return AppFab(
@@ -509,266 +517,274 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
     return MembershipCelebrationBinder(
       groupId: widget.group.id,
       child: PopScope(
-      canPop: canPop,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _navigateBack();
-      },
-      child: LayoutBuilder(
-      builder: (context, layoutConstraints) {
-        return Scaffold(
-          floatingActionButtonLocation: ContentAlignedFabLocation.of(
-            context,
-            contentAreaWidth: layoutConstraints.maxWidth,
-          ),
-          appBar: ContentAlignedAppBar(
-            contentAreaWidth: layoutConstraints.maxWidth,
-            centerTitle: false,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: _navigateBack,
-            ),
-            title: _buildAppBarTitle(context),
-            actions: [
-              if (!widget.readOnlyPreview)
-                IconButton(
-                  icon: const Icon(Icons.analytics_outlined),
-                  tooltip: 'analytics'.tr(),
-                  onPressed: () =>
-                      context.push(RoutePaths.groupAnalytics(widget.group.id)),
+        canPop: canPop,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _navigateBack();
+        },
+        child: LayoutBuilder(
+          builder: (context, layoutConstraints) {
+            return Scaffold(
+              floatingActionButtonLocation: ContentAlignedFabLocation.of(
+                context,
+                contentAreaWidth: layoutConstraints.maxWidth,
+              ),
+              appBar: ContentAlignedAppBar(
+                contentAreaWidth: layoutConstraints.maxWidth,
+                centerTitle: false,
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: _navigateBack,
                 ),
-              if (!localOnly &&
-                  !widget.readOnlyPreview &&
-                  (myRole == GroupRole.owner || myRole == GroupRole.admin) &&
-                  !widget.group.isPersonal)
-                IconButton(
-                  icon: const Icon(Icons.person_add),
-                  tooltip: 'invite_people'.tr(),
-                  onPressed: () =>
-                      showCreateInviteSheet(context, ref, widget.group.id),
-                ),
-              if (!widget.readOnlyPreview)
-                IconButton(
-                  icon: const Icon(Icons.settings),
-                  onPressed: () =>
-                      context.push(RoutePaths.groupSettings(widget.group.id)),
-                ),
-            ],
-          ),
-          body: ConstrainedContent(
-            child: Column(
-              children: [
-                if (widget.group.isArchived) _buildArchivedBanner(context),
-                if (widget.group.isPersonal) ...[
-                  _PersonalBudgetHeader(group: widget.group),
-                  Expanded(
-                    child: _ExpensesTab(
-                      groupId: widget.group.id,
-                      group: widget.group,
-                      onRefresh: _onRefresh,
-                      readOnlyPreview: widget.readOnlyPreview,
-                      previewToken: widget.previewToken,
-                    ),
-                  ),
-                ] else ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    child: Theme(
-                      data: Theme.of(context).copyWith(
-                        splashFactory: NoSplash.splashFactory,
-                        highlightColor: Colors.transparent,
+                title: _buildAppBarTitle(context),
+                actions: [
+                  if (!widget.readOnlyPreview)
+                    IconButton(
+                      icon: const Icon(Icons.analytics_outlined),
+                      tooltip: 'analytics'.tr(),
+                      onPressed: () => context.push(
+                        RoutePaths.groupAnalytics(widget.group.id),
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Builder(
-                          builder: (context) {
-                            final theme = Theme.of(context);
-                            final colorScheme = theme.colorScheme;
-                            return CustomSlidingSegmentedControl<int>(
-                              controller: _segmentController,
-                              initialValue: _initialTabIndex,
-                              children: {
-                                0: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 4,
-                                  ),
-                                  child: Text(
-                                    'expenses'.tr(),
-                                    style: theme.textTheme.titleSmall?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                      color: _selectedTabIndex == 0
-                                          ? colorScheme.primary
-                                          : colorScheme.onSurfaceVariant,
+                    ),
+                  if (!localOnly &&
+                      !widget.readOnlyPreview &&
+                      (myRole == GroupRole.owner ||
+                          myRole == GroupRole.admin) &&
+                      !widget.group.isPersonal)
+                    IconButton(
+                      icon: const Icon(Icons.person_add),
+                      tooltip: 'invite_people'.tr(),
+                      onPressed: () =>
+                          showCreateInviteSheet(context, ref, widget.group.id),
+                    ),
+                  if (!widget.readOnlyPreview)
+                    IconButton(
+                      icon: const Icon(Icons.settings),
+                      onPressed: () => context.push(
+                        RoutePaths.groupSettings(widget.group.id),
+                      ),
+                    ),
+                ],
+              ),
+              body: ConstrainedContent(
+                child: Column(
+                  children: [
+                    if (widget.group.isArchived) _buildArchivedBanner(context),
+                    if (widget.group.isPersonal) ...[
+                      _PersonalBudgetHeader(group: widget.group),
+                      Expanded(
+                        child: _ExpensesTab(
+                          groupId: widget.group.id,
+                          group: widget.group,
+                          onRefresh: _onRefresh,
+                          readOnlyPreview: widget.readOnlyPreview,
+                          previewToken: widget.previewToken,
+                        ),
+                      ),
+                    ] else ...[
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        child: Theme(
+                          data: Theme.of(context).copyWith(
+                            splashFactory: NoSplash.splashFactory,
+                            highlightColor: Colors.transparent,
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Builder(
+                              builder: (context) {
+                                final theme = Theme.of(context);
+                                final colorScheme = theme.colorScheme;
+                                return CustomSlidingSegmentedControl<int>(
+                                  controller: _segmentController,
+                                  initialValue: _initialTabIndex,
+                                  children: {
+                                    0: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 4,
+                                      ),
+                                      child: Text(
+                                        'expenses'.tr(),
+                                        style: theme.textTheme.titleSmall
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w600,
+                                              color: _selectedTabIndex == 0
+                                                  ? colorScheme.primary
+                                                  : colorScheme
+                                                        .onSurfaceVariant,
+                                            ),
+                                      ),
                                     ),
-                                  ),
-                                ),
-                                1: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 4,
-                                  ),
-                                  child: Text(
-                                    'balance'.tr(),
-                                    style: theme.textTheme.titleSmall?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                      color: _selectedTabIndex == 1
-                                          ? colorScheme.primary
-                                          : colorScheme.onSurfaceVariant,
+                                    1: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 4,
+                                      ),
+                                      child: Text(
+                                        'balance'.tr(),
+                                        style: theme.textTheme.titleSmall
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w600,
+                                              color: _selectedTabIndex == 1
+                                                  ? colorScheme.primary
+                                                  : colorScheme
+                                                        .onSurfaceVariant,
+                                            ),
+                                      ),
                                     ),
-                                  ),
-                                ),
-                                2: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 4,
-                                  ),
-                                  child: Text(
-                                    'people'.tr(),
-                                    style: theme.textTheme.titleSmall?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                      color: _selectedTabIndex == 2
-                                          ? colorScheme.primary
-                                          : colorScheme.onSurfaceVariant,
+                                    2: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 4,
+                                      ),
+                                      child: Text(
+                                        'people'.tr(),
+                                        style: theme.textTheme.titleSmall
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w600,
+                                              color: _selectedTabIndex == 2
+                                                  ? colorScheme.primary
+                                                  : colorScheme
+                                                        .onSurfaceVariant,
+                                            ),
+                                      ),
                                     ),
+                                  },
+                                  height: 52,
+                                  padding: 16,
+                                  innerPadding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 6,
                                   ),
-                                ),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.surfaceContainerHighest
+                                        .withValues(alpha: 0.6),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  thumbDecoration: BoxDecoration(
+                                    color: colorScheme.surface,
+                                    borderRadius: BorderRadius.circular(10),
+                                    boxShadow: UiPerf.preferCheapShadows
+                                        ? null
+                                        : [
+                                            BoxShadow(
+                                              color: colorScheme.shadow
+                                                  .withValues(alpha: 0.1),
+                                              blurRadius: 3,
+                                              offset: const Offset(0, 1),
+                                            ),
+                                          ],
+                                  ),
+                                  isStretch: true,
+                                  duration: UiPerf.preferInstantShellTabs
+                                      ? Duration.zero
+                                      : const Duration(milliseconds: 200),
+                                  curve: Curves.easeInOut,
+                                  onValueChanged: (v) {
+                                    _syncUrlToTab(v);
+                                    setState(() {
+                                      _selectedTabIndex = v;
+                                      _programmaticTargetPage = v;
+                                    });
+                                    _tabIndexNotifier.value = v;
+                                    final pageDuration =
+                                        UiPerf.preferInstantShellTabs
+                                        ? Duration.zero
+                                        : const Duration(milliseconds: 300);
+                                    if (pageDuration == Duration.zero) {
+                                      _pageController.jumpToPage(v);
+                                      if (mounted) {
+                                        setState(
+                                          () => _programmaticTargetPage = null,
+                                        );
+                                      }
+                                    } else {
+                                      _pageController
+                                          .animateToPage(
+                                            v,
+                                            duration: pageDuration,
+                                            curve: Curves.easeInOut,
+                                          )
+                                          .whenComplete(() {
+                                            if (mounted) {
+                                              setState(
+                                                () => _programmaticTargetPage =
+                                                    null,
+                                              );
+                                            }
+                                          });
+                                    }
+                                  },
+                                );
                               },
-                              height: 52,
-                              padding: 16,
-                              innerPadding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainerHighest
-                                    .withValues(alpha: 0.6),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              thumbDecoration: BoxDecoration(
-                                color: colorScheme.surface,
-                                borderRadius: BorderRadius.circular(10),
-                                boxShadow: UiPerf.preferCheapShadows
-                                    ? null
-                                    : [
-                                        BoxShadow(
-                                          color: colorScheme.shadow.withValues(
-                                            alpha: 0.1,
-                                          ),
-                                          blurRadius: 3,
-                                          offset: const Offset(0, 1),
-                                        ),
-                                      ],
-                              ),
-                              isStretch: true,
-                              duration: UiPerf.preferInstantShellTabs
-                                  ? Duration.zero
-                                  : const Duration(milliseconds: 200),
-                              curve: Curves.easeInOut,
-                              onValueChanged: (v) {
-                                _syncUrlToTab(v);
-                                setState(() {
-                                  _selectedTabIndex = v;
-                                  _programmaticTargetPage = v;
-                                });
-                                _tabIndexNotifier.value = v;
-                                final pageDuration =
-                                    UiPerf.preferInstantShellTabs
-                                    ? Duration.zero
-                                    : const Duration(milliseconds: 300);
-                                if (pageDuration == Duration.zero) {
-                                  _pageController.jumpToPage(v);
-                                  if (mounted) {
-                                    setState(
-                                      () => _programmaticTargetPage = null,
-                                    );
-                                  }
-                                } else {
-                                  _pageController
-                                      .animateToPage(
-                                        v,
-                                        duration: pageDuration,
-                                        curve: Curves.easeInOut,
-                                      )
-                                      .whenComplete(() {
-                                        if (mounted) {
-                                          setState(
-                                            () =>
-                                                _programmaticTargetPage = null,
-                                          );
-                                        }
-                                      });
-                                }
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: PageView.builder(
+                          controller: _pageController,
+                          itemCount: 3,
+                          onPageChanged: (i) {
+                            if (_programmaticTargetPage != null &&
+                                i != _programmaticTargetPage) {
+                              return;
+                            }
+                            if (_programmaticTargetPage != null) {
+                              setState(() => _programmaticTargetPage = null);
+                            }
+                            setState(() => _selectedTabIndex = i);
+                            _tabIndexNotifier.value = i;
+                            _segmentController.value = i;
+                            _syncUrlToTab(i);
+                          },
+                          itemBuilder: (context, i) {
+                            // Lazy: only visited pages mount; keepAlive preserves scroll.
+                            return _KeepAliveTab(
+                              child: switch (i) {
+                                0 => _ExpensesTab(
+                                  groupId: widget.group.id,
+                                  group: widget.group,
+                                  onRefresh: _onRefresh,
+                                  readOnlyPreview: widget.readOnlyPreview,
+                                  previewToken: widget.previewToken,
+                                ),
+                                1 => _BalanceTab(
+                                  groupId: widget.group.id,
+                                  onRefresh: _onRefresh,
+                                  readOnlyPreview: widget.readOnlyPreview,
+                                ),
+                                _ => _PeopleTab(
+                                  groupId: widget.group.id,
+                                  group: widget.group,
+                                  onRefresh: _onRefresh,
+                                  readOnlyPreview: widget.readOnlyPreview,
+                                ),
                               },
                             );
                           },
                         ),
                       ),
-                    ),
-                  ),
-                  Expanded(
-                    child: PageView.builder(
-                      controller: _pageController,
-                      itemCount: 3,
-                      onPageChanged: (i) {
-                        if (_programmaticTargetPage != null &&
-                            i != _programmaticTargetPage) {
-                          return;
-                        }
-                        if (_programmaticTargetPage != null) {
-                          setState(() => _programmaticTargetPage = null);
-                        }
-                        setState(() => _selectedTabIndex = i);
-                        _tabIndexNotifier.value = i;
-                        _segmentController.value = i;
-                        _syncUrlToTab(i);
-                      },
-                      itemBuilder: (context, i) {
-                        // Lazy: only visited pages mount; keepAlive preserves scroll.
-                        return _KeepAliveTab(
-                          child: switch (i) {
-                            0 => _ExpensesTab(
-                              groupId: widget.group.id,
-                              group: widget.group,
-                              onRefresh: _onRefresh,
-                              readOnlyPreview: widget.readOnlyPreview,
-                              previewToken: widget.previewToken,
-                            ),
-                            1 => _BalanceTab(
-                              groupId: widget.group.id,
-                              onRefresh: _onRefresh,
-                              readOnlyPreview: widget.readOnlyPreview,
-                            ),
-                            _ => _PeopleTab(
-                              groupId: widget.group.id,
-                              group: widget.group,
-                              onRefresh: _onRefresh,
-                              readOnlyPreview: widget.readOnlyPreview,
-                            ),
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          floatingActionButton: ValueListenableBuilder<int>(
-            valueListenable: _tabIndexNotifier,
-            builder: (context, index, _) =>
-                _buildFAB(
-                  context,
-                  widget.group.isPersonal ? 0 : index,
-                  myRole,
-                  localOnly,
-                ) ??
-                const SizedBox.shrink(),
-          ),
-          bottomNavigationBar: _buildPreviewJoinBar(context),
-        );
-      },
-    ),
-    ),
+                    ],
+                  ],
+                ),
+              ),
+              floatingActionButton: ValueListenableBuilder<int>(
+                valueListenable: _tabIndexNotifier,
+                builder: (context, index, _) =>
+                    _buildFAB(
+                      context,
+                      widget.group.isPersonal ? 0 : index,
+                      myRole,
+                      localOnly,
+                    ) ??
+                    const SizedBox.shrink(),
+              ),
+              bottomNavigationBar: _buildPreviewJoinBar(context),
+            );
+          },
+        ),
+      ),
     );
   }
 }
@@ -811,7 +827,7 @@ class _PersonalBudgetHeader extends ConsumerWidget {
   }
 }
 
-class _ExpensesTab extends ConsumerWidget {
+class _ExpensesTab extends ConsumerStatefulWidget {
   final String groupId;
   final Group group;
   final Future<void> Function() onRefresh;
@@ -847,7 +863,63 @@ class _ExpensesTab extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ExpensesTab> createState() => _ExpensesTabState();
+}
+
+class _ExpensesTabState extends ConsumerState<_ExpensesTab> {
+  String? _tagFilter;
+  DateTimeRange? _dateRangeFilter;
+  String _searchQuery = '';
+  bool _searchExpanded = false;
+  late final TextEditingController _searchController;
+  late final FocusNode _searchFocusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+    _searchFocusNode = FocusNode();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  @override
+  void dispose() {
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    final next = _searchController.text;
+    if (next == _searchQuery) return;
+    setState(() => _searchQuery = next);
+  }
+
+  void _openSearch() {
+    setState(() => _searchExpanded = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _searchFocusNode.requestFocus();
+    });
+  }
+
+  void _closeSearch() {
+    _searchController.clear();
+    _searchFocusNode.unfocus();
+    setState(() {
+      _searchQuery = '';
+      _searchExpanded = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final groupId = widget.groupId;
+    final group = widget.group;
+    final onRefresh = widget.onRefresh;
+    final readOnlyPreview = widget.readOnlyPreview;
+    final previewToken = widget.previewToken;
+
     final expensesAsync = ref.watch(expensesByGroupProvider(groupId));
     final participantsAsync = ref.watch(participantsByGroupProvider(groupId));
     final myMemberAsync = ref.watch(myMemberInGroupProvider(groupId));
@@ -915,14 +987,65 @@ class _ExpensesTab extends ConsumerWidget {
               );
             }
 
-            final sorted = List<Expense>.from(expenses)
+            final tagKeys = <String>{};
+            for (final e in expenses) {
+              final tag = (e.tag == null || e.tag!.isEmpty)
+                  ? 'untagged'
+                  : e.tag!;
+              tagKeys.add(tag);
+            }
+            final tagList = tagKeys.toList()
+              ..sort((a, b) {
+                if (a == 'untagged') return 1;
+                if (b == 'untagged') return -1;
+                return resolveTagLabel(a, customTags).toLowerCase().compareTo(
+                  resolveTagLabel(b, customTags).toLowerCase(),
+                );
+              });
+
+            final searchQ = _searchQuery.trim().toLowerCase();
+            final filtered = expenses.where((e) {
+              if (_tagFilter != null) {
+                final tag = (e.tag == null || e.tag!.isEmpty)
+                    ? 'untagged'
+                    : e.tag!;
+                if (tag != _tagFilter) return false;
+              }
+              if (_dateRangeFilter != null) {
+                final key = _ExpensesTab._dateOnly(
+                  e.date.isUtc ? e.date.toLocal() : e.date,
+                );
+                final start = _ExpensesTab._dateOnly(_dateRangeFilter!.start);
+                final end = _ExpensesTab._dateOnly(_dateRangeFilter!.end);
+                if (key.isBefore(start) || key.isAfter(end)) return false;
+              }
+              if (searchQ.isNotEmpty) {
+                final payer = nameOf[e.payerParticipantId] ?? '';
+                final toName = e.toParticipantId == null
+                    ? ''
+                    : (nameOf[e.toParticipantId!] ?? '');
+                final haystack = [
+                  e.title,
+                  e.description ?? '',
+                  payer,
+                  toName,
+                  e.tag ?? '',
+                ].join(' ').toLowerCase();
+                if (!haystack.contains(searchQ)) return false;
+              }
+              return true;
+            }).toList();
+
+            final sorted = List<Expense>.from(filtered)
               ..sort((a, b) => b.date.compareTo(a.date));
             final byDate = <DateTime, List<Expense>>{};
             int myShareCents = 0;
             int youPaidCents = 0;
             int totalCents = 0;
             for (final e in sorted) {
-              final key = _dateOnly(e.date.isUtc ? e.date.toLocal() : e.date);
+              final key = _ExpensesTab._dateOnly(
+                e.date.isUtc ? e.date.toLocal() : e.date,
+              );
               byDate.putIfAbsent(key, () => []).add(e);
               totalCents += contributionToExpenseTotal(e);
               if (currentUserParticipantId != null) {
@@ -938,12 +1061,57 @@ class _ExpensesTab extends ConsumerWidget {
             final dateKeys = byDate.keys.toList()
               ..sort((a, b) => b.compareTo(a));
 
+            final allDateKeys = <DateTime>{
+              for (final e in expenses)
+                _ExpensesTab._dateOnly(
+                  e.date.isUtc ? e.date.toLocal() : e.date,
+                ),
+            };
+            final earliestDate = allDateKeys.reduce(
+              (a, b) => a.isBefore(b) ? a : b,
+            );
+            final latestDate = allDateKeys.reduce(
+              (a, b) => a.isAfter(b) ? a : b,
+            );
+            final today = _ExpensesTab._dateOnly(DateTime.now());
+            final pickerLastDate = latestDate.isAfter(today)
+                ? latestDate
+                : today;
+
             final currencyCode = group.currencyCode;
             final dateFormat = DateFormat('MMMM d, yyyy');
             final theme = Theme.of(context);
+            final hasActiveListFilters =
+                _tagFilter != null ||
+                _dateRangeFilter != null ||
+                searchQ.isNotEmpty;
 
-            // Flatten for ListView.builder: [summary] + for each date [header, ...expenses]
+            String categoryChipLabel() {
+              final filter = _tagFilter;
+              if (filter == null) {
+                return 'analytics_filter_all_categories'.tr();
+              }
+              if (filter == 'untagged') {
+                return 'analytics_untagged'.tr();
+              }
+              final resolved = resolveTagLabel(filter, customTags);
+              return resolved.startsWith('category_')
+                  ? resolved.tr()
+                  : resolved;
+            }
+
+            String dateChipLabel() {
+              final filter = _dateRangeFilter;
+              if (filter == null) return 'expenses_all_dates'.tr();
+              return formatExpenseDateRangeLabel(filter);
+            }
+
+            // Flatten: [summary?] [tools] [empty?] + dates/expenses.
+            // Tools are a fixed list slot so the search field is not rebuilt when
+            // filters clear rows. The first date label is rendered inside tools
+            // (same row as chips when space allows); later dates use headers.
             // Personal: skip summary in list (budget header above already shows total).
+            final firstDateKey = dateKeys.isEmpty ? null : dateKeys.first;
             final flattenedItems = <_ExpenseListItem>[
               if (!group.isPersonal)
                 _ExpenseListSummaryItem(
@@ -951,12 +1119,232 @@ class _ExpensesTab extends ConsumerWidget {
                   youPaidCents: youPaidCents,
                   totalCents: totalCents,
                 ),
+              _ExpenseListToolsItem(firstDate: firstDateKey),
+              if (dateKeys.isEmpty && hasActiveListFilters)
+                const _ExpenseListEmptyFilterItem(),
             ];
-            for (final dateKey in dateKeys) {
-              flattenedItems.add(_ExpenseListDateHeaderItem(dateKey));
+            for (var i = 0; i < dateKeys.length; i++) {
+              final dateKey = dateKeys[i];
+              // First date is shown in the tools row.
+              if (i > 0) {
+                flattenedItems.add(_ExpenseListDateHeaderItem(dateKey));
+              }
               for (final e in byDate[dateKey]!) {
                 flattenedItems.add(_ExpenseListExpenseItem(e));
               }
+            }
+
+            Widget categoryFilterChip() {
+              return AnchoredDropdownChip<String>(
+                icon: _tagFilter == null
+                    ? Icons.apps_rounded
+                    : (_tagFilter == 'untagged'
+                          ? Icons.label_off_outlined
+                          : iconForExpenseTag(_tagFilter, customTags)),
+                label: categoryChipLabel(),
+                active: _tagFilter != null,
+                selected: _tagFilter ?? '',
+                options: [
+                  AnchoredDropdownOption(
+                    value: '',
+                    label: 'analytics_filter_all_categories'.tr(),
+                    icon: Icons.apps_rounded,
+                  ),
+                  for (final tag in tagList)
+                    AnchoredDropdownOption(
+                      value: tag,
+                      label: tag == 'untagged'
+                          ? 'analytics_untagged'.tr()
+                          : () {
+                              final resolved = resolveTagLabel(tag, customTags);
+                              return resolved.startsWith('category_')
+                                  ? resolved.tr()
+                                  : resolved;
+                            }(),
+                      icon: tag == 'untagged'
+                          ? Icons.label_off_outlined
+                          : iconForExpenseTag(tag, customTags),
+                    ),
+                ],
+                onSelected: (value) {
+                  setState(() {
+                    _tagFilter = value.isEmpty ? null : value;
+                  });
+                },
+              );
+            }
+
+            Widget dateFilterChip() {
+              final cs = theme.colorScheme;
+              final active = _dateRangeFilter != null;
+              final bg = active
+                  ? cs.primaryContainer
+                  : cs.surfaceContainerHighest.withValues(alpha: 0.65);
+              final fg = active ? cs.onPrimaryContainer : cs.onSurface;
+              final iconColor = active
+                  ? cs.onPrimaryContainer
+                  : cs.onSurfaceVariant;
+              return Material(
+                color: bg,
+                borderRadius: BorderRadius.circular(22),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(22),
+                  onTap: () async {
+                    final result = await showExpenseDateRangeSheet(
+                      context,
+                      initial: _dateRangeFilter,
+                      firstDate: earliestDate,
+                      lastDate: pickerLastDate,
+                    );
+                    if (!mounted || result == null) return;
+                    setState(() => _dateRangeFilter = result.range);
+                  },
+                  child: Container(
+                    padding: const EdgeInsetsDirectional.only(
+                      start: 14,
+                      end: 14,
+                      top: 10,
+                      bottom: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(
+                        color: active
+                            ? cs.primary.withValues(alpha: 0.35)
+                            : cs.outlineVariant.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.calendar_today_rounded,
+                          size: 18,
+                          color: iconColor,
+                        ),
+                        const SizedBox(width: 8),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 112),
+                          child: UserText(
+                            dateChipLabel(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              color: fg,
+                              fontWeight: active
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            Widget searchIconButton() {
+              final cs = theme.colorScheme;
+              return Material(
+                color: cs.surfaceContainerHighest.withValues(alpha: 0.65),
+                borderRadius: BorderRadius.circular(22),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(22),
+                  onTap: _openSearch,
+                  child: Container(
+                    width: 42,
+                    height: 42,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(
+                        color: cs.outlineVariant.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.search_rounded,
+                      size: 20,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            Widget searchBar() {
+              final cs = theme.colorScheme;
+              return TextField(
+                key: const ValueKey<String>('group_expenses_search_field'),
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  hintText: 'expenses_search_hint'.tr(),
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: IconButton(
+                    tooltip: 'clear'.tr(),
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: _closeSearch,
+                  ),
+                  filled: true,
+                  fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.55),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(22),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(22),
+                    borderSide: BorderSide(
+                      color: cs.outlineVariant.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(22),
+                    borderSide: BorderSide(color: cs.primary, width: 1.4),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  isDense: true,
+                ),
+              );
+            }
+
+            final motionDuration = UiPerf.preferReducedChromeMotion
+                ? Duration.zero
+                : const Duration(milliseconds: 220);
+
+            Widget filterChipsRow({required bool includeCategory}) {
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (!_searchExpanded) ...[
+                    searchIconButton(),
+                    const SizedBox(width: 8),
+                  ],
+                  dateFilterChip(),
+                  if (includeCategory) ...[
+                    const SizedBox(width: 8),
+                    categoryFilterChip(),
+                  ],
+                ],
+              );
+            }
+
+            Widget expandSearchSlot() {
+              return AnimatedSize(
+                duration: motionDuration,
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                child: _searchExpanded
+                    ? Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: searchBar(),
+                      )
+                    : const SizedBox(width: double.infinity),
+              );
             }
 
             return RefreshIndicator(
@@ -973,6 +1361,41 @@ class _ExpensesTab extends ConsumerWidget {
                 itemBuilder: (context, index) {
                   final item = flattenedItems[index];
                   switch (item) {
+                    case _ExpenseListToolsItem():
+                      final chips = filterChipsRow(
+                        includeCategory: tagList.isNotEmpty,
+                      );
+                      return Padding(
+                        key: const ValueKey<String>('group_expenses_list_tools'),
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            expandSearchSlot(),
+                            if (item.firstDate != null)
+                              _DateHeaderWithTools(
+                                dateLabel: dateFormat.format(item.firstDate!),
+                                tools: chips,
+                              )
+                            else
+                              Align(
+                                alignment: AlignmentDirectional.centerEnd,
+                                child: chips,
+                              ),
+                          ],
+                        ),
+                      );
+                    case _ExpenseListEmptyFilterItem():
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+                        child: Text(
+                          'expenses_no_match'.tr(),
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      );
                     case _ExpenseListSummaryItem():
                       return Padding(
                         padding: const EdgeInsets.symmetric(
@@ -1003,10 +1426,10 @@ class _ExpensesTab extends ConsumerWidget {
                                           theme: theme,
                                           valueWidget:
                                               AmountWithSecondaryDisplay(
-                                            amountCents: item.myShareCents,
-                                            groupCurrencyCode: currencyCode,
-                                            showSecondary: false,
-                                          ),
+                                                amountCents: item.myShareCents,
+                                                groupCurrencyCode: currencyCode,
+                                                showSecondary: false,
+                                              ),
                                         ),
                                       ),
                                       const SizedBox(width: 8),
@@ -1018,10 +1441,10 @@ class _ExpensesTab extends ConsumerWidget {
                                           theme: theme,
                                           valueWidget:
                                               AmountWithSecondaryDisplay(
-                                            amountCents: item.youPaidCents,
-                                            groupCurrencyCode: currencyCode,
-                                            showSecondary: false,
-                                          ),
+                                                amountCents: item.youPaidCents,
+                                                groupCurrencyCode: currencyCode,
+                                                showSecondary: false,
+                                              ),
                                         ),
                                       ),
                                     ],
@@ -1060,14 +1483,16 @@ class _ExpensesTab extends ConsumerWidget {
                             ? null
                             : nameOf[expense.toParticipantId!],
                         icon: iconForExpenseTag(expense.tag, customTags),
+                        customTags: customTags,
                         showPaidBy: !group.isPersonal,
                         groupCurrencyCode: group.currencyCode,
                         showDisclosure: true,
                         onTap: () {
-                          if (readOnlyPreview && previewToken != null) {
+                          final token = previewToken;
+                          if (readOnlyPreview && token != null) {
                             context.push(
                               RoutePaths.invitePreviewExpenseDetail(
-                                previewToken!,
+                                token,
                                 expense.id,
                               ),
                             );
@@ -2018,9 +2443,94 @@ class _PeopleTab extends ConsumerWidget {
   }
 }
 
+/// Date section header with trailing filter tools.
+///
+/// Keeps [tools] on the same row as the date when they fit; otherwise places
+/// tools on a row above the date.
+class _DateHeaderWithTools extends StatefulWidget {
+  const _DateHeaderWithTools({required this.dateLabel, required this.tools});
+
+  final String dateLabel;
+  final Widget tools;
+
+  @override
+  State<_DateHeaderWithTools> createState() => _DateHeaderWithToolsState();
+}
+
+class _DateHeaderWithToolsState extends State<_DateHeaderWithTools> {
+  final GlobalKey _toolsKey = GlobalKey();
+  bool _stackToolsAbove = false;
+
+  static const double _barAndGap = 11; // accent bar + spacing
+  static const double _minDateWidth = 80;
+
+  @override
+  void initState() {
+    super.initState();
+    _scheduleMeasure();
+  }
+
+  @override
+  void didUpdateWidget(covariant _DateHeaderWithTools oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _scheduleMeasure();
+  }
+
+  void _scheduleMeasure() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _measure();
+    });
+  }
+
+  void _measure() {
+    final toolsBox = _toolsKey.currentContext?.findRenderObject() as RenderBox?;
+    final selfBox = context.findRenderObject() as RenderBox?;
+    if (toolsBox == null || !toolsBox.hasSize) return;
+    if (selfBox == null || !selfBox.hasSize) return;
+
+    final maxWidth = selfBox.size.width;
+    final toolsWidth = toolsBox.size.width;
+    final availableForDate = maxWidth - _barAndGap - 8 - toolsWidth;
+    final shouldStack = availableForDate < _minDateWidth;
+
+    if (shouldStack != _stackToolsAbove) {
+      setState(() => _stackToolsAbove = shouldStack);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tools = KeyedSubtree(key: _toolsKey, child: widget.tools);
+
+    if (_stackToolsAbove) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Align(alignment: AlignmentDirectional.centerEnd, child: tools),
+          const SizedBox(height: 10),
+          GroupSectionHeader(label: widget.dateLabel),
+        ],
+      );
+    }
+
+    return GroupSectionHeader(label: widget.dateLabel, trailing: tools);
+  }
+}
+
 /// Sealed-like item types for virtualized expense list.
 sealed class _ExpenseListItem {
   const _ExpenseListItem();
+}
+
+class _ExpenseListToolsItem extends _ExpenseListItem {
+  const _ExpenseListToolsItem({this.firstDate});
+
+  /// When set, shown on the tools row (same line as chips when space allows).
+  final DateTime? firstDate;
+}
+
+class _ExpenseListEmptyFilterItem extends _ExpenseListItem {
+  const _ExpenseListEmptyFilterItem();
 }
 
 /// Person row for the People tab — matches expense-detail person cards.
@@ -2183,7 +2693,8 @@ class _ExpenseSummaryCard extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
               textAlign: TextAlign.end,
-              child: valueWidget ??
+              child:
+                  valueWidget ??
                   Text(
                     value,
                     maxLines: 1,

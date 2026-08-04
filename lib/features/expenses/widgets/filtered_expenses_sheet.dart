@@ -147,6 +147,7 @@ class AppExpenseTile extends StatelessWidget {
       payerName: row.payerName,
       toParticipantName: row.toParticipantName,
       icon: iconForExpenseTag(row.expense.tag, row.customTags),
+      customTags: row.customTags,
       groupCurrencyCode: row.groupCurrencyCode,
       amountCentsOverride: row.amountCentsOverride,
       detailLine: row.detailLine,

@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:upgrader/upgrader.dart';
 
+import '../../features/expenses/camera/receipt_camera_debug.dart';
 import '../../features/settings/feedback_handler.dart';
 import '../../features/settings/providers/settings_framework_providers.dart';
 import '../../features/settings/settings_definitions.dart';
@@ -98,10 +99,7 @@ class DebugMenuFab extends ConsumerWidget {
             path: 'assets/translations',
             fallbackLocale: const Locale('en'),
             startLocale: locContext.locale,
-            child: _DebugMenuSheet(
-              upgrader: upgrader,
-              hostContext: navContext,
-            ),
+            child: _DebugMenuSheet(upgrader: upgrader, hostContext: navContext),
           ),
         ).whenComplete(() => whenSheetClosed?.call());
       },
@@ -111,10 +109,7 @@ class DebugMenuFab extends ConsumerWidget {
 }
 
 class _DebugMenuSheet extends ConsumerStatefulWidget {
-  const _DebugMenuSheet({
-    required this.upgrader,
-    required this.hostContext,
-  });
+  const _DebugMenuSheet({required this.upgrader, required this.hostContext});
 
   final Upgrader upgrader;
 
@@ -306,9 +301,7 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
         !ref.read(screenshotReportPromptEnabledProvider)) {
       await ref
           .read(
-            settings
-                .provider(screenshotReportPromptEnabledSettingDef)
-                .notifier,
+            settings.provider(screenshotReportPromptEnabledSettingDef).notifier,
           )
           .set(true);
     }
@@ -322,9 +315,9 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
           if (!host.mounted) return;
           try {
             BetterFeedback.of(host).hide();
-            BetterFeedback.of(host).show(
-              (feedback) => handleFeedback(host, feedback: feedback),
-            );
+            BetterFeedback.of(
+              host,
+            ).show((feedback) => handleFeedback(host, feedback: feedback));
           } catch (_) {}
         },
       );
@@ -339,6 +332,7 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
     final screenshotOn = ref.watch(screenshotReportPromptEnabledProvider);
     final reduced = UiPerf.preferReducedChromeMotion;
     final syncOverride = ref.watch(debugSyncStatusOverrideProvider);
+    final receiptCameraMock = ref.watch(debugReceiptCameraMockProvider);
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -458,7 +452,7 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
               ),
             Text(
               extrasOn
-                  ? 'FAB playground — tap for leaf burst; plant bloom starts quickly.'
+                  ? 'FAB playground — each tap cycles the next flower (all kinds, then bouquets).'
                   : 'Turn on Extra animations above to preview FAB nature effects.',
               style: textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
@@ -498,6 +492,27 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
                   ? 'Shows the toast + Report action (enables setting)'
                   : 'Shows the toast UI (OS capture N/A on this platform)',
               onTap: () => unawaited(_simulateScreenshotPrompt()),
+            ),
+
+            const _SectionHeader('Receipt camera'),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              secondary: const Icon(Icons.receipt_long_outlined, size: 22),
+              title: const Text('Mock camera preview'),
+              subtitle: Text(
+                receiptCameraMock
+                    ? 'ON — animated fake receipt (desktop + mobile)'
+                    : 'OFF — real camera on phone; file picker on desktop',
+              ),
+              value: receiptCameraMock,
+              onChanged: (v) {
+                ref.read(debugReceiptCameraMockProvider.notifier).state = v;
+                _setStatus(
+                  v
+                      ? 'Mock camera ON — open expense → Camera'
+                      : 'Mock camera OFF',
+                );
+              },
             ),
 
             const _SectionHeader('Tools'),

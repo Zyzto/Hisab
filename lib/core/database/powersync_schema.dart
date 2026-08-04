@@ -68,6 +68,7 @@ const schema = Schema([
     Column.text('group_id'),
     Column.text('label'),
     Column.text('icon_name'),
+    Column.text('color'),
     Column.text('created_at'),
     Column.text('updated_at'),
   ]),

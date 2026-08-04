@@ -105,7 +105,7 @@ class AnchoredDropdownChip<T> extends StatelessWidget {
                   Icon(icon, size: 18, color: iconColor),
                   const SizedBox(width: 8),
                   ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 140),
+                    constraints: const BoxConstraints(maxWidth: 112),
                     child: UserText(
                       label,
                       maxLines: 1,

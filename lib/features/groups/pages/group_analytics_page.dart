@@ -17,6 +17,7 @@ import '../../../core/theme/accent_style.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/user_text.dart';
+import '../../../core/widgets/anchored_dropdown_chip.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/missing_route_page.dart';
 import '../../../core/widgets/user_text.dart';
@@ -80,7 +81,10 @@ Future<T?> _showModalSelectSheet<T>({
                         ? null
                         : Text(option.subtitle!),
                     selected: isSelected,
-                    onTap: () => Navigator.of(ctx, rootNavigator: true).pop(option.value),
+                    onTap: () => Navigator.of(
+                      ctx,
+                      rootNavigator: true,
+                    ).pop(option.value),
                   );
                 }),
               ],
@@ -147,7 +151,9 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final uiState = ref.watch(groupAnalyticsUiStateByGroupProvider(widget.groupId));
+    final uiState = ref.watch(
+      groupAnalyticsUiStateByGroupProvider(widget.groupId),
+    );
     final query = GroupAnalyticsQuery(
       groupId: widget.groupId,
       range: _range,
@@ -157,9 +163,8 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
     final analyticsAsync = ref.watch(groupAnalyticsDataProvider(query));
 
     return analyticsAsync.when(
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, st) => Scaffold(
         body: Center(
           child: ErrorContentWidget(
@@ -236,7 +241,9 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
                   Icons.insights_outlined,
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
-                const SizedBox(width: ThemeConfig.spacingS + ThemeConfig.spacingXS),
+                const SizedBox(
+                  width: ThemeConfig.spacingS + ThemeConfig.spacingXS,
+                ),
                 Expanded(
                   child: Text(
                     'analytics_empty'.tr(),
@@ -263,7 +270,10 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
           ),
           const SizedBox(height: ThemeConfig.spacingS + ThemeConfig.spacingXS),
           _KpiGrid(
-            total: CurrencyFormatter.formatCents(data.totalAmountCents, currency),
+            total: CurrencyFormatter.formatCents(
+              data.totalAmountCents,
+              currency,
+            ),
             mine: CurrencyFormatter.formatCents(data.myAmountCents, currency),
             avgPerDay: CurrencyFormatter.formatCents(
               data.averagePerDayCents,
@@ -291,67 +301,66 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
     required GroupAnalyticsUiStateNotifier uiNotifier,
   }) {
     final showPerson = !data.group.isPersonal;
-    final bothPie = showPerson &&
+    final bothPie =
+        showPerson &&
         uiState.categoryChartMode == AnalyticsCategoryChartMode.pie &&
         uiState.personChartMode == AnalyticsCategoryChartMode.pie;
 
     Widget categoryCard({required bool compact}) => _BreakdownBarsCard(
-          title: 'analytics_category_title'.tr(),
-          emptyLabel: 'analytics_empty_chart'.tr(),
-          rows: data.byTag,
-          currencyCode: currency,
-          translateUntagged: true,
-          allowPieMode: true,
-          compact: compact,
-          mode: uiState.categoryChartMode,
-          chartModeMenuTitle: 'analytics_category_chart_mode_menu'.tr(),
-          onModeChanged: (mode) =>
-              uiNotifier.setCategoryChartMode(widget.groupId, mode),
-          excludedIds: uiState.excludedCategoryIds,
-          onToggleExcluded: (categoryId) =>
-              uiNotifier.toggleExcludedCategory(widget.groupId, categoryId),
-          onClearExcluded: () =>
-              uiNotifier.clearExcludedCategories(widget.groupId),
-          onOpenRowExpenses: (categoryId, categoryLabel) =>
-              _showCategoryExpensesSheet(
-                context,
-                data,
-                categoryId: categoryId,
-                categoryLabel: categoryLabel,
-              ),
-        );
+      title: 'analytics_category_title'.tr(),
+      emptyLabel: 'analytics_empty_chart'.tr(),
+      rows: data.byTag,
+      currencyCode: currency,
+      translateUntagged: true,
+      allowPieMode: true,
+      compact: compact,
+      mode: uiState.categoryChartMode,
+      chartModeMenuTitle: 'analytics_category_chart_mode_menu'.tr(),
+      onModeChanged: (mode) =>
+          uiNotifier.setCategoryChartMode(widget.groupId, mode),
+      excludedIds: uiState.excludedCategoryIds,
+      onToggleExcluded: (categoryId) =>
+          uiNotifier.toggleExcludedCategory(widget.groupId, categoryId),
+      onClearExcluded: () => uiNotifier.clearExcludedCategories(widget.groupId),
+      onOpenRowExpenses: (categoryId, categoryLabel) =>
+          _showCategoryExpensesSheet(
+            context,
+            data,
+            categoryId: categoryId,
+            categoryLabel: categoryLabel,
+          ),
+      customTags: data.tags,
+    );
 
     if (!showPerson) {
       return [categoryCard(compact: false)];
     }
 
     Widget personCard({required bool compact}) => _BreakdownBarsCard(
-          title: 'analytics_by_person_title'.tr(),
-          emptyLabel: 'analytics_empty_chart'.tr(),
-          rows: data.byParticipant,
-          currencyCode: currency,
-          allowPieMode: true,
-          compact: compact,
-          mode: uiState.personChartMode,
-          chartModeMenuTitle: 'analytics_person_chart_mode_menu'.tr(),
-          onModeChanged: (mode) =>
-              uiNotifier.setPersonChartMode(widget.groupId, mode),
-          excludedIds: uiState.excludedPersonIds,
-          onToggleExcluded: (personId) =>
-              uiNotifier.toggleExcludedPerson(widget.groupId, personId),
-          onClearExcluded: () =>
-              uiNotifier.clearExcludedPersons(widget.groupId),
-          onOpenRowExpenses: (payerId, payerLabel) => _showPayerExpensesSheet(
-            context,
-            data,
-            payerId: payerId,
-            payerLabel: payerLabel,
-          ),
-        );
+      title: 'analytics_by_person_title'.tr(),
+      emptyLabel: 'analytics_empty_chart'.tr(),
+      rows: data.byParticipant,
+      currencyCode: currency,
+      allowPieMode: true,
+      compact: compact,
+      mode: uiState.personChartMode,
+      chartModeMenuTitle: 'analytics_person_chart_mode_menu'.tr(),
+      onModeChanged: (mode) =>
+          uiNotifier.setPersonChartMode(widget.groupId, mode),
+      excludedIds: uiState.excludedPersonIds,
+      onToggleExcluded: (personId) =>
+          uiNotifier.toggleExcludedPerson(widget.groupId, personId),
+      onClearExcluded: () => uiNotifier.clearExcludedPersons(widget.groupId),
+      onOpenRowExpenses: (payerId, payerLabel) => _showPayerExpensesSheet(
+        context,
+        data,
+        payerId: payerId,
+        payerLabel: payerLabel,
+      ),
+    );
 
     // Side-by-side only when the content band is wide enough; phones stay stacked.
-    final sideBySide =
-        bothPie && LayoutBreakpoints.isTabletOrWider(context);
+    final sideBySide = bothPie && LayoutBreakpoints.isTabletOrWider(context);
 
     if (sideBySide) {
       return [
@@ -373,7 +382,10 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
     ];
   }
 
-  String _trendSubtitle(AnalyticsRangePreset range, TrendGranularity granularity) {
+  String _trendSubtitle(
+    AnalyticsRangePreset range,
+    TrendGranularity granularity,
+  ) {
     switch (range) {
       case AnalyticsRangePreset.days30:
         return 'analytics_range_30d'.tr();
@@ -396,41 +408,62 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
   }
 
   Widget _buildFilters(BuildContext context, GroupAnalyticsData data) {
-    final participants = data.participants.where((p) => p.leftAt == null).toList()
-      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    final participants =
+        data.participants.where((p) => p.leftAt == null).toList()..sort(
+          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+        );
 
     final categoryIds = <String>{
       ...data.tags.map((tag) => tag.id),
       ...data.availableCategoryIds,
     };
-    final allTagOptions = categoryIds.map((tagId) {
-      final label = tagId == 'untagged'
-          ? 'untagged'
-          : resolveTagLabel(tagId, data.tags);
-      return _DropdownOption(id: tagId, label: label);
-    }).toList()
-      ..sort(
-        (a, b) => _translateCategoryLike(a.label).toLowerCase().compareTo(
-              _translateCategoryLike(b.label).toLowerCase(),
-            ),
-      );
+    final allTagOptions =
+        categoryIds.map((tagId) {
+          final label = tagId == 'untagged'
+              ? 'untagged'
+              : resolveTagLabel(tagId, data.tags);
+          return _DropdownOption(id: tagId, label: label);
+        }).toList()..sort(
+          (a, b) => _translateCategoryLike(a.label).toLowerCase().compareTo(
+            _translateCategoryLike(b.label).toLowerCase(),
+          ),
+        );
 
-    final categoryDropdown = _FilterDropdown(
-      label: 'analytics_filter_category'.tr(),
-      value: _tagId ?? '',
-      items: [
-        _DropdownMenuItemData(
+    final selectedCategoryLabel = _tagId == null
+        ? 'analytics_filter_all_categories'.tr()
+        : _translateCategoryLike(
+            allTagOptions
+                    .where((o) => o.id == _tagId)
+                    .map((o) => o.label)
+                    .firstOrNull ??
+                _tagId!,
+          );
+    final categoryDropdown = AnchoredDropdownChip<String>(
+      icon: _tagId == null
+          ? Icons.apps_rounded
+          : (_tagId == 'untagged'
+                ? Icons.label_off_outlined
+                : iconForExpenseTag(_tagId, data.tags)),
+      label: selectedCategoryLabel,
+      active: _tagId != null,
+      selected: _tagId ?? '',
+      options: [
+        AnchoredDropdownOption(
           value: '',
           label: 'analytics_filter_all_categories'.tr(),
+          icon: Icons.apps_rounded,
         ),
         ...allTagOptions.map(
-          (o) => _DropdownMenuItemData(
+          (o) => AnchoredDropdownOption(
             value: o.id,
             label: _translateCategoryLike(o.label),
+            icon: o.id == 'untagged'
+                ? Icons.label_off_outlined
+                : iconForExpenseTag(o.id, data.tags),
           ),
         ),
       ],
-      onChanged: (v) => setState(() => _tagId = v.isEmpty ? null : v),
+      onSelected: (v) => setState(() => _tagId = v.isEmpty ? null : v),
     );
 
     final narrow = MediaQuery.sizeOf(context).width < 420;
@@ -457,19 +490,22 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
                 label: Text('analytics_range_30d'.tr()),
                 selected: _range == AnalyticsRangePreset.days30,
                 showCheckmark: false,
-                onSelected: (_) => setState(() => _range = AnalyticsRangePreset.days30),
+                onSelected: (_) =>
+                    setState(() => _range = AnalyticsRangePreset.days30),
               ),
               ChoiceChip(
                 label: Text('analytics_range_90d'.tr()),
                 selected: _range == AnalyticsRangePreset.days90,
                 showCheckmark: false,
-                onSelected: (_) => setState(() => _range = AnalyticsRangePreset.days90),
+                onSelected: (_) =>
+                    setState(() => _range = AnalyticsRangePreset.days90),
               ),
               ChoiceChip(
                 label: Text('analytics_range_all'.tr()),
                 selected: _range == AnalyticsRangePreset.all,
                 showCheckmark: false,
-                onSelected: (_) => setState(() => _range = AnalyticsRangePreset.all),
+                onSelected: (_) =>
+                    setState(() => _range = AnalyticsRangePreset.all),
               ),
             ],
           ),
@@ -487,11 +523,15 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
                             label: 'analytics_filter_all_payers'.tr(),
                           ),
                           ...participants.map(
-                            (p) => _DropdownMenuItemData(value: p.id, label: p.name),
+                            (p) => _DropdownMenuItemData(
+                              value: p.id,
+                              label: p.name,
+                            ),
                           ),
                         ],
-                        onChanged: (v) =>
-                            setState(() => _participantId = v.isEmpty ? null : v),
+                        onChanged: (v) => setState(
+                          () => _participantId = v.isEmpty ? null : v,
+                        ),
                       ),
                       const SizedBox(height: ThemeConfig.spacingS + 2),
                       categoryDropdown,
@@ -509,12 +549,15 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
                               label: 'analytics_filter_all_payers'.tr(),
                             ),
                             ...participants.map(
-                              (p) =>
-                                  _DropdownMenuItemData(value: p.id, label: p.name),
+                              (p) => _DropdownMenuItemData(
+                                value: p.id,
+                                label: p.name,
+                              ),
                             ),
                           ],
-                          onChanged: (v) =>
-                              setState(() => _participantId = v.isEmpty ? null : v),
+                          onChanged: (v) => setState(
+                            () => _participantId = v.isEmpty ? null : v,
+                          ),
                         ),
                       ),
                       const SizedBox(width: ThemeConfig.spacingS + 2),
@@ -545,8 +588,7 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
           ? 'untagged'
           : expense.tag!;
       return normalizedTag == categoryId;
-    }).toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
+    }).toList()..sort((a, b) => b.date.compareTo(a.date));
 
     return _showExpensesSheet(
       context,
@@ -572,10 +614,11 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
     required String payerId,
     required String payerLabel,
   }) {
-    final expenses = data.filteredExpenses
-        .where((expense) => expense.payerParticipantId == payerId)
-        .toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
+    final expenses =
+        data.filteredExpenses
+            .where((expense) => expense.payerParticipantId == payerId)
+            .toList()
+          ..sort((a, b) => b.date.compareTo(a.date));
 
     return _showExpensesSheet(
       context,
@@ -603,7 +646,8 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
     required String Function(
       Expense expense,
       Map<String, String> participantNames,
-    ) subtitleFor,
+    )
+    subtitleFor,
   }) async {
     final participantNames = {
       for (final participant in data.participants)
@@ -667,7 +711,9 @@ class _KpiGrid extends StatelessWidget {
       children: [
         _KpiCard(label: 'analytics_kpi_total'.tr(), value: total),
         _KpiCard(
-          label: isPersonal ? 'analytics_kpi_my_spend_personal'.tr() : 'analytics_kpi_my_spend'.tr(),
+          label: isPersonal
+              ? 'analytics_kpi_my_spend_personal'.tr()
+              : 'analytics_kpi_my_spend'.tr(),
           value: mine,
         ),
         _KpiCard(label: 'analytics_kpi_avg_day'.tr(), value: avgPerDay),
@@ -755,7 +801,9 @@ class _TrendChartCard extends StatelessWidget {
     final availableModes = _availableModes;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(ThemeConfig.spacingS + ThemeConfig.spacingXS),
+      padding: const EdgeInsets.all(
+        ThemeConfig.spacingS + ThemeConfig.spacingXS,
+      ),
       decoration: AccentSurfaces.flatPanel(theme.colorScheme),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -768,19 +816,20 @@ class _TrendChartCard extends StatelessWidget {
                 onTap: () async {
                   final selected =
                       await _showModalSelectSheet<AnalyticsTrendChartMode>(
-                    context: context,
-                    title: 'analytics_chart_mode_menu'.tr(),
-                    selectedValue: activeMode,
-                    options: availableModes
-                        .map(
-                          (mode) => _ModalSelectOption<AnalyticsTrendChartMode>(
-                            value: mode,
-                            label: mode.labelKey.tr(),
-                            subtitle: _modeHint(mode).tr(),
-                          ),
-                        )
-                        .toList(),
-                  );
+                        context: context,
+                        title: 'analytics_chart_mode_menu'.tr(),
+                        selectedValue: activeMode,
+                        options: availableModes
+                            .map(
+                              (mode) =>
+                                  _ModalSelectOption<AnalyticsTrendChartMode>(
+                                    value: mode,
+                                    label: mode.labelKey.tr(),
+                                    subtitle: _modeHint(mode).tr(),
+                                  ),
+                            )
+                            .toList(),
+                      );
                   if (selected != null) onModeChanged(selected);
                 },
                 child: Row(
@@ -906,7 +955,9 @@ class _TrendChartCard extends StatelessWidget {
         );
       case AnalyticsTrendChartMode.userComparison:
         final visibleSeries = participantSeries
-            .where((series) => series.points.any((point) => point.amountCents != 0))
+            .where(
+              (series) => series.points.any((point) => point.amountCents != 0),
+            )
             .toList();
         if (visibleSeries.isEmpty) {
           return _emptyChart(context);
@@ -924,7 +975,9 @@ class _TrendChartCard extends StatelessWidget {
         );
       case AnalyticsTrendChartMode.categoryComparison:
         final visibleSeries = categorySeries
-            .where((series) => series.points.any((point) => point.amountCents != 0))
+            .where(
+              (series) => series.points.any((point) => point.amountCents != 0),
+            )
             .toList();
         if (visibleSeries.isEmpty) {
           return _emptyChart(context);
@@ -958,8 +1011,12 @@ class _TrendChartCard extends StatelessWidget {
                 FlLine(color: theme.colorScheme.outlineVariant),
           ),
           titlesData: FlTitlesData(
-            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
             leftTitles: _yAxisTitles(theme),
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
@@ -1031,7 +1088,10 @@ class _TrendChartCard extends StatelessWidget {
             runSpacing: 6,
             children: series
                 .map(
-                  (line) => _LegendChip(color: line.color, label: _displayLabel(line.label)),
+                  (line) => _LegendChip(
+                    color: line.color,
+                    label: _displayLabel(line.label),
+                  ),
                 )
                 .toList(),
           ),
@@ -1062,10 +1122,9 @@ class _TrendChartCard extends StatelessWidget {
                     )
                     .toList(),
                 touchTooltipData: LineTouchTooltipData(
-                  getTooltipColor: (touchedSpot) =>
-                      Theme.of(
-                        context,
-                      ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.88),
+                  getTooltipColor: (touchedSpot) => Theme.of(
+                    context,
+                  ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.88),
                   tooltipBorderRadius: BorderRadius.circular(10),
                   tooltipPadding: const EdgeInsets.symmetric(
                     horizontal: 10,
@@ -1086,10 +1145,13 @@ class _TrendChartCard extends StatelessWidget {
                       final itemIndex = entry.key;
                       final spot = entry.value;
                       final pointIndex = spot.x.toInt();
-                      if (pointIndex < 0 || pointIndex >= referencePoints.length) {
+                      if (pointIndex < 0 ||
+                          pointIndex >= referencePoints.length) {
                         return null;
                       }
-                      final seriesLabel = _displayLabel(series[spot.barIndex].label);
+                      final seriesLabel = _displayLabel(
+                        series[spot.barIndex].label,
+                      );
                       final value = CurrencyFormatter.formatCents(
                         spot.y.round(),
                         currencyCode,
@@ -1109,8 +1171,12 @@ class _TrendChartCard extends StatelessWidget {
                 ),
               ),
               titlesData: FlTitlesData(
-                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                rightTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
                 leftTitles: _yAxisTitles(Theme.of(context)),
                 bottomTitles: AxisTitles(
                   sideTitles: SideTitles(
@@ -1169,8 +1235,12 @@ class _TrendChartCard extends StatelessWidget {
     );
   }
 
-  Widget _buildCombinedCategoryChart(BuildContext context, List<TrendSeries> series) {
-    if (series.isEmpty || series.first.points.isEmpty) return _emptyChart(context);
+  Widget _buildCombinedCategoryChart(
+    BuildContext context,
+    List<TrendSeries> series,
+  ) {
+    if (series.isEmpty || series.first.points.isEmpty)
+      return _emptyChart(context);
     final pointCount = series.first.points.length;
     final step = _xLabelStep(pointCount);
     final maxY = _maxStackedAmount(series);
@@ -1223,7 +1293,8 @@ class _TrendChartCard extends StatelessWidget {
               .entries
               .map(
                 (entry) => _LegendChip(
-                  color: colorBySeriesId[entry.value.id] ??
+                  color:
+                      colorBySeriesId[entry.value.id] ??
                       _seriesPalette[entry.key % _seriesPalette.length],
                   label: _displayLabel(entry.value.label),
                 ),
@@ -1248,8 +1319,12 @@ class _TrendChartCard extends StatelessWidget {
                     FlLine(color: Theme.of(context).colorScheme.outlineVariant),
               ),
               titlesData: FlTitlesData(
-                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                rightTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
                 leftTitles: _yAxisTitles(Theme.of(context)),
                 bottomTitles: AxisTitles(
                   sideTitles: SideTitles(
@@ -1406,11 +1481,14 @@ class _TrendChartCard extends StatelessWidget {
     }
     return maxValue <= 0 ? 1 : maxValue.toDouble();
   }
-
 }
 
 class _LineSeries {
-  const _LineSeries({required this.label, required this.points, required this.color});
+  const _LineSeries({
+    required this.label,
+    required this.points,
+    required this.color,
+  });
 
   final String label;
   final List<TrendPoint> points;
@@ -1438,13 +1516,13 @@ class _LegendChip extends StatelessWidget {
         Container(
           width: 10,
           height: 10,
-          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3)),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(3),
+          ),
         ),
         const SizedBox(width: 5),
-        UserText(
-          label,
-          style: Theme.of(context).textTheme.labelMedium,
-        ),
+        UserText(label, style: Theme.of(context).textTheme.labelMedium),
       ],
     );
   }
@@ -1466,6 +1544,7 @@ class _BreakdownBarsCard extends StatefulWidget {
     this.onToggleExcluded,
     this.onClearExcluded,
     this.onOpenRowExpenses,
+    this.customTags = const <ExpenseTag>[],
   });
 
   final String title;
@@ -1474,6 +1553,7 @@ class _BreakdownBarsCard extends StatefulWidget {
   final String currencyCode;
   final bool translateUntagged;
   final bool allowPieMode;
+
   /// Smaller pie when two breakdown cards sit side by side.
   final bool compact;
   final AnalyticsCategoryChartMode mode;
@@ -1483,6 +1563,7 @@ class _BreakdownBarsCard extends StatefulWidget {
   final ValueChanged<String>? onToggleExcluded;
   final VoidCallback? onClearExcluded;
   final void Function(String rowId, String rowLabel)? onOpenRowExpenses;
+  final List<ExpenseTag> customTags;
 
   @override
   State<_BreakdownBarsCard> createState() => _BreakdownBarsCardState();
@@ -1504,7 +1585,9 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(ThemeConfig.spacingS + ThemeConfig.spacingXS),
+      padding: const EdgeInsets.all(
+        ThemeConfig.spacingS + ThemeConfig.spacingXS,
+      ),
       decoration: AccentSurfaces.flatPanel(theme.colorScheme),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1518,21 +1601,24 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
                   onTap: () async {
                     final selected =
                         await _showModalSelectSheet<AnalyticsCategoryChartMode>(
-                      context: context,
-                      title: widget.chartModeMenuTitle ??
-                          'analytics_breakdown_chart_mode_menu'.tr(),
-                      selectedValue: widget.mode,
-                      options: [
-                        _ModalSelectOption<AnalyticsCategoryChartMode>(
-                          value: AnalyticsCategoryChartMode.bars,
-                          label: AnalyticsCategoryChartMode.bars.labelKey.tr(),
-                        ),
-                        _ModalSelectOption<AnalyticsCategoryChartMode>(
-                          value: AnalyticsCategoryChartMode.pie,
-                          label: AnalyticsCategoryChartMode.pie.labelKey.tr(),
-                        ),
-                      ],
-                    );
+                          context: context,
+                          title:
+                              widget.chartModeMenuTitle ??
+                              'analytics_breakdown_chart_mode_menu'.tr(),
+                          selectedValue: widget.mode,
+                          options: [
+                            _ModalSelectOption<AnalyticsCategoryChartMode>(
+                              value: AnalyticsCategoryChartMode.bars,
+                              label: AnalyticsCategoryChartMode.bars.labelKey
+                                  .tr(),
+                            ),
+                            _ModalSelectOption<AnalyticsCategoryChartMode>(
+                              value: AnalyticsCategoryChartMode.pie,
+                              label: AnalyticsCategoryChartMode.pie.labelKey
+                                  .tr(),
+                            ),
+                          ],
+                        );
                     if (selected != null) widget.onModeChanged!(selected);
                   },
                   child: Row(
@@ -1598,8 +1684,9 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
       for (final entry in allRows.asMap().entries)
         entry.value.id: palette[entry.key % palette.length],
     };
-    final activeRows =
-        allRows.where((row) => !widget.excludedIds.contains(row.id)).toList();
+    final activeRows = allRows
+        .where((row) => !widget.excludedIds.contains(row.id))
+        .toList();
     final total = activeRows.fold<int>(
       0,
       (sum, row) => sum + row.amountCents.abs(),
@@ -1607,9 +1694,9 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
     final maxAmount = activeRows.isEmpty
         ? 1
         : activeRows
-            .map((r) => r.amountCents.abs())
-            .reduce(math.max)
-            .clamp(1, 1 << 30);
+              .map((r) => r.amountCents.abs())
+              .reduce(math.max)
+              .clamp(1, 1 << 30);
     final legendRows = _expanded || allRows.length <= _kBreakdownPreviewCount
         ? allRows
         : previewRows;
@@ -1646,11 +1733,10 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
           final pct = total <= 0
               ? 0
               : ((row.amountCents.abs() / total) * 100).round();
-          final progress =
-              isExcluded ? 0.0 : row.amountCents.abs() / maxAmount;
+          final progress = isExcluded ? 0.0 : row.amountCents.abs() / maxAmount;
           final isLastVisible = !isExcluded && activeRows.length <= 1;
-          final canToggle = widget.onToggleExcluded != null &&
-              (isExcluded || !isLastVisible);
+          final canToggle =
+              widget.onToggleExcluded != null && (isExcluded || !isLastVisible);
           final color = colorById[row.id] ?? palette.first;
 
           // Prefer color alpha over Opacity (Opacity forces a saveLayer).
@@ -1659,130 +1745,131 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
           return Padding(
             padding: const EdgeInsets.only(bottom: 4),
             child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: isExcluded || widget.onOpenRowExpenses == null
-                    ? null
-                    : () => _openSelectedOrRow(row),
-                onLongPress: canToggle
-                    ? () => widget.onToggleExcluded!.call(row.id)
-                    : null,
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.fromSTEB(10, 10, 6, 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 12,
-                            height: 12,
-                            decoration: BoxDecoration(
-                              color: swatch,
-                              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(12),
+              onTap: isExcluded || widget.onOpenRowExpenses == null
+                  ? null
+                  : () => _openSelectedOrRow(row),
+              onLongPress: canToggle
+                  ? () => widget.onToggleExcluded!.call(row.id)
+                  : null,
+              child: Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(10, 10, 6, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: swatch,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              UserText(
+                                label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: theme.colorScheme.onSurface.withValues(
+                                    alpha: dim,
+                                  ),
+                                  decoration: isExcluded
+                                      ? TextDecoration.lineThrough
+                                      : null,
+                                ),
+                              ),
+                              Text(
+                                isExcluded
+                                    ? _expenseCountLabel(row.count)
+                                    : '${_expenseCountLabel(row.count)} · $pct%',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant
+                                      .withValues(alpha: dim),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          CurrencyFormatter.formatCents(
+                            row.amountCents,
+                            widget.currencyCode,
+                          ),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: dim,
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                UserText(
-                                  label,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    color: theme.colorScheme.onSurface
-                                        .withValues(alpha: dim),
-                                    decoration: isExcluded
-                                        ? TextDecoration.lineThrough
-                                        : null,
-                                  ),
-                                ),
-                                Text(
-                                  isExcluded
-                                      ? _expenseCountLabel(row.count)
-                                      : '${_expenseCountLabel(row.count)} · $pct%',
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant
-                                        .withValues(alpha: dim),
-                                  ),
-                                ),
-                              ],
+                        ),
+                        if (canToggle)
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            tooltip:
+                                (isExcluded
+                                        ? 'analytics_pie_show'
+                                        : 'analytics_pie_hide')
+                                    .tr(),
+                            icon: Icon(
+                              isExcluded
+                                  ? Icons.visibility_off_rounded
+                                  : Icons.visibility_rounded,
+                              size: 18,
+                              color: theme.colorScheme.onSurfaceVariant
+                                  .withValues(alpha: dim),
                             ),
-                          ),
-                          Text(
-                            CurrencyFormatter.formatCents(
-                              row.amountCents,
-                              widget.currencyCode,
-                            ),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: theme.colorScheme.onSurface
+                            onPressed: () =>
+                                widget.onToggleExcluded!.call(row.id),
+                          )
+                        else if (isLastVisible)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Icon(
+                              Icons.lock_outline_rounded,
+                              size: 16,
+                              color: theme.colorScheme.onSurfaceVariant
                                   .withValues(alpha: dim),
                             ),
                           ),
-                          if (canToggle)
-                            IconButton(
-                              visualDensity: VisualDensity.compact,
-                              tooltip: (isExcluded
-                                      ? 'analytics_pie_show'
-                                      : 'analytics_pie_hide')
-                                  .tr(),
-                              icon: Icon(
-                                isExcluded
-                                    ? Icons.visibility_off_rounded
-                                    : Icons.visibility_rounded,
-                                size: 18,
-                                color: theme.colorScheme.onSurfaceVariant
-                                    .withValues(alpha: dim),
-                              ),
-                              onPressed: () =>
-                                  widget.onToggleExcluded!.call(row.id),
-                            )
-                          else if (isLastVisible)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                              ),
-                              child: Icon(
-                                Icons.lock_outline_rounded,
-                                size: 16,
-                                color: theme.colorScheme.onSurfaceVariant
-                                    .withValues(alpha: dim),
-                              ),
-                            ),
-                          if (widget.onOpenRowExpenses != null && !isExcluded)
-                            Icon(
-                              Icons.chevron_right_rounded,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                        ],
+                        if (widget.onOpenRowExpenses != null && !isExcluded)
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(999),
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0, end: progress.toDouble()),
+                        duration: UiPerf.preferCheapCharts
+                            ? Duration.zero
+                            : const Duration(milliseconds: 420),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, value, _) {
+                          return LinearProgressIndicator(
+                            value: value,
+                            minHeight: 9,
+                            backgroundColor:
+                                theme.colorScheme.surfaceContainerHighest,
+                            color: swatch,
+                          );
+                        },
                       ),
-                      const SizedBox(height: 8),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(999),
-                        child: TweenAnimationBuilder<double>(
-                          tween: Tween(begin: 0, end: progress.toDouble()),
-                          duration: UiPerf.preferCheapCharts
-                              ? Duration.zero
-                              : const Duration(milliseconds: 420),
-                          curve: Curves.easeOutCubic,
-                          builder: (context, value, _) {
-                            return LinearProgressIndicator(
-                              value: value,
-                              minHeight: 9,
-                              backgroundColor:
-                                  theme.colorScheme.surfaceContainerHighest,
-                              color: swatch,
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
+            ),
           );
         }),
         if (hasExcluded && widget.onClearExcluded != null)
@@ -1830,7 +1917,9 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
     ];
   }
 
-  List<AmountBreakdownItem> _chartSlices(List<AmountBreakdownItem> visibleRows) {
+  List<AmountBreakdownItem> _chartSlices(
+    List<AmountBreakdownItem> visibleRows,
+  ) {
     if (visibleRows.isEmpty) return const [];
     final total = visibleRows.fold<int>(
       0,
@@ -1904,13 +1993,23 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
     final hasExcluded = widget.excludedIds.isNotEmpty;
     final colorByCategoryId = <String, Color>{};
     for (final entry in allRows.asMap().entries) {
-      colorByCategoryId.putIfAbsent(
-        entry.value.id,
-        () => palette[entry.key % palette.length],
-      );
+      colorByCategoryId.putIfAbsent(entry.value.id, () {
+        if (widget.translateUntagged) {
+          final id = entry.value.id == 'untagged' ? null : entry.value.id;
+          return chromeForExpenseTag(
+            id,
+            brightness: theme.brightness,
+            surface: theme.colorScheme.surface,
+            customTags: widget.customTags,
+          ).container;
+        }
+        return palette[entry.key % palette.length];
+      });
     }
-    final total =
-        visibleRows.fold<int>(0, (sum, row) => sum + row.amountCents.abs());
+    final total = visibleRows.fold<int>(
+      0,
+      (sum, row) => sum + row.amountCents.abs(),
+    );
     final showToggle = allRows.length > _kBreakdownPreviewCount;
     final legendRows = _expanded || allRows.length <= _kBreakdownPreviewCount
         ? allRows
@@ -1921,7 +2020,8 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
     // Drop selection only when the row itself is gone (excluded/filtered out).
     // Keep selections for small rows rolled into the pie "Other" slice so
     // legend taps after "Show more" still select → open expenses.
-    final selectedStillValid = _selectedRowId != null &&
+    final selectedStillValid =
+        _selectedRowId != null &&
         (_selectedRowId == _otherSliceId
             ? pieSliceIds.contains(_otherSliceId)
             : visibleRows.any((r) => r.id == _selectedRowId));
@@ -1985,7 +2085,7 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
               ? Icons.more_horiz_rounded
               : iconForExpenseTag(
                   entry.value.id == 'untagged' ? null : entry.value.id,
-                  null,
+                  widget.customTags,
                 ),
           canOpen:
               entry.value.id != _otherSliceId &&
@@ -1997,8 +2097,8 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
     final pieHighlightId = _selectedRowId == null
         ? null
         : (pieSliceIds.contains(_selectedRowId!)
-            ? _selectedRowId
-            : (pieSliceIds.contains(_otherSliceId) ? _otherSliceId : null));
+              ? _selectedRowId
+              : (pieSliceIds.contains(_otherSliceId) ? _otherSliceId : null));
 
     BreakdownPieSlice? centerOverride;
     if (selectedItem != null &&
@@ -2013,7 +2113,7 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
         color: color,
         icon: iconForExpenseTag(
           selectedItem.id == 'untagged' ? null : selectedItem.id,
-          null,
+          widget.customTags,
         ),
         canOpen: widget.onOpenRowExpenses != null,
       );
@@ -2044,8 +2144,8 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
               ? 0
               : ((row.amountCents.abs() / total) * 100).round();
           final isLastVisible = !isExcluded && visibleRows.length <= 1;
-          final canToggle = widget.onToggleExcluded != null &&
-              (isExcluded || !isLastVisible);
+          final canToggle =
+              widget.onToggleExcluded != null && (isExcluded || !isLastVisible);
           final color = colorByCategoryId[row.id] ?? palette.first;
           final dim = isExcluded ? 0.45 : 1.0;
           final swatch = color.withValues(alpha: color.a * dim);
@@ -2071,10 +2171,7 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
                   ? () => widget.onToggleExcluded!.call(row.id)
                   : null,
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 8,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                 child: Row(
                   children: [
                     Container(
@@ -2096,8 +2193,9 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.w700,
-                              color: theme.colorScheme.onSurface
-                                  .withValues(alpha: dim),
+                              color: theme.colorScheme.onSurface.withValues(
+                                alpha: dim,
+                              ),
                               decoration: isExcluded
                                   ? TextDecoration.lineThrough
                                   : null,
@@ -2121,8 +2219,9 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
                         widget.currencyCode,
                       ),
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface
-                            .withValues(alpha: dim),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: dim,
+                        ),
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -2130,28 +2229,30 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
                       const SizedBox(width: 2),
                       IconButton(
                         visualDensity: VisualDensity.compact,
-                        tooltip: (isExcluded
-                                ? 'analytics_pie_show'
-                                : 'analytics_pie_hide')
-                            .tr(),
+                        tooltip:
+                            (isExcluded
+                                    ? 'analytics_pie_show'
+                                    : 'analytics_pie_hide')
+                                .tr(),
                         icon: Icon(
                           isExcluded
                               ? Icons.visibility_off_rounded
                               : Icons.visibility_rounded,
                           size: 18,
-                          color: theme.colorScheme.onSurfaceVariant
-                              .withValues(alpha: dim),
+                          color: theme.colorScheme.onSurfaceVariant.withValues(
+                            alpha: dim,
+                          ),
                         ),
-                        onPressed: () =>
-                            widget.onToggleExcluded!.call(row.id),
+                        onPressed: () => widget.onToggleExcluded!.call(row.id),
                       ),
                     ] else if (isLastVisible) ...[
                       const SizedBox(width: 8),
                       Icon(
                         Icons.lock_outline_rounded,
                         size: 16,
-                        color: theme.colorScheme.onSurfaceVariant
-                            .withValues(alpha: dim),
+                        color: theme.colorScheme.onSurfaceVariant.withValues(
+                          alpha: dim,
+                        ),
                       ),
                     ],
                     if (widget.onOpenRowExpenses != null && !isExcluded)
@@ -2171,7 +2272,8 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
             child: TextButton(
               onPressed: () => setState(() => _expanded = !_expanded),
               child: Text(
-                (_expanded ? 'analytics_show_less' : 'analytics_show_more').tr(),
+                (_expanded ? 'analytics_show_less' : 'analytics_show_more')
+                    .tr(),
               ),
             ),
           ),
@@ -2217,31 +2319,40 @@ class _FilterDropdown extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           onTap: canOpen
               ? () async {
-            final selectedValue = await _showModalSelectSheet<String>(
-              context: context,
-              title: label,
-              selectedValue: value,
-              options: items
-                  .map(
-                    (item) => _ModalSelectOption<String>(
-                      value: item.value,
-                      label: item.label,
-                    ),
-                  )
-                  .toList(),
-            );
-            if (selectedValue != null) onChanged(selectedValue);
-              }
+                  final selectedValue = await _showModalSelectSheet<String>(
+                    context: context,
+                    title: label,
+                    selectedValue: value,
+                    options: items
+                        .map(
+                          (item) => _ModalSelectOption<String>(
+                            value: item.value,
+                            label: item.label,
+                          ),
+                        )
+                        .toList(),
+                  );
+                  if (selectedValue != null) onChanged(selectedValue);
+                }
               : null,
           child: InputDecorator(
             decoration: InputDecoration(
               labelText: label,
               filled: true,
               fillColor: canOpen
-                  ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.22)
-                  : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.08),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ? theme.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.22,
+                    )
+                  : theme.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.08,
+                    ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(
@@ -2271,7 +2382,9 @@ class _FilterDropdown extends StatelessWidget {
                   ),
                 ),
                 Icon(
-                  canOpen ? Icons.expand_more_rounded : Icons.lock_outline_rounded,
+                  canOpen
+                      ? Icons.expand_more_rounded
+                      : Icons.lock_outline_rounded,
                   size: 20,
                   color: theme.colorScheme.onSurfaceVariant,
                 ),

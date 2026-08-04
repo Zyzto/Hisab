@@ -1,9 +1,11 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/widgets/sheet_helpers.dart';
+import 'month_gallery_calendar.dart';
 
 /// Shows a combined date and time picker as a responsive sheet.
 /// Returns the selected [DateTime] (local) on OK, or null if cancelled.
@@ -60,7 +62,7 @@ class _DateTimePickerTopBarController {
   }
 }
 
-/// Sheet content: calendar, time selector, Today, Cancel/OK.
+/// Sheet content: summary, presets, swipeable calendar, time wheels, Cancel/OK.
 class _DateTimePickerSheetContent extends StatefulWidget {
   const _DateTimePickerSheetContent({
     required this.initial,
@@ -84,23 +86,39 @@ class _DateTimePickerSheetContent extends StatefulWidget {
 class _DateTimePickerSheetContentState
     extends State<_DateTimePickerSheetContent> {
   late DateTime _selectedDate;
+  late DateTime _firstDateOnly;
   late DateTime _maxDateOnly;
+  late DateTime _visibleMonth;
 
   /// Hour in 24h (0-23). Used for both 24h and 12h; in 12h we derive display from this.
   late int _hour24;
   late int _minute;
   bool _isAm = true;
+  String? _activePresetId;
 
   @override
   void initState() {
     super.initState();
     final i = widget.initial;
     final maxDate = widget.maxDate;
-    _maxDateOnly = DateTime(maxDate.year, maxDate.month, maxDate.day);
-    final initialDateOnly = DateTime(i.year, i.month, i.day);
+    _maxDateOnly = monthGalleryDateOnly(maxDate);
+    final initialDateOnly = monthGalleryDateOnly(i);
     _selectedDate = initialDateOnly.isAfter(_maxDateOnly)
         ? _maxDateOnly
         : initialDateOnly;
+
+    final fiveYearsAgo = DateTime(
+      _maxDateOnly.year - 5,
+      _maxDateOnly.month,
+      _maxDateOnly.day,
+    );
+    final initialMonth = DateTime(_selectedDate.year, _selectedDate.month);
+    final boundMonth = DateTime(fiveYearsAgo.year, fiveYearsAgo.month);
+    _firstDateOnly = initialMonth.isBefore(boundMonth)
+        ? initialMonth
+        : boundMonth;
+
+    _visibleMonth = DateTime(_selectedDate.year, _selectedDate.month);
     _hour24 = i.hour;
     _minute = i.minute;
     _isAm = i.hour < 12;
@@ -116,10 +134,36 @@ class _DateTimePickerSheetContentState
   void _setToNow() {
     final now = DateTime.now();
     setState(() {
-      _selectedDate = DateTime(now.year, now.month, now.day);
+      _activePresetId = 'today';
+      _selectedDate = monthGalleryDateOnly(now);
+      _visibleMonth = DateTime(_selectedDate.year, _selectedDate.month);
       _hour24 = now.hour;
       _minute = now.minute;
       _isAm = now.hour < 12;
+    });
+  }
+
+  void _setToYesterday() {
+    final yesterday = monthGalleryDateOnly(
+      DateTime.now(),
+    ).subtract(const Duration(days: 1));
+    final day = yesterday.isBefore(_firstDateOnly)
+        ? _firstDateOnly
+        : (yesterday.isAfter(_maxDateOnly) ? _maxDateOnly : yesterday);
+    setState(() {
+      _activePresetId = 'yesterday';
+      _selectedDate = day;
+      _visibleMonth = DateTime(day.year, day.month);
+    });
+  }
+
+  void _onDayTap(DateTime day) {
+    final d = monthGalleryDateOnly(day);
+    if (d.isBefore(_firstDateOnly) || d.isAfter(_maxDateOnly)) return;
+    setState(() {
+      _activePresetId = null;
+      _selectedDate = d;
+      _visibleMonth = DateTime(d.year, d.month);
     });
   }
 
@@ -133,11 +177,29 @@ class _DateTimePickerSheetContentState
     return isAm ? hour12 : hour12 + 12;
   }
 
+  DateTime get _combined => DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+        _hour24,
+        _minute,
+      );
+
+  String _summaryLabel(bool use24h) {
+    final format = use24h
+        ? DateFormat.yMMMd().add_Hm()
+        : DateFormat.yMMMd().add_jm();
+    return format.format(_combined);
+  }
+
   @override
   Widget build(BuildContext context) {
     final ctx = widget.sheetContext;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     final use24h = widget.use24h ?? MediaQuery.alwaysUse24HourFormatOf(context);
     final isTabletOrWider = LayoutBreakpoints.isTabletOrWider(context);
+
     return buildSheetShell(
       ctx,
       title: 'date_and_time'.tr(),
@@ -146,92 +208,116 @@ class _DateTimePickerSheetContentState
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (!isTabletOrWider)
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  HapticFeedback.lightImpact();
-                  _setToNow();
-                },
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                icon: const Icon(Icons.today_outlined, size: 18),
-                label: Text('today'.tr()),
-              ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: cs.primaryContainer.withValues(alpha: 0.35),
+              borderRadius: BorderRadius.circular(14),
             ),
-          SizedBox(
-            width: 320,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: Row(
               children: [
-                CalendarDatePicker(
-                  key: ValueKey('${_selectedDate.year}-${_selectedDate.month}'),
-                  initialDate: _selectedDate,
-                  firstDate: DateTime(2000),
-                  lastDate: _maxDateOnly,
-                  currentDate: _selectedDate,
-                  onDateChanged: (d) => setState(() => _selectedDate = d),
-                ),
-                Semantics(
-                  label: 'time'.tr(),
-                  value: () {
-                    final t = DateTime(2000, 1, 1, _hour24, _minute);
-                    return use24h
-                        ? DateFormat.Hm().format(t)
-                        : DateFormat.jm().format(t);
-                  }(),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _TimeColumn<int>(
-                        items: use24h
-                            ? List.generate(24, (i) => i)
-                            : List.generate(12, (i) => i == 0 ? 12 : i),
-                        value: use24h ? _hour24 : _hour12Value,
-                        onChanged: (v) => setState(() {
-                          if (use24h) {
-                            _hour24 = v;
-                          } else {
-                            _hour24 =
-                                _DateTimePickerSheetContentState._hour24From12h(
-                                  v,
-                                  _isAm,
-                                );
-                          }
-                        }),
-                        format: (v) => '$v',
-                        semanticLabel: 'hour'.tr(),
-                      ),
-                      const SizedBox(width: 8),
-                      _TimeColumn<int>(
-                        items: List.generate(60, (i) => i),
-                        value: _minute,
-                        onChanged: (v) => setState(() => _minute = v),
-                        format: (v) => v.toString().padLeft(2, '0'),
-                        semanticLabel: 'minute'.tr(),
-                      ),
-                      if (!use24h) ...[
-                        const SizedBox(width: 8),
-                        _TimeColumn<DayPeriod>(
-                          items: const [DayPeriod.am, DayPeriod.pm],
-                          value: _isAm ? DayPeriod.am : DayPeriod.pm,
-                          onChanged: (v) =>
-                              setState(() => _isAm = v == DayPeriod.am),
-                          format: (v) => v == DayPeriod.am ? 'AM' : 'PM',
-                          semanticLabel: 'period'.tr(),
-                        ),
-                      ],
-                    ],
+                Icon(Icons.event_rounded, color: cs.primary, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _summaryLabel(use24h),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                FilterChip(
+                  label: Text('today'.tr()),
+                  selected: _activePresetId == 'today',
+                  showCheckmark: false,
+                  onSelected: (_) {
+                    HapticFeedback.lightImpact();
+                    _setToNow();
+                  },
+                ),
+                const SizedBox(width: 8),
+                FilterChip(
+                  label: Text('yesterday'.tr()),
+                  selected: _activePresetId == 'yesterday',
+                  showCheckmark: false,
+                  onSelected: (_) {
+                    HapticFeedback.lightImpact();
+                    _setToYesterday();
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          MonthGalleryCalendar(
+            visibleMonth: _visibleMonth,
+            firstDate: _firstDateOnly,
+            lastDate: _maxDateOnly,
+            selection: MonthGallerySingleSelection(_selectedDate),
+            onDayTap: _onDayTap,
+            onMonthChanged: (month) => setState(() => _visibleMonth = month),
+          ),
+          const SizedBox(height: 12),
+          Semantics(
+            label: 'time'.tr(),
+            value: () {
+              final t = DateTime(2000, 1, 1, _hour24, _minute);
+              return use24h
+                  ? DateFormat.Hm().format(t)
+                  : DateFormat.jm().format(t);
+            }(),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _TimeColumn<int>(
+                  items: use24h
+                      ? List.generate(24, (i) => i)
+                      : List.generate(12, (i) => i == 0 ? 12 : i),
+                  value: use24h ? _hour24 : _hour12Value,
+                  onChanged: (v) => setState(() {
+                    _activePresetId = null;
+                    if (use24h) {
+                      _hour24 = v;
+                    } else {
+                      _hour24 = _hour24From12h(v, _isAm);
+                    }
+                  }),
+                  format: (v) => '$v',
+                  semanticLabel: 'hour'.tr(),
+                ),
+                const SizedBox(width: 8),
+                _TimeColumn<int>(
+                  items: List.generate(60, (i) => i),
+                  value: _minute,
+                  onChanged: (v) => setState(() {
+                    _activePresetId = null;
+                    _minute = v;
+                  }),
+                  format: (v) => v.toString().padLeft(2, '0'),
+                  semanticLabel: 'minute'.tr(),
+                ),
+                if (!use24h) ...[
+                  const SizedBox(width: 8),
+                  _TimeColumn<DayPeriod>(
+                    items: const [DayPeriod.am, DayPeriod.pm],
+                    value: _isAm ? DayPeriod.am : DayPeriod.pm,
+                    onChanged: (v) => setState(() {
+                      _activePresetId = null;
+                      _isAm = v == DayPeriod.am;
+                      _hour24 = _hour24From12h(_hour12Value, _isAm);
+                    }),
+                    format: (v) => v == DayPeriod.am ? 'AM' : 'PM',
+                    semanticLabel: 'period'.tr(),
+                  ),
+                ],
               ],
             ),
           ),
@@ -244,17 +330,7 @@ class _DateTimePickerSheetContentState
             child: Text('cancel'.tr()),
           ),
         FilledButton(
-          onPressed: () {
-            Navigator.of(ctx).pop(
-              DateTime(
-                _selectedDate.year,
-                _selectedDate.month,
-                _selectedDate.day,
-                _hour24,
-                _minute,
-              ),
-            );
-          },
+          onPressed: () => Navigator.of(ctx).pop(_combined),
           child: Text('ok'.tr()),
         ),
       ],
@@ -332,7 +408,6 @@ class _TimeColumnState<T> extends State<_TimeColumn<T>> {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Wheel with visible track background
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
@@ -382,7 +457,6 @@ class _TimeColumnState<T> extends State<_TimeColumn<T>> {
               ),
             ),
           ),
-          // Selection strip over the centered row (drawn on top, non-interactive)
           Positioned(
             left: 10,
             right: 10,

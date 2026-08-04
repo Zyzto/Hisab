@@ -50,6 +50,8 @@ import '../../../features/settings/settings_definitions.dart';
 import '../../balance/providers/balance_provider.dart';
 import '../../groups/providers/group_member_provider.dart';
 import '../../groups/providers/groups_provider.dart';
+import '../camera/receipt_camera_debug.dart';
+import '../camera/show_receipt_camera.dart';
 import '../category_icons.dart';
 import '../constants/expense_form_constants.dart';
 import '../widgets/expense_amount_section.dart';
@@ -57,6 +59,8 @@ import '../widgets/expense_bill_breakdown_section.dart';
 import '../widgets/expense_title_section.dart';
 import '../widgets/date_time_picker_dialog.dart';
 import '../widgets/expense_split_section.dart';
+import '../widgets/tag_style_fields.dart';
+import '../../../core/motion/app_motion.dart';
 import '../../../domain/domain.dart';
 
 /// Height of the floating submit bar (button + padding) for ListView bottom padding.
@@ -1915,9 +1919,31 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     );
   }
 
+  bool _canCreateTags(Group? group, GroupRole? myRole) {
+    if (group == null) return false;
+    final localOnly = ref.read(effectiveLocalOnlyProvider);
+    final isOwnerOrAdmin =
+        localOnly || myRole == GroupRole.owner || myRole == GroupRole.admin;
+    return isOwnerOrAdmin || group.allowMemberChangeSettings;
+  }
+
   void _showTagPicker(List<ExpenseTag> customTags) {
     _defocusFormInputs();
     final theme = Theme.of(context);
+    final group = ref.read(futureGroupProvider(widget.groupId)).asData?.value;
+    final myRole =
+        ref.read(myRoleInGroupProvider(widget.groupId)).asData?.value;
+    final canCreate = _canCreateTags(group, myRole);
+    final expenses =
+        ref.read(expensesByGroupProvider(widget.groupId)).asData?.value ??
+            const <Expense>[];
+    final usageByTag = <String, int>{};
+    for (final e in expenses) {
+      final tag = e.tag;
+      if (tag == null || tag.isEmpty) continue;
+      usageByTag[tag] = (usageByTag[tag] ?? 0) + 1;
+    }
+
     showResponsiveSheet<void>(
       context: context,
       title: 'category'.tr(),
@@ -1925,191 +1951,250 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       isScrollControlled: true,
       centerInFullViewport: true,
       child: Builder(
-        builder: (ctx) => SafeArea(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                16,
-                16,
-                MediaQuery.of(ctx).padding.bottom + 24,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (!LayoutBreakpoints.isTabletOrWider(context)) ...[
-                    Text(
-                      'category'.tr(),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
+        builder: (ctx) {
+          var query = '';
+          return StatefulBuilder(
+            builder: (ctx, setSheetState) {
+              final q = query.trim().toLowerCase();
+              bool matches(String label) =>
+                  q.isEmpty || label.toLowerCase().contains(q);
+
+              final presets = presetExpenseTags.where((preset) {
+                return matches('category_${preset.id}'.tr()) ||
+                    matches(preset.label);
+              });
+              final customs = customTags.where((tag) => matches(tag.label));
+
+              Widget pill({
+                required bool selected,
+                required IconData icon,
+                required String label,
+                required ExpenseTagChrome chrome,
+                required VoidCallback onTap,
+                bool useUserText = false,
+                String? semanticsHint,
+              }) {
+                return Semantics(
+                  button: true,
+                  selected: selected,
+                  label: semanticsHint ?? label,
+                  child: InkWell(
+                    onTap: onTap,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      ...presetExpenseTags.map((preset) {
-                        final selected = _selectedTag == preset.id;
-                        final chrome = chromeForExpenseTag(
-                          preset.id,
-                          brightness: theme.brightness,
-                          surface: theme.colorScheme.surface,
-                        );
-                        return InkWell(
-                          onTap: () {
-                            setState(() => _selectedTag = preset.id);
-                            if (ctx.mounted) Navigator.of(ctx).pop();
-                          },
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              color: selected
-                                  ? chrome.container
-                                  : theme.colorScheme.surfaceContainerHighest,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: chrome.accent.withValues(
-                                  alpha: selected ? 0.0 : 0.35,
-                                ),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  preset.icon,
-                                  size: 20,
-                                  color: selected
-                                      ? chrome.onContainer
-                                      : chrome.onSurface,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'category_${preset.id}'.tr(),
-                                  style: theme.textTheme.labelLarge?.copyWith(
-                                    color: selected
-                                        ? chrome.onContainer
-                                        : theme.colorScheme.onSurface,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }),
-                      ...customTags.map((tag) {
-                        final selected = _selectedTag == tag.id;
-                        final iconData =
-                            selectableExpenseIcons[tag.iconName] ??
-                            Icons.label_outlined;
-                        final chrome = chromeForExpenseTag(
-                          tag.id,
-                          brightness: theme.brightness,
-                          surface: theme.colorScheme.surface,
-                        );
-                        return InkWell(
-                          onTap: () {
-                            setState(() => _selectedTag = tag.id);
-                            if (ctx.mounted) Navigator.of(ctx).pop();
-                          },
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              color: selected
-                                  ? chrome.container
-                                  : theme.colorScheme.surfaceContainerHighest,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: chrome.accent.withValues(
-                                  alpha: selected ? 0.0 : 0.35,
-                                ),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  iconData,
-                                  size: 20,
-                                  color: selected
-                                      ? chrome.onContainer
-                                      : chrome.onSurface,
-                                ),
-                                const SizedBox(width: 8),
-                                UserText(
-                                  tag.label,
-                                  style: theme.textTheme.labelLarge?.copyWith(
-                                    color: selected
-                                        ? chrome.onContainer
-                                        : theme.colorScheme.onSurface,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }),
-                      InkWell(
-                        onTap: () async {
-                          Navigator.of(ctx).pop();
-                          final created = await _showCreateTagDialog();
-                          if (created != null && mounted) {
-                            setState(() => _selectedTag = created.id);
-                          }
-                        },
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? chrome.container
+                            : theme.colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: theme.colorScheme.outline.withValues(
-                                alpha: 0.5,
-                              ),
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.add_circle_outline,
-                                size: 20,
-                                color: theme.colorScheme.primary,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'create_new_tag'.tr(),
-                                style: theme.textTheme.labelLarge?.copyWith(
-                                  color: theme.colorScheme.primary,
-                                ),
-                              ),
-                            ],
+                        border: Border.all(
+                          color: chrome.accent.withValues(
+                            alpha: selected ? 0.0 : 0.35,
                           ),
                         ),
                       ),
-                    ],
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            icon,
+                            size: 20,
+                            color: selected
+                                ? chrome.onContainer
+                                : chrome.onSurface,
+                          ),
+                          const SizedBox(width: 8),
+                          useUserText
+                              ? UserText(
+                                  label,
+                                  style: theme.textTheme.labelLarge?.copyWith(
+                                    color: selected
+                                        ? chrome.onContainer
+                                        : theme.colorScheme.onSurface,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                )
+                              : Text(
+                                  label,
+                                  style: theme.textTheme.labelLarge?.copyWith(
+                                    color: selected
+                                        ? chrome.onContainer
+                                        : theme.colorScheme.onSurface,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                        ],
+                      ),
+                    ),
                   ),
-                ],
-              ),
-            ),
-          ),
-        ),
+                );
+              }
+
+              return SafeArea(
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      16,
+                      16,
+                      MediaQuery.of(ctx).padding.bottom + 24,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (!LayoutBreakpoints.isTabletOrWider(context)) ...[
+                          Text(
+                            'category'.tr(),
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        TextField(
+                          decoration: InputDecoration(
+                            hintText: 'search'.tr(),
+                            prefixIcon: const Icon(Icons.search, size: 20),
+                            isDense: true,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onChanged: (v) => setSheetState(() => query = v),
+                        ),
+                        const SizedBox(height: 16),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            pill(
+                              selected: _selectedTag == null ||
+                                  _selectedTag!.isEmpty,
+                              icon: Icons.label_off_outlined,
+                              label: 'no_category'.tr(),
+                              chrome: chromeForExpenseTag(
+                                null,
+                                brightness: theme.brightness,
+                                surface: theme.colorScheme.surface,
+                              ),
+                              onTap: () {
+                                setState(() => _selectedTag = null);
+                                if (ctx.mounted) Navigator.of(ctx).pop();
+                              },
+                            ),
+                            ...presets.map((preset) {
+                              final selected = _selectedTag == preset.id;
+                              final chrome = chromeForExpenseTag(
+                                preset.id,
+                                brightness: theme.brightness,
+                                surface: theme.colorScheme.surface,
+                              );
+                              final count = usageByTag[preset.id] ?? 0;
+                              return pill(
+                                selected: selected,
+                                icon: preset.icon,
+                                label: 'category_${preset.id}'.tr(),
+                                chrome: chrome,
+                                semanticsHint: count > 0
+                                    ? '${'category_${preset.id}'.tr()}, ${'tag_usage_count'.tr(namedArgs: {'count': '$count'})}'
+                                    : null,
+                                onTap: () {
+                                  setState(() => _selectedTag = preset.id);
+                                  if (ctx.mounted) Navigator.of(ctx).pop();
+                                },
+                              );
+                            }),
+                            ...customs.map((tag) {
+                              final selected = _selectedTag == tag.id;
+                              final iconData =
+                                  selectableExpenseIcons[tag.iconName] ??
+                                  Icons.label_outlined;
+                              final chrome = chromeForExpenseTag(
+                                tag.id,
+                                brightness: theme.brightness,
+                                surface: theme.colorScheme.surface,
+                                customTags: customTags,
+                              );
+                              final count = usageByTag[tag.id] ?? 0;
+                              return pill(
+                                selected: selected,
+                                icon: iconData,
+                                label: tag.label,
+                                chrome: chrome,
+                                useUserText: true,
+                                semanticsHint: count > 0
+                                    ? '${tag.label}, ${'tag_usage_count'.tr(namedArgs: {'count': '$count'})}'
+                                    : tag.label,
+                                onTap: () {
+                                  setState(() => _selectedTag = tag.id);
+                                  if (ctx.mounted) Navigator.of(ctx).pop();
+                                },
+                              );
+                            }),
+                            if (canCreate)
+                              Semantics(
+                                button: true,
+                                label: 'create_new_tag'.tr(),
+                                child: InkWell(
+                                  onTap: () async {
+                                    Navigator.of(ctx).pop();
+                                    final created =
+                                        await _showCreateTagDialog();
+                                    if (created != null && mounted) {
+                                      setState(
+                                        () => _selectedTag = created.id,
+                                      );
+                                    }
+                                  },
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 10,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(
+                                        color: theme.colorScheme.outline
+                                            .withValues(alpha: 0.5),
+                                      ),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.add_circle_outline,
+                                          size: 20,
+                                          color: theme.colorScheme.primary,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'create_new_tag'.tr(),
+                                          style: theme.textTheme.labelLarge
+                                              ?.copyWith(
+                                            color: theme.colorScheme.primary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }
@@ -2217,49 +2302,69 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     await _addPhoto(scanAfter: true);
   }
 
-  Future<ImageSource?> _pickImageSource({required bool forScan}) {
-    return showResponsiveSheet<ImageSource>(
-      context: context,
-      title: (forScan ? 'scan_receipt' : 'add_photo').tr(),
-      maxHeight: MediaQuery.of(context).size.height * 0.75,
-      isScrollControlled: true,
-      centerInFullViewport: true,
-      child: Builder(
-        builder: (ctx) => SafeArea(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(ctx).padding.bottom + 16,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.camera_alt),
-                    title: Text('camera'.tr()),
-                    onTap: () => Navigator.pop(ctx, ImageSource.camera),
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.photo_library),
-                    title: Text('gallery'.tr()),
-                    onTap: () => Navigator.pop(ctx, ImageSource.gallery),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Add photo from camera or gallery. [scanAfter] runs OCR after attach.
+  /// Add photo via inline camera (gallery is on the camera chrome).
+  /// [scanAfter] runs OCR after attach. Desktop/web without mock → gallery picker.
   Future<void> _addPhoto({bool scanAfter = false}) async {
     _defocusFormInputs();
     if (_expenseImages.length >= _kMaxExpenseImages) return;
-    final source = await _pickImageSource(forScan: scanAfter);
-    if (source == null || !mounted) return;
 
+    final mockOn = ref.read(debugReceiptCameraMockProvider);
+    if (ReceiptScanCapability.isNativeMobile || mockOn) {
+      await _addPhotoFromInlineCamera(
+        scanAfter: scanAfter,
+        mockPreview: mockOn,
+      );
+      return;
+    }
+
+    await _pickAndIngestFromPicker(
+      source: ImageSource.gallery,
+      scanAfter: scanAfter,
+    );
+  }
+
+  /// In-app receipt camera. [mockPreview] skips hardware (debug desktop/mobile).
+  Future<void> _addPhotoFromInlineCamera({
+    required bool scanAfter,
+    bool mockPreview = false,
+  }) async {
+    final maxRemaining = _kMaxExpenseImages - _expenseImages.length;
+    if (maxRemaining <= 0 || !mounted) return;
+
+    final result = await showReceiptCamera(
+      context,
+      maxRemaining: maxRemaining,
+      scanAfter: scanAfter,
+      mockPreview: mockPreview,
+    );
+    if (!mounted) return;
+
+    if (result == null) return;
+
+    if (result.openGallery) {
+      await _pickAndIngestFromPicker(
+        source: ImageSource.gallery,
+        scanAfter: scanAfter,
+      );
+      return;
+    }
+
+    final images = result.images;
+    for (var i = 0; i < images.length; i++) {
+      if (!mounted) return;
+      final isLast = i == images.length - 1;
+      await _ingestPickedPhoto(
+        images[i],
+        scanAfter: result.scanAfter && isLast,
+      );
+    }
+  }
+
+  /// OS camera / gallery via [ImagePicker], with Android lost-data recovery.
+  Future<void> _pickAndIngestFromPicker({
+    required ImageSource source,
+    required bool scanAfter,
+  }) async {
     final bool hasPermission;
     if (source == ImageSource.camera) {
       hasPermission = await PermissionService.requestCameraPermission(context);
@@ -2476,6 +2581,11 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     int index,
   ) {
     final theme = Theme.of(context);
+    final scanMode = ref.watch(receiptScanModeProvider);
+    final canRescan =
+        ReceiptScanCapability.scanUiEnabled(scanMode) &&
+        item.bytes != null &&
+        !_scanningReceipt;
     Widget image;
     final thumbDecode = NetworkImageDecode.cacheSize(
       context,
@@ -2522,7 +2632,12 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     } else {
       image = const SizedBox(width: 80, height: 80);
     }
-    return Stack(
+
+    final motion = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : AppMotion.shellTab;
+
+    final thumb = Stack(
       clipBehavior: Clip.none,
       children: [
         Material(
@@ -2550,7 +2665,70 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
             onPressed: () => setState(() => _expenseImages.removeAt(index)),
           ),
         ),
+        if (item.bytes != null &&
+            ReceiptScanCapability.scanUiEnabled(scanMode))
+          Positioned(
+            left: 2,
+            bottom: 2,
+            child: Material(
+              color: theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.92,
+              ),
+              borderRadius: BorderRadius.circular(8),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: canRescan
+                    ? () => _onScanReceiptFromPhoto(item.bytes!)
+                    : null,
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: AnimatedSwitcher(
+                    duration: motion,
+                    child: _scanningReceipt
+                        ? SizedBox(
+                            key: const ValueKey('scanning'),
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: theme.colorScheme.primary,
+                            ),
+                          )
+                        : Icon(
+                            Icons.document_scanner_outlined,
+                            key: const ValueKey('scan'),
+                            size: 16,
+                            color: canRescan
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onSurface.withValues(
+                                    alpha: 0.38,
+                                  ),
+                          ),
+                  ),
+                ),
+              ),
+            ),
+          ),
       ],
+    );
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: motion,
+      curve: AppMotion.enterCurve,
+      builder: (context, t, child) {
+        return Opacity(
+          opacity: t,
+          child: Transform.scale(
+            scale: 0.92 + (0.08 * t),
+            child: child,
+          ),
+        );
+      },
+      child: Tooltip(
+        message: canRescan ? 'receipt_camera_scan_this'.tr() : '',
+        child: thumb,
+      ),
     );
   }
 
@@ -3187,12 +3365,14 @@ class _CreateTagSheetContent extends StatefulWidget {
 class _CreateTagSheetContentState extends State<_CreateTagSheetContent> {
   late final TextEditingController _nameController;
   late String _selectedIconName;
+  late String _selectedColorHex;
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController();
     _selectedIconName = selectableExpenseIcons.keys.first;
+    _selectedColorHex = selectableTagColorHexes.first;
   }
 
   @override
@@ -3224,34 +3404,11 @@ class _CreateTagSheetContentState extends State<_CreateTagSheetContent> {
             textCapitalization: TextCapitalization.sentences,
           ),
           const SizedBox(height: 16),
-          Text('choose_icon'.tr(), style: Theme.of(ctx).textTheme.labelLarge),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: selectableExpenseIcons.entries.map((e) {
-              final selected = _selectedIconName == e.key;
-              return InkWell(
-                onTap: () => setState(() => _selectedIconName = e.key),
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? Theme.of(ctx).colorScheme.primaryContainer
-                        : Theme.of(ctx).colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    e.value,
-                    size: 28,
-                    color: selected
-                        ? Theme.of(ctx).colorScheme.onPrimaryContainer
-                        : Theme.of(ctx).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              );
-            }).toList(),
+          TagStyleFields(
+            selectedIconName: _selectedIconName,
+            selectedColorHex: _selectedColorHex,
+            onIconSelected: (v) => setState(() => _selectedIconName = v),
+            onColorSelected: (v) => setState(() => _selectedColorHex = v),
           ),
         ],
       ),
@@ -3265,19 +3422,48 @@ class _CreateTagSheetContentState extends State<_CreateTagSheetContent> {
           onPressed: () async {
             final label = _nameController.text.trim();
             if (FormValidators.expenseTagLabel(label) != null) return;
-            final id = await widget.ref
-                .read(tagRepositoryProvider)
-                .create(widget.groupId, label, _selectedIconName);
-            if (!ctx.mounted) return;
-            final tag = ExpenseTag(
-              id: id,
-              groupId: widget.groupId,
-              label: label,
-              iconName: _selectedIconName,
-              createdAt: DateTime.now(),
-              updatedAt: DateTime.now(),
+            final existing =
+                widget.ref.read(tagsByGroupProvider(widget.groupId)).asData
+                    ?.value ??
+                const <ExpenseTag>[];
+            final reserved = presetCategoryTags.map(
+              (p) => 'category_${p.id}'.tr(),
             );
-            if (ctx.mounted) Navigator.of(ctx).pop(tag);
+            if (expenseTagLabelExists(
+              label,
+              customTags: existing,
+              extraReservedLabels: reserved,
+            )) {
+              if (ctx.mounted) {
+                ctx.showError(
+                  'tag_already_exists'.tr(namedArgs: {'name': label}),
+                );
+              }
+              return;
+            }
+            try {
+              final id = await widget.ref.read(tagRepositoryProvider).create(
+                    widget.groupId,
+                    label,
+                    _selectedIconName,
+                    colorHex: _selectedColorHex,
+                  );
+              if (!ctx.mounted) return;
+              final tag = ExpenseTag(
+                id: id,
+                groupId: widget.groupId,
+                label: label,
+                iconName: _selectedIconName,
+                colorHex: _selectedColorHex,
+                createdAt: DateTime.now(),
+                updatedAt: DateTime.now(),
+              );
+              if (ctx.mounted) Navigator.of(ctx).pop(tag);
+            } catch (_) {
+              if (ctx.mounted) {
+                ctx.showError('tag_create_failed'.tr());
+              }
+            }
           },
           child: Text('done'.tr()),
         ),

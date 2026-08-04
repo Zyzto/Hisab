@@ -40,6 +40,11 @@ class _OnboardingWelcomePageState extends State<OnboardingWelcomePage>
       subtitleKey: 'onboarding_expenses_desc',
     ),
     _FeatureSpec(
+      icon: Icons.label_outlined,
+      titleKey: 'onboarding_categories',
+      subtitleKey: 'onboarding_categories_desc',
+    ),
+    _FeatureSpec(
       icon: Icons.account_balance_wallet_outlined,
       titleKey: 'onboarding_balance',
       subtitleKey: 'onboarding_balance_desc',

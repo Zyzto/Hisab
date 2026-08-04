@@ -21,6 +21,7 @@ import '../../features/groups/pages/group_detail_page.dart';
 import '../../features/groups/pages/group_settings_page.dart';
 import '../../features/groups/pages/invite_accept_page.dart';
 import '../../features/groups/pages/invite_group_preview_page.dart';
+import '../../features/groups/pages/group_categories_page.dart';
 import '../../features/groups/pages/invite_management_page.dart';
 import '../../features/groups/pages/invite_redirect_proxy_page.dart';
 import '../../features/groups/pages/invite_scan_page.dart';
@@ -505,6 +506,16 @@ GoRouter router(Ref ref) {
           return appFadeSlidePage(
             key: state.pageKey,
             child: InviteManagementPage(groupId: groupId),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/groups/:id/categories',
+        pageBuilder: (context, state) {
+          final groupId = state.pathParameters['id'] ?? '';
+          return appFadeSlidePage(
+            key: state.pageKey,
+            child: GroupCategoriesPage(groupId: groupId),
           );
         },
       ),

@@ -19,6 +19,9 @@ class ExpenseListTile extends StatelessWidget {
   /// Icon for the expense (e.g. from [iconForExpenseTag]). When null, uses [defaultExpenseIcon].
   final IconData? icon;
 
+  /// Custom tags for resolving stored accent colors on list chrome.
+  final List<ExpenseTag>? customTags;
+
   /// When false (e.g. personal group), the "Paid by" line is hidden.
   final bool showPaidBy;
 
@@ -53,6 +56,7 @@ class ExpenseListTile extends StatelessWidget {
     required this.payerName,
     this.toParticipantName,
     this.icon,
+    this.customTags,
     this.showPaidBy = true,
     this.groupCurrencyCode,
     this.onTap,
@@ -91,22 +95,29 @@ class ExpenseListTile extends StatelessWidget {
       expense.tag,
       brightness: theme.brightness,
       surface: surface,
+      customTags: customTags,
     );
 
     final content = Row(
       children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: chrome.container,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          alignment: Alignment.center,
-          child: Icon(
-            effectiveIcon,
-            size: 22,
-            color: chrome.onContainer,
+        Semantics(
+          label: expense.tag == null || expense.tag!.isEmpty
+              ? 'no_category'.tr()
+              : 'category'.tr(),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: chrome.container,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            alignment: Alignment.center,
+            child: Icon(
+              effectiveIcon,
+              size: 22,
+              color: chrome.onContainer,
+              semanticLabel: expense.tag,
+            ),
           ),
         ),
         const SizedBox(width: 12),

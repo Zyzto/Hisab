@@ -356,6 +356,7 @@ ExpenseTag _tagFromRow(Map<String, dynamic> row) => ExpenseTag(
   groupId: row['group_id'] as String,
   label: row['label'] as String? ?? '',
   iconName: row['icon_name'] as String? ?? 'label',
+  colorHex: row['color'] as String?,
   createdAt: _parseDateTime(row['created_at']),
   updatedAt: _parseDateTime(row['updated_at']),
 );
@@ -393,6 +394,17 @@ InviteUsage _inviteUsageFromRow(Map<String, dynamic> row) => InviteUsage(
 );
 
 String _nowIso() => DateTime.now().toUtc().toIso8601String();
+
+/// Returns normalized `#RRGGBB` or null when missing/invalid.
+String? _normalizeTagColorHex(String? colorHex) {
+  if (colorHex == null) return null;
+  var s = colorHex.trim();
+  if (s.isEmpty) return null;
+  if (s.startsWith('#')) s = s.substring(1);
+  if (s.length != 6) return null;
+  if (int.tryParse(s, radix: 16) == null) return null;
+  return '#${s.toUpperCase()}';
+}
 
 /// When true, new [pending_writes] rows are marked silent (import/restore).
 bool _enqueueSilentDefault = false;
@@ -1793,9 +1805,15 @@ class PowerSyncTagRepository implements ITagRepository {
   }
 
   @override
-  Future<String> create(String groupId, String label, String iconName) async {
+  Future<String> create(
+    String groupId,
+    String label,
+    String iconName, {
+    String? colorHex,
+  }) async {
     final trimmedLabel = label.trim();
     final trimmedIcon = iconName.trim();
+    final normalizedColor = _normalizeTagColorHex(colorHex);
     if (trimmedLabel.isEmpty || trimmedLabel.length > 100) {
       throw ArgumentError(
         'Tag label must be 1–100 characters (got ${trimmedLabel.length})',
@@ -1813,6 +1831,7 @@ class PowerSyncTagRepository implements ITagRepository {
       'group_id': groupId,
       'label': trimmedLabel,
       'icon_name': trimmedIcon,
+      'color': normalizedColor,
       'created_at': now,
       'updated_at': now,
     };
@@ -1833,8 +1852,8 @@ class PowerSyncTagRepository implements ITagRepository {
     }
 
     await _db.execute(
-      'INSERT INTO expense_tags (id, group_id, label, icon_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [id, groupId, trimmedLabel, trimmedIcon, now, now],
+      'INSERT INTO expense_tags (id, group_id, label, icon_name, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [id, groupId, trimmedLabel, trimmedIcon, normalizedColor, now, now],
     );
     return id;
   }
@@ -1843,6 +1862,7 @@ class PowerSyncTagRepository implements ITagRepository {
   Future<void> update(ExpenseTag tag) async {
     final trimmedLabel = tag.label.trim();
     final trimmedIcon = tag.iconName.trim();
+    final normalizedColor = _normalizeTagColorHex(tag.colorHex);
     if (trimmedLabel.isEmpty || trimmedLabel.length > 100) {
       throw ArgumentError(
         'Tag label must be 1–100 characters (got ${trimmedLabel.length})',
@@ -1861,6 +1881,7 @@ class PowerSyncTagRepository implements ITagRepository {
           .update({
             'label': trimmedLabel,
             'icon_name': trimmedIcon,
+            'color': normalizedColor,
             'updated_at': now,
           })
           .eq('id', tag.id);
@@ -1876,14 +1897,15 @@ class PowerSyncTagRepository implements ITagRepository {
         data: {
           'label': trimmedLabel,
           'icon_name': trimmedIcon,
+          'color': normalizedColor,
           'updated_at': now,
         },
       );
     }
 
     await _db.execute(
-      'UPDATE expense_tags SET label = ?, icon_name = ?, updated_at = ? WHERE id = ?',
-      [trimmedLabel, trimmedIcon, now, tag.id],
+      'UPDATE expense_tags SET label = ?, icon_name = ?, color = ?, updated_at = ? WHERE id = ?',
+      [trimmedLabel, trimmedIcon, normalizedColor, now, tag.id],
     );
   }
 

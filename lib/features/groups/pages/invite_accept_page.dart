@@ -49,10 +49,7 @@ Widget _inviteStalledNavigationBody(
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 24),
-          FilledButton(
-            onPressed: onPrimary,
-            child: Text(primaryLabelKey.tr()),
-          ),
+          FilledButton(onPressed: onPrimary, child: Text(primaryLabelKey.tr())),
           const SizedBox(height: 12),
           TextButton.icon(
             onPressed: onGoHome,
@@ -112,7 +109,9 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
     }
     // Settings may not be ready on the first frame — retry next frame.
     if (ref.read(hisabSettingsProvidersProvider) == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _prepareInviteEntry());
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _prepareInviteEntry(),
+      );
       return;
     }
     _didPrepareInviteEntry = true;
@@ -246,7 +245,8 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                   final shouldAutoPreview = _shouldAutoRedirectToPreview(
                     preview.invite.accessMode,
                   );
-                  if (shouldAutoPreview && !_didAttemptPreviewRedirectForNotOnboarded) {
+                  if (shouldAutoPreview &&
+                      !_didAttemptPreviewRedirectForNotOnboarded) {
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       if (!mounted) return;
                       if (_didAttemptPreviewRedirectForNotOnboarded) return;
@@ -258,7 +258,8 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                       }
                     });
                   }
-                  if (shouldAutoPreview && _didAttemptPreviewRedirectForNotOnboarded) {
+                  if (shouldAutoPreview &&
+                      _didAttemptPreviewRedirectForNotOnboarded) {
                     return _inviteStalledNavigationBody(
                       context,
                       onPrimary: () =>
@@ -267,10 +268,15 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                       onGoHome: () => _dismissInvite(context),
                     );
                   }
-                  if (preview.invite.accessMode == InviteAccessMode.readonlyJoin ||
+                  if (preview.invite.accessMode ==
+                          InviteAccessMode.readonlyJoin ||
                       preview.invite.accessMode == InviteAccessMode.standard) {
                     return ConstrainedContent(
-                      child: _buildInviteContent(context, preview.invite, preview.group),
+                      child: _buildInviteContent(
+                        context,
+                        preview.invite,
+                        preview.group,
+                      ),
                     );
                   }
                   return const Center(child: CircularProgressIndicator());
@@ -432,8 +438,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                       final shouldAutoPreview = _shouldAutoRedirectToPreview(
                         data.invite.accessMode,
                       );
-                      if (shouldAutoPreview &&
-                          !_didAttemptWebPreviewRedirect) {
+                      if (shouldAutoPreview && !_didAttemptWebPreviewRedirect) {
                         WidgetsBinding.instance.addPostFrameCallback((_) {
                           if (!mounted) return;
                           if (_didAttemptWebPreviewRedirect) return;
@@ -445,10 +450,15 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                         return const Center(child: CircularProgressIndicator());
                       }
                       return ConstrainedContent(
-                        child: _buildInviteContent(context, data.invite, data.group),
+                        child: _buildInviteContent(
+                          context,
+                          data.invite,
+                          data.group,
+                        ),
                       );
                     },
-                    loading: () => const Center(child: CircularProgressIndicator()),
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
                     error: (e, st) {
                       sendErrorTelemetryIfOnline(
                         ref,
@@ -460,8 +470,9 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                           message: e.toString(),
                           details: e.toString(),
                           stackTrace: st,
-                          onRetry: () =>
-                              ref.invalidate(inviteByTokenProvider(widget.token)),
+                          onRetry: () => ref.invalidate(
+                            inviteByTokenProvider(widget.token),
+                          ),
                           onGoHome: () => _dismissInvite(context),
                         ),
                       );
@@ -690,7 +701,8 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
 
     // Resume view+join after login/register without an extra Accept tap.
     final settings = ref.read(hisabSettingsProvidersProvider);
-    final autoJoinFlag = settings != null &&
+    final autoJoinFlag =
+        settings != null &&
         ref.read(settings.provider(pendingInviteAutoJoinSettingDef));
     if (shouldAutoJoinInvite(
       autoJoinFlag: autoJoinFlag,
@@ -721,7 +733,8 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted || _didAttemptAutoJoin || _accepting) return;
           final settingsNow = ref.read(hisabSettingsProvidersProvider);
-          final autoJoinNow = settingsNow != null &&
+          final autoJoinNow =
+              settingsNow != null &&
               ref.read(settingsNow.provider(pendingInviteAutoJoinSettingDef));
           final action = unauthenticatedAutoJoinResume(
             autoJoinFlag: autoJoinNow,
@@ -841,7 +854,9 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                   )
                 else if (canAcceptInvite)
                   FilledButton(
-                    onPressed: _accepting ? null : () => _accept(context, group),
+                    onPressed: _accepting
+                        ? null
+                        : () => _accept(context, group),
                     child: _accepting
                         ? const SizedBox(
                             height: 24,

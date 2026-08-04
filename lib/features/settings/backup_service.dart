@@ -161,6 +161,7 @@ class BackupService {
       groups: backup.groups,
       participants: backup.participants,
       expenses: backup.expenses,
+      expenseTags: backup.expenseTags,
     );
     return BackupExportResult(
       bytes: Uint8List.fromList(utf8.encode(csv)),
@@ -234,6 +235,7 @@ class BackupService {
       groups: backup.groups,
       participants: backup.participants,
       expenses: rewrittenExpenses,
+      expenseTags: backup.expenseTags,
     );
     final info = await PackageInfo.fromPlatform();
     final exportedAt = DateTime.now();
@@ -256,6 +258,7 @@ class BackupService {
       expenses: rewrittenExpenses,
       exportedAt: exportedAt,
       locale: locale,
+      expenseTags: backup.expenseTags,
     );
     onProgress?.call('export_building', 0.85);
     final bytes = encodeBackupZip(
@@ -485,6 +488,18 @@ class BackupService {
       }
     }
 
+    // Create tags before expenses so custom tag ids on expenses can be remapped.
+    final tagIds = <String, String>{};
+    for (final t in data.expenseTags.where((t) => t.groupId == g.id)) {
+      final newTagId = await tagRepo.create(
+        newGroupId,
+        t.label,
+        t.iconName,
+        colorHex: t.colorHex,
+      );
+      tagIds[t.id] = newTagId;
+    }
+
     final expenseIds = <String, String>{};
     final oldExpenses = data.expenses.where((e) => e.groupId == g.id).toList();
     for (final e in oldExpenses) {
@@ -513,6 +528,10 @@ class BackupService {
         }
       }
 
+      final remappedTag = e.tag == null
+          ? null
+          : (tagIds[e.tag!] ?? e.tag);
+
       final expense = Expense(
         id: '',
         groupId: newGroupId,
@@ -530,17 +549,13 @@ class BackupService {
         updatedAt: e.updatedAt,
         transactionType: e.transactionType,
         toParticipantId: toId,
-        tag: e.tag,
+        tag: remappedTag,
         lineItems: e.lineItems,
         imagePath: storedPaths.isNotEmpty ? storedPaths.first : null,
         imagePaths: storedPaths.isNotEmpty ? storedPaths : null,
       );
       final newExpenseId = await expenseRepo.create(expense);
       expenseIds[e.id] = newExpenseId;
-    }
-
-    for (final t in data.expenseTags.where((t) => t.groupId == g.id)) {
-      await tagRepo.create(newGroupId, t.label, t.iconName);
     }
 
     final created = await groupRepo.getById(newGroupId);

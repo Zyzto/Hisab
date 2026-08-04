@@ -271,12 +271,13 @@ class SyncEngine {
       }
       for (final t in tags) {
         await tx.execute(
-          'INSERT INTO expense_tags (id, group_id, label, icon_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+          'INSERT INTO expense_tags (id, group_id, label, icon_name, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
           [
             t['id'],
             t['group_id'],
             t['label'],
             t['icon_name'],
+            t['color'],
             t['created_at'],
             t['updated_at'],
           ],
