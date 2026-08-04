@@ -386,6 +386,7 @@ class ExpenseDetailBodyHeader extends StatelessWidget {
       expense.tag,
       brightness: theme.brightness,
       surface: headerSurface,
+      customTags: customTags,
     );
     final dateFormat = use24HourFormat
         ? DateFormat('EEE, MMM d, yyyy').add_Hm()

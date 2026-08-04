@@ -1,7 +1,7 @@
 name: hisab
 description: "Group expense splitting and settle-up app."
 publish_to: 'none'
-version: 0.7.8+78
+version: 0.7.9+79
 
 environment:
   sdk: ^3.11.0
@@ -47,6 +47,7 @@ dependencies:
   intl: ^0.20.2
 
   # Receipt: camera + OCR (Tesseract Android / Vision iOS via MethodChannel)
+  camera: ^0.11.2
   image_picker: ^1.0.7
   image_picker_android: ^0.8.13
   image_picker_platform_interface: ^2.9.0

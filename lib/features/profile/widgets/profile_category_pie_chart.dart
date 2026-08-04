@@ -1,11 +1,14 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/user_text.dart';
+import '../../../domain/domain.dart';
 import '../../expenses/category_icons.dart';
 import '../../expenses/widgets/breakdown_pie_chart.dart';
 import '../../expenses/widgets/filtered_expenses_sheet.dart';
 import '../../groups/providers/group_analytics_provider.dart';
+import '../../groups/providers/groups_provider.dart';
 import '../providers/profile_activity_provider.dart';
 import 'profile_expense_tile.dart';
 
@@ -15,7 +18,7 @@ const _kOtherId = '__other__';
 /// Profile analytics donut: my-share spend by category.
 ///
 /// Uses the shared [BreakdownPieChart] (select → tap again → expense list).
-class ProfileCategoryPieChart extends StatelessWidget {
+class ProfileCategoryPieChart extends ConsumerWidget {
   const ProfileCategoryPieChart({
     super.key,
     required this.byTag,
@@ -30,10 +33,11 @@ class ProfileCategoryPieChart extends StatelessWidget {
   final List<ProfileExpenseItem> rangeExpenses;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final slices = _buildSlices(theme, cs);
+    final customTags = _collectCustomTags(ref);
+    final slices = _buildSlices(theme, cs, customTags);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -47,7 +51,29 @@ class ProfileCategoryPieChart extends StatelessWidget {
     );
   }
 
-  List<BreakdownPieSlice> _buildSlices(ThemeData theme, ColorScheme cs) {
+  List<ExpenseTag> _collectCustomTags(WidgetRef ref) {
+    final groupIds = <String>{};
+    for (final item in rangeExpenses) {
+      groupIds.add(item.expense.groupId);
+    }
+    final customTags = <ExpenseTag>[];
+    final seen = <String>{};
+    for (final groupId in groupIds) {
+      final tags =
+          ref.watch(tagsByGroupProvider(groupId)).asData?.value ??
+          const <ExpenseTag>[];
+      for (final tag in tags) {
+        if (seen.add(tag.id)) customTags.add(tag);
+      }
+    }
+    return customTags;
+  }
+
+  List<BreakdownPieSlice> _buildSlices(
+    ThemeData theme,
+    ColorScheme cs,
+    List<ExpenseTag> customTags,
+  ) {
     final positive = byTag.where((row) => row.amountCents > 0).toList();
     if (positive.isEmpty) return const [];
 
@@ -57,12 +83,12 @@ class ProfileCategoryPieChart extends StatelessWidget {
       for (final row in top)
         BreakdownPieSlice(
           id: row.tagKey,
-          label: _label(row.tagKey),
+          label: _label(row.tagKey, customTags),
           amountCents: row.amountCents,
-          color: _colorFor(row.tagKey, theme, cs),
+          color: _colorFor(row.tagKey, theme, cs, customTags),
           icon: row.tagKey == 'untagged'
               ? Icons.label_off_outlined
-              : iconForExpenseTag(row.tagKey, null),
+              : iconForExpenseTag(row.tagKey, customTags),
           canOpen: true,
         ),
     ];
@@ -123,18 +149,24 @@ class ProfileCategoryPieChart extends StatelessWidget {
     );
   }
 
-  Color _colorFor(String tagKey, ThemeData theme, ColorScheme cs) {
+  Color _colorFor(
+    String tagKey,
+    ThemeData theme,
+    ColorScheme cs,
+    List<ExpenseTag> customTags,
+  ) {
     final chromeId = tagKey == 'untagged' ? null : tagKey;
     return chromeForExpenseTag(
       chromeId,
       brightness: theme.brightness,
       surface: cs.surface,
+      customTags: customTags,
     ).container;
   }
 
-  String _label(String key) {
+  String _label(String key, List<ExpenseTag> customTags) {
     if (key == 'untagged') return 'analytics_untagged'.tr();
-    final resolved = resolveTagLabel(key, const []);
+    final resolved = resolveTagLabel(key, customTags);
     if (resolved.startsWith('category_')) return resolved.tr();
     return resolved;
   }

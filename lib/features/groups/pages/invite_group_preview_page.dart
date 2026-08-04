@@ -274,12 +274,14 @@ Iterable<dynamic> _buildPreviewOverrides(InvitePreviewData preview) {
     tagsByGroupProvider(
       groupId,
     ).overrideWith((ref) => Stream.value(const <ExpenseTag>[])),
-    myRoleInGroupProvider(groupId).overrideWith(
-      (ref) => Stream<GroupRole?>.value(null),
-    ),
-    myMemberInGroupProvider(groupId).overrideWith(
-      (ref) => Stream<GroupMember?>.value(null),
-    ),
-    membersByGroupProvider(groupId).overrideWith((ref) => Stream.value(members)),
+    myRoleInGroupProvider(
+      groupId,
+    ).overrideWith((ref) => Stream<GroupRole?>.value(null)),
+    myMemberInGroupProvider(
+      groupId,
+    ).overrideWith((ref) => Stream<GroupMember?>.value(null)),
+    membersByGroupProvider(
+      groupId,
+    ).overrideWith((ref) => Stream.value(members)),
   ];
 }

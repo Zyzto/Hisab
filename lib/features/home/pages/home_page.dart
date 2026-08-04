@@ -18,6 +18,7 @@ import '../../../core/widgets/sheet_option_tile.dart';
 import '../../../core/widgets/shell_menu_button.dart';
 import '../../../core/widgets/sync_status_icon.dart';
 import '../../../core/widgets/user_text.dart';
+import '../../groups/pages/show_invite_scanner.dart';
 import '../../groups/providers/groups_provider.dart';
 import '../../settings/providers/settings_framework_providers.dart';
 import '../../settings/settings_definitions.dart';
@@ -427,12 +428,12 @@ class HomePage extends ConsumerWidget {
                             overflow: TextOverflow.ellipsis,
                           ))
                   : showExperimentThemes
-                        ? _ExperimentTitle()
-                        : Text(
-                            'app_name'.tr(),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                  ? _ExperimentTitle()
+                  : Text(
+                      'app_name'.tr(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
               actions: effectiveSelectionMode
                   ? [
                       IconButton(
@@ -573,7 +574,8 @@ class HomePage extends ConsumerWidget {
                       child: GroupCard(
                         group: group,
                         experimentStyleIndex: experimentStyleIndex,
-                        isSelected: effectiveSelectionMode &&
+                        isSelected:
+                            effectiveSelectionMode &&
                             selectedIds.contains(group.id),
                         badgeCount: group.isPersonal ? scannerBadge : 0,
                         onTap: () {
@@ -586,8 +588,9 @@ class HomePage extends ConsumerWidget {
                           }
                           context.push(RoutePaths.groupDetail(group.id));
                         },
-                        createdDateLabel:
-                            formatCreatedDateLabel(group.createdAt),
+                        createdDateLabel: formatCreatedDateLabel(
+                          group.createdAt,
+                        ),
                         isPinned:
                             pinningEnabled && pinnedSet.contains(group.id),
                         onPinToggle: null,
@@ -597,7 +600,9 @@ class HomePage extends ConsumerWidget {
                                 if (cur.isEmpty) {
                                   ref
                                       .read(selectedGroupIdsProvider.notifier)
-                                      .state = {group.id};
+                                      .state = {
+                                    group.id,
+                                  };
                                 } else {
                                   toggleSelection(group.id);
                                 }
@@ -650,7 +655,8 @@ class HomePage extends ConsumerWidget {
 
                   Widget buildReorderSliver(
                     List<Group> list, {
-                    required void Function(List<Group> sectionOrder) onSectionReorder,
+                    required void Function(List<Group> sectionOrder)
+                    onSectionReorder,
                   }) {
                     return HomeReorderableGroupsSliver(
                       groups: list,
@@ -668,9 +674,7 @@ class HomePage extends ConsumerWidget {
                         key: const PageStorageKey<String>('home_list_separate'),
                         physics: const AlwaysScrollableScrollPhysics(),
                         slivers: [
-                          const SliverPadding(
-                            padding: EdgeInsets.only(top: 8),
-                          ),
+                          const SliverPadding(padding: EdgeInsets.only(top: 8)),
                           if (personal.isNotEmpty) ...[
                             SliverToBoxAdapter(
                               child: Padding(
@@ -706,12 +710,7 @@ class HomePage extends ConsumerWidget {
                           ],
                           SliverToBoxAdapter(
                             child: Padding(
-                              padding: const EdgeInsets.fromLTRB(
-                                16,
-                                12,
-                                16,
-                                8,
-                              ),
+                              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                               child: GroupSectionHeader(label: 'groups'.tr()),
                             ),
                           ),
@@ -770,7 +769,9 @@ class HomePage extends ConsumerWidget {
                           )
                         else
                           buildGroupSliver(ordered),
-                        const SliverPadding(padding: EdgeInsets.only(bottom: 8)),
+                        const SliverPadding(
+                          padding: EdgeInsets.only(bottom: 8),
+                        ),
                       ],
                     ),
                   );
@@ -780,9 +781,9 @@ class HomePage extends ConsumerWidget {
             floatingActionButton: _HomeFabCluster(
               localOnly: localOnly,
               onCreate: () => _showCreateModal(context, ref),
-              onScan: () {
+              onScan: (fabOrigin) {
                 clearSelection();
-                context.push(RoutePaths.scanInvite);
+                showInviteScanner(context, origin: fabOrigin);
               },
             ),
           );
@@ -792,7 +793,7 @@ class HomePage extends ConsumerWidget {
   }
 }
 
-class _HomeFabCluster extends StatelessWidget {
+class _HomeFabCluster extends StatefulWidget {
   const _HomeFabCluster({
     required this.localOnly,
     required this.onCreate,
@@ -801,7 +802,14 @@ class _HomeFabCluster extends StatelessWidget {
 
   final bool localOnly;
   final VoidCallback onCreate;
-  final VoidCallback onScan;
+  final void Function(Rect? fabOrigin) onScan;
+
+  @override
+  State<_HomeFabCluster> createState() => _HomeFabClusterState();
+}
+
+class _HomeFabClusterState extends State<_HomeFabCluster> {
+  final GlobalKey _scanFabKey = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
@@ -812,12 +820,12 @@ class _HomeFabCluster extends StatelessWidget {
       heroTag: 'create_group',
       semanticsLabel: 'create_group'.tr(),
       tooltip: 'create_group'.tr(),
-      onPressed: onCreate,
-      onLongPress: onCreate,
-      playIdleMotion: localOnly,
+      onPressed: widget.onCreate,
+      onLongPress: widget.onCreate,
+      playIdleMotion: widget.localOnly,
     );
 
-    if (localOnly) return createFab;
+    if (widget.localOnly) return createFab;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -830,12 +838,23 @@ class _HomeFabCluster extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            AppFab(
-              icon: Icons.qr_code_scanner,
-              heroTag: 'scan_invite',
-              semanticsLabel: 'scan_invite'.tr(),
-              tooltip: 'scan_invite'.tr(),
-              onPressed: onScan,
+            KeyedSubtree(
+              key: _scanFabKey,
+              child: AppFab(
+                icon: Icons.qr_code_scanner,
+                heroTag: 'scan_invite',
+                semanticsLabel: 'scan_invite'.tr(),
+                tooltip: 'scan_invite'.tr(),
+                onPressed: () {
+                  final box =
+                      _scanFabKey.currentContext?.findRenderObject()
+                          as RenderBox?;
+                  final origin = box == null
+                      ? null
+                      : box.localToGlobal(Offset.zero) & box.size;
+                  widget.onScan(origin);
+                },
+              ),
             ),
             SizedBox(height: spacing),
             createFab,
@@ -844,10 +863,7 @@ class _HomeFabCluster extends StatelessWidget {
         if (constraints.maxHeight.isFinite &&
             constraints.maxHeight < twoFabHeight &&
             constraints.maxHeight > 0) {
-          return FittedBox(
-            alignment: Alignment.bottomCenter,
-            child: column,
-          );
+          return FittedBox(alignment: Alignment.bottomCenter, child: column);
         }
         return column;
       },

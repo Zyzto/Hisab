@@ -1,19 +1,13 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:easy_localization/easy_localization.dart';
-import 'package:go_router/go_router.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 
-import '../../../core/layout/content_aligned_app_bar.dart';
-import '../../../core/layout/constrained_content.dart';
-import '../../../core/navigation/invite_link_handler.dart';
+import '../../../core/layout/sheet_handle_drag.dart';
+import '../../../core/motion/app_motion.dart';
 import '../../../core/navigation/nav_back.dart';
 import '../../../core/navigation/route_paths.dart';
-import '../../../core/services/permission_service.dart';
+import 'invite_scanner_view.dart';
+import 'show_invite_scanner.dart';
 
-/// Full-screen QR scanner to join a group via an invite QR code.
-/// Requests camera permission, then shows [MobileScanner]. On a valid
-/// invite URL/token, stops the camera and navigates to the invite accept page.
+/// Route entry for `/scan-invite` — same 65%↔full sheet chrome as the FAB flow.
 class InviteScanPage extends StatefulWidget {
   const InviteScanPage({super.key});
 
@@ -22,15 +16,34 @@ class InviteScanPage extends StatefulWidget {
 }
 
 class _InviteScanPageState extends State<InviteScanPage> {
-  bool _permissionGranted = false;
-  bool _permissionChecked = false;
-  bool _handled = false;
-  final MobileScannerController _controller = MobileScannerController();
+  bool _expanded = false;
+  final _drag = SheetHandleDrag();
+
+  void _close() => popOrGo(context, RoutePaths.home);
+
+  void _onHandleDragEnd(DragEndDetails details) {
+    final action = _drag.end(
+      expanded: _expanded,
+      velocity: details.primaryVelocity ?? 0,
+    );
+    setState(() {
+      switch (action) {
+        case SheetHandleDragAction.expand:
+          _expanded = true;
+        case SheetHandleDragAction.collapse:
+          _expanded = false;
+        case SheetHandleDragAction.dismiss:
+          _close();
+        case SheetHandleDragAction.none:
+          break;
+      }
+      _drag.reset();
+    });
+  }
 
   @override
   void initState() {
     super.initState();
-    _requestPermission();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       seedParentHistoryForBrowserBack(
@@ -41,166 +54,87 @@ class _InviteScanPageState extends State<InviteScanPage> {
     });
   }
 
-  void _close() => popOrGo(context, RoutePaths.home);
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  Future<void> _requestPermission() async {
-    if (kIsWeb) {
-      setState(() {
-        _permissionChecked = true;
-        _permissionGranted = true;
-      });
-      return;
-    }
-    final granted = await PermissionService.requestCameraPermission(context);
-    if (mounted) {
-      setState(() {
-        _permissionChecked = true;
-        _permissionGranted = granted;
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final canPop = routerCanPop(context);
-    Widget body;
-    if (!_permissionChecked) {
-      body = LayoutBuilder(
-        builder: (context, layoutConstraints) {
-          return Scaffold(
-            appBar: ContentAlignedAppBar(
-              contentAreaWidth: layoutConstraints.maxWidth,
-              title: Text('scan_invite_title'.tr()),
-            ),
-            body: const Center(child: CircularProgressIndicator()),
-          );
-        },
-      );
-    } else if (!_permissionGranted) {
-      body = LayoutBuilder(
-        builder: (context, layoutConstraints) {
-          return Scaffold(
-            appBar: ContentAlignedAppBar(
-              contentAreaWidth: layoutConstraints.maxWidth,
-              title: Text('scan_invite_title'.tr()),
-              leading: IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: _close,
-              ),
-            ),
-            body: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  'permission_camera_message'.tr(),
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-              ),
-            ),
-          );
-        },
-      );
-    } else {
-      body = LayoutBuilder(
-        builder: (context, layoutConstraints) {
-          return Scaffold(
-            appBar: ContentAlignedAppBar(
-              contentAreaWidth: layoutConstraints.maxWidth,
-              title: Text('scan_invite_title'.tr()),
-              leading: IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: _close,
-              ),
-            ),
-            body: ConstrainedContent(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  MobileScanner(
-                    controller: _controller,
-                    onDetect: (capture) async {
-                      if (_handled) return;
-                      final barcodes = capture.barcodes;
-                      for (final barcode in barcodes) {
-                        final raw = barcode.rawValue;
-                        if (raw == null || raw.isEmpty) continue;
-                        final uri = Uri.tryParse(raw);
-                        final token = extractInviteTokenFromUri(uri);
-                        if (token != null && mounted) {
-                          _handled = true;
-                          await _controller.stop();
-                          if (!context.mounted) return;
-                          context.go(RoutePaths.inviteAccept(token));
-                          return;
-                        }
-                      }
-                    },
-                    errorBuilder: (context, error) => Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.error_outline,
-                            size: 64,
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                          const SizedBox(height: 16),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 24),
-                            child: Text(
-                              error.errorDetails?.message ??
-                                  '${error.errorCode}',
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.bodyLarge,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: 24,
-                    right: 24,
-                    bottom: 32,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.surface.withValues(alpha: 0.9),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        'scan_invite_hint'.tr(),
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      );
-    }
+    final h = MediaQuery.sizeOf(context).height;
+    final compactH = h * kInviteScannerCompactHeightFraction;
+    final panelH = _drag.panelHeight(
+      expanded: _expanded,
+      compactH: compactH,
+      fullH: h,
+    );
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : AppMotion.modal;
 
     return PopScope(
       canPop: canPop,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _close();
       },
-      child: body,
+      child: Scaffold(
+        backgroundColor: Colors.black54,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _close,
+                child: const ColoredBox(color: Colors.transparent),
+              ),
+            ),
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: Transform.translate(
+                offset: Offset(0, _drag.translateY(expanded: _expanded)),
+                child: AnimatedContainer(
+                  duration: _drag.offset == 0 ? duration : Duration.zero,
+                  curve: AppMotion.enterCurve,
+                  height: panelH,
+                  width: double.infinity,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: Colors.black,
+                    borderRadius: _expanded && _drag.offset <= 0
+                        ? BorderRadius.zero
+                        : const BorderRadius.vertical(top: Radius.circular(16)),
+                  ),
+                  child: Column(
+                    children: [
+                      SheetHandleBar(
+                        expanded: _expanded,
+                        duration: duration,
+                        onVerticalDragUpdate: (details) {
+                          setState(
+                            () => _drag.update(
+                              details.delta.dy,
+                              expanded: _expanded,
+                            ),
+                          );
+                        },
+                        onVerticalDragEnd: _onHandleDragEnd,
+                        onVerticalDragCancel: () => setState(_drag.reset),
+                      ),
+                      Expanded(
+                        child: InviteScannerView(
+                          expanded: _expanded,
+                          onToggleExpanded: () => setState(() {
+                            _expanded = !_expanded;
+                            _drag.reset();
+                          }),
+                          onClose: _close,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

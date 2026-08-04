@@ -1,3 +1,4 @@
+import 'package:collection/collection.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -54,8 +55,8 @@ class ProfileExpensesFiltersBar extends ConsumerWidget {
       ..sort((a, b) {
         if (a == 'untagged') return 1;
         if (b == 'untagged') return -1;
-        return _profileTagLabel(a, customTags)
-            .compareTo(_profileTagLabel(b, customTags));
+        return _profileTagLabel(a, customTags, groups)
+            .compareTo(_profileTagLabel(b, customTags, groups));
       });
 
     final period = switch (filter.range) {
@@ -129,7 +130,7 @@ class ProfileExpensesFiltersBar extends ConsumerWidget {
               : iconForExpenseTag(filter.tagKey, customTags));
     final categoryLabel = filter.tagKey == null
         ? 'analytics_filter_all_categories'.tr()
-        : _profileTagLabel(filter.tagKey!, customTags);
+        : _profileTagLabel(filter.tagKey!, customTags, groups);
 
     final groupIcon = filter.groupId == null
         ? Icons.workspaces_outline
@@ -279,7 +280,7 @@ class ProfileExpensesFiltersBar extends ConsumerWidget {
                     for (final tag in tagList)
                       AnchoredDropdownOption(
                         value: tag,
-                        label: _profileTagLabel(tag, customTags),
+                        label: _profileTagLabel(tag, customTags, groups),
                         icon: tag == 'untagged'
                             ? Icons.label_off_outlined
                             : iconForExpenseTag(tag, customTags),
@@ -358,9 +359,20 @@ class ProfileExpensesFiltersBar extends ConsumerWidget {
   }
 }
 
-String _profileTagLabel(String tagId, List<ExpenseTag> customTags) {
+String _profileTagLabel(
+  String tagId,
+  List<ExpenseTag> customTags,
+  Map<String, String> groupNames,
+) {
   if (tagId == 'untagged') return 'analytics_untagged'.tr();
   final resolved = resolveTagLabel(tagId, customTags);
-  if (resolved.startsWith('category_')) return resolved.tr();
-  return resolved;
+  final base = resolved.startsWith('category_') ? resolved.tr() : resolved;
+  final custom = customTags.where((t) => t.id == tagId).firstOrNull;
+  if (custom == null) return base;
+  final sameLabelCount =
+      customTags.where((t) => t.label == custom.label).length;
+  if (sameLabelCount <= 1) return base;
+  final groupName = groupNames[custom.groupId];
+  if (groupName == null || groupName.isEmpty) return base;
+  return '$base ($groupName)';
 }

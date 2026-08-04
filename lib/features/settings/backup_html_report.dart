@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../../domain/domain.dart';
+import '../expenses/category_icons.dart';
 
 /// Builds a self-contained offline HTML report for a full backup package.
 String buildBackupHtmlReport({
@@ -9,11 +10,17 @@ String buildBackupHtmlReport({
   required List<Expense> expenses,
   required DateTime exportedAt,
   String locale = 'en',
+  List<ExpenseTag> expenseTags = const [],
 }) {
   final embed = const JsonEncoder().convert(backupJson);
+  final tagsByGroup = <String, List<ExpenseTag>>{};
+  for (final t in expenseTags) {
+    tagsByGroup.putIfAbsent(t.groupId, () => []).add(t);
+  }
   final groupRows = StringBuffer();
   for (final g in groups) {
     final groupExpenses = expenses.where((e) => e.groupId == g.id).toList();
+    final groupTags = tagsByGroup[g.id] ?? const <ExpenseTag>[];
     final total = groupExpenses.fold<int>(
       0,
       (s, e) => s + e.effectiveBaseAmountCents,
@@ -29,12 +36,13 @@ String buildBackupHtmlReport({
         '<th>Date</th><th>Title</th><th>Amount</th><th>Tag</th>'
         '</tr></thead><tbody>');
     for (final e in groupExpenses) {
+      final tagLabel = exportDisplayTagLabel(e.tag, groupTags);
       groupRows.writeln(
         '<tr>'
         '<td>${_esc(e.date.toIso8601String().split('T').first)}</td>'
         '<td>${_esc(e.title)}</td>'
         '<td>${_money(e.amountCents, e.currencyCode)}</td>'
-        '<td>${_esc(e.tag ?? '')}</td>'
+        '<td>${_esc(tagLabel)}</td>'
         '</tr>',
       );
     }

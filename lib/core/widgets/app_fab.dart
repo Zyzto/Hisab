@@ -70,8 +70,8 @@ class AppFab extends ConsumerStatefulWidget {
   /// When false, skips mount wiggle and ambient plant blooms (press still animates).
   final bool playIdleMotion;
 
-  /// Debug playground: first ambient bloom starts after a short delay (~0.6s)
-  /// instead of the normal 8–18s idle wait.
+  /// Debug playground: blooms start quickly, and each press advances through
+  /// every plant kind (solo, then bouquets) so they can be reviewed in order.
   final bool previewAmbientBloom;
 
   static const double size = 56;
@@ -95,8 +95,16 @@ class _AppFabState extends ConsumerState<AppFab>
   static const Duration _leafDuration = Duration(milliseconds: 720);
   /// ~0.9s grow + 10s windy stay + ~1.1s leave.
   static const Duration _bloomDuration = Duration(milliseconds: 12000);
+  /// Shorter cycle in the debug FAB playground.
+  static const Duration _bloomPreviewDuration = Duration(milliseconds: 4000);
   /// Lets the leaf burst / pop read before navigation replaces the route.
   static const Duration _actionDelay = Duration(milliseconds: 380);
+
+  /// Solo pass over every kind, then bouquet pass with classic heroes.
+  static final List<(AppFabPlantKind, bool)> _previewBloomCatalog = [
+    for (final kind in AppFabPlantKind.values) (kind, false),
+    for (final kind in appFabOriginalPlantKinds) (kind, true),
+  ];
 
   late final AnimationController _pressController;
   late final AnimationController _releaseController;
@@ -113,6 +121,8 @@ class _AppFabState extends ConsumerState<AppFab>
 
   List<AppFabLeafSpec> _leaves = const [];
   AppFabPlantKind? _plantKind;
+  bool _bloomBouquet = false;
+  int _previewBloomIndex = 0;
   Timer? _ambientTimer;
   Timer? _actionTimer;
 
@@ -152,13 +162,19 @@ class _AppFabState extends ConsumerState<AppFab>
     );
     _bloomController = AnimationController(
       vsync: this,
-      duration: _bloomDuration,
+      duration: widget.previewAmbientBloom
+          ? _bloomPreviewDuration
+          : _bloomDuration,
     )..addStatusListener((status) {
         if (status == AnimationStatus.completed && mounted) {
           _bloomController.value = 0;
           _plantKind = null;
+          _bloomBouquet = false;
           _releaseAmbientSlot();
-          _scheduleAmbientBloom();
+          // Preview mode is tap-driven; don't auto-queue the next bloom.
+          if (!widget.previewAmbientBloom) {
+            _scheduleAmbientBloom();
+          }
         }
       });
 
@@ -205,6 +221,7 @@ class _AppFabState extends ConsumerState<AppFab>
     _bloomController.value = 0;
     _leaves = const [];
     _plantKind = null;
+    _bloomBouquet = false;
     _wiggleStarted = false;
     _releaseAmbientSlot();
   }
@@ -256,6 +273,8 @@ class _AppFabState extends ConsumerState<AppFab>
   void _scheduleAmbientBloom({Duration? delay}) {
     _ambientTimer?.cancel();
     if (!_ambientAllowed) return;
+    // Debug playground: only the first auto bloom; further kinds via tap.
+    if (widget.previewAmbientBloom && delay == null) return;
     final wait =
         delay ?? Duration(milliseconds: 8000 + _rng.nextInt(10000));
     _ambientTimer = Timer(wait, () {
@@ -269,12 +288,42 @@ class _AppFabState extends ConsumerState<AppFab>
         _scheduleAmbientBloom(delay: const Duration(milliseconds: 600));
         return;
       }
+      if (widget.previewAmbientBloom) {
+        _startPreviewBloom();
+        return;
+      }
       setState(() {
-        _plantKind = AppFabPlantKind
-            .values[_rng.nextInt(AppFabPlantKind.values.length)];
+        // Classic original kinds as hero; sometimes a multi-plant bouquet too.
+        _plantKind = appFabOriginalPlantKinds[
+            _rng.nextInt(appFabOriginalPlantKinds.length)];
+        _bloomBouquet = _rng.nextBool();
       });
-      _bloomController.forward(from: 0);
+      _bloomController
+        ..duration = _bloomDuration
+        ..forward(from: 0);
     });
+  }
+
+  /// Advances through [_previewBloomCatalog], restarting the bloom immediately.
+  void _startPreviewBloom() {
+    _ambientTimer?.cancel();
+    if (!_extras || !mounted) return;
+    if (!_acquireAmbientSlot()) {
+      _releaseAmbientSlot();
+      _acquireAmbientSlot();
+    }
+    final entry = _previewBloomCatalog[
+        _previewBloomIndex % _previewBloomCatalog.length];
+    _previewBloomIndex++;
+    setState(() {
+      _plantKind = entry.$1;
+      _bloomBouquet = entry.$2;
+    });
+    // Skip grow — land in the stay phase so each tap shows the next plant now.
+    _bloomController
+      ..duration = _bloomPreviewDuration
+      ..value = AppFabBloomTimeline.growEnd
+      ..forward();
   }
 
   void _burstLeaves() {
@@ -287,6 +336,9 @@ class _AppFabState extends ConsumerState<AppFab>
     final cb = widget.onPressed;
     if (cb == null) return;
     _burstLeaves();
+    if (widget.previewAmbientBloom && _extras) {
+      _startPreviewBloom();
+    }
     _actionTimer?.cancel();
     // Integration / reduced-motion: invoke immediately so tests and a11y
     // paths do not depend on a wall-clock Timer after the press animation.
@@ -414,10 +466,14 @@ class _AppFabState extends ConsumerState<AppFab>
               children: [
                 if (_extras)
                   Positioned(
-                    left: (AppFab.size - AppFabNaturePainter.paintSize.width) /
+                    left: (AppFabNaturePainter.fabSize -
+                            AppFabNaturePainter.paintSize.width) /
                         2,
-                    top: (AppFab.size - AppFabNaturePainter.paintSize.height) /
-                        2,
+                    // Bias canvas upward so heads grow above the FAB; stems root on it.
+                    top: (AppFabNaturePainter.fabSize -
+                                AppFabNaturePainter.paintSize.height) /
+                            2 -
+                        AppFabNaturePainter.paintLift,
                     child: IgnorePointer(
                       child: CustomPaint(
                         size: AppFabNaturePainter.paintSize,
@@ -426,6 +482,7 @@ class _AppFabState extends ConsumerState<AppFab>
                           leaves: _leaves,
                           bloomProgress: _bloomController.value,
                           plantKind: _plantKind,
+                          bouquet: _bloomBouquet,
                         ),
                       ),
                     ),

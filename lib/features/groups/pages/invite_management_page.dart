@@ -73,196 +73,197 @@ class _InviteManagementPageState extends ConsumerState<InviteManagementPage> {
         if (!didPop) popOrGo(context, settingsPath);
       },
       child: LayoutBuilder(
-      builder: (context, layoutConstraints) {
-        return Scaffold(
-          floatingActionButtonLocation: ContentAlignedFabLocation.of(
-            context,
-            contentAreaWidth: layoutConstraints.maxWidth,
-          ),
-          appBar: ContentAlignedAppBar(
-            contentAreaWidth: layoutConstraints.maxWidth,
-            title: Text('invite_links'.tr()),
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => popOrGo(context, settingsPath),
+        builder: (context, layoutConstraints) {
+          return Scaffold(
+            floatingActionButtonLocation: ContentAlignedFabLocation.of(
+              context,
+              contentAreaWidth: layoutConstraints.maxWidth,
             ),
-          ),
-          floatingActionButton: AppFab(
-            icon: Icons.add,
-            tooltip: 'create_invite'.tr(),
-            onPressed: () =>
-                showCreateInviteSheet(context, ref, widget.groupId),
-          ),
-          body: myRoleAsync.when(
-            data: (myRole) {
-              final canManageInvites =
-                  localOnly ||
-                  myRole == GroupRole.owner ||
-                  myRole == GroupRole.admin;
-              if (!canManageInvites) {
-                return Center(
-                  child: ErrorContentWidget(
-                    titleKey: 'generic_error',
-                    message: 'invite_manage_restricted'.tr(),
-                    details: 'invite_manage_restricted'.tr(),
-                  ),
-                );
-              }
-              return ConstrainedContent(
-                child: invitesAsync.when(
-                  data: (invites) {
-                    // Sort: active first, then by created_at desc
-                    invites.sort((a, b) {
-                      final aActive = a.status == InviteStatus.active ? 0 : 1;
-                      final bActive = b.status == InviteStatus.active ? 0 : 1;
-                      if (aActive != bActive) return aActive.compareTo(bActive);
-                      return b.createdAt.compareTo(a.createdAt);
-                    });
-
-                    final filtered = _filter == null
-                        ? invites
-                        : invites.where((i) => i.status == _filter).toList();
-
-                    return Column(
-                      children: [
-                        // Filter chips
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: ThemeConfig.spacingM,
-                            vertical: ThemeConfig.spacingS,
-                          ),
-                          child: Row(
-                            children: [
-                              _FilterChip(
-                                label: 'invite_filter_all'.tr(),
-                                count: invites.length,
-                                selected: _filter == null,
-                                onSelected: () =>
-                                    setState(() => _filter = null),
-                              ),
-                              const SizedBox(width: 8),
-                              _FilterChip(
-                                label: 'invite_filter_active'.tr(),
-                                count: invites
-                                    .where(
-                                      (i) => i.status == InviteStatus.active,
-                                    )
-                                    .length,
-                                selected: _filter == InviteStatus.active,
-                                onSelected: () => setState(
-                                  () => _filter = InviteStatus.active,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              _FilterChip(
-                                label: 'invite_filter_expired'.tr(),
-                                count: invites
-                                    .where(
-                                      (i) => i.status == InviteStatus.expired,
-                                    )
-                                    .length,
-                                selected: _filter == InviteStatus.expired,
-                                onSelected: () => setState(
-                                  () => _filter = InviteStatus.expired,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              _FilterChip(
-                                label: 'invite_filter_revoked'.tr(),
-                                count: invites
-                                    .where(
-                                      (i) => i.status == InviteStatus.revoked,
-                                    )
-                                    .length,
-                                selected: _filter == InviteStatus.revoked,
-                                onSelected: () => setState(
-                                  () => _filter = InviteStatus.revoked,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Divider(height: 1),
-                        // List
-                        Expanded(
-                          child: filtered.isEmpty
-                              ? Center(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.link_off,
-                                        size: 48,
-                                        color: theme
-                                            .colorScheme
-                                            .onSurfaceVariant
-                                            .withAlpha(120),
-                                      ),
-                                      const SizedBox(
-                                        height: ThemeConfig.spacingM,
-                                      ),
-                                      Text(
-                                        'invite_empty'.tr(),
-                                        style: theme.textTheme.bodyLarge
-                                            ?.copyWith(
-                                              color: theme
-                                                  .colorScheme
-                                                  .onSurfaceVariant,
-                                            ),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              : ListView.builder(
-                                  padding: const EdgeInsets.only(
-                                    top: ThemeConfig.spacingS,
-                                    bottom: 80,
-                                  ),
-                                  itemCount: filtered.length,
-                                  itemBuilder: (context, i) => _InviteCard(
-                                    invite: filtered[i],
-                                    groupId: widget.groupId,
-                                  ),
-                                ),
-                        ),
-                      ],
-                    );
-                  },
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
-                  error: (e, st) {
-                    sendErrorTelemetryIfOnline(
-                      ref,
-                      message: e.toString(),
-                      details: e.toString(),
-                    );
-                    return Center(
-                      child: ErrorContentWidget(
-                        message: e.toString(),
-                        details: e.toString(),
-                        stackTrace: st,
-                        onRetry: () => ref.invalidate(
-                          invitesByGroupProvider(widget.groupId),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              );
-            },
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, st) => Center(
-              child: ErrorContentWidget(
-                message: e.toString(),
-                details: e.toString(),
-                stackTrace: st,
+            appBar: ContentAlignedAppBar(
+              contentAreaWidth: layoutConstraints.maxWidth,
+              title: Text('invite_links'.tr()),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => popOrGo(context, settingsPath),
               ),
             ),
-          ),
-        );
-      },
-    ),
+            floatingActionButton: AppFab(
+              icon: Icons.add,
+              tooltip: 'create_invite'.tr(),
+              onPressed: () =>
+                  showCreateInviteSheet(context, ref, widget.groupId),
+            ),
+            body: myRoleAsync.when(
+              data: (myRole) {
+                final canManageInvites =
+                    localOnly ||
+                    myRole == GroupRole.owner ||
+                    myRole == GroupRole.admin;
+                if (!canManageInvites) {
+                  return Center(
+                    child: ErrorContentWidget(
+                      titleKey: 'generic_error',
+                      message: 'invite_manage_restricted'.tr(),
+                      details: 'invite_manage_restricted'.tr(),
+                    ),
+                  );
+                }
+                return ConstrainedContent(
+                  child: invitesAsync.when(
+                    data: (invites) {
+                      // Sort: active first, then by created_at desc
+                      invites.sort((a, b) {
+                        final aActive = a.status == InviteStatus.active ? 0 : 1;
+                        final bActive = b.status == InviteStatus.active ? 0 : 1;
+                        if (aActive != bActive)
+                          return aActive.compareTo(bActive);
+                        return b.createdAt.compareTo(a.createdAt);
+                      });
+
+                      final filtered = _filter == null
+                          ? invites
+                          : invites.where((i) => i.status == _filter).toList();
+
+                      return Column(
+                        children: [
+                          // Filter chips
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: ThemeConfig.spacingM,
+                              vertical: ThemeConfig.spacingS,
+                            ),
+                            child: Row(
+                              children: [
+                                _FilterChip(
+                                  label: 'invite_filter_all'.tr(),
+                                  count: invites.length,
+                                  selected: _filter == null,
+                                  onSelected: () =>
+                                      setState(() => _filter = null),
+                                ),
+                                const SizedBox(width: 8),
+                                _FilterChip(
+                                  label: 'invite_filter_active'.tr(),
+                                  count: invites
+                                      .where(
+                                        (i) => i.status == InviteStatus.active,
+                                      )
+                                      .length,
+                                  selected: _filter == InviteStatus.active,
+                                  onSelected: () => setState(
+                                    () => _filter = InviteStatus.active,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                _FilterChip(
+                                  label: 'invite_filter_expired'.tr(),
+                                  count: invites
+                                      .where(
+                                        (i) => i.status == InviteStatus.expired,
+                                      )
+                                      .length,
+                                  selected: _filter == InviteStatus.expired,
+                                  onSelected: () => setState(
+                                    () => _filter = InviteStatus.expired,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                _FilterChip(
+                                  label: 'invite_filter_revoked'.tr(),
+                                  count: invites
+                                      .where(
+                                        (i) => i.status == InviteStatus.revoked,
+                                      )
+                                      .length,
+                                  selected: _filter == InviteStatus.revoked,
+                                  onSelected: () => setState(
+                                    () => _filter = InviteStatus.revoked,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Divider(height: 1),
+                          // List
+                          Expanded(
+                            child: filtered.isEmpty
+                                ? Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.link_off,
+                                          size: 48,
+                                          color: theme
+                                              .colorScheme
+                                              .onSurfaceVariant
+                                              .withAlpha(120),
+                                        ),
+                                        const SizedBox(
+                                          height: ThemeConfig.spacingM,
+                                        ),
+                                        Text(
+                                          'invite_empty'.tr(),
+                                          style: theme.textTheme.bodyLarge
+                                              ?.copyWith(
+                                                color: theme
+                                                    .colorScheme
+                                                    .onSurfaceVariant,
+                                              ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                : ListView.builder(
+                                    padding: const EdgeInsets.only(
+                                      top: ThemeConfig.spacingS,
+                                      bottom: 80,
+                                    ),
+                                    itemCount: filtered.length,
+                                    itemBuilder: (context, i) => _InviteCard(
+                                      invite: filtered[i],
+                                      groupId: widget.groupId,
+                                    ),
+                                  ),
+                          ),
+                        ],
+                      );
+                    },
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (e, st) {
+                      sendErrorTelemetryIfOnline(
+                        ref,
+                        message: e.toString(),
+                        details: e.toString(),
+                      );
+                      return Center(
+                        child: ErrorContentWidget(
+                          message: e.toString(),
+                          details: e.toString(),
+                          stackTrace: st,
+                          onRetry: () => ref.invalidate(
+                            invitesByGroupProvider(widget.groupId),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, st) => Center(
+                child: ErrorContentWidget(
+                  message: e.toString(),
+                  details: e.toString(),
+                  stackTrace: st,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -483,8 +484,8 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
                                         invite.label!,
                                         style: theme.textTheme.titleSmall
                                             ?.copyWith(
-                                          fontWeight: FontWeight.w600,
-                                        ),
+                                              fontWeight: FontWeight.w600,
+                                            ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       )
@@ -492,151 +493,152 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
                                         displayLabel,
                                         style: theme.textTheme.titleSmall
                                             ?.copyWith(
-                                          fontWeight: FontWeight.w600,
-                                        ),
+                                              fontWeight: FontWeight.w600,
+                                            ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
                               ),
-                            const SizedBox(width: 8),
-                            _statusChip(context),
-                            if (invite.role == 'admin') ...[
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 1,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.primaryContainer,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  'group_admin'.tr(),
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: theme.colorScheme.onPrimaryContainer,
+                              const SizedBox(width: 8),
+                              _statusChip(context),
+                              if (invite.role == 'admin') ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 1,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.primaryContainer,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    'group_admin'.tr(),
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color:
+                                          theme.colorScheme.onPrimaryContainer,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        // Info row
-                        DefaultTextStyle(
-                          style: theme.textTheme.bodySmall!.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.people_outline, size: 14),
-                              const SizedBox(width: 4),
-                              Text(_usageText()),
-                              const SizedBox(width: 12),
-                              const Icon(Icons.schedule, size: 14),
-                              const SizedBox(width: 4),
-                              Flexible(child: Text(_expiryText())),
+                              ],
                             ],
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 4),
+                          // Info row
+                          DefaultTextStyle(
+                            style: theme.textTheme.bodySmall!.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.people_outline, size: 14),
+                                const SizedBox(width: 4),
+                                Text(_usageText()),
+                                const SizedBox(width: 12),
+                                const Icon(Icons.schedule, size: 14),
+                                const SizedBox(width: 4),
+                                Flexible(child: Text(_expiryText())),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  Icon(
-                    _expanded ? Icons.expand_less : Icons.expand_more,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ],
-              ),
-
-              // Expanded section
-              if (_expanded) ...[
-                const SizedBox(height: ThemeConfig.spacingS),
-                const Divider(height: 1),
-                const SizedBox(height: ThemeConfig.spacingS),
-
-                // Created info
-                Text(
-                  'invite_created_on'.tr(
-                    args: [
-                      DateFormat.yMMMd().add_jm().format(invite.createdAt),
-                    ],
-                  ),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+                    Icon(
+                      _expanded ? Icons.expand_less : Icons.expand_more,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: ThemeConfig.spacingS),
 
-                // Actions
-                if (_actionLoading)
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(8.0),
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  )
-                else
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: [
-                      if (invite.isUsable) ...[
-                        _ActionChip(
-                          icon: Icons.copy,
-                          label: 'copy_link'.tr(),
-                          onPressed: () {
-                            Clipboard.setData(
-                              ClipboardData(text: _inviteUrl(invite.token)),
-                            );
-                            context.showSuccess('invite_link_copied'.tr());
-                          },
-                        ),
-                        _ActionChip(
-                          icon: Icons.qr_code,
-                          label: 'show_qr_code'.tr(),
-                          onPressed: _showQrCode,
-                        ),
-                      ],
-                      if (invite.isActive)
-                        _ActionChip(
-                          icon: Icons.pause,
-                          label: 'invite_pause'.tr(),
-                          onPressed: _toggleActive,
-                        )
-                      else if (invite.status == InviteStatus.revoked)
-                        _ActionChip(
-                          icon: Icons.play_arrow,
-                          label: 'invite_resume'.tr(),
-                          onPressed: _toggleActive,
-                        ),
-                      if (invite.isActive)
-                        _ActionChip(
-                          icon: Icons.block,
-                          label: 'invite_revoke'.tr(),
-                          onPressed: _revoke,
-                          isDestructive: true,
-                        ),
-                    ],
-                  ),
-
-                // Usage history
-                if (invite.useCount > 0) ...[
+                // Expanded section
+                if (_expanded) ...[
                   const SizedBox(height: ThemeConfig.spacingS),
                   const Divider(height: 1),
                   const SizedBox(height: ThemeConfig.spacingS),
+
+                  // Created info
                   Text(
-                    'invite_usage_history'.tr(),
-                    style: theme.textTheme.titleSmall,
+                    'invite_created_on'.tr(
+                      args: [
+                        DateFormat.yMMMd().add_jm().format(invite.createdAt),
+                      ],
+                    ),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                  const SizedBox(height: ThemeConfig.spacingXS),
-                  _UsageHistoryList(
-                    inviteId: invite.id,
-                    groupId: widget.groupId,
-                  ),
+                  const SizedBox(height: ThemeConfig.spacingS),
+
+                  // Actions
+                  if (_actionLoading)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  else
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        if (invite.isUsable) ...[
+                          _ActionChip(
+                            icon: Icons.copy,
+                            label: 'copy_link'.tr(),
+                            onPressed: () {
+                              Clipboard.setData(
+                                ClipboardData(text: _inviteUrl(invite.token)),
+                              );
+                              context.showSuccess('invite_link_copied'.tr());
+                            },
+                          ),
+                          _ActionChip(
+                            icon: Icons.qr_code,
+                            label: 'show_qr_code'.tr(),
+                            onPressed: _showQrCode,
+                          ),
+                        ],
+                        if (invite.isActive)
+                          _ActionChip(
+                            icon: Icons.pause,
+                            label: 'invite_pause'.tr(),
+                            onPressed: _toggleActive,
+                          )
+                        else if (invite.status == InviteStatus.revoked)
+                          _ActionChip(
+                            icon: Icons.play_arrow,
+                            label: 'invite_resume'.tr(),
+                            onPressed: _toggleActive,
+                          ),
+                        if (invite.isActive)
+                          _ActionChip(
+                            icon: Icons.block,
+                            label: 'invite_revoke'.tr(),
+                            onPressed: _revoke,
+                            isDestructive: true,
+                          ),
+                      ],
+                    ),
+
+                  // Usage history
+                  if (invite.useCount > 0) ...[
+                    const SizedBox(height: ThemeConfig.spacingS),
+                    const Divider(height: 1),
+                    const SizedBox(height: ThemeConfig.spacingS),
+                    Text(
+                      'invite_usage_history'.tr(),
+                      style: theme.textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: ThemeConfig.spacingXS),
+                    _UsageHistoryList(
+                      inviteId: invite.id,
+                      groupId: widget.groupId,
+                    ),
+                  ],
                 ],
               ],
-            ],
             ),
           ),
         ),
@@ -735,14 +737,8 @@ class _UsageHistoryList extends ConsumerWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: realName != null
-                        ? UserText(
-                            realName,
-                            style: theme.textTheme.bodySmall,
-                          )
-                        : Text(
-                            displayLabel,
-                            style: theme.textTheme.bodySmall,
-                          ),
+                        ? UserText(realName, style: theme.textTheme.bodySmall)
+                        : Text(displayLabel, style: theme.textTheme.bodySmall),
                   ),
                   Text(
                     dateStr,

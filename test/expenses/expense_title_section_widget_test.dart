@@ -1,7 +1,10 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hisab/features/expenses/widgets/category_affordance_chip.dart';
 import 'package:hisab/features/expenses/widgets/expense_title_section.dart';
+import 'package:hisab/features/settings/providers/settings_framework_providers.dart';
 
 void main() {
   late TextEditingController controller;
@@ -18,29 +21,35 @@ void main() {
     controller.dispose();
   });
 
-  testWidgets('ExpenseTitleSection shows title label and tag icon', (
+  testWidgets('ExpenseTitleSection shows title label and category chip', (
     tester,
   ) async {
     await tester.pumpWidget(
-      EasyLocalization(
-        path: 'assets/translations',
-        supportedLocales: const [Locale('en')],
-        fallbackLocale: const Locale('en'),
-        startLocale: const Locale('en'),
-        child: MaterialApp(
-          home: Scaffold(
-            body: ExpenseTitleSection(
-              controller: controller,
-              selectedTag: null,
-              customTags: const [],
-              onTagPicker: () {},
-              onPickImage: () {},
+      ProviderScope(
+        overrides: [
+          extraAnimationsEnabledProvider.overrideWith((ref) => false),
+        ],
+        child: EasyLocalization(
+          path: 'assets/translations',
+          supportedLocales: const [Locale('en')],
+          fallbackLocale: const Locale('en'),
+          startLocale: const Locale('en'),
+          child: MaterialApp(
+            home: Scaffold(
+              body: ExpenseTitleSection(
+                controller: controller,
+                selectedTag: null,
+                customTags: const [],
+                onTagPicker: () {},
+                onPickImage: () {},
+              ),
             ),
           ),
         ),
       ),
     );
     await tester.pumpAndSettle();
+    expect(find.byType(CategoryAffordanceChip), findsOneWidget);
     expect(find.byIcon(Icons.label_outlined), findsOneWidget);
     expect(find.byIcon(Icons.camera_alt_outlined), findsOneWidget);
     expect(find.byType(ExpenseTitleSection), findsOneWidget);

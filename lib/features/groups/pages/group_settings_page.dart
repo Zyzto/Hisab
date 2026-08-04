@@ -118,7 +118,8 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                     onPressed: () => popOrGo(context, groupPath),
                   ),
                   title: Text(
-                    (group.isPersonal ? 'list_settings' : 'group_settings').tr(),
+                    (group.isPersonal ? 'list_settings' : 'group_settings')
+                        .tr(),
                   ),
                 ),
                 body: ConstrainedContent(
@@ -128,218 +129,245 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
                       vertical: ThemeConfig.spacingS,
                     ),
                     children: [
-                    // ── Group Profile Header ──
-                    _buildProfileHeader(
-                      context,
-                      group,
-                      canEditSettings: canEditSettings,
-                    ),
-                    const SizedBox(height: ThemeConfig.spacingL),
-
-                    // ── Currency Section ──
-                    _buildSection(
-                      context,
-                      title: (group.isPersonal ? 'currency' : 'group_currency')
-                          .tr(),
-                      children: [
-                        _buildCurrencyRow(
-                          context,
-                          group,
-                          expensesAsync,
-                          ref,
-                          canEditSettings: canEditSettings,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: ThemeConfig.spacingL),
-
-                    // ── My budget (personal only) ──
-                    if (group.isPersonal) ...[
-                      _buildSection(
+                      // ── Group Profile Header ──
+                      _buildProfileHeader(
                         context,
-                        title: 'my_budget'.tr(),
-                        children: [
-                          _buildMyBudgetRow(
-                            context,
-                            group,
-                            ref,
-                            canEditSettings: canEditSettings,
-                          ),
-                        ],
+                        group,
+                        canEditSettings: canEditSettings,
                       ),
                       const SizedBox(height: ThemeConfig.spacingL),
-                    ],
 
-                    // ── Settlement Section (group only) ──
-                    if (!group.isPersonal)
+                      // ── Currency Section ──
                       _buildSection(
                         context,
-                        title: 'settlement_settings'.tr(),
+                        title:
+                            (group.isPersonal ? 'currency' : 'group_currency')
+                                .tr(),
                         children: [
-                          SettlementMethodPickerButton(
-                            method: group.settlementMethod,
-                            enabled: canEditSettings && !_saving,
-                            onChanged: (method) =>
-                                _onMethodChanged(ref, group, method),
-                          ),
-                          const SizedBox(height: ThemeConfig.spacingM),
-                          SettlementMethodGuideCard(
-                            method: group.settlementMethod,
-                            showExample: true,
-                          ),
-                          if (group.settlementMethod ==
-                              SettlementMethod.treasurer)
-                            _buildTreasurerContent(
-                              context,
-                              group,
-                              participantsAsync,
-                              ref,
-                              canEditSettings: canEditSettings,
-                            ),
-                          _buildFreezeContent(
+                          _buildCurrencyRow(
                             context,
                             group,
-                            participantsAsync,
                             expensesAsync,
                             ref,
                             canEditSettings: canEditSettings,
                           ),
                         ],
                       ),
-                    if (!group.isPersonal)
                       const SizedBox(height: ThemeConfig.spacingL),
 
-                    // ── Permissions Section (online only, group only) ──
-                    if (!localOnly && !group.isPersonal)
-                      myRoleAsync.when(
-                        data: (myRole) {
-                          final isOwnerOrAdmin =
-                              myRole == GroupRole.owner ||
-                              myRole == GroupRole.admin;
-                          if (!isOwnerOrAdmin || group.ownerId == null) {
-                            return const SizedBox.shrink();
-                          }
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: ThemeConfig.spacingL),
-                              _buildSection(
-                                context,
-                                title: 'group_permissions'.tr(),
-                                children: [
-                                  SwitchListTile(
-                                    contentPadding: EdgeInsets.zero,
-                                    title: Text('allow_add_expense'.tr()),
-                                    value: group.allowMemberAddExpense,
-                                    onChanged: _saving
-                                        ? null
-                                        : (v) => _onPermissionChanged(
-                                            ref,
-                                            group,
-                                            allowMemberAddExpense: v,
-                                          ),
-                                  ),
-                                  SwitchListTile(
-                                    contentPadding: EdgeInsets.zero,
-                                    title: Text('allow_change_settings'.tr()),
-                                    value: group.allowMemberChangeSettings,
-                                    onChanged: _saving
-                                        ? null
-                                        : (v) => _onPermissionChanged(
-                                            ref,
-                                            group,
-                                            allowMemberChangeSettings: v,
-                                          ),
-                                  ),
-                                  SwitchListTile(
-                                    contentPadding: EdgeInsets.zero,
-                                    title: Text('allow_expense_as_other'.tr()),
-                                    value: group.allowExpenseAsOtherParticipant,
-                                    onChanged: _saving
-                                        ? null
-                                        : (v) => _onPermissionChanged(
-                                            ref,
-                                            group,
-                                            allowExpenseAsOtherParticipant: v,
-                                          ),
-                                  ),
-                                  SwitchListTile(
-                                    contentPadding: EdgeInsets.zero,
-                                    title: Text('allow_settle_for_others'.tr()),
-                                    value: group.allowMemberSettleForOthers,
-                                    onChanged: _saving
-                                        ? null
-                                        : (v) => _onPermissionChanged(
-                                            ref,
-                                            group,
-                                            allowMemberSettleForOthers: v,
-                                          ),
-                                  ),
-                                ],
+                      // ── Categories ──
+                      if (canEditSettings)
+                        _buildSection(
+                          context,
+                          title: 'manage_categories'.tr(),
+                          children: [
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: const Icon(Icons.label_outlined),
+                              title: Text('manage_categories'.tr()),
+                              subtitle: Text('manage_categories_subtitle'.tr()),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () => context.push(
+                                RoutePaths.groupCategories(widget.groupId),
                               ),
-                            ],
-                          );
-                        },
-                        loading: () => const SizedBox.shrink(),
-                        error: (_, _) => const SizedBox.shrink(),
-                      ),
+                            ),
+                          ],
+                        ),
+                      if (canEditSettings)
+                        const SizedBox(height: ThemeConfig.spacingL),
 
-                    // ── Invite Section (online only, owner/admin, group only) ──
-                    if (!localOnly && !group.isPersonal)
-                      myRoleAsync.when(
-                        data: (myRole) {
-                          final isOwnerOrAdmin =
-                              myRole == GroupRole.owner ||
-                              myRole == GroupRole.admin;
-                          if (!isOwnerOrAdmin) return const SizedBox.shrink();
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: ThemeConfig.spacingL),
-                              _buildInviteSection(context, ref),
-                            ],
-                          );
-                        },
-                        loading: () => const SizedBox.shrink(),
-                        error: (_, _) => const SizedBox.shrink(),
-                      ),
+                      // ── My budget (personal only) ──
+                      if (group.isPersonal) ...[
+                        _buildSection(
+                          context,
+                          title: 'my_budget'.tr(),
+                          children: [
+                            _buildMyBudgetRow(
+                              context,
+                              group,
+                              ref,
+                              canEditSettings: canEditSettings,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: ThemeConfig.spacingL),
+                      ],
 
-                    // ── Danger Zone ──
-                    const SizedBox(height: ThemeConfig.spacingXL),
-                    localArchivedIdsAsync.when(
-                      data: (ids) => _buildDangerZone(
-                        context,
-                        group,
-                        localOnly,
-                        myRoleAsync,
-                        participantsAsync,
-                        ref,
-                        isLocallyArchived: ids.contains(widget.groupId),
+                      // ── Settlement Section (group only) ──
+                      if (!group.isPersonal)
+                        _buildSection(
+                          context,
+                          title: 'settlement_settings'.tr(),
+                          children: [
+                            SettlementMethodPickerButton(
+                              method: group.settlementMethod,
+                              enabled: canEditSettings && !_saving,
+                              onChanged: (method) =>
+                                  _onMethodChanged(ref, group, method),
+                            ),
+                            const SizedBox(height: ThemeConfig.spacingM),
+                            SettlementMethodGuideCard(
+                              method: group.settlementMethod,
+                              showExample: true,
+                            ),
+                            if (group.settlementMethod ==
+                                SettlementMethod.treasurer)
+                              _buildTreasurerContent(
+                                context,
+                                group,
+                                participantsAsync,
+                                ref,
+                                canEditSettings: canEditSettings,
+                              ),
+                            _buildFreezeContent(
+                              context,
+                              group,
+                              participantsAsync,
+                              expensesAsync,
+                              ref,
+                              canEditSettings: canEditSettings,
+                            ),
+                          ],
+                        ),
+                      if (!group.isPersonal)
+                        const SizedBox(height: ThemeConfig.spacingL),
+
+                      // ── Permissions Section (online only, group only) ──
+                      if (!localOnly && !group.isPersonal)
+                        myRoleAsync.when(
+                          data: (myRole) {
+                            final isOwnerOrAdmin =
+                                myRole == GroupRole.owner ||
+                                myRole == GroupRole.admin;
+                            if (!isOwnerOrAdmin || group.ownerId == null) {
+                              return const SizedBox.shrink();
+                            }
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: ThemeConfig.spacingL),
+                                _buildSection(
+                                  context,
+                                  title: 'group_permissions'.tr(),
+                                  children: [
+                                    SwitchListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      title: Text('allow_add_expense'.tr()),
+                                      value: group.allowMemberAddExpense,
+                                      onChanged: _saving
+                                          ? null
+                                          : (v) => _onPermissionChanged(
+                                              ref,
+                                              group,
+                                              allowMemberAddExpense: v,
+                                            ),
+                                    ),
+                                    SwitchListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      title: Text('allow_change_settings'.tr()),
+                                      value: group.allowMemberChangeSettings,
+                                      onChanged: _saving
+                                          ? null
+                                          : (v) => _onPermissionChanged(
+                                              ref,
+                                              group,
+                                              allowMemberChangeSettings: v,
+                                            ),
+                                    ),
+                                    SwitchListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      title: Text(
+                                        'allow_expense_as_other'.tr(),
+                                      ),
+                                      value:
+                                          group.allowExpenseAsOtherParticipant,
+                                      onChanged: _saving
+                                          ? null
+                                          : (v) => _onPermissionChanged(
+                                              ref,
+                                              group,
+                                              allowExpenseAsOtherParticipant: v,
+                                            ),
+                                    ),
+                                    SwitchListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      title: Text(
+                                        'allow_settle_for_others'.tr(),
+                                      ),
+                                      value: group.allowMemberSettleForOthers,
+                                      onChanged: _saving
+                                          ? null
+                                          : (v) => _onPermissionChanged(
+                                              ref,
+                                              group,
+                                              allowMemberSettleForOthers: v,
+                                            ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            );
+                          },
+                          loading: () => const SizedBox.shrink(),
+                          error: (_, _) => const SizedBox.shrink(),
+                        ),
+
+                      // ── Invite Section (online only, owner/admin, group only) ──
+                      if (!localOnly && !group.isPersonal)
+                        myRoleAsync.when(
+                          data: (myRole) {
+                            final isOwnerOrAdmin =
+                                myRole == GroupRole.owner ||
+                                myRole == GroupRole.admin;
+                            if (!isOwnerOrAdmin) return const SizedBox.shrink();
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: ThemeConfig.spacingL),
+                                _buildInviteSection(context, ref),
+                              ],
+                            );
+                          },
+                          loading: () => const SizedBox.shrink(),
+                          error: (_, _) => const SizedBox.shrink(),
+                        ),
+
+                      // ── Danger Zone ──
+                      const SizedBox(height: ThemeConfig.spacingXL),
+                      localArchivedIdsAsync.when(
+                        data: (ids) => _buildDangerZone(
+                          context,
+                          group,
+                          localOnly,
+                          myRoleAsync,
+                          participantsAsync,
+                          ref,
+                          isLocallyArchived: ids.contains(widget.groupId),
+                        ),
+                        loading: () => _buildDangerZone(
+                          context,
+                          group,
+                          localOnly,
+                          myRoleAsync,
+                          participantsAsync,
+                          ref,
+                          isLocallyArchived: false,
+                        ),
+                        error: (_, _) => _buildDangerZone(
+                          context,
+                          group,
+                          localOnly,
+                          myRoleAsync,
+                          participantsAsync,
+                          ref,
+                          isLocallyArchived: false,
+                        ),
                       ),
-                      loading: () => _buildDangerZone(
-                        context,
-                        group,
-                        localOnly,
-                        myRoleAsync,
-                        participantsAsync,
-                        ref,
-                        isLocallyArchived: false,
-                      ),
-                      error: (_, _) => _buildDangerZone(
-                        context,
-                        group,
-                        localOnly,
-                        myRoleAsync,
-                        participantsAsync,
-                        ref,
-                        isLocallyArchived: false,
-                      ),
-                    ),
-                    const SizedBox(height: ThemeConfig.spacingXL),
-                  ],
+                      const SizedBox(height: ThemeConfig.spacingXL),
+                    ],
+                  ),
                 ),
               ),
-            ),
             );
           },
         );
@@ -816,10 +844,8 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
               ),
               items: participants
                   .map(
-                    (p) => DropdownMenuItem(
-                      value: p.id,
-                      child: UserText(p.name),
-                    ),
+                    (p) =>
+                        DropdownMenuItem(value: p.id, child: UserText(p.name)),
                   )
                   .toList(),
               onChanged: _saving || !canEditSettings

@@ -94,6 +94,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
   // ── Step 2 state ──
   final _participantController = TextEditingController();
   final _participantFocusNode = FocusNode();
+
   /// Prevents the Add button from stealing focus from the name field.
   late final FocusNode _addParticipantButtonFocusNode;
   final List<String> _participants = [];
@@ -104,6 +105,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
 
   // ── Group settings (group create only; not personal) ──
   SettlementMethod _settlementMethod = SettlementMethod.greedy;
+
   /// `null` = owner is treasurer; otherwise a name from [_participants].
   String? _treasurerParticipantName;
   bool _allowMemberAddExpense = true;
@@ -181,7 +183,8 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
   void didUpdateWidget(covariant GroupCreatePage oldWidget) {
     super.didUpdateWidget(oldWidget);
     final targetPage = widget.initialStep.clamp(0, _pageCount - 1);
-    if (oldWidget.initialStep != widget.initialStep && targetPage != _currentPage) {
+    if (oldWidget.initialStep != widget.initialStep &&
+        targetPage != _currentPage) {
       _currentPage = targetPage;
       _pageController.jumpToPage(targetPage);
     }
@@ -850,7 +853,8 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
             builder: (context) {
               final profile = ref.watch(authUserProfileProvider).value;
               final profileName = profile?.name?.trim();
-              final displayName = (profileName != null && profileName.isNotEmpty)
+              final displayName =
+                  (profileName != null && profileName.isNotEmpty)
                   ? profileName
                   : 'wizard_you'.tr();
               return Container(
@@ -871,7 +875,9 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                   leading: ParticipantAvatar(
                     name: displayName,
                     avatarId: profile?.avatarId,
-                    backgroundColor: colorScheme.primary.withValues(alpha: 0.16),
+                    backgroundColor: colorScheme.primary.withValues(
+                      alpha: 0.16,
+                    ),
                     foregroundColor: colorScheme.primary,
                   ),
                   title: Text(
@@ -1014,7 +1020,9 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                       border: Border.all(
                         color: isSelected
                             ? _selectedColor
-                            : colorScheme.outlineVariant.withValues(alpha: 0.45),
+                            : colorScheme.outlineVariant.withValues(
+                                alpha: 0.45,
+                              ),
                         width: isSelected ? 2 : 1,
                       ),
                     ),
@@ -1105,7 +1113,8 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                     return CircleAvatar(
                       radius: 40,
                       backgroundColor: _selectedColor,
-                      child: iconDef != null && iconDef.key != groupIconLetterKey
+                      child:
+                          iconDef != null && iconDef.key != groupIconLetterKey
                           ? Icon(iconDef.icon, size: 40, color: fgOnColor)
                           : Text(
                               _nameController.text.trim().isNotEmpty

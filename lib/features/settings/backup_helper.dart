@@ -115,6 +115,7 @@ Map<String, dynamic> _tagToMap(ExpenseTag t) => {
   'groupId': t.groupId,
   'label': t.label,
   'iconName': t.iconName,
+  'color': t.colorHex,
   'createdAt': t.createdAt.toIso8601String(),
   'updatedAt': t.updatedAt.toIso8601String(),
 };
@@ -368,6 +369,7 @@ ExpenseTag _mapToTag(Map<String, dynamic> m) => ExpenseTag(
     m['iconName'] as String? ?? 'label',
     BackupLimits.maxTagIconName,
   ),
+  colorHex: _clampStrNullable(m['color'] as String?, 7),
   createdAt: DateTime.parse(m['createdAt'] as String),
   updatedAt: DateTime.parse(m['updatedAt'] as String),
 );

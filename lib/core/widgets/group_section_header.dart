@@ -40,13 +40,18 @@ class GroupSectionHeader extends StatelessWidget {
         Expanded(
           child: Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w700,
               color: labelColor ?? theme.colorScheme.onSurface,
             ),
           ),
         ),
-        ?trailing,
+        if (trailing != null) ...[
+          const SizedBox(width: 8),
+          trailing!,
+        ],
       ],
     );
   }

@@ -42,6 +42,8 @@ class RoutePaths {
   static String groupEdit(String groupId) => '/groups/$groupId/edit';
   static String groupSettings(String groupId) => '/groups/$groupId/settings';
   static String groupInvites(String groupId) => '/groups/$groupId/invites';
+  static String groupCategories(String groupId) =>
+      '/groups/$groupId/categories';
 
   static String inviteAccept(String token) => '/invite/$token';
   static String invitePreview(String token) => '/invite/$token/preview';

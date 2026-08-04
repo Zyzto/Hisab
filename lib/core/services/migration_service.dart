@@ -170,6 +170,7 @@ class MigrationService {
           'group_id': t['group_id'],
           'label': t['label'],
           'icon_name': t['icon_name'],
+          'color': t['color'],
           'created_at': t['created_at'],
           'updated_at': t['updated_at'],
         });

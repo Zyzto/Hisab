@@ -41,7 +41,92 @@ const Map<String, IconData> selectableCategoryIcons = {
   'pets': Icons.pets,
   'local_gas_station': Icons.local_gas_station,
   'restaurant_menu': Icons.restaurant_menu,
+  'sports_esports': Icons.sports_esports_outlined,
+  'music_note': Icons.music_note_outlined,
+  'beach_access': Icons.beach_access_outlined,
+  'hotel': Icons.hotel_outlined,
+  'directions_bus': Icons.directions_bus_outlined,
+  'train': Icons.train_outlined,
+  'pedal_bike': Icons.pedal_bike_outlined,
+  'local_taxi': Icons.local_taxi_outlined,
+  'pharmacy': Icons.local_pharmacy_outlined,
+  'child_care': Icons.child_care_outlined,
+  'spa': Icons.spa_outlined,
+  'content_cut': Icons.content_cut,
+  'build': Icons.build_outlined,
+  'handyman': Icons.handyman_outlined,
+  'cleaning_services': Icons.cleaning_services_outlined,
+  'electrical_services': Icons.electrical_services,
+  'wifi': Icons.wifi,
+  'phone_iphone': Icons.phone_iphone,
+  'computer': Icons.computer_outlined,
+  'headphones': Icons.headphones_outlined,
+  'camera_alt': Icons.camera_alt_outlined,
+  'book': Icons.menu_book_outlined,
+  'work': Icons.work_outline,
+  'savings': Icons.savings_outlined,
+  'account_balance': Icons.account_balance_outlined,
+  'attach_money': Icons.attach_money,
+  'celebration': Icons.celebration_outlined,
+  'cake': Icons.cake_outlined,
+  'local_bar': Icons.local_bar_outlined,
+  'icecream': Icons.icecream_outlined,
+  'lunch_dining': Icons.lunch_dining_outlined,
+  'bakery_dining': Icons.bakery_dining_outlined,
+  'park': Icons.park_outlined,
+  'yard': Icons.yard_outlined,
+  'water_drop': Icons.water_drop_outlined,
+  'bolt': Icons.bolt_outlined,
+  'local_laundry_service': Icons.local_laundry_service_outlined,
+  'shopping_basket': Icons.shopping_basket_outlined,
+  'storefront': Icons.storefront_outlined,
+  'apartment': Icons.apartment_outlined,
+  'directions_walk': Icons.directions_walk,
+  'self_improvement': Icons.self_improvement,
+  'favorite': Icons.favorite_outline,
+  'star': Icons.star_outline,
 };
+
+/// Curated accents for the custom-tag color picker (`#RRGGBB`).
+const List<String> selectableTagColorHexes = [
+  '#E67E22',
+  '#2EAD5B',
+  '#3B82F6',
+  '#EC4899',
+  '#8B5CF6',
+  '#EF4444',
+  '#14B8A6',
+  '#A16207',
+  '#0EA5E9',
+  '#6366F1',
+  '#D97706',
+  '#F43F5E',
+  '#0D9488',
+  '#2563EB',
+  '#DB2777',
+  '#7C3AED',
+  '#059669',
+  '#EA580C',
+  '#64748B',
+  '#0F172A',
+];
+
+/// Parses `#RRGGBB` / `RRGGBB`; returns null if invalid.
+Color? parseTagColorHex(String? hex) {
+  if (hex == null) return null;
+  var s = hex.trim();
+  if (s.isEmpty) return null;
+  if (s.startsWith('#')) s = s.substring(1);
+  if (s.length != 6) return null;
+  final value = int.tryParse(s, radix: 16);
+  if (value == null) return null;
+  return Color(0xFF000000 | value);
+}
+
+String tagColorToHex(Color color) {
+  final rgb = color.toARGB32() & 0xFFFFFF;
+  return '#${rgb.toRadixString(16).padLeft(6, '0').toUpperCase()}';
+}
 
 /// Default icon when no tag or unknown tag.
 const IconData defaultExpenseIcon = Icons.receipt_long;
@@ -100,6 +185,46 @@ class ExpenseTagChrome {
   });
 }
 
+/// Whether [label] clashes with a preset or an existing custom tag (case-insensitive).
+///
+/// Pass localized preset names in [extraReservedLabels] (e.g. translated
+/// `category_travel`) so locale-specific duplicates are caught too.
+bool expenseTagLabelExists(
+  String label, {
+  required List<ExpenseTag> customTags,
+  String? excludingTagId,
+  Iterable<String> extraReservedLabels = const [],
+}) {
+  final key = label.trim().toLowerCase();
+  if (key.isEmpty) return false;
+
+  for (final preset in presetCategoryTags) {
+    if (preset.id.toLowerCase() == key) return true;
+    if (preset.label.toLowerCase() == key) return true;
+  }
+  for (final reserved in extraReservedLabels) {
+    if (reserved.trim().toLowerCase() == key) return true;
+  }
+  for (final tag in customTags) {
+    if (excludingTagId != null && tag.id == excludingTagId) continue;
+    if (tag.label.trim().toLowerCase() == key) return true;
+  }
+  return false;
+}
+
+/// Human-readable tag label for exports (CSV/HTML). Presets use English
+/// [presetCategoryTags] labels; custom tags use stored labels; unknown ids pass through.
+String exportDisplayTagLabel(String? tagId, List<ExpenseTag> customTags) {
+  if (tagId == null || tagId.isEmpty) return '';
+  for (final custom in customTags) {
+    if (custom.id == tagId) return custom.label;
+  }
+  for (final preset in presetCategoryTags) {
+    if (preset.id == tagId) return preset.label;
+  }
+  return tagId;
+}
+
 /// Returns the icon for an expense tag (preset id or custom tag id).
 IconData iconForExpenseTag(String? tagId, List<ExpenseTag>? customTags) {
   if (tagId == null || tagId.isEmpty) return defaultExpenseIcon;
@@ -138,8 +263,10 @@ ExpenseTagChrome chromeForExpenseTag(
   String? tagId, {
   required Brightness brightness,
   required Color surface,
+  List<ExpenseTag>? customTags,
 }) {
-  final base = _rawTagColor(tagId);
+  final stored = _storedCustomColor(tagId, customTags);
+  final base = stored ?? _rawTagColor(tagId);
   // Keep accents vivid; darken slightly in light mode if needed so white text
   // can pass AA on the solid fill. Lighten a touch in dark mode for presence.
   var accent = base;
@@ -215,6 +342,14 @@ Color readableOnBackground(
 Color _rawTagColor(String? tagId) {
   if (tagId == null || tagId.isEmpty) return const Color(0xFF64748B);
   return _presetTagColors[tagId] ?? _colorForCustomTag(tagId);
+}
+
+Color? _storedCustomColor(String? tagId, List<ExpenseTag>? customTags) {
+  if (tagId == null || tagId.isEmpty || customTags == null) return null;
+  for (final tag in customTags) {
+    if (tag.id == tagId) return parseTagColorHex(tag.colorHex);
+  }
+  return null;
 }
 
 Color _colorForCustomTag(String tagId) {
