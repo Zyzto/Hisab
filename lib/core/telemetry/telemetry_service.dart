@@ -5,6 +5,7 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:http/http.dart' as http;
 
 import '../constants/app_config.dart';
+import '../constants/supabase_config.dart';
 
 /// Telemetry service. Sends events to a configurable endpoint.
 /// No-op when [telemetryEndpointUrl] is empty or [enabled] is false.
@@ -18,6 +19,7 @@ class TelemetryService {
     required bool enabled,
   }) async {
     if (!enabled || telemetryEndpointUrl.isEmpty) return;
+    if (supabaseAnonKey.isEmpty) return;
 
     try {
       final body = jsonEncode({
@@ -28,7 +30,11 @@ class TelemetryService {
       final response = await http
           .post(
             Uri.parse(telemetryEndpointUrl),
-            headers: {'Content-Type': 'application/json'},
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': supabaseAnonKey,
+              'Authorization': 'Bearer $supabaseAnonKey',
+            },
             body: body,
           )
           .timeout(const Duration(seconds: 10));

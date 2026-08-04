@@ -289,7 +289,9 @@ class NotificationService extends _$NotificationService {
     }
   }
 
-  /// Remove the device token from Supabase (call on sign-out).
+  /// Remove the device token from Supabase.
+  /// Prefer calling this **before** [AuthService.signOut] while the session
+  /// is still valid (RLS requires auth.uid()).
   Future<void> unregisterToken() async {
     _initialized = false;
     _initializing = false;
@@ -300,12 +302,19 @@ class NotificationService extends _$NotificationService {
     _openedAppSub?.cancel();
     _openedAppSub = null;
 
-    if (_currentToken == null) return;
+    final token = _currentToken;
+    if (token == null) return;
 
     final client = supabaseClientIfConfigured;
-    if (client == null) return;
+    if (client == null || client.auth.currentSession == null) {
+      Log.warning(
+        'NotificationService: skip unregister, no authenticated session',
+      );
+      _currentToken = null;
+      return;
+    }
     try {
-      await client.from('device_tokens').delete().eq('token', _currentToken!);
+      await client.from('device_tokens').delete().eq('token', token);
       Log.info('NotificationService: token unregistered');
       _currentToken = null;
     } catch (e) {
@@ -388,13 +397,15 @@ class NotificationService extends _$NotificationService {
 
       final locale = ref.read(languageProvider);
 
-      await client.from('device_tokens').upsert({
-        'user_id': userId,
-        'token': token,
-        'platform': platform,
-        'locale': locale,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }, onConflict: 'user_id,token');
+      // Claim exclusive ownership of this FCM token (drops other users' rows).
+      await client.rpc(
+        'claim_device_token',
+        params: {
+          'p_token': token,
+          'p_platform': platform,
+          'p_locale': locale,
+        },
+      );
 
       Log.info('NotificationService: token registered ($platform)');
     } catch (e, st) {
@@ -408,6 +419,15 @@ class NotificationService extends _$NotificationService {
 
   void _handleForegroundMessage(RemoteMessage message) {
     Log.debug('FCM foreground: ${message.notification?.title}');
+
+    final actorId = message.data['actor_user_id'] as String?;
+    final currentId = supabaseClientIfConfigured?.auth.currentUser?.id;
+    if (actorId != null &&
+        currentId != null &&
+        actorId.trim().toLowerCase() == currentId.trim().toLowerCase()) {
+      Log.debug('FCM foreground: ignoring notification for self-action');
+      return;
+    }
 
     final notification = message.notification;
     if (notification == null) return;

@@ -264,10 +264,10 @@ class _CategoryAffordanceChipState extends ConsumerState<CategoryAffordanceChip>
             ? 1.0 + 0.1 * math.sin(Curves.easeOut.transform(settleT) * math.pi)
             : 1.0;
 
-        // Cartoony idle: squash/stretch + hop + icon wiggle.
-        final idleScaleX = tagged ? 1.0 : 1.0 + 0.07 * math.sin(breathT * math.pi);
-        final idleScaleY = tagged ? 1.0 : 1.0 - 0.05 * math.sin(breathT * math.pi);
-        final idleHop = tagged ? 0.0 : -2.2 * math.sin(breathT * math.pi);
+        // Cartoony idle: squash/stretch from center + icon wiggle (no upward hop).
+        final pulse = tagged ? 0.0 : math.sin(breathT * math.pi);
+        final idleScaleX = tagged ? 1.0 : 1.0 + 0.07 * pulse;
+        final idleScaleY = tagged ? 1.0 : 1.0 - 0.05 * pulse;
         final iconWiggle = tagged
             ? 0.0
             : math.sin(breathT * math.pi * 2) * (10 * math.pi / 180);
@@ -347,42 +347,41 @@ class _CategoryAffordanceChipState extends ConsumerState<CategoryAffordanceChip>
             clipBehavior: Clip.none,
             alignment: Alignment.center,
             children: [
+              // Positioned + OverflowBox so the 96px burst never imposes a
+              // min-width on the chip (tight suffix slots were crashing with
+              // BoxConstraints(96<=w<=~92; NOT NORMALIZED)).
               if (_leafController.value > 0 && _leaves.isNotEmpty)
-                IgnorePointer(
-                  child: ClipRect(
-                    child: SizedBox(
-                      width: 96,
-                      height: 40,
-                      child: OverflowBox(
-                        maxWidth: AppFabNaturePainter.paintSize.width * 0.55,
-                        maxHeight: AppFabNaturePainter.paintSize.height * 0.55,
-                        child: Transform.scale(
-                          scale: 0.55,
-                          child: CustomPaint(
-                            size: AppFabNaturePainter.paintSize,
-                            painter: AppFabNaturePainter(
-                              leafProgress: _leafController.value,
-                              leaves: _leaves,
-                              bloomProgress: 0,
-                              plantKind: null,
-                            ),
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: OverflowBox(
+                      alignment: Alignment.center,
+                      minWidth: 96,
+                      maxWidth: 96,
+                      minHeight: 40,
+                      maxHeight: 40,
+                      child: Transform.scale(
+                        scale: 0.55,
+                        child: CustomPaint(
+                          size: AppFabNaturePainter.paintSize,
+                          painter: AppFabNaturePainter(
+                            leafProgress: _leafController.value,
+                            leaves: _leaves,
+                            bloomProgress: 0,
+                            plantKind: null,
                           ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              Transform.translate(
-                offset: Offset(0, idleHop),
-                child: Transform(
-                  alignment: Alignment.center,
-                  transform: Matrix4.diagonal3Values(
-                    idleScaleX * settleScale,
-                    idleScaleY * settleScale,
-                    1,
-                  ),
-                  child: chip,
+              Transform(
+                alignment: Alignment.center,
+                transform: Matrix4.diagonal3Values(
+                  idleScaleX * settleScale,
+                  idleScaleY * settleScale,
+                  1,
                 ),
+                child: chip,
               ),
             ],
           ),

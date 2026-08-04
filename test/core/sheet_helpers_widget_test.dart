@@ -167,4 +167,57 @@ void main() {
     await tester.pumpAndSettle();
     expect(chosen, 'b');
   });
+
+  testWidgets(
+    'showOptionPickerSheet supports subtitle, disabled, and header',
+    (tester) async {
+      setPhoneViewport(tester);
+      String? chosen;
+      await tester.pumpWidget(
+        buildApp(
+          onOpen: (ctx) async {
+            chosen = await showOptionPickerSheet<String>(
+              ctx,
+              title: 'Import',
+              header: const Text('Preview counts'),
+              options: const [
+                SheetPickerOption(
+                  value: 'add',
+                  label: 'Add copies',
+                  subtitle: 'Keeps existing data',
+                ),
+                SheetPickerOption(
+                  value: 'replace',
+                  label: 'Replace',
+                  subtitle: 'Requires offline mode',
+                  enabled: false,
+                ),
+              ],
+            );
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Preview counts'), findsOneWidget);
+      expect(find.text('Keeps existing data'), findsOneWidget);
+      expect(find.text('Requires offline mode'), findsOneWidget);
+
+      final disabled = tester.widget<SheetOptionTile>(
+        find.widgetWithText(SheetOptionTile, 'Replace'),
+      );
+      expect(disabled.enabled, isFalse);
+
+      await tester.tap(find.text('Replace'));
+      await tester.pumpAndSettle();
+      expect(chosen, isNull);
+      expect(find.byType(SheetOptionTile), findsNWidgets(2));
+
+      await tester.tap(find.text('Add copies'));
+      await tester.pumpAndSettle();
+      expect(chosen, 'add');
+    },
+  );
 }

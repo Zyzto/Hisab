@@ -16,33 +16,27 @@ import 'providers/settings_framework_providers.dart';
 import 'settings_definitions.dart';
 
 Future<void> runBackupExportFlow(BuildContext context, WidgetRef ref) async {
-  final kind = await showModalBottomSheet<BackupExportKind>(
-    context: context,
-    showDragHandle: true,
-    builder: (ctx) {
-      return SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: Text('export_minimal_json'.tr()),
-              subtitle: Text('export_minimal_json_subtitle'.tr()),
-              onTap: () => Navigator.pop(ctx, BackupExportKind.minimalJson),
-            ),
-            ListTile(
-              title: Text('export_minimal_csv'.tr()),
-              subtitle: Text('export_minimal_csv_subtitle'.tr()),
-              onTap: () => Navigator.pop(ctx, BackupExportKind.minimalCsv),
-            ),
-            ListTile(
-              title: Text('export_full_zip'.tr()),
-              subtitle: Text('export_full_zip_subtitle'.tr()),
-              onTap: () => Navigator.pop(ctx, BackupExportKind.fullZip),
-            ),
-          ],
-        ),
-      );
-    },
+  final kind = await showOptionPickerSheet<BackupExportKind>(
+    context,
+    title: 'export_data'.tr(),
+    centerInFullViewport: false,
+    options: [
+      SheetPickerOption(
+        value: BackupExportKind.minimalJson,
+        label: 'export_minimal_json'.tr(),
+        subtitle: 'export_minimal_json_subtitle'.tr(),
+      ),
+      SheetPickerOption(
+        value: BackupExportKind.minimalCsv,
+        label: 'export_minimal_csv'.tr(),
+        subtitle: 'export_minimal_csv_subtitle'.tr(),
+      ),
+      SheetPickerOption(
+        value: BackupExportKind.fullZip,
+        label: 'export_full_zip'.tr(),
+        subtitle: 'export_full_zip_subtitle'.tr(),
+      ),
+    ],
   );
   if (kind == null || !context.mounted) return;
 
@@ -141,65 +135,49 @@ Future<void> runBackupImportFlow(BuildContext context, WidgetRef ref) async {
     }
 
     if (!context.mounted) return;
-    final mode = await showModalBottomSheet<BackupImportMode>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'import_preview_title'.tr(),
-                  style: Theme.of(ctx).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'import_preview_counts'.tr(
-                    namedArgs: {
-                      'groups': '${preview.data.groups.length}',
-                      'expenses': '${preview.data.expenses.length}',
-                      'participants': '${preview.data.participants.length}',
-                      'version': '${preview.schemaVersion}',
-                    },
-                  ),
-                ),
-                if (warnings.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  ...warnings.map(
-                    (w) => Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Text('• ${w.tr()}'),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                ListTile(
-                  title: Text('import_mode_add'.tr()),
-                  subtitle: Text('import_mode_add_subtitle'.tr()),
-                  onTap: () => Navigator.pop(ctx, BackupImportMode.addCopies),
-                ),
-                ListTile(
-                  enabled: localOnly,
-                  title: Text('import_mode_replace'.tr()),
-                  subtitle: Text(
-                    localOnly
-                        ? 'import_mode_replace_subtitle'.tr()
-                        : 'import_mode_replace_requires_local'.tr(),
-                  ),
-                  onTap: localOnly
-                      ? () => Navigator.pop(ctx, BackupImportMode.replaceLocal)
-                      : null,
-                ),
-              ],
+    final mode = await showOptionPickerSheet<BackupImportMode>(
+      context,
+      title: 'import_preview_title'.tr(),
+      centerInFullViewport: false,
+      header: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'import_preview_counts'.tr(
+              namedArgs: {
+                'groups': '${preview.data.groups.length}',
+                'expenses': '${preview.data.expenses.length}',
+                'participants': '${preview.data.participants.length}',
+                'version': '${preview.schemaVersion}',
+              },
             ),
           ),
-        );
-      },
+          if (warnings.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ...warnings.map(
+              (w) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text('• ${w.tr()}'),
+              ),
+            ),
+          ],
+        ],
+      ),
+      options: [
+        SheetPickerOption(
+          value: BackupImportMode.addCopies,
+          label: 'import_mode_add'.tr(),
+          subtitle: 'import_mode_add_subtitle'.tr(),
+        ),
+        SheetPickerOption(
+          value: BackupImportMode.replaceLocal,
+          label: 'import_mode_replace'.tr(),
+          subtitle: localOnly
+              ? 'import_mode_replace_subtitle'.tr()
+              : 'import_mode_replace_requires_local'.tr(),
+          enabled: localOnly,
+        ),
+      ],
     );
     if (mode == null || !context.mounted) return;
 

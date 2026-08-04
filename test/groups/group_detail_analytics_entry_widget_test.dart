@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:hisab/core/widgets/anchored_dropdown_chip.dart';
 import 'package:hisab/domain/domain.dart';
 import 'package:hisab/features/groups/pages/group_analytics_page.dart';
 import 'package:hisab/features/groups/pages/group_detail_page.dart';
@@ -328,4 +329,80 @@ void main() {
     expect(find.byType(GroupAnalyticsPage), findsOneWidget);
     expect(find.byType(GroupSectionHeader), findsWidgets);
   });
+
+  testWidgets(
+    'analytics filters use AnchoredDropdownChip for range payer and category',
+    (tester) async {
+      const groupId = 'g-filters';
+      final now = DateTime.now();
+      final group = Group(
+        id: groupId,
+        name: 'Trip',
+        currencyCode: 'USD',
+        createdAt: now,
+        updatedAt: now,
+      );
+      final participants = [
+        Participant(
+          id: 'p1',
+          groupId: groupId,
+          name: 'Ali',
+          order: 0,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      ];
+      final router = GoRouter(
+        initialLocation: '/groups/$groupId/analytics',
+        routes: [
+          GoRoute(
+            path: '/groups/:id/analytics',
+            builder: (context, state) {
+              return GroupAnalyticsPage(groupId: state.pathParameters['id']!);
+            },
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            effectiveLocalOnlyProvider.overrideWith((ref) => true),
+            futureGroupProvider(
+              groupId,
+            ).overrideWithValue(AsyncValue.data(group)),
+            expensesByGroupProvider(
+              groupId,
+            ).overrideWithValue(const AsyncValue.data(<Expense>[])),
+            participantsByGroupProvider(
+              groupId,
+            ).overrideWithValue(AsyncValue.data(participants)),
+            tagsByGroupProvider(
+              groupId,
+            ).overrideWithValue(const AsyncValue.data(<ExpenseTag>[])),
+            myMemberInGroupProvider(
+              groupId,
+            ).overrideWithValue(const AsyncValue.data(null)),
+          ],
+          child: EasyLocalization(
+            path: 'assets/translations',
+            supportedLocales: testSupportedLocales,
+            fallbackLocale: const Locale('en'),
+            startLocale: const Locale('en'),
+            child: MaterialApp.router(routerConfig: router),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ChoiceChip), findsNothing);
+      expect(
+        find.byWidgetPredicate((w) => w is AnchoredDropdownChip),
+        findsNWidgets(3),
+      );
+      expect(find.text('analytics_range_90d'.tr()), findsOneWidget);
+      expect(find.text('analytics_filter_all_payers'.tr()), findsOneWidget);
+      expect(find.text('analytics_filter_all_categories'.tr()), findsOneWidget);
+    },
+  );
 }

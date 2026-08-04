@@ -110,6 +110,7 @@ class _ExpenseDateRangeSheetBodyState extends State<_ExpenseDateRangeSheetBody> 
       _end = _dateOnly(initial.end);
       _visibleMonth = DateTime(_end!.year, _end!.month);
     } else {
+      _activePresetId = 'all';
       _visibleMonth = DateTime(widget.lastDate.year, widget.lastDate.month);
     }
   }
@@ -209,11 +210,18 @@ class _ExpenseDateRangeSheetBodyState extends State<_ExpenseDateRangeSheetBody> 
 
   Widget _presetList(
     List<({String id, String label, DateTimeRange range})> presets,
-    ColorScheme cs,
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: _PresetTile(
+            label: 'expenses_all_dates'.tr(),
+            selected: _activePresetId == 'all',
+            onTap: _reset,
+          ),
+        ),
         for (final preset in presets)
           Padding(
             padding: const EdgeInsets.only(bottom: 4),
@@ -223,16 +231,6 @@ class _ExpenseDateRangeSheetBodyState extends State<_ExpenseDateRangeSheetBody> 
               onTap: () => _applyPreset(preset.id, preset.range),
             ),
           ),
-        const SizedBox(height: 8),
-        TextButton(
-          onPressed: _reset,
-          style: TextButton.styleFrom(
-            foregroundColor: cs.primary,
-            alignment: AlignmentDirectional.centerStart,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          ),
-          child: Text('expenses_date_reset'.tr()),
-        ),
       ],
     );
   }
@@ -244,6 +242,15 @@ class _ExpenseDateRangeSheetBodyState extends State<_ExpenseDateRangeSheetBody> 
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
+          Padding(
+            padding: const EdgeInsetsDirectional.only(end: 8),
+            child: FilterChip(
+              label: Text('expenses_all_dates'.tr()),
+              selected: _activePresetId == 'all',
+              onSelected: (_) => _reset(),
+              showCheckmark: false,
+            ),
+          ),
           for (final preset in presets)
             Padding(
               padding: const EdgeInsetsDirectional.only(end: 8),
@@ -254,10 +261,6 @@ class _ExpenseDateRangeSheetBodyState extends State<_ExpenseDateRangeSheetBody> 
                 showCheckmark: false,
               ),
             ),
-          TextButton(
-            onPressed: _reset,
-            child: Text('expenses_date_reset'.tr()),
-          ),
         ],
       ),
     );
@@ -297,7 +300,12 @@ class _ExpenseDateRangeSheetBodyState extends State<_ExpenseDateRangeSheetBody> 
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: EdgeInsetsDirectional.only(
+              start: 14,
+              end: pending != null ? 4 : 14,
+              top: pending != null ? 4 : 12,
+              bottom: pending != null ? 4 : 12,
+            ),
             decoration: BoxDecoration(
               color: cs.primaryContainer.withValues(alpha: 0.35),
               borderRadius: BorderRadius.circular(14),
@@ -314,6 +322,17 @@ class _ExpenseDateRangeSheetBodyState extends State<_ExpenseDateRangeSheetBody> 
                     ),
                   ),
                 ),
+                if (pending != null)
+                  IconButton(
+                    tooltip: 'expenses_date_clear'.tr(),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () =>
+                        _pop(const ExpenseDateRangeSheetResult(null)),
+                    icon: Icon(
+                      Icons.close_rounded,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -322,7 +341,7 @@ class _ExpenseDateRangeSheetBodyState extends State<_ExpenseDateRangeSheetBody> 
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(width: 148, child: _presetList(presets, cs)),
+                SizedBox(width: 148, child: _presetList(presets)),
                 const SizedBox(width: 12),
                 Expanded(child: calendar),
               ],

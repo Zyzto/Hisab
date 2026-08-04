@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
@@ -58,6 +59,7 @@ class _ReceiptCameraViewerState extends State<ReceiptCameraViewer>
   PageController? _pageController;
   bool _flashVisible = false;
   bool _shutterPressed = false;
+  bool _capturing = false;
   bool _shakeShutter = false;
   bool _guideVisible = false;
   double _pinchStartZoom = 1;
@@ -199,8 +201,18 @@ class _ReceiptCameraViewerState extends State<ReceiptCameraViewer>
     );
   }
 
+  void _playShutterCue() {
+    if (MediaQuery.disableAnimationsOf(context)) return;
+    setState(() => _flashVisible = true);
+    unawaited(
+      Future<void>.delayed(const Duration(milliseconds: 45), () {
+        if (mounted) setState(() => _flashVisible = false);
+      }),
+    );
+  }
+
   Future<void> _onShutter() async {
-    if (!_session.canCapture || !_controller.isReady) {
+    if (_capturing || !_session.canCapture || !_controller.isReady) {
       if (_session.atMax) {
         setState(() => _shakeShutter = true);
         await Future<void>.delayed(const Duration(milliseconds: 200));
@@ -209,24 +221,17 @@ class _ReceiptCameraViewerState extends State<ReceiptCameraViewer>
       return;
     }
 
+    _capturing = true;
     setState(() => _shutterPressed = true);
-    await Future<void>.delayed(const Duration(milliseconds: 60));
-    if (!mounted) return;
-    setState(() {
-      _shutterPressed = false;
-      _flashVisible = true;
-    });
+    _playShutterCue();
 
     final file = await _controller.takePicture();
-    if (!mounted) return;
-    // Keep flash briefly after capture (plan: ~80ms in / 160ms out).
-    await Future<void>.delayed(
-      MediaQuery.disableAnimationsOf(context)
-          ? Duration.zero
-          : const Duration(milliseconds: 160),
-    );
-    if (!mounted) return;
-    setState(() => _flashVisible = false);
+    if (!mounted) {
+      _capturing = false;
+      return;
+    }
+    setState(() => _shutterPressed = false);
+    _capturing = false;
 
     if (file == null) {
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
@@ -291,14 +296,8 @@ class _ReceiptCameraViewerState extends State<ReceiptCameraViewer>
           children: [
             _buildBody(theme, cs),
             if (_flashVisible)
-              IgnorePointer(
-                child: AnimatedOpacity(
-                  opacity: _flashVisible ? 1 : 0,
-                  duration: MediaQuery.disableAnimationsOf(context)
-                      ? Duration.zero
-                      : const Duration(milliseconds: 80),
-                  child: const ColoredBox(color: Colors.white),
-                ),
+              const IgnorePointer(
+                child: ColoredBox(color: Color(0x66FFFFFF)),
               ),
           ],
         ),
@@ -364,21 +363,35 @@ class _ReceiptCameraViewerState extends State<ReceiptCameraViewer>
         zoom: _controller.zoom,
         paused: _controller.mockPaused,
       );
+    } else if (_controller.camera != null) {
+      livePreview = _CameraPreviewBox(
+        controller: _controller.camera!,
+        mirror: _controller.lensDirection == CameraLensDirection.front,
+      );
     } else {
-      livePreview = _CameraPreviewBox(controller: _controller.camera!);
+      livePreview = const ColoredBox(
+        color: Colors.black,
+        child: Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        ),
+      );
     }
 
     return Column(
       children: [
         _TopBar(
           expanded: widget.expanded,
-          padTopSafeArea: widget.expanded,
+          // Handle bar already clears the status bar when expanded.
+          padTopSafeArea: false,
           torchSupported: _controller.torchSupported,
           torchOn: _controller.torchOn,
+          canSwitchLens: _controller.canSwitchLens,
+          lensDirection: _controller.lensDirection,
           onClose: _requestClose,
           onToggleExpanded: widget.onToggleExpanded,
           onGallery: _requestGallery,
           onTorch: () => _controller.setTorch(!_controller.torchOn),
+          onSwitchLens: () => _controller.switchLens(),
           motion: _modalMotion,
         ),
         Expanded(
@@ -488,10 +501,13 @@ class _TopBar extends StatelessWidget {
     required this.padTopSafeArea,
     required this.torchSupported,
     required this.torchOn,
+    required this.canSwitchLens,
+    required this.lensDirection,
     required this.onClose,
     required this.onToggleExpanded,
     required this.onGallery,
     required this.onTorch,
+    required this.onSwitchLens,
     required this.motion,
   });
 
@@ -499,10 +515,13 @@ class _TopBar extends StatelessWidget {
   final bool padTopSafeArea;
   final bool torchSupported;
   final bool torchOn;
+  final bool canSwitchLens;
+  final CameraLensDirection lensDirection;
   final VoidCallback onClose;
   final VoidCallback onToggleExpanded;
   final VoidCallback onGallery;
   final VoidCallback onTorch;
+  final VoidCallback onSwitchLens;
   final Duration motion;
 
   @override
@@ -524,6 +543,23 @@ class _TopBar extends StatelessWidget {
             icon: const Icon(Icons.photo_library_outlined, color: Colors.white),
           ),
           const Spacer(),
+          if (canSwitchLens)
+            IconButton(
+              tooltip: lensDirection == CameraLensDirection.front
+                  ? 'receipt_camera_lens_rear'.tr()
+                  : 'receipt_camera_lens_front'.tr(),
+              onPressed: onSwitchLens,
+              icon: AnimatedSwitcher(
+                duration: motion == Duration.zero
+                    ? Duration.zero
+                    : const Duration(milliseconds: 150),
+                child: Icon(
+                  Icons.cameraswitch_outlined,
+                  key: ValueKey(lensDirection),
+                  color: Colors.white,
+                ),
+              ),
+            ),
           if (torchSupported)
             IconButton(
               tooltip: 'receipt_camera_torch'.tr(),
@@ -561,9 +597,10 @@ class _TopBar extends StatelessWidget {
 }
 
 class _CameraPreviewBox extends StatelessWidget {
-  const _CameraPreviewBox({required this.controller});
+  const _CameraPreviewBox({required this.controller, this.mirror = false});
 
   final CameraController controller;
+  final bool mirror;
 
   @override
   Widget build(BuildContext context) {
@@ -571,20 +608,28 @@ class _CameraPreviewBox extends StatelessWidget {
       return const ColoredBox(color: Colors.black);
     }
     final size = controller.value.previewSize;
+    Widget preview;
     if (size == null) {
-      return CameraPreview(controller);
-    }
-    // Preview size is landscape-oriented from the plugin; rotate for portrait UI.
-    return ClipRect(
-      child: FittedBox(
+      preview = CameraPreview(controller);
+    } else {
+      // Preview size is landscape-oriented from the plugin; rotate for portrait UI.
+      preview = FittedBox(
         fit: BoxFit.cover,
         child: SizedBox(
           width: size.height,
           height: size.width,
           child: CameraPreview(controller),
         ),
-      ),
-    );
+      );
+    }
+    if (mirror) {
+      preview = Transform(
+        alignment: Alignment.center,
+        transform: Matrix4.identity()..scaleByDouble(-1, 1, 1, 1),
+        child: preview,
+      );
+    }
+    return ClipRect(child: preview);
   }
 }
 
@@ -1049,7 +1094,7 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-/// Loads an [XFile] via bytes so mock captures (no filesystem path) work on web.
+/// Loads an [XFile] via bytes (works for mock captures and native paths).
 class _XFileImage extends StatefulWidget {
   const _XFileImage({
     required this.file,

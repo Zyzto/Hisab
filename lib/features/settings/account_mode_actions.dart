@@ -10,6 +10,7 @@ import '../../core/constants/supabase_config.dart';
 import '../../core/database/database_providers.dart';
 import '../../core/layout/responsive_sheet.dart';
 import '../../core/services/migration_service.dart';
+import '../../core/services/notification_service.dart';
 import '../../core/widgets/sheet_helpers.dart';
 import '../../core/widgets/toast.dart';
 import 'settings_definitions.dart';
@@ -69,6 +70,8 @@ class AccountModeActions {
     ref.read(settings.provider(localOnlySettingDef).notifier).set(true);
     Log.info('Setting changed: ${localOnlySettingDef.key}=true');
     try {
+      // Unregister FCM while session is still valid (RLS on device_tokens).
+      await ref.read(notificationServiceProvider.notifier).unregisterToken();
       await ref.read(authServiceProvider).signOut();
     } catch (e, st) {
       Log.warning('Sign-out failed', error: e, stackTrace: st);

@@ -87,27 +87,32 @@ class SheetHandleBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedSize(
-      duration: duration,
-      curve: AppMotion.enterCurve,
-      alignment: Alignment.topCenter,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onVerticalDragUpdate: onVerticalDragUpdate,
-        onVerticalDragEnd: onVerticalDragEnd,
-        onVerticalDragCancel: onVerticalDragCancel,
-        child: Padding(
-          padding: EdgeInsets.only(
-            top: expanded ? 8 : 10,
-            bottom: expanded ? 4 : 6,
-          ),
-          child: Center(
-            child: Container(
-              width: 40,
-              height: 5,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.35),
-                borderRadius: BorderRadius.circular(2),
+    // Full-screen sheets draw under the status bar — keep the grabber reachable.
+    return SafeArea(
+      top: expanded,
+      bottom: false,
+      child: AnimatedSize(
+        duration: duration,
+        curve: AppMotion.enterCurve,
+        alignment: Alignment.topCenter,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onVerticalDragUpdate: onVerticalDragUpdate,
+          onVerticalDragEnd: onVerticalDragEnd,
+          onVerticalDragCancel: onVerticalDragCancel,
+          child: Padding(
+            padding: EdgeInsets.only(
+              top: expanded ? 8 : 10,
+              bottom: expanded ? 4 : 6,
+            ),
+            child: Center(
+              child: Container(
+                width: 40,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
           ),
