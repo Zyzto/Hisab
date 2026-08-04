@@ -14,6 +14,7 @@ class AmountText extends StatelessWidget {
     this.maxLines,
     this.overflow,
     this.textAlign,
+    this.softWrap,
   });
 
   final String data;
@@ -21,6 +22,7 @@ class AmountText extends StatelessWidget {
   final int? maxLines;
   final TextOverflow? overflow;
   final TextAlign? textAlign;
+  final bool? softWrap;
 
   @override
   Widget build(BuildContext context) {
@@ -30,6 +32,7 @@ class AmountText extends StatelessWidget {
       maxLines: maxLines,
       overflow: overflow,
       textAlign: textAlign,
+      softWrap: softWrap,
       textDirection: TextDirection.ltr,
     );
   }

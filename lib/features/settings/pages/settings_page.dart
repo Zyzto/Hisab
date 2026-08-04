@@ -28,6 +28,7 @@ import '../../../core/receipt/receipt_scan_capability.dart';
 import '../../../core/update/update_check_providers.dart';
 import '../../../core/services/delete_my_data_service.dart';
 import '../../../core/services/github_user_client.dart';
+import '../../../core/services/notification_service.dart';
 import '../../../core/utils/currency_helpers.dart';
 import '../settings_definitions.dart';
 import '../providers/settings_framework_providers.dart';
@@ -876,6 +877,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       final alsoDeleteLocal = result;
       await ref.read(deleteMyDataServiceProvider).deleteMyData();
       if (!context.mounted) return;
+      await ref.read(notificationServiceProvider.notifier).unregisterToken();
       await ref.read(authServiceProvider).signOut();
       if (!context.mounted) return;
       if (alsoDeleteLocal) {

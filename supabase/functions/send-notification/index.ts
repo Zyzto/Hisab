@@ -47,8 +47,6 @@ function elideGraphemes(text: string, maxGraphemes: number): string {
     if (graphemes.length <= maxGraphemes) return trimmed;
     return `${graphemes.slice(0, maxGraphemes).join("")}…`;
   } catch {
-    // Deno / older runtimes without Segmenter: Array.from still splits most
-    // surrogate pairs better than string indexing.
     const units = Array.from(trimmed);
     if (units.length <= maxGraphemes) return trimmed;
     return `${units.slice(0, maxGraphemes).join("")}…`;
@@ -57,6 +55,12 @@ function elideGraphemes(text: string, maxGraphemes: number): string {
 
 const MAX_EXPENSE_TITLE_GRAPHEMES = 80;
 const MAX_GROUP_NAME_GRAPHEMES = 60;
+const FCM_SEND_CONCURRENCY = 10;
+/** Refresh FCM OAuth a bit before the 1h expiry. */
+const FCM_TOKEN_TTL_MS = 55 * 60 * 1000;
+
+let cachedFcmAccessToken: string | null = null;
+let cachedFcmAccessTokenExpiresAt = 0;
 
 /** Format expense body: optional prefix + title + optional cost. */
 function formatExpenseBody(
@@ -70,7 +74,6 @@ function formatExpenseBody(
     p.amount_cents != null && p.currency_code
       ? `${(p.amount_cents / 100).toFixed(2)} ${p.currency_code}`
       : "";
-  // LRM around ASCII separator so it stays between title and amount visually.
   const core = amount ? `${expenseTitle}\u200E - \u200E${amount}` : expenseTitle;
   return prefix ? `${prefix} ${core}` : core;
 }
@@ -94,8 +97,13 @@ function buildNotificationText(p: TriggerPayload, locale: string | null): { titl
   }
 }
 
-/** Get OAuth2 access token for FCM using service account JWT. */
+/** Get OAuth2 access token for FCM using service account JWT (cached per worker). */
 async function getFcmAccessToken(serviceAccountKey: string): Promise<string> {
+  const now = Date.now();
+  if (cachedFcmAccessToken && now < cachedFcmAccessTokenExpiresAt) {
+    return cachedFcmAccessToken;
+  }
+
   const key = JSON.parse(serviceAccountKey) as {
     client_email: string;
     private_key: string;
@@ -123,11 +131,13 @@ async function getFcmAccessToken(serviceAccountKey: string): Promise<string> {
     throw new Error(`FCM OAuth2 failed: ${res.status} ${text}`);
   }
   const data = (await res.json()) as { access_token: string };
+  cachedFcmAccessToken = data.access_token;
+  cachedFcmAccessTokenExpiresAt = Date.now() + FCM_TOKEN_TTL_MS;
   return data.access_token;
 }
 
 /** Result of sending one FCM message. */
-type SendResult = { ok: true } | { ok: false, error: string, stale?: boolean };
+type SendResult = { ok: true } | { ok: false; error: string; stale?: boolean };
 
 /** Send one FCM v1 message to a single token. */
 async function sendFcmMessage(
@@ -136,7 +146,8 @@ async function sendFcmMessage(
   token: string,
   title: string,
   body: string,
-  groupId: string
+  groupId: string,
+  actorUserId: string,
 ): Promise<SendResult> {
   const url = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
   const res = await fetch(url, {
@@ -149,7 +160,10 @@ async function sendFcmMessage(
       message: {
         token,
         notification: { title, body },
-        data: { group_id: groupId },
+        data: {
+          group_id: groupId,
+          actor_user_id: actorUserId,
+        },
       },
     }),
   });
@@ -157,6 +171,27 @@ async function sendFcmMessage(
   const text = await res.text();
   const stale = res.status === 404 && text.includes("UNREGISTERED");
   return { ok: false, error: `${res.status} ${text}`, ...(stale && { stale: true }) };
+}
+
+async function mapPool<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  }
+  const workers = Array.from(
+    { length: Math.min(concurrency, Math.max(items.length, 1)) },
+    () => worker(),
+  );
+  await Promise.all(workers);
+  return results;
 }
 
 Deno.serve(async (req: Request) => {
@@ -212,7 +247,6 @@ async function handleNotificationRequest(req: Request): Promise<Response> {
   const dryRun =
     Deno.env.get("DRY_RUN") === "true" || !fcmProjectId || !fcmServiceAccountKey;
 
-  // Normalize actor so joinee is never sent member_joined (handles UUID/casing from trigger).
   const actorNorm = String(payload?.actor_user_id ?? "").trim().toLowerCase();
   if (payload.action === "member_joined" && !actorNorm) {
     console.log("send-notification: member_joined with no actor, skipping");
@@ -226,8 +260,6 @@ async function handleNotificationRequest(req: Request): Promise<Response> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-  // For expense create/update/delete, the actor is the creator/editor/deleter; they must not
-  // receive a notification. Only other group members are notified (same as for member_joined).
   const { data: members } = await supabase
     .from("group_members")
     .select("user_id")
@@ -249,10 +281,17 @@ async function handleNotificationRequest(req: Request): Promise<Response> {
     });
   }
 
-  const { data: tokenRows } = await supabase
-    .from("device_tokens")
-    .select("token, locale, user_id")
-    .in("user_id", userIds);
+  const [{ data: tokenRows }, { data: actorTokenRows }] = await Promise.all([
+    supabase.from("device_tokens").select("token, locale, user_id").in("user_id", userIds),
+    supabase.from("device_tokens").select("token").eq("user_id", payload.actor_user_id),
+  ]);
+
+  const actorTokens = new Set(
+    (actorTokenRows ?? [])
+      .map((r) => String(r.token ?? "").trim())
+      .filter((t) => t.length > 0),
+  );
+
   const localeByUser = new Map<string, string | null>();
   for (const r of tokenRows ?? []) {
     const uid = String(r.user_id ?? "");
@@ -262,7 +301,6 @@ async function handleNotificationRequest(req: Request): Promise<Response> {
     }
   }
 
-  // Persist in-app history for every recipient (even without a device token / dry-run).
   const historyRows = userIds.map((userId) => {
     const { title, body } = buildNotificationText(payload, localeByUser.get(userId) ?? null);
     return {
@@ -308,10 +346,22 @@ async function handleNotificationRequest(req: Request): Promise<Response> {
   const projectId = fcmProjectId!;
   const serviceAccountKey = fcmServiceAccountKey!;
 
-  // Exclude actor from send list (defense-in-depth so joinee never gets member_joined).
-  const rows = (tokenRows ?? []).filter(
-    (r) => r.token && r.user_id && String(r.user_id).trim().toLowerCase() !== actorNorm,
-  );
+  // Exclude actor by user_id and by shared/stale FCM token string.
+  const rows = (tokenRows ?? []).filter((r) => {
+    if (!r.token || !r.user_id) return false;
+    if (String(r.user_id).trim().toLowerCase() === actorNorm) return false;
+    if (actorTokens.has(String(r.token).trim())) return false;
+    return true;
+  });
+  const skippedSharedTokens = (tokenRows ?? []).filter((r) => {
+    if (!r.token || !r.user_id) return false;
+    if (String(r.user_id).trim().toLowerCase() === actorNorm) return false;
+    return actorTokens.has(String(r.token).trim());
+  }).length;
+  if (skippedSharedTokens > 0) {
+    console.log("send-notification: skipped shared actor tokens", { count: skippedSharedTokens });
+  }
+
   if (rows.length === 0) {
     console.log("send-notification: No device tokens for members", {
       group_id: payload.group_id,
@@ -344,18 +394,17 @@ async function handleNotificationRequest(req: Request): Promise<Response> {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 
   let sent = 0;
   const errors: string[] = [];
   let deletedStale = 0;
-  for (const row of rows) {
+
+  const results = await mapPool(rows, FCM_SEND_CONCURRENCY, async (row) => {
     const token = row.token as string;
     const userId = row.user_id as string;
-    // Never send to the actor (person who made the change)
-    if (String(userId ?? "").trim().toLowerCase() === actorNorm) continue;
     const locale = (row.locale as string | null) ?? null;
     const { title, body } = buildNotificationText(payload, locale);
     const result = await sendFcmMessage(
@@ -364,19 +413,25 @@ async function handleNotificationRequest(req: Request): Promise<Response> {
       token,
       title,
       body,
-      payload.group_id
+      payload.group_id,
+      payload.actor_user_id,
     );
-    if (result.ok) sent++;
-    else {
-      if (result.error) errors.push(result.error);
-      if ("stale" in result && result.stale) {
-        const { error: deleteErr } = await supabase
-          .from("device_tokens")
-          .delete()
-          .eq("user_id", userId)
-          .eq("token", token);
-        if (!deleteErr) deletedStale++;
-      }
+    return { result, token, userId };
+  });
+
+  for (const { result, token, userId } of results) {
+    if (result.ok) {
+      sent++;
+      continue;
+    }
+    if (result.error) errors.push(result.error);
+    if ("stale" in result && result.stale) {
+      const { error: deleteErr } = await supabase
+        .from("device_tokens")
+        .delete()
+        .eq("user_id", userId)
+        .eq("token", token);
+      if (!deleteErr) deletedStale++;
     }
   }
 
@@ -403,6 +458,6 @@ async function handleNotificationRequest(req: Request): Promise<Response> {
     {
       status: 200,
       headers: { "Content-Type": "application/json" },
-    }
+    },
   );
 }

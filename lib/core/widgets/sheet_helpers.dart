@@ -12,12 +12,16 @@ class SheetPickerOption<T> {
   const SheetPickerOption({
     required this.value,
     required this.label,
+    this.subtitle,
     this.leading,
+    this.enabled = true,
   });
 
   final T value;
   final String label;
+  final String? subtitle;
   final Widget? leading;
+  final bool enabled;
 }
 
 /// Simple single-select option sheet using [SheetOptionTile]s.
@@ -27,6 +31,7 @@ Future<T?> showOptionPickerSheet<T>(
   required List<SheetPickerOption<T>> options,
   T? selected,
   bool centerInFullViewport = true,
+  Widget? header,
 }) {
   final isTablet = LayoutBreakpoints.isTabletOrWider(context);
   return showResponsiveSheet<T>(
@@ -56,14 +61,23 @@ Future<T?> showOptionPickerSheet<T>(
                       ),
                     ),
                   ),
+                if (header != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: header,
+                  ),
                 SheetOptionList(
                   children: [
                     for (final opt in options)
                       SheetOptionTile(
                         title: opt.label,
+                        subtitle: opt.subtitle,
                         leading: opt.leading,
+                        enabled: opt.enabled,
                         selected: selected != null && opt.value == selected,
-                        onTap: () => Navigator.of(ctx).pop(opt.value),
+                        onTap: opt.enabled
+                            ? () => Navigator.of(ctx).pop(opt.value)
+                            : null,
                       ),
                   ],
                 ),

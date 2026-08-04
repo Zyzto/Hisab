@@ -323,6 +323,20 @@ SITE_URL = "env(SITE_URL)"
 FCM_PROJECT_ID = "env(FCM_PROJECT_ID)"
 FCM_SERVICE_ACCOUNT_KEY = "env(FCM_SERVICE_ACCOUNT_KEY)"
 
+# Per-function JWT gate (matches production deploy --no-verify-jwt).
+# Public invite/OG links, pg_net service-role auth, anonymous telemetry + apikey/RLS.
+[functions.telemetry]
+verify_jwt = false
+
+[functions.send-notification]
+verify_jwt = false
+
+[functions.invite-redirect]
+verify_jwt = false
+
+[functions.og-invite-image]
+verify_jwt = false
+
 [analytics]
 # Disabled for rootless Podman: analytics uses the syslog log driver, which
 # often breaks Kong/health checks (see supabase/cli#2348). Enable only with Docker.

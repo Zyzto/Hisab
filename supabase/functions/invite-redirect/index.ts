@@ -3,19 +3,21 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const WEB_URL = Deno.env.get("SITE_URL") ?? "https://hisab.shenepoy.com";
 
+function redirect(location: string): Response {
+  return new Response(null, {
+    status: 302,
+    headers: { Location: location },
+  });
+}
+
 Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
   const token = url.searchParams.get("token");
 
-  // No token → redirect to error page
   if (!token) {
-    return new Response(null, {
-      status: 302,
-      headers: { "Location": `${WEB_URL}/redirect.html?error=missing` },
-    });
+    return redirect(`${WEB_URL}/redirect.html?error=missing`);
   }
 
-  // Validate token server-side
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -25,22 +27,13 @@ Deno.serve(async (req: Request) => {
     });
 
     if (error || !data || data.length === 0) {
-      return new Response(null, {
-        status: 302,
-        headers: { "Location": `${WEB_URL}/redirect.html?error=expired` },
-      });
+      return redirect(`${WEB_URL}/redirect.html?error=expired`);
     }
-  } catch (_) {
-    // If DB check fails, proceed anyway — let the app/web handle it
+  } catch (e) {
+    console.error("invite-redirect: validation failed", e);
+    return redirect(`${WEB_URL}/redirect.html?error=expired`);
   }
 
-  // Always 302 redirect to the hosted redirect page.
-  // The static page (redirect.html on Firebase Hosting) handles:
-  //   - Mobile: try app deep link, fallback to web
-  //   - Desktop: immediate redirect to web invite page
   const encodedToken = encodeURIComponent(token);
-  return new Response(null, {
-    status: 302,
-    headers: { "Location": `${WEB_URL}/redirect.html?token=${encodedToken}` },
-  });
+  return redirect(`${WEB_URL}/redirect.html?token=${encodedToken}`);
 });

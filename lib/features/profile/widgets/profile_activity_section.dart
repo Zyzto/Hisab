@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/widgets/anchored_dropdown_chip.dart';
 import '../../../core/widgets/group_section_header.dart';
 import '../../groups/providers/group_analytics_provider.dart';
 import '../providers/profile_activity_provider.dart';
@@ -43,35 +44,49 @@ class ProfileActivitySection extends ConsumerWidget {
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              ChoiceChip(
-                label: Text('analytics_range_30d'.tr()),
-                selected: range == AnalyticsRangePreset.days30,
-                showCheckmark: false,
-                onSelected: (_) => ref
+          child: Builder(
+            builder: (context) {
+              final period = switch (range) {
+                AnalyticsRangePreset.days30 => (
+                  Icons.calendar_view_week_rounded,
+                  'analytics_range_30d'.tr(),
+                ),
+                AnalyticsRangePreset.days90 => (
+                  Icons.calendar_view_month_rounded,
+                  'analytics_range_90d'.tr(),
+                ),
+                AnalyticsRangePreset.all => (
+                  Icons.all_inclusive_rounded,
+                  'analytics_range_all'.tr(),
+                ),
+              };
+              return AnchoredDropdownChip<AnalyticsRangePreset>(
+                icon: period.$1,
+                label: period.$2,
+                active: range != AnalyticsRangePreset.all,
+                selected: range,
+                options: [
+                  AnchoredDropdownOption(
+                    value: AnalyticsRangePreset.days30,
+                    label: 'analytics_range_30d'.tr(),
+                    icon: Icons.calendar_view_week_rounded,
+                  ),
+                  AnchoredDropdownOption(
+                    value: AnalyticsRangePreset.days90,
+                    label: 'analytics_range_90d'.tr(),
+                    icon: Icons.calendar_view_month_rounded,
+                  ),
+                  AnchoredDropdownOption(
+                    value: AnalyticsRangePreset.all,
+                    label: 'analytics_range_all'.tr(),
+                    icon: Icons.all_inclusive_rounded,
+                  ),
+                ],
+                onSelected: (value) => ref
                     .read(profileAnalyticsRangeProvider.notifier)
-                    .state = AnalyticsRangePreset.days30,
-              ),
-              ChoiceChip(
-                label: Text('analytics_range_90d'.tr()),
-                selected: range == AnalyticsRangePreset.days90,
-                showCheckmark: false,
-                onSelected: (_) => ref
-                    .read(profileAnalyticsRangeProvider.notifier)
-                    .state = AnalyticsRangePreset.days90,
-              ),
-              ChoiceChip(
-                label: Text('analytics_range_all'.tr()),
-                selected: range == AnalyticsRangePreset.all,
-                showCheckmark: false,
-                onSelected: (_) => ref
-                    .read(profileAnalyticsRangeProvider.notifier)
-                    .state = AnalyticsRangePreset.all,
-              ),
-            ],
+                    .state = value,
+              );
+            },
           ),
         ),
         const SizedBox(height: 8),

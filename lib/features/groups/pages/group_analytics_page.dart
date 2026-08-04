@@ -9,7 +9,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/layout_breakpoints.dart';
-import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/navigation/nav_back.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/platform/ui_perf.dart';
@@ -20,6 +19,7 @@ import '../../../core/utils/user_text.dart';
 import '../../../core/widgets/anchored_dropdown_chip.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/missing_route_page.dart';
+import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/user_text.dart';
 import '../../../domain/domain.dart';
 import '../../expenses/category_icons.dart';
@@ -29,72 +29,6 @@ import '../providers/group_analytics_provider.dart';
 import '../widgets/group_section_header.dart';
 
 const _kBreakdownPreviewCount = 6;
-
-class _ModalSelectOption<T> {
-  const _ModalSelectOption({
-    required this.value,
-    required this.label,
-    this.subtitle,
-  });
-
-  final T value;
-  final String label;
-  final String? subtitle;
-}
-
-Future<T?> _showModalSelectSheet<T>({
-  required BuildContext context,
-  required String title,
-  required T selectedValue,
-  required List<_ModalSelectOption<T>> options,
-}) {
-  final isTablet = LayoutBreakpoints.isTabletOrWider(context);
-  return showResponsiveSheet<T>(
-    context: context,
-    title: title,
-    maxHeight: MediaQuery.of(context).size.height * 0.75,
-    isScrollControlled: true,
-    centerInFullViewport: true,
-    child: Builder(
-      builder: (ctx) => SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(ctx).padding.bottom + ThemeConfig.spacingM,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (!isTablet)
-                  Padding(
-                    padding: const EdgeInsets.all(ThemeConfig.spacingM),
-                    child: Text(
-                      title,
-                      style: Theme.of(ctx).textTheme.titleMedium,
-                    ),
-                  ),
-                ...options.map((option) {
-                  final isSelected = option.value == selectedValue;
-                  return ListTile(
-                    title: UserText(option.label),
-                    subtitle: option.subtitle == null
-                        ? null
-                        : Text(option.subtitle!),
-                    selected: isSelected,
-                    onTap: () => Navigator.of(
-                      ctx,
-                      rootNavigator: true,
-                    ).pop(option.value),
-                  );
-                }),
-              ],
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-}
 
 extension on AnalyticsTrendChartMode {
   String get labelKey {
@@ -446,6 +380,7 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
                 : iconForExpenseTag(_tagId, data.tags)),
       label: selectedCategoryLabel,
       active: _tagId != null,
+      expand: true,
       selected: _tagId ?? '',
       options: [
         AnchoredDropdownOption(
@@ -466,7 +401,77 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
       onSelected: (v) => setState(() => _tagId = v.isEmpty ? null : v),
     );
 
-    final narrow = MediaQuery.sizeOf(context).width < 420;
+    final rangePeriod = switch (_range) {
+      AnalyticsRangePreset.days30 => (
+        Icons.calendar_view_week_rounded,
+        'analytics_range_30d'.tr(),
+      ),
+      AnalyticsRangePreset.days90 => (
+        Icons.calendar_view_month_rounded,
+        'analytics_range_90d'.tr(),
+      ),
+      AnalyticsRangePreset.all => (
+        Icons.all_inclusive_rounded,
+        'analytics_range_all'.tr(),
+      ),
+    };
+    final rangeDropdown = AnchoredDropdownChip<AnalyticsRangePreset>(
+      icon: rangePeriod.$1,
+      label: rangePeriod.$2,
+      active: _range != AnalyticsRangePreset.all,
+      expand: true,
+      selected: _range,
+      options: [
+        AnchoredDropdownOption(
+          value: AnalyticsRangePreset.days30,
+          label: 'analytics_range_30d'.tr(),
+          icon: Icons.calendar_view_week_rounded,
+        ),
+        AnchoredDropdownOption(
+          value: AnalyticsRangePreset.days90,
+          label: 'analytics_range_90d'.tr(),
+          icon: Icons.calendar_view_month_rounded,
+        ),
+        AnchoredDropdownOption(
+          value: AnalyticsRangePreset.all,
+          label: 'analytics_range_all'.tr(),
+          icon: Icons.all_inclusive_rounded,
+        ),
+      ],
+      onSelected: (value) => setState(() => _range = value),
+    );
+
+    final selectedPayerLabel = _participantId == null
+        ? 'analytics_filter_all_payers'.tr()
+        : (participants
+                  .where((p) => p.id == _participantId)
+                  .map((p) => p.name)
+                  .firstOrNull ??
+              'analytics_filter_all_payers'.tr());
+    final payerDropdown = AnchoredDropdownChip<String>(
+      icon: _participantId == null
+          ? Icons.groups_outlined
+          : Icons.person_rounded,
+      label: selectedPayerLabel,
+      active: _participantId != null,
+      expand: true,
+      selected: _participantId ?? '',
+      options: [
+        AnchoredDropdownOption(
+          value: '',
+          label: 'analytics_filter_all_payers'.tr(),
+          icon: Icons.groups_outlined,
+        ),
+        ...participants.map(
+          (p) => AnchoredDropdownOption(
+            value: p.id,
+            label: p.name,
+            icon: Icons.person_rounded,
+          ),
+        ),
+      ],
+      onSelected: (v) => setState(() => _participantId = v.isEmpty ? null : v),
+    );
 
     return Container(
       width: double.infinity,
@@ -482,90 +487,17 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
         children: [
           GroupSectionHeader(label: 'analytics_filters'.tr()),
           const SizedBox(height: ThemeConfig.spacingS + 2),
-          Wrap(
-            spacing: ThemeConfig.spacingS,
-            runSpacing: ThemeConfig.spacingS,
+          Row(
             children: [
-              ChoiceChip(
-                label: Text('analytics_range_30d'.tr()),
-                selected: _range == AnalyticsRangePreset.days30,
-                showCheckmark: false,
-                onSelected: (_) =>
-                    setState(() => _range = AnalyticsRangePreset.days30),
-              ),
-              ChoiceChip(
-                label: Text('analytics_range_90d'.tr()),
-                selected: _range == AnalyticsRangePreset.days90,
-                showCheckmark: false,
-                onSelected: (_) =>
-                    setState(() => _range = AnalyticsRangePreset.days90),
-              ),
-              ChoiceChip(
-                label: Text('analytics_range_all'.tr()),
-                selected: _range == AnalyticsRangePreset.all,
-                showCheckmark: false,
-                onSelected: (_) =>
-                    setState(() => _range = AnalyticsRangePreset.all),
-              ),
+              Flexible(flex: 2, child: rangeDropdown),
+              if (!data.group.isPersonal) ...[
+                const SizedBox(width: ThemeConfig.spacingS),
+                Flexible(flex: 3, child: payerDropdown),
+              ],
+              const SizedBox(width: ThemeConfig.spacingS),
+              Flexible(flex: 3, child: categoryDropdown),
             ],
           ),
-          const SizedBox(height: ThemeConfig.spacingS + 2),
-          if (!data.group.isPersonal)
-            narrow
-                ? Column(
-                    children: [
-                      _FilterDropdown(
-                        label: 'analytics_filter_payer'.tr(),
-                        value: _participantId ?? '',
-                        items: [
-                          _DropdownMenuItemData(
-                            value: '',
-                            label: 'analytics_filter_all_payers'.tr(),
-                          ),
-                          ...participants.map(
-                            (p) => _DropdownMenuItemData(
-                              value: p.id,
-                              label: p.name,
-                            ),
-                          ),
-                        ],
-                        onChanged: (v) => setState(
-                          () => _participantId = v.isEmpty ? null : v,
-                        ),
-                      ),
-                      const SizedBox(height: ThemeConfig.spacingS + 2),
-                      categoryDropdown,
-                    ],
-                  )
-                : Row(
-                    children: [
-                      Expanded(
-                        child: _FilterDropdown(
-                          label: 'analytics_filter_payer'.tr(),
-                          value: _participantId ?? '',
-                          items: [
-                            _DropdownMenuItemData(
-                              value: '',
-                              label: 'analytics_filter_all_payers'.tr(),
-                            ),
-                            ...participants.map(
-                              (p) => _DropdownMenuItemData(
-                                value: p.id,
-                                label: p.name,
-                              ),
-                            ),
-                          ],
-                          onChanged: (v) => setState(
-                            () => _participantId = v.isEmpty ? null : v,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: ThemeConfig.spacingS + 2),
-                      Expanded(child: categoryDropdown),
-                    ],
-                  )
-          else
-            categoryDropdown,
         ],
       ),
     );
@@ -707,7 +639,9 @@ class _KpiGrid extends StatelessWidget {
       crossAxisCount: 2,
       mainAxisSpacing: ThemeConfig.spacingS,
       crossAxisSpacing: ThemeConfig.spacingS,
-      childAspectRatio: 2.85,
+      // Slightly taller than content (label + value + padding) to avoid
+      // sub-pixel bottom overflow on some text scales / densities.
+      childAspectRatio: 2.6,
       children: [
         _KpiCard(label: 'analytics_kpi_total'.tr(), value: total),
         _KpiCard(
@@ -746,6 +680,7 @@ class _KpiCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             label,
@@ -754,15 +689,21 @@ class _KpiCard extends StatelessWidget {
             style: theme.textTheme.labelMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w600,
+              height: 1.1,
             ),
           ),
           const SizedBox(height: 2),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: AlignmentDirectional.centerStart,
+            child: Text(
+              value,
+              maxLines: 1,
+              softWrap: false,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                height: 1.1,
+              ),
             ),
           ),
         ],
@@ -815,14 +756,14 @@ class _TrendChartCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
                 onTap: () async {
                   final selected =
-                      await _showModalSelectSheet<AnalyticsTrendChartMode>(
-                        context: context,
+                      await showOptionPickerSheet<AnalyticsTrendChartMode>(
+                        context,
                         title: 'analytics_chart_mode_menu'.tr(),
-                        selectedValue: activeMode,
+                        selected: activeMode,
                         options: availableModes
                             .map(
                               (mode) =>
-                                  _ModalSelectOption<AnalyticsTrendChartMode>(
+                                  SheetPickerOption<AnalyticsTrendChartMode>(
                                     value: mode,
                                     label: mode.labelKey.tr(),
                                     subtitle: _modeHint(mode).tr(),
@@ -1600,19 +1541,19 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
                   borderRadius: BorderRadius.circular(8),
                   onTap: () async {
                     final selected =
-                        await _showModalSelectSheet<AnalyticsCategoryChartMode>(
-                          context: context,
+                        await showOptionPickerSheet<AnalyticsCategoryChartMode>(
+                          context,
                           title:
                               widget.chartModeMenuTitle ??
                               'analytics_breakdown_chart_mode_menu'.tr(),
-                          selectedValue: widget.mode,
+                          selected: widget.mode,
                           options: [
-                            _ModalSelectOption<AnalyticsCategoryChartMode>(
+                            SheetPickerOption<AnalyticsCategoryChartMode>(
                               value: AnalyticsCategoryChartMode.bars,
                               label: AnalyticsCategoryChartMode.bars.labelKey
                                   .tr(),
                             ),
-                            _ModalSelectOption<AnalyticsCategoryChartMode>(
+                            SheetPickerOption<AnalyticsCategoryChartMode>(
                               value: AnalyticsCategoryChartMode.pie,
                               label: AnalyticsCategoryChartMode.pie.labelKey
                                   .tr(),
@@ -2289,119 +2230,6 @@ class _BreakdownBarsCardState extends State<_BreakdownBarsCard> {
       ],
     );
   }
-}
-
-class _FilterDropdown extends StatelessWidget {
-  const _FilterDropdown({
-    required this.label,
-    required this.value,
-    required this.items,
-    required this.onChanged,
-  });
-
-  final String label;
-  final String value;
-  final List<_DropdownMenuItemData> items;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final canOpen = items.length > 1;
-    final selected = items.where((item) => item.value == value).firstOrNull;
-    final selectedLabel = selected?.label ?? '';
-
-    return Material(
-      color: Colors.transparent,
-      child: Opacity(
-        opacity: canOpen ? 1 : 0.72,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: canOpen
-              ? () async {
-                  final selectedValue = await _showModalSelectSheet<String>(
-                    context: context,
-                    title: label,
-                    selectedValue: value,
-                    options: items
-                        .map(
-                          (item) => _ModalSelectOption<String>(
-                            value: item.value,
-                            label: item.label,
-                          ),
-                        )
-                        .toList(),
-                  );
-                  if (selectedValue != null) onChanged(selectedValue);
-                }
-              : null,
-          child: InputDecorator(
-            decoration: InputDecoration(
-              labelText: label,
-              filled: true,
-              fillColor: canOpen
-                  ? theme.colorScheme.surfaceContainerHighest.withValues(
-                      alpha: 0.22,
-                    )
-                  : theme.colorScheme.surfaceContainerHighest.withValues(
-                      alpha: 0.08,
-                    ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 10,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: canOpen
-                      ? theme.colorScheme.outlineVariant
-                      : theme.colorScheme.outline.withValues(alpha: 0.45),
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: theme.colorScheme.primary),
-              ),
-              isDense: true,
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: UserText(
-                    selectedLabel,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: canOpen
-                          ? theme.colorScheme.onSurface
-                          : theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-                Icon(
-                  canOpen
-                      ? Icons.expand_more_rounded
-                      : Icons.lock_outline_rounded,
-                  size: 20,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DropdownMenuItemData {
-  const _DropdownMenuItemData({required this.value, required this.label});
-
-  final String value;
-  final String label;
 }
 
 class _DropdownOption {

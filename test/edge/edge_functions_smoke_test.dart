@@ -23,7 +23,10 @@ const _siteUrl = String.fromEnvironment(
 );
 
 const _testUserAEmail = 'test-a@hisab.test';
+const _testUserBEmail = 'test-b@hisab.test';
 const _testPassword = 'TestPass123!';
+const _userAId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+const _userBId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 
 bool get _configured =>
     _supabaseUrl.isNotEmpty &&
@@ -63,7 +66,10 @@ Future<String> _readBody(HttpClientResponse response) async {
   ));
 }
 
-Future<String?> _signInAccessToken(HttpClient client) async {
+Future<String?> _signInAccessToken(
+  HttpClient client, {
+  String email = _testUserAEmail,
+}) async {
   final uri = Uri.parse('$_supabaseUrl/auth/v1/token?grant_type=password');
   final response = await _send(
     client,
@@ -73,19 +79,22 @@ Future<String?> _signInAccessToken(HttpClient client) async {
       'apikey': _anonKey,
       'Authorization': 'Bearer $_anonKey',
     },
-    body: {'email': _testUserAEmail, 'password': _testPassword},
+    body: {'email': email, 'password': _testPassword},
   );
   final text = await _readBody(response);
   if (response.statusCode != 200) {
-    print('sign-in failed: ${response.statusCode} $text');
+    print('sign-in failed ($email): ${response.statusCode} $text');
     return null;
   }
   final map = jsonDecode(text) as Map<String, dynamic>;
   return map['access_token'] as String?;
 }
 
-Future<String?> _createInviteToken(HttpClient client, String accessToken) async {
-  final userId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+Future<String?> _createGroupWithOwner(
+  HttpClient client,
+  String accessToken, {
+  String ownerId = _userAId,
+}) async {
   final groupName =
       'Edge Smoke Group ${DateTime.now().millisecondsSinceEpoch}';
 
@@ -101,7 +110,7 @@ Future<String?> _createInviteToken(HttpClient client, String accessToken) async 
     body: {
       'name': groupName,
       'currency_code': 'USD',
-      'owner_id': userId,
+      'owner_id': ownerId,
     },
   );
   final groupBody = await _readBody(groupRes);
@@ -123,7 +132,7 @@ Future<String?> _createInviteToken(HttpClient client, String accessToken) async 
     },
     body: {
       'group_id': groupId,
-      'user_id': userId,
+      'user_id': ownerId,
       'role': 'owner',
     },
   );
@@ -132,6 +141,12 @@ Future<String?> _createInviteToken(HttpClient client, String accessToken) async 
     print('create member failed: ${memberRes.statusCode} $memberBody');
     return null;
   }
+  return groupId;
+}
+
+Future<String?> _createInviteToken(HttpClient client, String accessToken) async {
+  final groupId = await _createGroupWithOwner(client, accessToken);
+  if (groupId == null) return null;
 
   final inviteRes = await _send(
     client,
@@ -169,6 +184,21 @@ void main() {
       client.close(force: true);
     });
 
+    test('telemetry rejects missing apikey', () async {
+      if (skipReason != null) return;
+      final response = await _send(
+        client,
+        method: 'POST',
+        uri: _fn('telemetry'),
+        headers: {'Content-Type': 'application/json'},
+        body: {
+          'event': 'integration.edge_telemetry_unauth',
+          'timestamp': DateTime.now().toUtc().toIso8601String(),
+        },
+      );
+      expect(response.statusCode, 401);
+    }, skip: skipReason);
+
     test('telemetry rejects missing event', () async {
       if (skipReason != null) return;
       final response = await _send(
@@ -184,6 +214,24 @@ void main() {
       expect(response.statusCode, 400);
       final body = jsonDecode(await _readBody(response)) as Map<String, dynamic>;
       expect(body['error'], contains('event'));
+    }, skip: skipReason);
+
+    test('telemetry rejects invalid event shape', () async {
+      if (skipReason != null) return;
+      final response = await _send(
+        client,
+        method: 'POST',
+        uri: _fn('telemetry'),
+        headers: {
+          'apikey': _anonKey,
+          'Authorization': 'Bearer $_anonKey',
+        },
+        body: {
+          'event': 'Bad Event!',
+          'timestamp': DateTime.now().toUtc().toIso8601String(),
+        },
+      );
+      expect(response.statusCode, 400);
     }, skip: skipReason);
 
     test('telemetry accepts valid event', () async {
@@ -248,6 +296,26 @@ void main() {
       expect(location, startsWith('$_siteUrl/redirect.html'));
       expect(location, contains('token='));
       expect(location, isNot(contains('error=')));
+    }, skip: skipReason);
+
+    test('invite-redirect unknown token fails closed to error=expired', () async {
+      if (skipReason != null) return;
+      final response = await _send(
+        client,
+        method: 'GET',
+        uri: _fn('invite-redirect', {
+          'token': 'not-a-real-invite-token-zzzz',
+        }),
+        headers: {
+          'apikey': _anonKey,
+          'Authorization': 'Bearer $_anonKey',
+        },
+      );
+      expect(response.statusCode, 302);
+      final location = response.headers.value(HttpHeaders.locationHeader);
+      expect(location, isNotNull);
+      expect(location, contains('error=expired'));
+      expect(location, isNot(contains('token=not-a-real')));
     }, skip: skipReason);
 
     test('og-invite-image returns PNG for token', () async {
@@ -369,6 +437,143 @@ void main() {
         },
       );
       expect(response.statusCode, 401);
+    }, skip: skipReason);
+
+    test('claim_device_token makes token exclusive to claimant', () async {
+      if (skipReason != null) return;
+      final accessA = await _signInAccessToken(client);
+      final accessB = await _signInAccessToken(client, email: _testUserBEmail);
+      expect(accessA, isNotNull);
+      expect(accessB, isNotNull);
+
+      final sharedToken =
+          'edge-smoke-shared-${DateTime.now().millisecondsSinceEpoch}';
+
+      // Seed a row for B via service role (simulates stale registration).
+      final seedRes = await _send(
+        client,
+        method: 'POST',
+        uri: Uri.parse('$_supabaseUrl/rest/v1/device_tokens'),
+        headers: {
+          'apikey': _serviceRoleKey,
+          'Authorization': 'Bearer $_serviceRoleKey',
+          'Prefer': 'return=minimal',
+        },
+        body: {
+          'user_id': _userBId,
+          'token': sharedToken,
+          'platform': 'android',
+          'locale': 'en',
+        },
+      );
+      expect(seedRes.statusCode, lessThan(300), reason: await _readBody(seedRes));
+
+      final claimRes = await _send(
+        client,
+        method: 'POST',
+        uri: Uri.parse('$_supabaseUrl/rest/v1/rpc/claim_device_token'),
+        headers: {
+          'apikey': _anonKey,
+          'Authorization': 'Bearer $accessA',
+        },
+        body: {
+          'p_token': sharedToken,
+          'p_platform': 'android',
+          'p_locale': 'en',
+        },
+      );
+      expect(claimRes.statusCode, lessThan(300), reason: await _readBody(claimRes));
+
+      final listRes = await _send(
+        client,
+        method: 'GET',
+        uri: Uri.parse(
+          '$_supabaseUrl/rest/v1/device_tokens?token=eq.${Uri.encodeQueryComponent(sharedToken)}&select=user_id',
+        ),
+        headers: {
+          'apikey': _serviceRoleKey,
+          'Authorization': 'Bearer $_serviceRoleKey',
+        },
+      );
+      final listBody = await _readBody(listRes);
+      expect(listRes.statusCode, 200, reason: listBody);
+      final rows = jsonDecode(listBody) as List<dynamic>;
+      expect(rows.length, 1);
+      expect((rows.first as Map<String, dynamic>)['user_id'], _userAId);
+    }, skip: skipReason);
+
+    test('send-notification excludes actor from history', () async {
+      if (skipReason != null) return;
+      final accessA = await _signInAccessToken(client);
+      expect(accessA, isNotNull);
+
+      final groupId = await _createGroupWithOwner(client, accessA!);
+      expect(groupId, isNotNull);
+
+      // Service role: add B (invite/accept path is out of scope for this smoke).
+      final joinRes = await _send(
+        client,
+        method: 'POST',
+        uri: Uri.parse('$_supabaseUrl/rest/v1/group_members'),
+        headers: {
+          'apikey': _serviceRoleKey,
+          'Authorization': 'Bearer $_serviceRoleKey',
+          'Prefer': 'return=minimal',
+        },
+        body: {
+          'group_id': groupId,
+          'user_id': _userBId,
+          'role': 'member',
+        },
+      );
+      expect(joinRes.statusCode, lessThan(300), reason: await _readBody(joinRes));
+
+      final notifyRes = await _send(
+        client,
+        method: 'POST',
+        uri: _fn('send-notification'),
+        headers: {
+          'apikey': _serviceRoleKey,
+          'Authorization': 'Bearer $_serviceRoleKey',
+        },
+        body: {
+          'group_id': groupId,
+          'actor_user_id': _userAId,
+          'action': 'expense_created',
+          'expense_title': 'Actor exclusion smoke',
+          'amount_cents': 250,
+          'currency_code': 'USD',
+        },
+      );
+      final notifyText = await _readBody(notifyRes);
+      expect(notifyRes.statusCode, 200, reason: notifyText);
+      final notifyBody = jsonDecode(notifyText) as Map<String, dynamic>;
+      expect(notifyBody['persisted'], 1);
+
+      final histRes = await _send(
+        client,
+        method: 'GET',
+        uri: Uri.parse(
+          '$_supabaseUrl/rest/v1/user_notifications'
+          '?group_id=eq.$groupId'
+          '&action=eq.expense_created'
+          '&select=user_id,actor_user_id'
+          '&order=created_at.desc'
+          '&limit=10',
+        ),
+        headers: {
+          'apikey': _serviceRoleKey,
+          'Authorization': 'Bearer $_serviceRoleKey',
+        },
+      );
+      final histText = await _readBody(histRes);
+      expect(histRes.statusCode, 200, reason: histText);
+      final histRows = jsonDecode(histText) as List<dynamic>;
+      final recipients = histRows
+          .map((r) => (r as Map<String, dynamic>)['user_id'] as String)
+          .toSet();
+      expect(recipients.contains(_userAId), isFalse);
+      expect(recipients.contains(_userBId), isTrue);
     }, skip: skipReason);
   });
 }

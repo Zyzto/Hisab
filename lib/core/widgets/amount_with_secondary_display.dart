@@ -27,6 +27,15 @@ class AmountWithSecondaryDisplay extends ConsumerWidget {
   /// When true and secondary is shown, primary and secondary are in one row (e.g. "XXX EUR  (YYY USD)").
   final bool secondaryOnSameRow;
 
+  /// Forwarded to the primary [AmountText] (e.g. false inside [FittedBox]).
+  final bool? softWrap;
+
+  /// Forwarded to the primary [AmountText].
+  final int? maxLines;
+
+  /// Forwarded to the primary [AmountText].
+  final TextOverflow? overflow;
+
   const AmountWithSecondaryDisplay({
     super.key,
     required this.amountCents,
@@ -36,6 +45,9 @@ class AmountWithSecondaryDisplay extends ConsumerWidget {
     this.isNegative = false,
     this.showSecondary = true,
     this.secondaryOnSameRow = false,
+    this.softWrap,
+    this.maxLines,
+    this.overflow,
   });
 
   static double _divisor(int decimalDigits) {
@@ -106,6 +118,9 @@ class AmountWithSecondaryDisplay extends ConsumerWidget {
     final primaryWidget = AmountText(
       isNegative ? '- $primaryFormatted' : primaryFormatted,
       style: primaryStyle,
+      softWrap: softWrap,
+      maxLines: maxLines,
+      overflow: overflow,
     );
 
     final rate = rateAsync?.asData?.value;

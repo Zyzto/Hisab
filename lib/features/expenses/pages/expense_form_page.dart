@@ -3075,49 +3075,22 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                 onTap: () async {
                   if (others.isEmpty) return;
                   _defocusFormInputs();
-                  final chosen = await showResponsiveSheet<String>(
-                    context: context,
+                  final chosen = await showOptionPickerSheet<String>(
+                    context,
                     title: 'to'.tr(),
-                    maxHeight: MediaQuery.of(context).size.height * 0.75,
-                    isScrollControlled: true,
-                    centerInFullViewport: true,
-                    child: Builder(
-                      builder: (ctx) => SafeArea(
-                        child: SingleChildScrollView(
-                          child: Padding(
-                            padding: EdgeInsets.only(
-                              bottom: MediaQuery.of(ctx).padding.bottom + 16,
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (!LayoutBreakpoints.isTabletOrWider(context))
-                                  Padding(
-                                    padding: const EdgeInsets.all(16),
-                                    child: Text(
-                                      'to'.tr(),
-                                      style: Theme.of(
-                                        ctx,
-                                      ).textTheme.titleMedium,
-                                    ),
-                                  ),
-                                ...others.map(
-                                  (p) => ListTile(
-                                    leading: ParticipantAvatar(
-                                      name: p.name,
-                                      avatarId: p.avatarId,
-                                      radius: 18,
-                                    ),
-                                    title: UserText(p.name),
-                                    onTap: () => Navigator.of(ctx).pop(p.id),
-                                  ),
-                                ),
-                              ],
-                            ),
+                    selected: _toParticipantId,
+                    options: [
+                      for (final p in others)
+                        SheetPickerOption(
+                          value: p.id,
+                          label: p.name,
+                          leading: ParticipantAvatar(
+                            name: p.name,
+                            avatarId: p.avatarId,
+                            radius: 16,
                           ),
                         ),
-                      ),
-                    ),
+                    ],
                   );
                   if (chosen != null) setState(() => _toParticipantId = chosen);
                 },
@@ -3235,95 +3208,43 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     List<Participant> participants,
   ) async {
     _defocusFormInputs();
-    final chosen = await showResponsiveSheet<String>(
-      context: context,
+    final chosen = await showOptionPickerSheet<String>(
+      context,
       title: 'paid_by_label'.tr(),
-      maxHeight: MediaQuery.of(context).size.height * 0.75,
-      isScrollControlled: true,
-      centerInFullViewport: true,
-      child: Builder(
-        builder: (ctx) => SafeArea(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(ctx).padding.bottom + 16,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (!LayoutBreakpoints.isTabletOrWider(context))
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(
-                        'paid_by_label'.tr(),
-                        style: Theme.of(ctx).textTheme.titleMedium,
-                      ),
-                    ),
-                  ...participants.map(
-                    (p) => ListTile(
-                      leading: ParticipantAvatar(
-                        name: p.name,
-                        avatarId: p.avatarId,
-                        radius: 18,
-                      ),
-                      title: UserText(p.name),
-                      onTap: () => Navigator.of(ctx).pop(p.id),
-                    ),
-                  ),
-                ],
-              ),
+      selected: _payerParticipantId,
+      options: [
+        for (final p in participants)
+          SheetPickerOption(
+            value: p.id,
+            label: p.name,
+            leading: ParticipantAvatar(
+              name: p.name,
+              avatarId: p.avatarId,
+              radius: 16,
             ),
           ),
-        ),
-      ),
+      ],
     );
     if (chosen != null) setState(() => _payerParticipantId = chosen);
   }
 
   Future<void> _showSplitTypePicker(BuildContext context) async {
     _defocusFormInputs();
-    final chosen = await showResponsiveSheet<SplitType>(
-      context: context,
+    final chosen = await showOptionPickerSheet<SplitType>(
+      context,
       title: 'split_type'.tr(),
-      maxHeight: MediaQuery.of(context).size.height * 0.75,
-      isScrollControlled: true,
-      centerInFullViewport: true,
-      child: Builder(
-        builder: (ctx) => SafeArea(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(ctx).padding.bottom + 16,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (!LayoutBreakpoints.isTabletOrWider(context))
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(
-                        'split_type'.tr(),
-                        style: Theme.of(ctx).textTheme.titleMedium,
-                      ),
-                    ),
-                  ...SplitType.values.map(
-                    (e) => ListTile(
-                      title: Text(
-                        e == SplitType.equal
-                            ? 'equal'.tr()
-                            : e == SplitType.parts
-                            ? 'parts'.tr()
-                            : 'amounts'.tr(),
-                      ),
-                      onTap: () => Navigator.of(ctx).pop(e),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+      selected: _splitType,
+      options: [
+        for (final e in SplitType.values)
+          SheetPickerOption(
+            value: e,
+            label: e == SplitType.equal
+                ? 'equal'.tr()
+                : e == SplitType.parts
+                ? 'parts'.tr()
+                : 'amounts'.tr(),
           ),
-        ),
-      ),
+      ],
     );
     if (chosen != null) {
       setState(() {

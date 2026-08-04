@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme/accent_style.dart';
 import 'user_text.dart';
 
 /// One row in an [AnchoredDropdownChip] menu.
@@ -25,6 +26,7 @@ class AnchoredDropdownChip<T> extends StatelessWidget {
     required this.selected,
     required this.onSelected,
     this.active = false,
+    this.expand = false,
   });
 
   final IconData icon;
@@ -36,10 +38,14 @@ class AnchoredDropdownChip<T> extends StatelessWidget {
   /// When true, chip uses the emphasized (selected-filter) look.
   final bool active;
 
+  /// When true, fills the parent width and ellipsizes the label (for dense rows).
+  final bool expand;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final subtle = context.subtleAccents;
 
     return MenuAnchor(
       // Let the tap reach another chip so it can open in the same gesture.
@@ -71,6 +77,16 @@ class AnchoredDropdownChip<T> extends StatelessWidget {
         final fg = active ? cs.onPrimaryContainer : cs.onSurface;
         final iconColor =
             active ? cs.onPrimaryContainer : cs.onSurfaceVariant;
+        final labelStyle = theme.textTheme.labelLarge?.copyWith(
+          color: fg,
+          fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+        );
+        final labelText = UserText(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: labelStyle,
+        );
 
         return Material(
           color: bg,
@@ -85,9 +101,10 @@ class AnchoredDropdownChip<T> extends StatelessWidget {
               }
             },
             child: Container(
-              padding: const EdgeInsetsDirectional.only(
-                start: 14,
-                end: 10,
+              width: expand ? double.infinity : null,
+              padding: EdgeInsetsDirectional.only(
+                start: expand ? 10 : 14,
+                end: expand ? 6 : 10,
                 top: 10,
                 bottom: 10,
               ),
@@ -100,22 +117,17 @@ class AnchoredDropdownChip<T> extends StatelessWidget {
                 ),
               ),
               child: Row(
-                mainAxisSize: MainAxisSize.min,
+                mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
                 children: [
                   Icon(icon, size: 18, color: iconColor),
-                  const SizedBox(width: 8),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 112),
-                    child: UserText(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: fg,
-                        fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                      ),
+                  SizedBox(width: expand ? 6 : 8),
+                  if (expand)
+                    Expanded(child: labelText)
+                  else
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 112),
+                      child: labelText,
                     ),
-                  ),
                   const SizedBox(width: 4),
                   Icon(
                     controller.isOpen
@@ -146,12 +158,20 @@ class AnchoredDropdownChip<T> extends StatelessWidget {
             style: ButtonStyle(
               backgroundColor: WidgetStateProperty.resolveWith((states) {
                 if (options[i].value == selected) {
-                  return cs.primaryContainer.withValues(alpha: 0.65);
+                  return AccentSurfaces.emphasizedFill(cs, subtle: subtle);
                 }
-                return null;
+                return cs.surfaceContainerLow;
+              }),
+              side: WidgetStateProperty.resolveWith((states) {
+                final selectedRow = options[i].value == selected;
+                return BorderSide(
+                  color: selectedRow
+                      ? AccentSurfaces.emphasizedBorder(cs, subtle: subtle)
+                      : cs.outlineVariant.withValues(alpha: 0.45),
+                );
               }),
               shape: WidgetStatePropertyAll(
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
               padding: const WidgetStatePropertyAll(
                 EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -163,10 +183,10 @@ class AnchoredDropdownChip<T> extends StatelessWidget {
               style: theme.textTheme.bodyMedium?.copyWith(
                 fontWeight: options[i].value == selected
                     ? FontWeight.w700
-                    : FontWeight.w500,
+                    : FontWeight.w600,
                 color: options[i].value == selected
                     ? cs.onPrimaryContainer
-                    : null,
+                    : cs.onSurface,
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,

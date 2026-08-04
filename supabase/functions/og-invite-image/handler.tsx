@@ -11,7 +11,8 @@ const TEXT = "#333333";
 export async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const token = url.searchParams.get("token");
-  if (!token || token.length > 512) {
+  // Shape guard only — crawlers hit this without auth; keep render cheap.
+  if (!token || token.length < 8 || token.length > 512 || /\s/.test(token)) {
     return new Response("Missing or invalid token", { status: 400 });
   }
 

@@ -6,14 +6,32 @@ Function source lives in this repo under `supabase/functions/`. Deploy with the 
 
 Local smoke tests: [LOCAL_TEST_ENV.md](LOCAL_TEST_ENV.md).
 
+Shared helpers: `supabase/functions/_shared/` (CORS, JSON responses, telemetry validation).
+
+## Auth modes
+
+| Function | Caller | Platform `verify_jwt` | In-function auth |
+|----------|--------|----------------------|------------------|
+| **telemetry** | Flutter app (optional analytics) | `false` ([config.toml](../supabase/config.toml)) | Require `apikey` == anon key; insert with **anon** client so RLS applies |
+| **send-notification** | `pg_net` from `notify_group_activity()` | `false` | `Authorization: Bearer` must equal service role key |
+| **invite-redirect** | Public invite links / Hosting proxy | `false` | Invite `token` query param; fail closed on RPC errors |
+| **og-invite-image** | Link-preview crawlers | `false` | Token shape guard only |
+
+Official patterns: [Securing Edge Functions](https://supabase.com/docs/guides/functions/auth), [Authorization headers](https://supabase.com/docs/guides/functions/auth-headers).
+
 ## Functions in this repo
 
 | Function | Path | Purpose |
 |----------|------|--------|
-| **invite-redirect** | `supabase/functions/invite-redirect/index.ts` | Validates invite token via `get_invite_by_token`, then 302 redirects to `redirect.html?token=...` (or error). Uses `SITE_URL` (default e.g. hisab.shenepoy.com) for the redirect base. |
-| **og-invite-image** | `supabase/functions/og-invite-image/` | GET `?token=...` → returns a 1200×630 PNG with themed QR code (encoding the invite URL), “Hisab” branding, and logo. Used as `og:image` / `twitter:image` for invite link previews (WhatsApp, Telegram, etc.). Uses `SITE_URL`. Deploy with `--no-verify-jwt`. |
-| **send-notification** | `supabase/functions/send-notification/index.ts` | Called by DB trigger `notify_group_activity()` on expense insert/content-update/delete and member join. Copy: title = group name; body = `{title} - {cost}` with Edit/Deleted prefixes (en/ar). Skips image-only expense updates (create-with-photos). Inserts `user_notifications` for other members, then FCM when secrets are set. Actor is never notified. Dry-run still persists history. Secrets: `FCM_PROJECT_ID`, `FCM_SERVICE_ACCOUNT_KEY`. |
-| **telemetry** | `supabase/functions/telemetry/index.ts` | POST body `{ event, timestamp?, data? }`; inserts into `public.telemetry`. Used for optional anonymous usage analytics when enabled in app settings. |
+| **invite-redirect** | `supabase/functions/invite-redirect/index.ts` | Validates invite token via `get_invite_by_token`, then 302 redirects to `redirect.html?token=...` (or `error=expired` / `missing`). Uses `SITE_URL` for the redirect base. Fail closed if DB/RPC fails. |
+| **og-invite-image** | `supabase/functions/og-invite-image/` | GET `?token=...` → 1200×630 PNG with themed QR (invite URL), branding, logo. Used as `og:image` / `twitter:image`. |
+| **send-notification** | `supabase/functions/send-notification/index.ts` | Called by DB trigger `notify_group_activity()` on expense insert/content-update/delete and member join. Persists `user_notifications` for other members, then FCM. Excludes actor by `user_id` and by shared FCM token string. FCM `data` includes `actor_user_id` and `group_id`. Caches FCM OAuth token; sends with bounded concurrency. Dry-run still persists history. Secrets: `FCM_PROJECT_ID`, `FCM_SERVICE_ACCOUNT_KEY`. |
+| **telemetry** | `supabase/functions/telemetry/index.ts` | POST `{ event, timestamp?, data? }` with `apikey`; validates payload (mirrors RLS) and inserts via anon client into `public.telemetry`. |
+
+SQL helpers related to notifications:
+
+- `claim_device_token(token, platform, locale)` — exclusive FCM token ownership (`UNIQUE(device_tokens.token)`).
+- `notify_group_activity()` — skips `pg_net` when the actor is the only group member (and for personal groups / suppress / image-only updates).
 
 ## Local testing
 
@@ -28,7 +46,7 @@ See [LOCAL_TEST_ENV.md](LOCAL_TEST_ENV.md). Locally, `send-notification` returns
 
 ## Deploy
 
-From the project root:
+From the project root (`verify_jwt` is also set in `supabase/config.toml`):
 
 ```bash
 supabase functions deploy invite-redirect --no-verify-jwt

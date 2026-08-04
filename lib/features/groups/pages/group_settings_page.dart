@@ -34,6 +34,7 @@ import '../../../core/utils/currency_helpers.dart';
 import '../../../core/utils/error_report_helper.dart';
 import '../../../core/utils/form_validators.dart';
 import '../../../core/widgets/error_content.dart';
+import '../../../core/widgets/participant_avatar.dart';
 import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../core/widgets/user_text.dart';
@@ -822,6 +823,14 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     final theme = Theme.of(context);
     return participantsAsync.when(
       data: (participants) {
+        if (participants.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        final selectedId =
+            group.treasurerParticipantId ?? participants.first.id;
+        final selected = participants.where((p) => p.id == selectedId).firstOrNull ??
+            participants.first;
+        final canEdit = !_saving && canEditSettings;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -833,24 +842,64 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
               ),
             ),
             const SizedBox(height: ThemeConfig.spacingS),
-            DropdownButtonFormField<String>(
-              initialValue:
-                  group.treasurerParticipantId ??
-                  (participants.isNotEmpty ? participants.first.id : null),
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(ThemeConfig.radiusXL),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(ThemeConfig.radiusXL),
+                onTap: !canEdit
+                    ? null
+                    : () async {
+                        final chosen = await showOptionPickerSheet<String>(
+                          context,
+                          title: 'select_treasurer'.tr(),
+                          selected: selectedId,
+                          options: [
+                            for (final p in participants)
+                              SheetPickerOption(
+                                value: p.id,
+                                label: p.name,
+                                leading: ParticipantAvatar(
+                                  name: p.name,
+                                  avatarId: p.avatarId,
+                                  radius: 16,
+                                ),
+                              ),
+                          ],
+                        );
+                        if (chosen != null) {
+                          await _onTreasurerChanged(ref, group, chosen);
+                        }
+                      },
+                child: InputDecorator(
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(ThemeConfig.radiusXL),
+                    ),
+                    enabled: canEdit,
+                  ),
+                  child: Row(
+                    children: [
+                      ParticipantAvatar(
+                        name: selected.name,
+                        avatarId: selected.avatarId,
+                        radius: 14,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: UserText(
+                          selected.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Icon(
+                        Icons.expand_more_rounded,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              items: participants
-                  .map(
-                    (p) =>
-                        DropdownMenuItem(value: p.id, child: UserText(p.name)),
-                  )
-                  .toList(),
-              onChanged: _saving || !canEditSettings
-                  ? null
-                  : (v) => _onTreasurerChanged(ref, group, v),
             ),
           ],
         );
@@ -1718,36 +1767,17 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
       context.showToast('no_other_members'.tr());
       return;
     }
-    final chosen = await showResponsiveSheet<String>(
-      context: context,
+    final chosen = await showOptionPickerSheet<String>(
+      context,
       title: 'transfer_ownership'.tr(),
-      maxHeight: MediaQuery.of(context).size.height * 0.75,
-      isScrollControlled: true,
-      centerInFullViewport: true,
-      child: Builder(
-        builder: (ctx) => SafeArea(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(ctx).padding.bottom + 16,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: others
-                    .map(
-                      (m) => ListTile(
-                        title: Text(
-                          '${m.userId.substring(0, 8)}... (${m.role})',
-                        ),
-                        onTap: () => Navigator.pop(ctx, m.id),
-                      ),
-                    )
-                    .toList(),
-              ),
-            ),
+      options: [
+        for (final m in others)
+          SheetPickerOption(
+            value: m.id,
+            label: '${m.userId.substring(0, 8)}...',
+            subtitle: m.role,
           ),
-        ),
-      ),
+      ],
     );
     if (chosen == null || !context.mounted) return;
     try {

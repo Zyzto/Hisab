@@ -63,8 +63,8 @@ class SheetOptionTile extends StatelessWidget {
               children: [
                 if (leading != null) ...[
                   SizedBox(
-                    width: 28,
-                    height: 28,
+                    width: 36,
+                    height: 36,
                     child: Center(child: leading!),
                   ),
                   const SizedBox(width: 14),

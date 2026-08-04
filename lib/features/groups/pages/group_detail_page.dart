@@ -16,6 +16,7 @@ import '../../../core/platform/ui_perf.dart';
 import '../providers/groups_provider.dart';
 import '../providers/group_member_provider.dart';
 import '../widgets/create_invite_sheet.dart';
+import '../widgets/expense_summary_card.dart';
 import '../widgets/group_section_header.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/repository/repository_providers.dart';
@@ -24,7 +25,6 @@ import '../../../core/navigation/invite_auth_helpers.dart';
 import '../../../core/navigation/nav_back.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/widgets/missing_route_page.dart';
-import '../../../core/theme/accent_style.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/error_report_helper.dart';
@@ -1403,14 +1403,15 @@ class _ExpensesTabState extends ConsumerState<_ExpensesTab> {
                           vertical: 8,
                         ),
                         child: group.isPersonal
-                            ? _ExpenseSummaryCard(
+                            ? ExpenseSummaryCard(
                                 label: 'my_expenses'.tr(),
                                 value:
                                     '${CurrencyFormatter.formatCompactCents(item.totalCents)} $currencyCode',
-                                theme: theme,
                                 valueWidget: AmountWithSecondaryDisplay(
                                   amountCents: item.totalCents,
                                   groupCurrencyCode: currencyCode,
+                                  softWrap: false,
+                                  maxLines: 1,
                                 ),
                               )
                             : Column(
@@ -1419,46 +1420,49 @@ class _ExpensesTabState extends ConsumerState<_ExpensesTab> {
                                   Row(
                                     children: [
                                       Expanded(
-                                        child: _ExpenseSummaryCard(
+                                        child: ExpenseSummaryCard(
                                           label: 'your_share'.tr(),
                                           value:
                                               '${CurrencyFormatter.formatCompactCents(item.myShareCents)} $currencyCode',
-                                          theme: theme,
                                           valueWidget:
                                               AmountWithSecondaryDisplay(
                                                 amountCents: item.myShareCents,
                                                 groupCurrencyCode: currencyCode,
                                                 showSecondary: false,
+                                                softWrap: false,
+                                                maxLines: 1,
                                               ),
                                         ),
                                       ),
                                       const SizedBox(width: 8),
                                       Expanded(
-                                        child: _ExpenseSummaryCard(
+                                        child: ExpenseSummaryCard(
                                           label: 'you_paid'.tr(),
                                           value:
                                               '${CurrencyFormatter.formatCompactCents(item.youPaidCents)} $currencyCode',
-                                          theme: theme,
                                           valueWidget:
                                               AmountWithSecondaryDisplay(
                                                 amountCents: item.youPaidCents,
                                                 groupCurrencyCode: currencyCode,
                                                 showSecondary: false,
+                                                softWrap: false,
+                                                maxLines: 1,
                                               ),
                                         ),
                                       ),
                                     ],
                                   ),
                                   const SizedBox(height: 8),
-                                  _ExpenseSummaryCard(
+                                  ExpenseSummaryCard(
                                     label: 'total_expenses'.tr(),
                                     value:
                                         '${CurrencyFormatter.formatCompactCents(item.totalCents)} $currencyCode',
-                                    theme: theme,
                                     valueWidget: AmountWithSecondaryDisplay(
                                       amountCents: item.totalCents,
                                       groupCurrencyCode: currencyCode,
                                       showSecondary: false,
+                                      softWrap: false,
+                                      maxLines: 1,
                                     ),
                                   ),
                                 ],
@@ -2203,63 +2207,34 @@ class _PeopleTab extends ConsumerWidget {
     List<GroupMember> members,
     List<Participant> participants,
   ) async {
-    final theme = Theme.of(context);
-    final chosen = await showResponsiveSheet<GroupMember>(
-      context: context,
-      title: 'merge_with_user'.tr(),
-      isScrollControlled: true,
-      centerInFullViewport: true,
-      child: Builder(
-        builder: (ctx) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (!LayoutBreakpoints.isTabletOrWider(context))
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    'merge_with_user'.tr(),
-                    style: theme.textTheme.titleLarge,
-                  ),
-                ),
-              Flexible(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: members.length,
-                  itemBuilder: (ctx, i) {
-                    final m = members[i];
-                    Participant? linked;
-                    if (m.participantId != null) {
-                      try {
-                        linked = participants.firstWhere(
-                          (p) => p.id == m.participantId,
-                        );
-                      } catch (_) {
-                        linked = null;
-                      }
-                    } else {
-                      linked = null;
-                    }
-                    final label = linked?.name ?? 'group_member'.tr();
-                    return ListTile(
-                      leading: ParticipantAvatar(
-                        name: label,
-                        avatarId: linked?.avatarId,
-                        radius: 18,
-                      ),
-                      title: linked != null
-                          ? UserText(linked.name)
-                          : Text(label),
-                      subtitle: Text(_roleLabel(m.role)),
-                      onTap: () => Navigator.pop(ctx, m),
-                    );
-                  },
-                ),
-              ),
-            ],
+    final options = <SheetPickerOption<GroupMember>>[];
+    for (final m in members) {
+      Participant? linked;
+      if (m.participantId != null) {
+        try {
+          linked = participants.firstWhere((p) => p.id == m.participantId);
+        } catch (_) {
+          linked = null;
+        }
+      }
+      final label = linked?.name ?? 'group_member'.tr();
+      options.add(
+        SheetPickerOption(
+          value: m,
+          label: label,
+          subtitle: _roleLabel(m.role),
+          leading: ParticipantAvatar(
+            name: label,
+            avatarId: linked?.avatarId,
+            radius: 16,
           ),
         ),
-      ),
+      );
+    }
+    final chosen = await showOptionPickerSheet<GroupMember>(
+      context,
+      title: 'merge_with_user'.tr(),
+      options: options,
     );
     if (chosen == null || !context.mounted) return;
     final confirmed = await showConfirmSheet(
@@ -2315,44 +2290,20 @@ class _PeopleTab extends ConsumerWidget {
     WidgetRef ref,
     GroupMember member,
   ) async {
-    final role = await showResponsiveSheet<GroupRole>(
-      context: context,
+    final role = await showOptionPickerSheet<GroupRole>(
+      context,
       title: 'change_role'.tr(),
-      maxHeight: MediaQuery.of(context).size.height * 0.75,
-      isScrollControlled: true,
-      centerInFullViewport: true,
-      child: Builder(
-        builder: (ctx) => SafeArea(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(ctx).padding.bottom + 16,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (!LayoutBreakpoints.isTabletOrWider(context))
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(
-                        'change_role'.tr(),
-                        style: Theme.of(ctx).textTheme.titleMedium,
-                      ),
-                    ),
-                  ListTile(
-                    title: Text('group_admin'.tr()),
-                    onTap: () => Navigator.pop(ctx, GroupRole.admin),
-                  ),
-                  ListTile(
-                    title: Text('group_member'.tr()),
-                    onTap: () => Navigator.pop(ctx, GroupRole.member),
-                  ),
-                ],
-              ),
-            ),
-          ),
+      selected: member.role == 'admin' ? GroupRole.admin : GroupRole.member,
+      options: [
+        SheetPickerOption(
+          value: GroupRole.admin,
+          label: 'group_admin'.tr(),
         ),
-      ),
+        SheetPickerOption(
+          value: GroupRole.member,
+          label: 'group_member'.tr(),
+        ),
+      ],
     );
     if (role != null && context.mounted) {
       try {
@@ -2645,71 +2596,6 @@ class _ExpenseListDateHeaderItem extends _ExpenseListItem {
 class _ExpenseListExpenseItem extends _ExpenseListItem {
   final Expense expense;
   _ExpenseListExpenseItem(this.expense) : super();
-}
-
-/// Summary card for my/total expenses in the expenses tab.
-class _ExpenseSummaryCard extends StatelessWidget {
-  const _ExpenseSummaryCard({
-    required this.label,
-    required this.value,
-    required this.theme,
-    this.valueWidget,
-  });
-
-  final String label;
-  final String value;
-  final ThemeData theme;
-
-  /// When set, shown instead of [value] (e.g. [AmountWithSecondaryDisplay]).
-  final Widget? valueWidget;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = theme.colorScheme;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-      decoration: AccentSurfaces.panel(
-        colorScheme,
-        subtle: context.subtleAccents,
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Flexible(
-            child: DefaultTextStyle.merge(
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-              textAlign: TextAlign.end,
-              child:
-                  valueWidget ??
-                  Text(
-                    value,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.end,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 Future<void> _showAddParticipant(

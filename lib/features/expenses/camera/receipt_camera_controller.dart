@@ -8,7 +8,7 @@ import 'receipt_camera_mock_preview.dart';
 /// High-level camera readiness for the receipt viewer.
 enum ReceiptCameraStatus { loading, permissionDenied, noCamera, ready, error }
 
-/// Owns a [CameraController] for receipt capture (back camera, torch, lifecycle).
+/// Owns a [CameraController] for receipt capture (torch, lens flip, lifecycle).
 class ReceiptCameraController extends ChangeNotifier {
   ReceiptCameraController({bool mock = false}) : _mockMode = mock;
 
@@ -23,6 +23,8 @@ class ReceiptCameraController extends ChangeNotifier {
        _errorMessage = errorMessage;
 
   CameraController? _camera;
+  List<CameraDescription> _cameras = const [];
+  CameraLensDirection _lensDirection = CameraLensDirection.back;
   ReceiptCameraStatus _status = ReceiptCameraStatus.loading;
   String? _errorMessage;
   bool _torchOn = false;
@@ -34,6 +36,7 @@ class ReceiptCameraController extends ChangeNotifier {
   bool _testMode = false;
   final bool _mockMode;
   bool _mockPaused = false;
+  bool _switching = false;
 
   ReceiptCameraStatus get status => _status;
   String? get errorMessage => _errorMessage;
@@ -46,11 +49,25 @@ class ReceiptCameraController extends ChangeNotifier {
   CameraController? get camera => _camera;
   bool get isMock => _mockMode;
   bool get mockPaused => _mockPaused;
+  CameraLensDirection get lensDirection => _lensDirection;
+  bool get canSwitchLens {
+    if (_mockMode) return true;
+    if (_cameras.length < 2) return false;
+    final hasBack = _cameras.any(
+      (c) => c.lensDirection == CameraLensDirection.back,
+    );
+    final hasFront = _cameras.any(
+      (c) => c.lensDirection == CameraLensDirection.front,
+    );
+    return hasBack && hasFront;
+  }
+
   bool get isReady =>
       _status == ReceiptCameraStatus.ready &&
+      !_switching &&
       (_mockMode || (_camera != null && _camera!.value.isInitialized));
 
-  /// Request permission, pick back camera, initialize preview.
+  /// Request permission, pick camera, initialize preview.
   Future<void> initialize(BuildContext context) async {
     if (_disposed) return;
     if (_testMode) {
@@ -63,6 +80,7 @@ class ReceiptCameraController extends ChangeNotifier {
       notifyListeners();
       await Future<void>.delayed(const Duration(milliseconds: 200));
       if (_disposed) return;
+      _lensDirection = CameraLensDirection.back;
       _torchSupported = true;
       _torchOn = false;
       _minZoom = 1;
@@ -98,34 +116,22 @@ class ReceiptCameraController extends ChangeNotifier {
     }
 
     try {
-      final cameras = await availableCameras();
+      _cameras = await availableCameras();
       if (_disposed) return;
-      if (cameras.isEmpty) {
+      if (_cameras.isEmpty) {
         _status = ReceiptCameraStatus.noCamera;
         notifyListeners();
         return;
       }
 
-      final back = cameras.firstWhere(
-        (c) => c.lensDirection == CameraLensDirection.back,
-        orElse: () => cameras.first,
-      );
-
-      final controller = CameraController(
-        back,
-        ResolutionPreset.veryHigh,
-        enableAudio: false,
-        imageFormatGroup: ImageFormatGroup.jpeg,
-      );
-      await controller.initialize();
-      if (_disposed) {
-        await controller.dispose();
+      final opened = await _openLens(_lensDirection, retryOnFailure: true);
+      if (_disposed) return;
+      if (!opened) {
+        _status = ReceiptCameraStatus.error;
+        _errorMessage ??= 'receipt_camera_no_camera';
+        notifyListeners();
         return;
       }
-
-      _camera = controller;
-      await _probeTorchAndZoom();
-      if (_disposed) return;
 
       _status = ReceiptCameraStatus.ready;
       notifyListeners();
@@ -138,7 +144,77 @@ class ReceiptCameraController extends ChangeNotifier {
     }
   }
 
-  Future<void> _probeTorchAndZoom() async {
+  CameraDescription? _descriptionFor(CameraLensDirection lens) {
+    for (final c in _cameras) {
+      if (c.lensDirection == lens) return c;
+    }
+    return _cameras.isEmpty ? null : _cameras.first;
+  }
+
+  /// Opens [lens]. Retries once — Android often fails the first cold start.
+  Future<bool> _openLens(
+    CameraLensDirection lens, {
+    required bool retryOnFailure,
+  }) async {
+    final description = _descriptionFor(lens);
+    if (description == null) return false;
+
+    Future<bool> attempt() async {
+      final previous = _camera;
+      _camera = null;
+      if (previous != null) {
+        try {
+          await previous.dispose();
+        } catch (_) {}
+      }
+
+      // Medium keeps shutter snappy; high is enough fallback for OCR quality.
+      final presets = <ResolutionPreset>[
+        ResolutionPreset.medium,
+        ResolutionPreset.high,
+      ];
+
+      Object? lastError;
+      for (final preset in presets) {
+        CameraController? controller;
+        try {
+          controller = CameraController(
+            description,
+            preset,
+            enableAudio: false,
+            imageFormatGroup: ImageFormatGroup.jpeg,
+          );
+          await controller.initialize();
+          if (_disposed) {
+            await controller.dispose();
+            return false;
+          }
+          _camera = controller;
+          _lensDirection = description.lensDirection;
+          await _configureAfterOpen();
+          return true;
+        } catch (e) {
+          lastError = e;
+          debugPrint('Camera open failed ($preset): $e');
+          try {
+            await controller?.dispose();
+          } catch (_) {}
+          _camera = null;
+        }
+      }
+      _errorMessage = lastError?.toString();
+      return false;
+    }
+
+    if (await attempt()) return true;
+    if (!retryOnFailure || _disposed) return false;
+    // Brief pause lets the platform camera service finish releasing.
+    await Future<void>.delayed(const Duration(milliseconds: 280));
+    if (_disposed) return false;
+    return attempt();
+  }
+
+  Future<void> _configureAfterOpen() async {
     final cam = _camera;
     if (cam == null || !cam.value.isInitialized) return;
 
@@ -152,19 +228,56 @@ class ReceiptCameraController extends ChangeNotifier {
       _zoom = 1;
     }
 
-    _torchSupported = false;
+    // Never probe torch with on→off (that is what made the LED fire on open in
+    // release). Only touch flash mode if the session did not start as off.
     _torchOn = false;
+    _torchSupported = _lensDirection == CameraLensDirection.back;
     try {
-      await cam.setFlashMode(FlashMode.off);
-      // Some devices throw when torch is unsupported; probe by toggling briefly.
-      await cam.setFlashMode(FlashMode.torch);
-      await cam.setFlashMode(FlashMode.off);
-      _torchSupported = true;
-    } catch (_) {
-      _torchSupported = false;
-      try {
+      if (cam.value.flashMode != FlashMode.off) {
         await cam.setFlashMode(FlashMode.off);
-      } catch (_) {}
+      }
+    } catch (_) {
+      // Leave torch control available; first user toggle will disable on failure.
+    }
+  }
+
+  /// Flip between rear and front cameras.
+  Future<void> switchLens() async {
+    if (_disposed || _switching || !canSwitchLens) return;
+
+    if (_mockMode) {
+      _lensDirection = _lensDirection == CameraLensDirection.back
+          ? CameraLensDirection.front
+          : CameraLensDirection.back;
+      _torchSupported = _lensDirection == CameraLensDirection.back;
+      _torchOn = false;
+      notifyListeners();
+      return;
+    }
+
+    final next = _lensDirection == CameraLensDirection.back
+        ? CameraLensDirection.front
+        : CameraLensDirection.back;
+
+    _switching = true;
+    _torchOn = false;
+    notifyListeners();
+
+    try {
+      final ok = await _openLens(next, retryOnFailure: true);
+      if (_disposed) return;
+      if (!ok) {
+        // Fall back to the previous lens if flip failed.
+        await _openLens(_lensDirection, retryOnFailure: true);
+      }
+    } finally {
+      _switching = false;
+      if (!_disposed) {
+        _status = _camera != null
+            ? ReceiptCameraStatus.ready
+            : ReceiptCameraStatus.error;
+        notifyListeners();
+      }
     }
   }
 
@@ -220,8 +333,6 @@ class ReceiptCameraController extends ChangeNotifier {
       return null;
     }
     try {
-      // Torch can interfere with still capture on some devices; leave as-is
-      // so framing stays lit under dark conditions.
       return await cam.takePicture();
     } catch (e, stack) {
       debugPrint('takePicture failed: $e');

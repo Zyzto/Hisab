@@ -21,7 +21,7 @@ void main() {
     controller.dispose();
   });
 
-  testWidgets('ExpenseTitleSection shows title label and category chip', (
+  testWidgets('ExpenseTitleSection keeps category and camera inside the field', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -49,9 +49,13 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    expect(find.byType(ExpenseTitleSection), findsOneWidget);
     expect(find.byType(CategoryAffordanceChip), findsOneWidget);
     expect(find.byIcon(Icons.label_outlined), findsOneWidget);
     expect(find.byIcon(Icons.camera_alt_outlined), findsOneWidget);
-    expect(find.byType(ExpenseTitleSection), findsOneWidget);
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.decoration?.suffixIcon, isNotNull);
+    // Widget-test EasyLocalization harness falls back to keys.
+    expect(field.decoration?.hintText, 'title_hint');
   });
 }
