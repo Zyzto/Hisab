@@ -58,10 +58,9 @@ Widget buildExpenseImageView(
   final radius = borderRadius ?? BorderRadius.circular(12);
   if (isImageUrl(imagePath)) {
     final effectiveMaxHeight = maxHeight ?? 200;
-    final decode = NetworkImageDecode.cacheSize(
+    final decode = NetworkImageDecode.cacheSizePreserveAspect(
       context,
-      logicalWidth: width ?? effectiveMaxHeight,
-      logicalHeight: effectiveMaxHeight,
+      logicalMaxEdge: width ?? effectiveMaxHeight,
     );
     return Padding(
       padding: padding,

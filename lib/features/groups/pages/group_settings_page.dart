@@ -23,6 +23,7 @@ import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/navigation/nav_back.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/navigation/route_transition_ready.dart';
 import '../../../core/widgets/missing_route_page.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/services/settle_up_service.dart';
@@ -50,7 +51,8 @@ class GroupSettingsPage extends ConsumerStatefulWidget {
   ConsumerState<GroupSettingsPage> createState() => _GroupSettingsPageState();
 }
 
-class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
+class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage>
+    with RouteTransitionReady {
   @override
   void initState() {
     super.initState();
@@ -61,7 +63,14 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
         parentPath: RoutePaths.groupDetail(widget.groupId),
         currentPath: RoutePaths.groupSettings(widget.groupId),
       );
+      ensureRouteReady(context);
     });
+  }
+
+  @override
+  void dispose() {
+    disposeRouteReady();
+    super.dispose();
   }
 
   bool _saving = false;
@@ -76,8 +85,44 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
     }
   }
 
+  Widget _settingsShell(
+    BuildContext context, {
+    String? title,
+    Widget? body,
+  }) {
+    final groupPath = RoutePaths.groupDetail(widget.groupId);
+    return LayoutBuilder(
+      builder: (context, layoutConstraints) {
+        final canPop = routerCanPop(context);
+        return PopScope(
+          canPop: canPop,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) popOrGo(context, groupPath);
+          },
+          child: Scaffold(
+            appBar: ContentAlignedAppBar(
+              contentAreaWidth: layoutConstraints.maxWidth,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => popOrGo(context, groupPath),
+              ),
+              title: Text(title ?? 'group_settings'.tr()),
+            ),
+            body: body ?? const SizedBox.shrink(),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    ensureRouteReady(context);
+    // Defer multi-provider watches until the push transition finishes.
+    if (!routeReady) {
+      return _settingsShell(context);
+    }
+
     final groupAsync = ref.watch(futureGroupProvider(widget.groupId));
     final participantsAsync = ref.watch(
       activeParticipantsByGroupProvider(widget.groupId),
@@ -373,37 +418,28 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
           },
         );
       },
-      loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      loading: () => _settingsShell(
+        context,
+        body: const Center(child: CircularProgressIndicator()),
+      ),
       error: (e, st) {
         sendErrorTelemetryIfOnline(
           ref,
           message: e.toString(),
           details: e.toString(),
         );
-        return LayoutBuilder(
-          builder: (context, layoutConstraints) {
-            return Scaffold(
-              appBar: ContentAlignedAppBar(
-                contentAreaWidth: layoutConstraints.maxWidth,
-                title: Text('list_settings'.tr()),
-                leading: IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () =>
-                      popOrGo(context, RoutePaths.groupDetail(widget.groupId)),
-                ),
-              ),
-              body: Center(
-                child: ErrorContentWidget(
-                  message: e.toString(),
-                  details: e.toString(),
-                  stackTrace: st,
-                  onRetry: () =>
-                      ref.invalidate(futureGroupProvider(widget.groupId)),
-                ),
-              ),
-            );
-          },
+        return _settingsShell(
+          context,
+          title: 'list_settings'.tr(),
+          body: Center(
+            child: ErrorContentWidget(
+              message: e.toString(),
+              details: e.toString(),
+              stackTrace: st,
+              onRetry: () =>
+                  ref.invalidate(futureGroupProvider(widget.groupId)),
+            ),
+          ),
         );
       },
     );
@@ -1386,11 +1422,11 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage> {
           builder: (ctx, setSheetState) {
             return SingleChildScrollView(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(
+                padding: const EdgeInsets.fromLTRB(
                   ThemeConfig.spacingM,
                   0,
                   ThemeConfig.spacingM,
-                  ThemeConfig.spacingM + MediaQuery.of(ctx).padding.bottom,
+                  ThemeConfig.spacingM,
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,

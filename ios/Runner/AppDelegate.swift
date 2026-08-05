@@ -16,8 +16,10 @@ import UIKit
     // fall back to registrar for scene/cold-start edge cases.
     if let controller = window?.rootViewController as? FlutterViewController {
       ReceiptOcrBridge.register(with: controller.binaryMessenger)
+      GalleryThumbBridge.register(with: controller.binaryMessenger)
     } else if let registrar = self.registrar(forPlugin: "ReceiptOcrBridge") {
       ReceiptOcrBridge.register(with: registrar.messenger())
+      GalleryThumbBridge.register(with: registrar.messenger())
     }
     return launched
   }

@@ -29,6 +29,18 @@ Future<String?> getOrFetchCachedReceiptPathForUrl(String url) async {
   }
 }
 
+/// Loads receipt image bytes for [url], preferring the local cache.
+Future<Uint8List?> loadReceiptImageBytesForUrl(String url) async {
+  final path = await getOrFetchCachedReceiptPathForUrl(url);
+  if (path == null || path.isEmpty) return null;
+  try {
+    final bytes = await File(path).readAsBytes();
+    return bytes.isEmpty ? null : bytes;
+  } catch (_) {
+    return null;
+  }
+}
+
 Future<void> warmReceiptImageCacheForUrl(
   String url,
   Uint8List bytes, {

@@ -93,12 +93,10 @@ class _AppFabState extends ConsumerState<AppFab>
   static const Duration _releaseReducedDuration = Duration(milliseconds: 160);
   static const Duration _wiggleDuration = Duration(milliseconds: 1500);
   static const Duration _leafDuration = Duration(milliseconds: 720);
-  /// ~0.9s grow + 10s windy stay + ~1.1s leave.
-  static const Duration _bloomDuration = Duration(milliseconds: 12000);
+  /// ~0.45s grow + ~5s windy stay + ~0.55s leave.
+  static const Duration _bloomDuration = Duration(milliseconds: 6000);
   /// Shorter cycle in the debug FAB playground.
   static const Duration _bloomPreviewDuration = Duration(milliseconds: 4000);
-  /// Lets the leaf burst / pop read before navigation replaces the route.
-  static const Duration _actionDelay = Duration(milliseconds: 380);
 
   /// Solo pass over every kind, then bouquet pass with classic heroes.
   static final List<(AppFabPlantKind, bool)> _previewBloomCatalog = [
@@ -124,7 +122,6 @@ class _AppFabState extends ConsumerState<AppFab>
   bool _bloomBouquet = false;
   int _previewBloomIndex = 0;
   Timer? _ambientTimer;
-  Timer? _actionTimer;
 
   @override
   void initState() {
@@ -188,7 +185,6 @@ class _AppFabState extends ConsumerState<AppFab>
   @override
   void dispose() {
     _ambientTimer?.cancel();
-    _actionTimer?.cancel();
     _releaseAmbientSlot();
     _pressController.dispose();
     _releaseController.dispose();
@@ -276,7 +272,7 @@ class _AppFabState extends ConsumerState<AppFab>
     // Debug playground: only the first auto bloom; further kinds via tap.
     if (widget.previewAmbientBloom && delay == null) return;
     final wait =
-        delay ?? Duration(milliseconds: 8000 + _rng.nextInt(10000));
+        delay ?? Duration(milliseconds: 16000 + _rng.nextInt(14000));
     _ambientTimer = Timer(wait, () {
       if (!_ambientAllowed) return;
       if (_bloomController.isAnimating || _leafController.isAnimating) {
@@ -339,17 +335,8 @@ class _AppFabState extends ConsumerState<AppFab>
     if (widget.previewAmbientBloom && _extras) {
       _startPreviewBloom();
     }
-    _actionTimer?.cancel();
-    // Integration / reduced-motion: invoke immediately so tests and a11y
-    // paths do not depend on a wall-clock Timer after the press animation.
-    if (!_extras || isIntegrationTestMode) {
-      cb();
-      return;
-    }
-    _actionTimer = Timer(_actionDelay, () {
-      _actionTimer = null;
-      cb();
-    });
+    // Invoke immediately so navigation is not held for leaf-burst cosmetics.
+    cb();
   }
 
   void _onTapDown(TapDownDetails _) {

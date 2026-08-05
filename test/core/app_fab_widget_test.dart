@@ -25,7 +25,7 @@ void main() {
     AppFab.enableAmbientNature = false;
   });
 
-  testWidgets('AppFab shows icon and invokes onPressed after delay', (
+  testWidgets('AppFab shows icon and invokes onPressed immediately', (
     tester,
   ) async {
     var pressed = 0;
@@ -42,8 +42,6 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.add));
     await tester.pump();
-    expect(pressed, 0);
-    await tester.pump(const Duration(milliseconds: 400));
     expect(pressed, 1);
 
     await tester.pump(const Duration(seconds: 2));

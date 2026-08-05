@@ -38,7 +38,7 @@ class AppFabLeafSpec {
   final double size;
 }
 
-/// Bloom timeline fractions for a ~12s controller (≈0.9s grow, 10s stay, ≈1.1s leave).
+/// Bloom timeline fractions for a ~6s controller (≈0.45s grow, ~5s stay, ≈0.55s leave).
 abstract final class AppFabBloomTimeline {
   static const double growEnd = 0.075;
   static const double stayEnd = 0.908;

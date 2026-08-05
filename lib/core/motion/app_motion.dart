@@ -152,6 +152,26 @@ class AppMotion {
     );
   }
 
+  /// Hierarchical page enter for GoRouter and Material [PageTransitionsTheme].
+  ///
+  /// When [fadeOnly] is true (iOS web via [UiPerf.preferFadeOnlyPageTransitions]),
+  /// skips the end-slide to avoid slide+opacity compositing cost.
+  static Widget buildHierarchicalPageTransition({
+    required Animation<double> animation,
+    required Widget child,
+    required TextDirection direction,
+    required bool fadeOnly,
+  }) {
+    if (fadeOnly) {
+      return buildFadeTransition(animation: animation, child: child);
+    }
+    return buildFadeSlideTransition(
+      animation: animation,
+      child: child,
+      direction: direction,
+    );
+  }
+
   /// Genie-bottle open: smoke-puff + scale out from the FAB corner (bottom end).
   ///
   /// [origin] is optional — used for the smoke puff position. Scale pivots from
@@ -254,14 +274,11 @@ class AppFadeSlidePageTransitionsBuilder extends PageTransitionsBuilder {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    // iOS web only: slide + opacity compositing is costly on WebKit / older GPUs.
-    if (UiPerf.preferFadeOnlyPageTransitions) {
-      return AppMotion.buildFadeTransition(animation: animation, child: child);
-    }
-    return AppMotion.buildFadeSlideTransition(
+    return AppMotion.buildHierarchicalPageTransition(
       animation: animation,
       child: child,
       direction: Directionality.of(context),
+      fadeOnly: UiPerf.preferFadeOnlyPageTransitions,
     );
   }
 }

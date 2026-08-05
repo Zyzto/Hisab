@@ -16,6 +16,7 @@ import '../../../core/repository/repository_providers.dart';
 import '../../../core/navigation/decorative_route.dart';
 import '../../../core/navigation/nav_back.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/navigation/route_transition_ready.dart';
 import '../../../core/platform/ui_perf.dart';
 import '../../../core/telemetry/telemetry_service.dart';
 import '../../../core/theme/theme_config.dart';
@@ -71,7 +72,30 @@ class GroupCreatePage extends ConsumerStatefulWidget {
   ConsumerState<GroupCreatePage> createState() => _GroupCreatePageState();
 }
 
-class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
+/// Keeps a wizard step alive after first visit (FormState / WizardStepEnter).
+class _KeepAliveStep extends StatefulWidget {
+  const _KeepAliveStep({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_KeepAliveStep> createState() => _KeepAliveStepState();
+}
+
+class _KeepAliveStepState extends State<_KeepAliveStep>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
+}
+
+class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
+    with RouteTransitionReady {
   static const _kIndicatorActiveWidth = 28.0;
   static const _kIndicatorInactiveWidth = 8.0;
 
@@ -176,6 +200,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
         parentPath: RoutePaths.home,
         currentPath: _decorativePathForPage(_currentPage),
       );
+      ensureRouteReady(context);
     });
   }
 
@@ -192,6 +217,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
 
   @override
   void dispose() {
+    disposeRouteReady();
     _pageController.dispose();
     _nameController.dispose();
     _nameFocusNode.dispose();
@@ -201,6 +227,22 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
     _participantFocusNode.dispose();
     _addParticipantButtonFocusNode.dispose();
     super.dispose();
+  }
+
+  Widget _stepForIndex(BuildContext context, int index) {
+    if (widget.isPersonal) {
+      return switch (index) {
+        0 => _buildStep1NameCurrency(context),
+        1 => _buildStep3IconColor(context),
+        _ => _buildStep4Summary(context),
+      };
+    }
+    return switch (index) {
+      0 => _buildStep1NameCurrency(context),
+      1 => _buildStep2Participants(context),
+      2 => _buildStep3IconColor(context),
+      _ => _buildStep4Summary(context),
+    };
   }
 
   // ── Navigation ──────────────────────────────────────────────────────────
@@ -411,6 +453,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
 
   @override
   Widget build(BuildContext context) {
+    ensureRouteReady(context);
     final colorScheme = Theme.of(context).colorScheme;
 
     return LayoutBuilder(
@@ -441,48 +484,47 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage> {
                     : 'create_group'.tr(),
               ),
             ),
-            body: ConstrainedContent(
-              child: SafeArea(
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: PageView(
-                        controller: _pageController,
-                        physics: const NeverScrollableScrollPhysics(),
-                        onPageChanged: (i) {
-                          final fromPage = _currentPage;
-                          setState(() => _currentPage = i);
-                          _syncDecorativeUrlToPage(i);
-                          // Clear focus after returning to step 0 so keyboard does not reopen.
-                          if (i == 0 && fromPage > 0) {
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              if (!mounted) return;
-                              _nameFocusNode.unfocus();
-                              _budgetFocusNode.unfocus();
-                              FocusManager.instance.primaryFocus?.unfocus();
-                            });
-                          }
-                        },
-                        children: widget.isPersonal
-                            ? [
-                                _buildStep1NameCurrency(context),
-                                _buildStep3IconColor(context),
-                                _buildStep4Summary(context),
-                              ]
-                            : [
-                                _buildStep1NameCurrency(context),
-                                _buildStep2Participants(context),
-                                _buildStep3IconColor(context),
-                                _buildStep4Summary(context),
-                              ],
+            body: !routeReady
+                ? const SizedBox.shrink()
+                : ConstrainedContent(
+                    child: SafeArea(
+                      child: Column(
+                        children: [
+                          Expanded(
+                            child: PageView.builder(
+                              controller: _pageController,
+                              itemCount: _pageCount,
+                              physics: const NeverScrollableScrollPhysics(),
+                              onPageChanged: (i) {
+                                final fromPage = _currentPage;
+                                setState(() => _currentPage = i);
+                                _syncDecorativeUrlToPage(i);
+                                // Clear focus after returning to step 0 so keyboard does not reopen.
+                                if (i == 0 && fromPage > 0) {
+                                  WidgetsBinding.instance.addPostFrameCallback((
+                                    _,
+                                  ) {
+                                    if (!mounted) return;
+                                    _nameFocusNode.unfocus();
+                                    _budgetFocusNode.unfocus();
+                                    FocusManager.instance.primaryFocus
+                                        ?.unfocus();
+                                  });
+                                }
+                              },
+                              itemBuilder: (context, index) {
+                                return _KeepAliveStep(
+                                  child: _stepForIndex(context, index),
+                                );
+                              },
+                            ),
+                          ),
+                          _buildPageIndicator(context),
+                          _buildBottomBar(context, colorScheme),
+                        ],
                       ),
                     ),
-                    _buildPageIndicator(context),
-                    _buildBottomBar(context, colorScheme),
-                  ],
-                ),
-              ),
-            ),
+                  ),
           ),
         );
       },

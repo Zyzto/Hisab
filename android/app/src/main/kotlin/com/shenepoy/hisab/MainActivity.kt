@@ -8,5 +8,7 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         NotificationBridge.register(flutterEngine, applicationContext)
         ReceiptOcrBridge.register(flutterEngine, applicationContext)
+        GalleryThumbBridge.register(flutterEngine, applicationContext)
+        CameraLensesBridge.register(flutterEngine, applicationContext)
     }
 }

@@ -12,7 +12,6 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../../../core/receipt/receipt_image_compress.dart';
 import '../../../core/receipt/receipt_image_cache.dart';
-import '../../../core/receipt/receipt_image_view.dart';
 import '../../../core/receipt/receipt_ocr.dart';
 import '../../../core/receipt/receipt_scan_capability.dart';
 import '../../../core/receipt/receipt_scan_service.dart';
@@ -34,6 +33,7 @@ import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/navigation/last_route_restore.dart';
 import '../../../core/navigation/nav_back.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/navigation/route_transition_ready.dart';
 import '../../../core/widgets/missing_route_page.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/utils/currency_helpers.dart';
@@ -58,6 +58,7 @@ import '../widgets/expense_amount_section.dart';
 import '../widgets/expense_bill_breakdown_section.dart';
 import '../widgets/expense_title_section.dart';
 import '../widgets/date_time_picker_dialog.dart';
+import '../widgets/expense_photo_gallery.dart';
 import '../widgets/expense_split_section.dart';
 import '../widgets/tag_style_fields.dart';
 import '../../../core/motion/app_motion.dart';
@@ -83,7 +84,8 @@ class ExpenseFormPage extends ConsumerStatefulWidget {
   ConsumerState<ExpenseFormPage> createState() => _ExpenseFormPageState();
 }
 
-class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
+class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
+    with RouteTransitionReady {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
@@ -153,8 +155,11 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
   /// Photos: pending bytes (before upload) or stored URL. Max [_kMaxExpenseImages].
   final List<_ExpenseImageItem> _expenseImages = [];
 
-  /// True while OCR/AI scan is running.
-  bool _scanningReceipt = false;
+  /// Index of the expense image currently OCR/AI scanning.
+  /// `-1` = scanning with unknown thumb; `null` = idle.
+  int? _scanningImageIndex;
+
+  bool get _scanningReceipt => _scanningImageIndex != null;
 
   /// Cooperative cancel for the in-flight receipt scan.
   ReceiptScanCancelToken? _scanCancel;
@@ -211,8 +216,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         parentPath: _formBackPath,
         currentPath: _formRoutePath,
       );
-      // Camera often kills MainActivity; pickImage never completes — recover here.
-      _recoverLostPickerImage();
+      // Backup if the first build had no ModalRoute yet.
+      ensureRouteReady(context, onReady: _recoverLostPickerImage);
     });
   }
 
@@ -300,6 +305,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
 
   @override
   void dispose() {
+    disposeRouteReady();
     _scanCancel?.cancel();
     _scanCancel = null;
     cancelReceiptOcr();
@@ -331,8 +337,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     _scanCancel = null;
     // Ignore: native stop is best-effort.
     cancelReceiptOcr();
-    if (mounted && _scanningReceipt) {
-      setState(() => _scanningReceipt = false);
+    if (mounted && _scanningImageIndex != null) {
+      setState(() => _scanningImageIndex = null);
     }
   }
 
@@ -630,13 +636,18 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
 
       final List<String> imageUrls = [];
       for (final item in _expenseImages) {
-        if (item.url != null && item.url!.isNotEmpty) {
-          imageUrls.add(item.url!);
-        } else if (item.bytes != null && shouldUploadPhotos) {
+        // Prefer pending bytes (e.g. after rotate) over a stale stored URL.
+        if (item.bytes != null && shouldUploadPhotos) {
           final uploadId = existingExpenseId.isNotEmpty
               ? existingExpenseId
               : '';
-          if (uploadId.isEmpty) continue;
+          if (uploadId.isEmpty) {
+            // New expense: upload after create (below). Keep URL fallback.
+            if (item.url != null && item.url!.isNotEmpty) {
+              imageUrls.add(item.url!);
+            }
+            continue;
+          }
           final url = await uploadExpenseImageBytesToStorage(
             item.bytes!,
             widget.groupId,
@@ -646,7 +657,11 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           if (url != null) {
             imageUrls.add(url);
             await warmReceiptImageCacheForUrl(url, item.bytes!, fileExt: 'jpg');
+          } else if (item.url != null && item.url!.isNotEmpty) {
+            imageUrls.add(item.url!);
           }
+        } else if (item.url != null && item.url!.isNotEmpty) {
+          imageUrls.add(item.url!);
         }
       }
       final imagePaths = imageUrls.isEmpty ? null : imageUrls;
@@ -695,9 +710,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         final id = await ref.read(expenseRepositoryProvider).create(expense);
         final createdUrls = <String>[];
         for (final item in _expenseImages) {
-          if (item.url != null && item.url!.isNotEmpty) {
-            createdUrls.add(item.url!);
-          } else if (item.bytes != null && shouldUploadPhotos) {
+          if (item.bytes != null && shouldUploadPhotos) {
             final url = await uploadExpenseImageBytesToStorage(
               item.bytes!,
               widget.groupId,
@@ -711,7 +724,11 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                 item.bytes!,
                 fileExt: 'jpg',
               );
+            } else if (item.url != null && item.url!.isNotEmpty) {
+              createdUrls.add(item.url!);
             }
+          } else if (item.url != null && item.url!.isNotEmpty) {
+            createdUrls.add(item.url!);
           }
         }
         if (createdUrls.isNotEmpty) {
@@ -1135,7 +1152,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                 },
               );
             }
-            final payerId = _payerParticipantId ?? participants.first.id;
+            ensureRouteReady(context, onReady: _recoverLostPickerImage);
             final localOnly = ref.watch(effectiveLocalOnlyProvider);
             final myRole = ref
                 .watch(myRoleInGroupProvider(widget.groupId))
@@ -1152,64 +1169,59 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                 .where((p) => p.userId == currentUserId)
                 .firstOrNull
                 ?.id;
+            final myMemberAsync = ref.watch(
+              myMemberInGroupProvider(widget.groupId),
+            );
             if (myParticipantId == null) {
-              final myMember = ref
-                  .watch(myMemberInGroupProvider(widget.groupId))
-                  .value;
-              final pid = myMember?.participantId;
+              final pid = myMemberAsync.value?.participantId;
               if (pid != null && participants.any((p) => p.id == pid)) {
                 myParticipantId = pid;
               }
             }
-            final effectivePayerId = restrictPayerToSelf
-                ? (myParticipantId ?? participants.first.id)
-                : payerId;
-            // Only add newly added participants to split by default (don't re-add unchecked)
+            // Sync create defaults on first / updated participants (no post-frame setState).
             final currentIds = participants.map((p) => p.id).toSet();
             final newIds = currentIds.difference(_previousParticipantIds);
             if (newIds.isNotEmpty) {
               _previousParticipantIds = Set.from(currentIds);
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (!mounted) return;
-                setState(() {
-                  for (final id in newIds) {
-                    _includedInSplitIds.add(id);
-                  }
-                });
-              });
+              _includedInSplitIds.addAll(newIds);
             } else {
               _previousParticipantIds = Set.from(currentIds);
             }
-            // Default payer to current user when adding a new expense (once)
             if (widget.expenseId == null &&
                 _payerParticipantId == null &&
                 participants.isNotEmpty) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                ref.read(myMemberInGroupProvider(widget.groupId).future).then((
-                  member,
-                ) {
-                  if (!mounted) return;
-                  final currentUserId = ref
-                      .read(authServiceProvider)
-                      .currentUser
-                      ?.id;
-                  var resolvedPayerId = participants
-                      .where((p) => p.userId == currentUserId)
-                      .firstOrNull
-                      ?.id;
-                  if (resolvedPayerId == null) {
-                    final pid = member?.participantId;
-                    if (pid != null && participants.any((p) => p.id == pid)) {
-                      resolvedPayerId = pid;
-                    }
-                  }
-                  if (!mounted) return;
-                  setState(() {
-                    _payerParticipantId =
-                        resolvedPayerId ?? participants.first.id;
-                  });
-                });
-              });
+              if (myParticipantId != null) {
+                _payerParticipantId = myParticipantId;
+              } else if (!myMemberAsync.isLoading) {
+                _payerParticipantId = participants.first.id;
+              }
+            }
+            final payerId = _payerParticipantId ?? participants.first.id;
+            final effectivePayerId = restrictPayerToSelf
+                ? (myParticipantId ?? participants.first.id)
+                : payerId;
+
+            if (!routeReady) {
+              return LayoutBuilder(
+                builder: (context, layoutConstraints) {
+                  return Scaffold(
+                    appBar: ContentAlignedAppBar(
+                      contentAreaWidth: layoutConstraints.maxWidth,
+                      leading: IconButton(
+                        icon: const Icon(Icons.arrow_back),
+                        onPressed: _popForm,
+                      ),
+                      title: Text(
+                        (widget.expenseId != null
+                                ? 'edit_expense'
+                                : 'add_expense')
+                            .tr(),
+                      ),
+                    ),
+                    body: const SizedBox.shrink(),
+                  );
+                },
+              );
             }
 
             final isTransfer = _transactionType == TransactionType.transfer;
@@ -2034,15 +2046,12 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
                 );
               }
 
+              // Bottom safe/IME inset is owned by [showResponsiveSheet].
               return SafeArea(
+                bottom: false,
                 child: SingleChildScrollView(
                   child: Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      16,
-                      16,
-                      16,
-                      MediaQuery.of(ctx).padding.bottom + 24,
-                    ),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2217,8 +2226,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     );
   }
 
-  /// After Android kills MainActivity under the camera, [pickImage] never
-  /// returns — recover the captured file and ingest it into the form.
+  /// After Android kills MainActivity under the camera, [pickImage] /
+  /// [pickMultiImage] never returns — recover files and ingest into the form.
   Future<void> _recoverLostPickerImage() async {
     if (_lostPickerDataChecked) return;
     _lostPickerDataChecked = true;
@@ -2241,50 +2250,70 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         clearPendingImagePick(ref);
         return;
       }
-      final file = response.files?.firstOrNull ?? response.file;
-      if (file == null) {
+      final files = <XFile>[
+        ...?response.files,
+        if ((response.files == null || response.files!.isEmpty) &&
+            response.file != null)
+          response.file!,
+      ];
+      if (files.isEmpty) {
         clearPendingImagePick(ref);
         return;
       }
       final scanAfter =
           readPendingImagePickMode(ref) == PendingImagePickMode.scan;
       Log.info(
-        'Recovered photo after camera activity kill (scanAfter=$scanAfter)',
+        'Recovered ${files.length} photo(s) after picker activity kill '
+        '(scanAfter=$scanAfter)',
       );
-      await _ingestPickedPhoto(file, scanAfter: scanAfter);
+      await _ingestPickedPhotos(files, scanAfter: scanAfter);
     } catch (e, stack) {
       Log.warning('retrieveLostData failed', error: e, stackTrace: stack);
       clearPendingImagePick(ref);
     }
   }
 
-  /// Compress, append to [_expenseImages], then optionally OCR.
-  Future<void> _ingestPickedPhoto(XFile file, {bool scanAfter = false}) async {
-    try {
-      final bytes = await file.readAsBytes();
-      final forOcr = await compressReceiptImageForOcr(bytes) ?? bytes;
-      final compressed = await compressReceiptImage(forOcr);
-      if (!mounted) {
-        clearPendingImagePick(ref);
-        return;
-      }
-      final toAdd = compressed ?? forOcr;
-      setState(() {
-        if (_expenseImages.length < _kMaxExpenseImages) {
-          _expenseImages.add((bytes: toAdd, url: null));
-        }
-      });
+  /// Compress and append multiple picks; OCR runs on the last image when asked.
+  Future<void> _ingestPickedPhotos(
+    List<XFile> files, {
+    required bool scanAfter,
+  }) async {
+    if (files.isEmpty) {
       clearPendingImagePick(ref);
-      if (scanAfter && mounted) {
-        await _onScanReceiptFromPhoto(forOcr);
+      return;
+    }
+    Uint8List? lastOcrBytes;
+    try {
+      for (final file in files) {
+        if (!mounted) break;
+        if (_expenseImages.length >= _kMaxExpenseImages) break;
+        final bytes = await file.readAsBytes();
+        final forOcr = await compressReceiptImageForOcr(bytes) ?? bytes;
+        final compressed = await compressReceiptImage(forOcr);
+        if (!mounted) break;
+        final toAdd = compressed ?? forOcr;
+        lastOcrBytes = forOcr;
+        setState(() {
+          if (_expenseImages.length < _kMaxExpenseImages) {
+            _expenseImages.add((bytes: toAdd, url: null));
+          }
+        });
       }
     } catch (e, stack) {
-      clearPendingImagePick(ref);
       if (mounted) {
         debugPrint('Photo add error: $e');
         debugPrintStack(stackTrace: stack);
         context.showError('receipt_scan_error'.tr(args: [e.toString()]));
       }
+    } finally {
+      clearPendingImagePick(ref);
+    }
+    if (scanAfter && lastOcrBytes != null && mounted) {
+      final scanIndex = _expenseImages.length - 1;
+      await _onScanReceiptFromPhoto(
+        lastOcrBytes,
+        imageIndex: scanIndex >= 0 ? scanIndex : null,
+      );
     }
   }
 
@@ -2331,11 +2360,21 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     final maxRemaining = _kMaxExpenseImages - _expenseImages.length;
     if (maxRemaining <= 0 || !mounted) return;
 
+    Uint8List? galleryThumb;
+    for (var i = _expenseImages.length - 1; i >= 0; i--) {
+      final bytes = _expenseImages[i].bytes;
+      if (bytes != null && bytes.isNotEmpty) {
+        galleryThumb = bytes;
+        break;
+      }
+    }
+
     final result = await showReceiptCamera(
       context,
       maxRemaining: maxRemaining,
       scanAfter: scanAfter,
       mockPreview: mockPreview,
+      galleryThumb: galleryThumb,
     );
     if (!mounted) return;
 
@@ -2350,14 +2389,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     }
 
     final images = result.images;
-    for (var i = 0; i < images.length; i++) {
-      if (!mounted) return;
-      final isLast = i == images.length - 1;
-      await _ingestPickedPhoto(
-        images[i],
-        scanAfter: result.scanAfter && isLast,
-      );
-    }
+    await _ingestPickedPhotos(images, scanAfter: result.scanAfter);
   }
 
   /// OS camera / gallery via [ImagePicker], with Android lost-data recovery.
@@ -2365,6 +2397,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     required ImageSource source,
     required bool scanAfter,
   }) async {
+    final maxRemaining = _kMaxExpenseImages - _expenseImages.length;
+    if (maxRemaining <= 0) return;
+
     final bool hasPermission;
     if (source == ImageSource.camera) {
       hasPermission = await PermissionService.requestCameraPermission(context);
@@ -2381,13 +2416,26 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       scanAfter ? PendingImagePickMode.scan : PendingImagePickMode.attach,
     );
 
-    final XFile? file = await ImagePicker().pickImage(
-      source: source,
-      maxWidth: kReceiptOcrMaxDimension.toDouble(),
-      maxHeight: kReceiptOcrMaxDimension.toDouble(),
-      imageQuality: kReceiptOcrQuality,
-    );
-    if (file == null || !mounted) {
+    final picker = ImagePicker();
+    final List<XFile> files;
+    if (source == ImageSource.gallery) {
+      // Multi-select up to remaining slots (limit:1 delegates to single pick).
+      files = await picker.pickMultiImage(
+        limit: maxRemaining,
+        maxWidth: kReceiptOcrMaxDimension.toDouble(),
+        maxHeight: kReceiptOcrMaxDimension.toDouble(),
+        imageQuality: kReceiptOcrQuality,
+      );
+    } else {
+      final file = await picker.pickImage(
+        source: source,
+        maxWidth: kReceiptOcrMaxDimension.toDouble(),
+        maxHeight: kReceiptOcrMaxDimension.toDouble(),
+        imageQuality: kReceiptOcrQuality,
+      );
+      files = file == null ? const <XFile>[] : <XFile>[file];
+    }
+    if (files.isEmpty || !mounted) {
       if (mounted && isAndroid && !kIsWeb) {
         _lostPickerDataChecked = false;
         await _recoverLostPickerImage();
@@ -2396,7 +2444,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
       }
       return;
     }
-    await _ingestPickedPhoto(file, scanAfter: scanAfter);
+    await _ingestPickedPhotos(files, scanAfter: scanAfter);
   }
 
   Widget _buildPhotosSection(BuildContext context) {
@@ -2545,34 +2593,33 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     );
   }
 
-  void _showPhotoFullScreen(_ExpenseImageItem item) {
-    if (item.url != null && item.url!.isNotEmpty) {
-      showExpenseImageFullScreen(context, item.url!);
-      return;
-    }
-    if (item.bytes != null) {
-      showAppDialog<void>(
-        context: context,
-        barrierColor: Theme.of(context).colorScheme.scrim,
-        barrierDismissible: true,
-        centerInFullViewport: true,
-        fadeScale: false,
-        builder: (ctx) => Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: EdgeInsets.zero,
-          child: InteractiveViewer(
-            minScale: 0.5,
-            maxScale: 4,
-            child: GestureDetector(
-              onTap: () => Navigator.of(ctx).pop(),
-              child: Center(
-                child: Image.memory(item.bytes!, fit: BoxFit.contain),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
+  Future<void> _showPhotoGallery(int index) async {
+    if (_expenseImages.isEmpty || !mounted) return;
+    final scanMode = ref.read(receiptScanModeProvider);
+    final scanEnabled = ReceiptScanCapability.scanUiEnabled(scanMode);
+    final updated = await showExpensePhotoGallery(
+      context,
+      images: List<_ExpenseImageItem>.of(_expenseImages),
+      initialIndex: index,
+      scanEnabled: scanEnabled && !_scanningReceipt,
+      onScan: scanEnabled
+          ? (bytes) async {
+              final idx = _expenseImages.indexWhere(
+                (e) => identical(e.bytes, bytes),
+              );
+              await _onScanReceiptFromPhoto(
+                bytes,
+                imageIndex: idx >= 0 ? idx : null,
+              );
+            }
+          : null,
+    );
+    if (!mounted || updated == null) return;
+    setState(() {
+      _expenseImages
+        ..clear()
+        ..addAll(updated);
+    });
   }
 
   Widget _buildPhotoThumbnail(
@@ -2581,16 +2628,10 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     int index,
   ) {
     final theme = Theme.of(context);
-    final scanMode = ref.watch(receiptScanModeProvider);
-    final canRescan =
-        ReceiptScanCapability.scanUiEnabled(scanMode) &&
-        item.bytes != null &&
-        !_scanningReceipt;
     Widget image;
-    final thumbDecode = NetworkImageDecode.cacheSize(
+    final thumbDecode = NetworkImageDecode.cacheSizePreserveAspect(
       context,
-      logicalWidth: 80,
-      logicalHeight: 80,
+      logicalMaxEdge: 80,
     );
     if (item.bytes != null) {
       image = Image.memory(
@@ -2599,7 +2640,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         width: 80,
         height: 80,
         cacheWidth: thumbDecode.width,
-        cacheHeight: thumbDecode.height,
+        gaplessPlayback: true,
       );
     } else if (item.url != null && item.url!.isNotEmpty) {
       image = Image.network(
@@ -2608,7 +2649,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
         width: 80,
         height: 80,
         cacheWidth: thumbDecode.width,
-        cacheHeight: thumbDecode.height,
+        gaplessPlayback: true,
         loadingBuilder: (_, child, progress) {
           if (progress == null) return child;
           return const SizedBox(
@@ -2644,7 +2685,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           borderRadius: BorderRadius.circular(12),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
-            onTap: () => _showPhotoFullScreen(item),
+            onTap: () => _showPhotoGallery(index),
             child: SizedBox(width: 80, height: 80, child: image),
           ),
         ),
@@ -2662,48 +2703,41 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
               padding: const EdgeInsets.all(4),
               minimumSize: const Size(28, 28),
             ),
-            onPressed: () => setState(() => _expenseImages.removeAt(index)),
+            onPressed: () {
+              final scanning = _scanningImageIndex;
+              if (scanning == index) {
+                _scanCancel?.cancel();
+                _scanCancel = null;
+                cancelReceiptOcr();
+              }
+              setState(() {
+                _expenseImages.removeAt(index);
+                if (scanning == index) {
+                  _scanningImageIndex = null;
+                } else if (scanning != null && scanning > index) {
+                  _scanningImageIndex = scanning - 1;
+                }
+              });
+            },
           ),
         ),
-        if (item.bytes != null &&
-            ReceiptScanCapability.scanUiEnabled(scanMode))
-          Positioned(
-            left: 2,
-            bottom: 2,
-            child: Material(
-              color: theme.colorScheme.surfaceContainerHighest.withValues(
-                alpha: 0.92,
-              ),
-              borderRadius: BorderRadius.circular(8),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(8),
-                onTap: canRescan
-                    ? () => _onScanReceiptFromPhoto(item.bytes!)
-                    : null,
-                child: Padding(
-                  padding: const EdgeInsets.all(4),
-                  child: AnimatedSwitcher(
-                    duration: motion,
-                    child: _scanningReceipt
-                        ? SizedBox(
-                            key: const ValueKey('scanning'),
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: theme.colorScheme.primary,
-                            ),
-                          )
-                        : Icon(
-                            Icons.document_scanner_outlined,
-                            key: const ValueKey('scan'),
-                            size: 16,
-                            color: canRescan
-                                ? theme.colorScheme.primary
-                                : theme.colorScheme.onSurface.withValues(
-                                    alpha: 0.38,
-                                  ),
-                          ),
+        // Scan lives in the full-screen gallery; only show busy on this thumb.
+        if (_scanningImageIndex == index)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.black38,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Center(
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: theme.colorScheme.onPrimary,
+                    ),
                   ),
                 ),
               ),
@@ -2725,15 +2759,15 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
           ),
         );
       },
-      child: Tooltip(
-        message: canRescan ? 'receipt_camera_scan_this'.tr() : '',
-        child: thumb,
-      ),
+      child: thumb,
     );
   }
 
   /// Run OCR/AI on a photo (native only). Pre-fills title/date/amount or description.
-  Future<void> _onScanReceiptFromPhoto(Uint8List bytes) async {
+  Future<void> _onScanReceiptFromPhoto(
+    Uint8List bytes, {
+    int? imageIndex,
+  }) async {
     if (_scanningReceipt) return;
     if (kIsWeb) {
       context.showToast('receipt_scan_web_unavailable'.tr());
@@ -2744,7 +2778,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
 
     final cancel = ReceiptScanCancelToken();
     _scanCancel = cancel;
-    setState(() => _scanningReceipt = true);
+    // -1 keeps the section header busy without marking every thumbnail.
+    setState(() => _scanningImageIndex = imageIndex ?? -1);
     try {
       if (!_nanoFallbackToastShown &&
           !cancel.isCancelled &&
@@ -2809,7 +2844,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage> {
     } finally {
       if (_scanCancel == cancel) {
         _scanCancel = null;
-        if (mounted) setState(() => _scanningReceipt = false);
+        if (mounted) setState(() => _scanningImageIndex = null);
       }
     }
   }
@@ -3287,6 +3322,8 @@ class _CreateTagSheetContentState extends State<_CreateTagSheetContent> {
   late final TextEditingController _nameController;
   late String _selectedIconName;
   late String _selectedColorHex;
+  String? _nameError;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -3302,90 +3339,97 @@ class _CreateTagSheetContentState extends State<_CreateTagSheetContent> {
     super.dispose();
   }
 
+  Future<void> _submit() async {
+    if (_saving) return;
+    final ctx = widget.sheetContext;
+    final label = _nameController.text.trim();
+    final error = FormValidators.expenseTagLabel(label);
+    if (error != null) {
+      setState(() => _nameError = error);
+      return;
+    }
+    setState(() => _nameError = null);
+    final existing =
+        widget.ref.read(tagsByGroupProvider(widget.groupId)).asData?.value ??
+        const <ExpenseTag>[];
+    final reserved = presetCategoryTags.map((p) => 'category_${p.id}'.tr());
+    if (expenseTagLabelExists(
+      label,
+      customTags: existing,
+      extraReservedLabels: reserved,
+    )) {
+      if (ctx.mounted) {
+        ctx.showError('tag_already_exists'.tr(namedArgs: {'name': label}));
+      }
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      final id = await widget.ref.read(tagRepositoryProvider).create(
+            widget.groupId,
+            label,
+            _selectedIconName,
+            colorHex: _selectedColorHex,
+          );
+      if (!ctx.mounted) return;
+      final tag = ExpenseTag(
+        id: id,
+        groupId: widget.groupId,
+        label: label,
+        iconName: _selectedIconName,
+        colorHex: _selectedColorHex,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      if (ctx.mounted) Navigator.of(ctx).pop(tag);
+    } catch (_) {
+      if (mounted) setState(() => _saving = false);
+      if (ctx.mounted) {
+        ctx.showError('tag_create_failed'.tr());
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ctx = widget.sheetContext;
-    return buildSheetShell(
-      ctx,
+    return TagEditorSheetShell(
       title: 'create_new_tag'.tr(),
-      showTitleInBody: !LayoutBreakpoints.isTabletOrWider(context),
-      body: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextField(
-            controller: _nameController,
-            decoration: InputDecoration(
-              labelText: 'tag_name'.tr(),
-              border: const OutlineInputBorder(),
-              counterText: '',
-            ),
-            maxLength: FormValidators.expenseTagLabelMax,
-            autofocus: true,
-            textCapitalization: TextCapitalization.sentences,
-          ),
-          const SizedBox(height: 16),
-          TagStyleFields(
-            selectedIconName: _selectedIconName,
-            selectedColorHex: _selectedColorHex,
-            onIconSelected: (v) => setState(() => _selectedIconName = v),
-            onColorSelected: (v) => setState(() => _selectedColorHex = v),
-          ),
-        ],
+      nameField: TextField(
+        controller: _nameController,
+        decoration: InputDecoration(
+          labelText: 'tag_name'.tr(),
+          border: const OutlineInputBorder(),
+          counterText: '',
+          errorText: _nameError,
+        ),
+        maxLength: FormValidators.expenseTagLabelMax,
+        autofocus: true,
+        textCapitalization: TextCapitalization.sentences,
+        textInputAction: TextInputAction.done,
+        onChanged: (_) => setState(() => _nameError = null),
+        onSubmitted: (_) => _submit(),
+      ),
+      styleFields: TagStyleFields(
+        showPreview: false,
+        selectedIconName: _selectedIconName,
+        selectedColorHex: _selectedColorHex,
+        onIconSelected: (v) => setState(() => _selectedIconName = v),
+        onColorSelected: (v) => setState(() => _selectedColorHex = v),
+      ),
+      preview: TagPreviewChip(
+        label: _nameController.text,
+        iconName: _selectedIconName,
+        colorHex: _selectedColorHex,
       ),
       actions: [
         if (!LayoutBreakpoints.isTabletOrWider(context))
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
+            onPressed: _saving ? null : () => Navigator.of(ctx).pop(),
             child: Text('cancel'.tr()),
           ),
         FilledButton(
-          onPressed: () async {
-            final label = _nameController.text.trim();
-            if (FormValidators.expenseTagLabel(label) != null) return;
-            final existing =
-                widget.ref.read(tagsByGroupProvider(widget.groupId)).asData
-                    ?.value ??
-                const <ExpenseTag>[];
-            final reserved = presetCategoryTags.map(
-              (p) => 'category_${p.id}'.tr(),
-            );
-            if (expenseTagLabelExists(
-              label,
-              customTags: existing,
-              extraReservedLabels: reserved,
-            )) {
-              if (ctx.mounted) {
-                ctx.showError(
-                  'tag_already_exists'.tr(namedArgs: {'name': label}),
-                );
-              }
-              return;
-            }
-            try {
-              final id = await widget.ref.read(tagRepositoryProvider).create(
-                    widget.groupId,
-                    label,
-                    _selectedIconName,
-                    colorHex: _selectedColorHex,
-                  );
-              if (!ctx.mounted) return;
-              final tag = ExpenseTag(
-                id: id,
-                groupId: widget.groupId,
-                label: label,
-                iconName: _selectedIconName,
-                colorHex: _selectedColorHex,
-                createdAt: DateTime.now(),
-                updatedAt: DateTime.now(),
-              );
-              if (ctx.mounted) Navigator.of(ctx).pop(tag);
-            } catch (_) {
-              if (ctx.mounted) {
-                ctx.showError('tag_create_failed'.tr());
-              }
-            }
-          },
+          onPressed: _saving ? null : _submit,
           child: Text('done'.tr()),
         ),
       ],

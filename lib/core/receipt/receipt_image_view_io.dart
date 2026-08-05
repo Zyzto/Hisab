@@ -173,10 +173,9 @@ class _ReceiptCachedOrNetworkImageState extends State<_ReceiptCachedOrNetworkIma
 
   Widget _fallbackNetworkImage() {
     final size = MediaQuery.sizeOf(context);
-    final decode = NetworkImageDecode.cacheSize(
+    final decode = NetworkImageDecode.cacheSizePreserveAspect(
       context,
-      logicalWidth: size.width,
-      logicalHeight: size.height,
+      logicalMaxEdge: size.longestSide,
     );
     return Image.network(
       widget.imageUrl,

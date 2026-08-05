@@ -41,12 +41,12 @@ Future<T?> showOptionPickerSheet<T>(
     isScrollControlled: true,
     centerInFullViewport: centerInFullViewport,
     child: Builder(
+      // Bottom safe/IME inset is owned by [showResponsiveSheet].
       builder: (ctx) => SafeArea(
+        bottom: false,
         child: SingleChildScrollView(
           child: Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(ctx).padding.bottom + 16,
-            ),
+            padding: const EdgeInsets.only(bottom: 16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -111,12 +111,17 @@ Widget buildSheetShell(
   required List<Widget> actions,
   bool showTitleInBody = true,
 }) {
+  // Bottom safe/IME inset is owned by [showResponsiveSheet]. Nesting another
+  // bottom SafeArea / viewPadding here jumps sheet height when the keyboard
+  // opens (outer SafeArea stops consuming viewPadding once padding.bottom
+  // collapses).
   return SafeArea(
+    bottom: false,
     child: SingleChildScrollView(
       child: Padding(
         padding: EdgeInsets.only(
           top: showTitleInBody ? 0 : _kSheetPadding,
-          bottom: MediaQuery.of(ctx).padding.bottom + _kSheetPadding,
+          bottom: _kSheetPadding,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,

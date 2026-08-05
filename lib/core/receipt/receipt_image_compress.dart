@@ -1,5 +1,8 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 
 /// Max dimension for receipt photos stored / uploaded (stream-friendly).
@@ -64,6 +67,64 @@ Future<Uint8List?> compressReceiptImageForOcr(Uint8List imageBytes) async {
       autoCorrectionAngle: true,
     );
     return result.isEmpty ? null : result;
+  } catch (_) {
+    return null;
+  }
+}
+
+/// Rotates image bytes by [degrees] (90 / 180 / 270) and re-encodes as JPEG.
+///
+/// Native uses [FlutterImageCompress] (honors [rotate]). Web's compressor
+/// ignores rotate, so we fall back to a codec/canvas path there.
+Future<Uint8List?> rotateReceiptImage(Uint8List imageBytes, int degrees) async {
+  final normalized = ((degrees % 360) + 360) % 360;
+  if (normalized == 0) return imageBytes;
+
+  if (!kIsWeb) {
+    try {
+      final result = await FlutterImageCompress.compressWithList(
+        imageBytes,
+        minWidth: kReceiptImageMaxDimension,
+        minHeight: kReceiptImageMaxDimension,
+        quality: kReceiptImageQuality,
+        rotate: normalized,
+        format: CompressFormat.jpeg,
+        autoCorrectionAngle: false,
+        keepExif: false,
+      );
+      if (result.isNotEmpty) return result;
+    } catch (_) {}
+  }
+
+  return _rotateWithCodec(imageBytes, normalized);
+}
+
+Future<Uint8List?> _rotateWithCodec(Uint8List bytes, int degrees) async {
+  try {
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    final src = frame.image;
+    final swap = degrees == 90 || degrees == 270;
+    final outW = swap ? src.height : src.width;
+    final outH = swap ? src.width : src.height;
+
+    final recorder = ui.PictureRecorder();
+    final canvas = ui.Canvas(recorder);
+    canvas.translate(outW / 2, outH / 2);
+    canvas.rotate(degrees * math.pi / 180);
+    canvas.translate(-src.width / 2, -src.height / 2);
+    canvas.drawImage(src, ui.Offset.zero, ui.Paint());
+
+    final picture = recorder.endRecording();
+    final out = await picture.toImage(outW, outH);
+    src.dispose();
+    final byteData = await out.toByteData(format: ui.ImageByteFormat.png);
+    out.dispose();
+    picture.dispose();
+    if (byteData == null) return null;
+
+    final png = byteData.buffer.asUint8List();
+    return await compressReceiptImage(png) ?? png;
   } catch (_) {
     return null;
   }
