@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/sheet_handle_drag.dart';
 import '../../../core/motion/app_motion.dart';
+import '../../../core/navigation/route_transition_ready.dart';
 import 'receipt_camera_types.dart';
 import 'receipt_camera_viewer.dart';
 
@@ -12,11 +14,15 @@ export 'receipt_camera_types.dart';
 ///
 /// Compact height defaults to [kReceiptCameraCompactHeightFraction] of the
 /// screen; the viewer can toggle to full height without disposing the camera.
+///
+/// While open, the route is portrait-locked so chrome can follow the *sensor*
+/// orientation even when the OS rotation lock is on.
 Future<ReceiptCameraResult?> showReceiptCamera(
   BuildContext context, {
   required int maxRemaining,
   required bool scanAfter,
   bool mockPreview = false,
+  Uint8List? galleryThumb,
 }) {
   if (maxRemaining <= 0) {
     return Future<ReceiptCameraResult?>.value(null);
@@ -34,6 +40,7 @@ Future<ReceiptCameraResult?> showReceiptCamera(
         maxRemaining: maxRemaining,
         scanAfter: scanAfter,
         mockPreview: mockPreview,
+        galleryThumb: galleryThumb,
         openAnimation: animation,
       );
     },
@@ -47,11 +54,13 @@ class _ReceiptCameraHost extends StatefulWidget {
     required this.scanAfter,
     required this.openAnimation,
     this.mockPreview = false,
+    this.galleryThumb,
   });
 
   final int maxRemaining;
   final bool scanAfter;
   final bool mockPreview;
+  final Uint8List? galleryThumb;
   final Animation<double> openAnimation;
 
   @override
@@ -60,8 +69,42 @@ class _ReceiptCameraHost extends StatefulWidget {
 
 class _ReceiptCameraHostState extends State<_ReceiptCameraHost> {
   bool _expanded = false;
+  bool _viewerReady = false;
   final _drag = SheetHandleDrag();
   Future<void> Function()? _viewerClose;
+  VoidCallback? _cancelArmViewer;
+
+  @override
+  void initState() {
+    super.initState();
+    // Keep Flutter layout portrait; sensor orientation drives chrome + capture.
+    SystemChrome.setPreferredOrientations(const [
+      DeviceOrientation.portraitUp,
+    ]);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      // Skip hardware during sheet roll; mount viewer when open settles.
+      if (MediaQuery.disableAnimationsOf(context)) {
+        setState(() => _viewerReady = true);
+        return;
+      }
+      _cancelArmViewer = armWhenAnimationReady(
+        context: context,
+        animation: widget.openAnimation,
+        action: () {
+          if (!mounted || _viewerReady) return;
+          setState(() => _viewerReady = true);
+        },
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _cancelArmViewer?.call();
+    SystemChrome.setPreferredOrientations(kReceiptCameraRestoredOrientations);
+    super.dispose();
+  }
 
   Duration _duration(BuildContext context) =>
       MediaQuery.disableAnimationsOf(context) ? Duration.zero : AppMotion.modal;
@@ -164,18 +207,21 @@ class _ReceiptCameraHostState extends State<_ReceiptCameraHost> {
                 onVerticalDragCancel: () => setState(_drag.reset),
               ),
               Expanded(
-                child: ReceiptCameraViewer(
-                  maxRemaining: widget.maxRemaining,
-                  scanAfter: widget.scanAfter,
-                  expanded: _expanded,
-                  mockPreview: widget.mockPreview,
-                  onToggleExpanded: () => setState(() {
-                    _expanded = !_expanded;
-                    _drag.reset();
-                  }),
-                  onPop: _pop,
-                  onBindCloseRequest: (fn) => _viewerClose = fn,
-                ),
+                child: _viewerReady
+                    ? ReceiptCameraViewer(
+                        maxRemaining: widget.maxRemaining,
+                        scanAfter: widget.scanAfter,
+                        expanded: _expanded,
+                        mockPreview: widget.mockPreview,
+                        galleryThumb: widget.galleryThumb,
+                        onToggleExpanded: () => setState(() {
+                          _expanded = !_expanded;
+                          _drag.reset();
+                        }),
+                        onPop: _pop,
+                        onBindCloseRequest: (fn) => _viewerClose = fn,
+                      )
+                    : const ColoredBox(color: Colors.black),
               ),
             ],
           ),

@@ -24,7 +24,7 @@ Sources: [Flutter Wasm docs](https://docs.flutter.dev/platform-integration/web/w
 | Cheap nav / segment shadows | yes (`UiPerf`) | no | no | no | no |
 | Instant Home↔Settings (no Opacity crossfade) | yes | no | no | no | no |
 | Instant group-detail tab switch | yes | no | no | no | no |
-| Fade-only page transitions | yes | no | no | no | no |
+| Fade-only page transitions (GoRouter `appFadeSlidePage` + Material `PageTransitionsTheme`) | yes | no | no | no | no |
 | Disable chart touch tooltips (bar/line) | yes | yes (mobile) | no | no | no |
 | Skip legend `Opacity` / progress tweens | yes | yes (mobile) | no | no | no |
 | Onboarding: no chrome demo timers / lazy steps | yes | no | no | no | no |

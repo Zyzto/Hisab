@@ -173,14 +173,11 @@ class _AdaptiveSheetHost extends StatelessWidget {
     final panelWidth = isWide
         ? math.min(dialogMaxWidth, math.max(0.0, availableWidth - 48))
         : availableWidth;
-    // Keep the panel above the IME. Wide (centered) dialogs previously only
-    // shrank the body while the panel maxHeight still included keyboard space,
-    // which let header+body Columns overflow by ~10–20px in landscape.
-    final rawMaxHeight = maxHeight ?? size.height * (isWide ? 0.85 : 0.92);
-    final effectiveMaxHeight = math.max(
-      0.0,
-      rawMaxHeight - viewInsets.bottom,
-    );
+    // IME is handled only by the outer [Padding] below — do not fold
+    // viewInsets into this maxHeight. Putting keyboard-dependent constraints on
+    // [AnimatedContainer] made dismiss replay a 320ms "re-open" height morph.
+    final effectiveMaxHeight =
+        maxHeight ?? size.height * (isWide ? 0.85 : 0.92);
 
     final showTitle = title != null && title!.isNotEmpty;
     // Wide dialog header: padded title row (was a flush 56px bar).
@@ -318,6 +315,9 @@ class _AdaptiveSheetHost extends StatelessWidget {
       ),
     );
 
+    // Height caps stay on a plain [ConstrainedBox] so IME / size changes never
+    // run through [AnimatedContainer]'s modal curve (that looked like a re-open).
+    // Width + chrome still morph when crossing the tablet breakpoint.
     final Widget panel = sheetShape != null
         ? Material(
             key: const ValueKey('responsive_sheet_panel'),
@@ -325,25 +325,30 @@ class _AdaptiveSheetHost extends StatelessWidget {
             elevation: 0,
             clipBehavior: Clip.antiAlias,
             shape: sheetShape,
-            child: panelBody,
-          )
-        : AnimatedContainer(
-            key: const ValueKey('responsive_sheet_panel'),
-            duration: AppMotion.modal,
-            curve: AppMotion.enterCurve,
-            width: panelWidth,
-            constraints: BoxConstraints(maxHeight: effectiveMaxHeight),
-            decoration: BoxDecoration(
-              color: cs.surfaceContainerLow,
-              borderRadius: radius,
-              border: Border.all(
-                color: cs.outlineVariant.withValues(alpha: 0.45),
-              ),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Material(
-              color: Colors.transparent,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: effectiveMaxHeight),
               child: panelBody,
+            ),
+          )
+        : ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: effectiveMaxHeight),
+            child: AnimatedContainer(
+              key: const ValueKey('responsive_sheet_panel'),
+              duration: AppMotion.modal,
+              curve: AppMotion.enterCurve,
+              width: panelWidth,
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerLow,
+                borderRadius: radius,
+                border: Border.all(
+                  color: cs.outlineVariant.withValues(alpha: 0.45),
+                ),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Material(
+                color: Colors.transparent,
+                child: panelBody,
+              ),
             ),
           );
 
@@ -359,10 +364,7 @@ class _AdaptiveSheetHost extends StatelessWidget {
         alignment: isWide ? Alignment.center : Alignment.bottomCenter,
         child: sheetShape != null
             ? ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: panelWidth,
-                  maxHeight: effectiveMaxHeight,
-                ),
+                constraints: BoxConstraints(maxWidth: panelWidth),
                 child: panel,
               )
             : panel,
@@ -401,16 +403,25 @@ class _AdaptiveSheetHost extends StatelessWidget {
               child: const SizedBox.expand(),
             ),
           ),
-        AnimatedPadding(
-          duration: AppMotion.modal,
-          curve: AppMotion.enterCurve,
-          padding: EdgeInsetsDirectional.only(start: railWidth),
-          child: SafeArea(
-            top: useSafeArea && isWide,
-            bottom: useSafeArea && !isWide,
-            left: false,
-            right: false,
-            child: entering,
+        // Plain Padding (not AnimatedPadding): MediaQuery.viewInsets already
+        // tracks the IME frame-by-frame; a second modal-duration animation
+        // would lag the sheet behind the keyboard.
+        Padding(
+          padding: EdgeInsets.only(bottom: viewInsets.bottom),
+          child: AnimatedPadding(
+            duration: AppMotion.modal,
+            curve: AppMotion.enterCurve,
+            padding: EdgeInsetsDirectional.only(start: railWidth),
+            child: SafeArea(
+              top: useSafeArea && isWide,
+              // When the IME is up, [Padding] above already clears the keyboard.
+              // Keeping viewPadding.bottom would leave a home-indicator gap
+              // between the sheet and the keyboard.
+              bottom: useSafeArea && !isWide && viewInsets.bottom <= 0,
+              left: false,
+              right: false,
+              child: entering,
+            ),
           ),
         ),
       ],
@@ -485,6 +496,7 @@ class _AdaptiveAppDialogHost extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
+    final viewInsets = MediaQuery.viewInsetsOf(context);
     final isWide = size.width >= LayoutBreakpoints.breakpointTablet;
     final railWidth = isWide
         ? _railWidthForDialog(
@@ -508,27 +520,33 @@ class _AdaptiveAppDialogHost extends StatelessWidget {
               child: const SizedBox.expand(),
             ),
           ),
-        AnimatedPadding(
-          duration: AppMotion.modal,
-          curve: AppMotion.enterCurve,
-          padding: EdgeInsetsDirectional.only(start: railWidth),
-          child: AnimatedBuilder(
-            animation: openAnimation,
-            builder: (context, child) {
-              if (fadeScale) {
-                return AppMotion.buildFadeScaleTransition(
+        // Match [showResponsiveSheet]: keep dialogs above the IME. Current
+        // call sites are image viewers (no fields), but the host must stay
+        // safe if a future dialog adds text input.
+        Padding(
+          padding: EdgeInsets.only(bottom: viewInsets.bottom),
+          child: AnimatedPadding(
+            duration: AppMotion.modal,
+            curve: AppMotion.enterCurve,
+            padding: EdgeInsetsDirectional.only(start: railWidth),
+            child: AnimatedBuilder(
+              animation: openAnimation,
+              builder: (context, child) {
+                if (fadeScale) {
+                  return AppMotion.buildFadeScaleTransition(
+                    animation: openAnimation,
+                    child: child!,
+                  );
+                }
+                return AppMotion.buildFadeTransition(
                   animation: openAnimation,
                   child: child!,
                 );
-              }
-              return AppMotion.buildFadeTransition(
-                animation: openAnimation,
-                child: child!,
-              );
-            },
-            child: Align(
-              alignment: Alignment.center,
-              child: builder(context),
+              },
+              child: Align(
+                alignment: Alignment.center,
+                child: builder(context),
+              ),
             ),
           ),
         ),

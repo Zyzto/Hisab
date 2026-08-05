@@ -11,6 +11,7 @@ import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/navigation/nav_back.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/navigation/route_transition_ready.dart';
 import '../../../core/platform/ui_perf.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/theme/theme_config.dart';
@@ -65,7 +66,8 @@ class GroupAnalyticsPage extends ConsumerStatefulWidget {
   ConsumerState<GroupAnalyticsPage> createState() => _GroupAnalyticsPageState();
 }
 
-class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
+class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage>
+    with RouteTransitionReady {
   AnalyticsRangePreset _range = AnalyticsRangePreset.days90;
   String? _participantId;
   String? _tagId;
@@ -80,11 +82,50 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
         parentPath: RoutePaths.groupDetail(widget.groupId),
         currentPath: RoutePaths.groupAnalytics(widget.groupId),
       );
+      ensureRouteReady(context);
     });
   }
 
   @override
+  void dispose() {
+    disposeRouteReady();
+    super.dispose();
+  }
+
+  Widget _analyticsShell(BuildContext context, {Widget? body}) {
+    final groupPath = RoutePaths.groupDetail(widget.groupId);
+    return LayoutBuilder(
+      builder: (context, layoutConstraints) {
+        final canPop = routerCanPop(context);
+        return PopScope(
+          canPop: canPop,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) popOrGo(context, groupPath);
+          },
+          child: Scaffold(
+            appBar: ContentAlignedAppBar(
+              contentAreaWidth: layoutConstraints.maxWidth,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => popOrGo(context, groupPath),
+              ),
+              title: Text('analytics'.tr()),
+            ),
+            body: body ?? const SizedBox.shrink(),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    ensureRouteReady(context);
+    // Defer heavy analytics watches until the push transition finishes.
+    if (!routeReady) {
+      return _analyticsShell(context);
+    }
+
     final uiState = ref.watch(
       groupAnalyticsUiStateByGroupProvider(widget.groupId),
     );
@@ -97,9 +138,12 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
     final analyticsAsync = ref.watch(groupAnalyticsDataProvider(query));
 
     return analyticsAsync.when(
-      loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (e, st) => Scaffold(
+      loading: () => _analyticsShell(
+        context,
+        body: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, st) => _analyticsShell(
+        context,
         body: Center(
           child: ErrorContentWidget(
             message: e.toString(),
@@ -115,30 +159,11 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage> {
             messageKey: 'group_not_found_message',
           );
         }
-        final groupPath = RoutePaths.groupDetail(widget.groupId);
-        return LayoutBuilder(
-          builder: (context, layoutConstraints) {
-            final canPop = routerCanPop(context);
-            return PopScope(
-              canPop: canPop,
-              onPopInvokedWithResult: (didPop, _) {
-                if (!didPop) popOrGo(context, groupPath);
-              },
-              child: Scaffold(
-                appBar: ContentAlignedAppBar(
-                  contentAreaWidth: layoutConstraints.maxWidth,
-                  leading: IconButton(
-                    icon: const Icon(Icons.arrow_back),
-                    onPressed: () => popOrGo(context, groupPath),
-                  ),
-                  title: Text('analytics'.tr()),
-                ),
-                body: ConstrainedContent(
-                  child: _buildContent(context, data, uiState),
-                ),
-              ),
-            );
-          },
+        return _analyticsShell(
+          context,
+          body: ConstrainedContent(
+            child: _buildContent(context, data, uiState),
+          ),
         );
       },
     );

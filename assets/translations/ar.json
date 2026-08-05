@@ -170,6 +170,8 @@
   "add_photo": "إضافة صورة",
   "photos_section": "الصور",
   "photos_count": "الصور ({}/{})",
+  "photo_rotate_left": "تدوير لليسار",
+  "photo_rotate_right": "تدوير لليمين",
   "camera": "الكاميرا",
   "gallery": "المعرض",
   "receipt_camera_hint": "حاذِ الفاتورة داخل الإطار",

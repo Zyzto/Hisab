@@ -86,6 +86,8 @@ Group, invite, expense, balance, onboarding, auth, permission sheets keep full-v
 ## Other behavior
 
 - **Drag handle** – Provided by `showResponsiveSheet` on narrow screens (and web bottom sheet). **Sheet content must not draw its own drag handle**; otherwise two handles appear. On tablet+ the dialog uses a title bar instead of a handle.
+- **Keyboard (IME)** – The adaptive host pads by `MediaQuery.viewInsets.bottom` (not via `AnimatedContainer` height) so sheets lift with the keyboard without replaying the modal open morph. Phone bottom `SafeArea` is off while the IME is up so the home-indicator inset does not leave a gap above the keyboard. Sheet bodies should not re-apply bottom safe/viewPadding (host owns it).
+- **Custom tag editor** – Create/edit category sheets use `TagEditorSheetShell` (`tag_style_fields.dart`): scrollable name + style pickers, sticky one-row footer (dynamic-width preview chip + trailing Cancel/Done, RTL-aware).
 - **Services status** – Nests a `DraggableScrollableSheet` inside the responsive sheet; chrome changes must preserve height/drag sizing.
 - **Scanner** – Destructive/confirm flows use `showConfirmSheet` / `showResponsiveSheet` (not raw `AlertDialog`).
 

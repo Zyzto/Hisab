@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-// Hide intl's TextDirection (LTR/RTL) so Flutter's TextDirection.ltr/rtl resolve.
-import 'package:easy_localization/easy_localization.dart' hide TextDirection;
+import 'package:easy_localization/easy_localization.dart';
 import '../../../domain/domain.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/expense_display_title.dart';
@@ -185,10 +184,8 @@ class ExpenseListTile extends StatelessWidget {
         if (trailing != null || showDisclosure) const SizedBox(width: 10),
         if (showDisclosure && trailing == null)
           Icon(
-            // Point toward the trailing edge in both LTR and RTL.
-            Directionality.of(context) == TextDirection.rtl
-                ? Icons.chevron_left_rounded
-                : Icons.chevron_right_rounded,
+            // matchTextDirection mirrors this toward the trailing edge in RTL.
+            Icons.chevron_right_rounded,
             size: 20,
             color: colorScheme.onSurfaceVariant,
           ),

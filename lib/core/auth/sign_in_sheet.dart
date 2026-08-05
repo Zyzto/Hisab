@@ -380,12 +380,7 @@ class _SignInSheetState extends State<_SignInSheet> {
       // Allow dismiss after magic/confirm email link (returns pendingEmailLink).
       canPop: !_loading || _magicLinkSent || _emailNotConfirmed,
       child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          24,
-          16,
-          24,
-          MediaQuery.of(context).padding.bottom + 24,
-        ),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,

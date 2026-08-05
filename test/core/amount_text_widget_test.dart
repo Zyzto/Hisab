@@ -61,9 +61,10 @@ void main() {
       final amount = tester.widget<Text>(find.textContaining('792.50'));
       expect(amount.textDirection, TextDirection.ltr);
 
-      // RTL disclosure chevron points toward the trailing/start edge.
-      expect(find.byIcon(Icons.chevron_left_rounded), findsOneWidget);
-      expect(find.byIcon(Icons.chevron_right_rounded), findsNothing);
+      // Use chevron_right (matchTextDirection) so Flutter mirrors it in RTL;
+      // do not swap to chevron_left or it double-flips.
+      expect(find.byIcon(Icons.chevron_right_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.chevron_left_rounded), findsNothing);
     },
   );
 }

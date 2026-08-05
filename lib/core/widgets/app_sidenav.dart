@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
@@ -226,11 +225,8 @@ class _Header extends StatelessWidget {
                   : 'shell_nav_collapse'.tr(),
               onPressed: onToggleCompact,
               icon: Icon(
-                collapsed
-                    ? Icons.menu
-                    : (Directionality.of(context) == ui.TextDirection.rtl
-                          ? Icons.chevron_right
-                          : Icons.chevron_left),
+                // matchTextDirection mirrors chevron_left toward the rail edge in RTL.
+                collapsed ? Icons.menu : Icons.chevron_left,
               ),
             ),
           ),

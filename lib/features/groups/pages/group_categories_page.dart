@@ -11,7 +11,6 @@ import '../../../core/repository/repository_providers.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/form_validators.dart';
 import '../../../core/widgets/error_content.dart';
-import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../core/widgets/user_text.dart';
 import '../../../domain/domain.dart';
@@ -360,6 +359,7 @@ class _EditTagSheetState extends State<_EditTagSheet> {
   late final TextEditingController _nameController;
   late String _selectedIconName;
   late String _selectedColorHex;
+  String? _nameError;
 
   @override
   void initState() {
@@ -375,37 +375,60 @@ class _EditTagSheetState extends State<_EditTagSheet> {
     super.dispose();
   }
 
+  void _submit() {
+    final ctx = widget.sheetContext;
+    final label = _nameController.text.trim();
+    final error = FormValidators.expenseTagLabel(label);
+    if (error != null) {
+      setState(() => _nameError = error);
+      return;
+    }
+    setState(() => _nameError = null);
+    final reserved = presetCategoryTags.map((p) => 'category_${p.id}'.tr());
+    if (expenseTagLabelExists(
+      label,
+      customTags: widget.existingTags,
+      excludingTagId: widget.excludingTagId,
+      extraReservedLabels: reserved,
+    )) {
+      ctx.showError('tag_already_exists'.tr(namedArgs: {'name': label}));
+      return;
+    }
+    Navigator.of(ctx).pop((label, _selectedIconName, _selectedColorHex));
+  }
+
   @override
   Widget build(BuildContext context) {
     final ctx = widget.sheetContext;
     final isCreate = widget.initialLabel.isEmpty;
-    return buildSheetShell(
-      ctx,
+    return TagEditorSheetShell(
       title: (isCreate ? 'create_new_tag' : 'edit_tag').tr(),
-      showTitleInBody: !LayoutBreakpoints.isTabletOrWider(context),
-      body: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextField(
-            controller: _nameController,
-            decoration: InputDecoration(
-              labelText: 'tag_name'.tr(),
-              border: const OutlineInputBorder(),
-              counterText: '',
-            ),
-            maxLength: FormValidators.expenseTagLabelMax,
-            autofocus: true,
-            textCapitalization: TextCapitalization.sentences,
-          ),
-          const SizedBox(height: 16),
-          TagStyleFields(
-            selectedIconName: _selectedIconName,
-            selectedColorHex: _selectedColorHex,
-            onIconSelected: (v) => setState(() => _selectedIconName = v),
-            onColorSelected: (v) => setState(() => _selectedColorHex = v),
-          ),
-        ],
+      nameField: TextField(
+        controller: _nameController,
+        decoration: InputDecoration(
+          labelText: 'tag_name'.tr(),
+          border: const OutlineInputBorder(),
+          counterText: '',
+          errorText: _nameError,
+        ),
+        maxLength: FormValidators.expenseTagLabelMax,
+        autofocus: true,
+        textCapitalization: TextCapitalization.sentences,
+        textInputAction: TextInputAction.done,
+        onChanged: (_) => setState(() => _nameError = null),
+        onSubmitted: (_) => _submit(),
+      ),
+      styleFields: TagStyleFields(
+        showPreview: false,
+        selectedIconName: _selectedIconName,
+        selectedColorHex: _selectedColorHex,
+        onIconSelected: (v) => setState(() => _selectedIconName = v),
+        onColorSelected: (v) => setState(() => _selectedColorHex = v),
+      ),
+      preview: TagPreviewChip(
+        label: _nameController.text,
+        iconName: _selectedIconName,
+        colorHex: _selectedColorHex,
       ),
       actions: [
         if (!LayoutBreakpoints.isTabletOrWider(context))
@@ -414,27 +437,7 @@ class _EditTagSheetState extends State<_EditTagSheet> {
             child: Text('cancel'.tr()),
           ),
         FilledButton(
-          onPressed: () {
-            final label = _nameController.text.trim();
-            if (FormValidators.expenseTagLabel(label) != null) return;
-            final reserved = presetCategoryTags.map(
-              (p) => 'category_${p.id}'.tr(),
-            );
-            if (expenseTagLabelExists(
-              label,
-              customTags: widget.existingTags,
-              excludingTagId: widget.excludingTagId,
-              extraReservedLabels: reserved,
-            )) {
-              ctx.showError(
-                'tag_already_exists'.tr(namedArgs: {'name': label}),
-              );
-              return;
-            }
-            Navigator.of(
-              ctx,
-            ).pop((label, _selectedIconName, _selectedColorHex));
-          },
+          onPressed: _submit,
           child: Text('done'.tr()),
         ),
       ],

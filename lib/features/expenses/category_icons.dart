@@ -88,27 +88,30 @@ const Map<String, IconData> selectableCategoryIcons = {
 };
 
 /// Curated accents for the custom-tag color picker (`#RRGGBB`).
+///
+/// Ordered by hue grade (red → orange → green → teal → blue → violet → pink),
+/// with neutrals last.
 const List<String> selectableTagColorHexes = [
-  '#E67E22',
-  '#2EAD5B',
-  '#3B82F6',
-  '#EC4899',
-  '#8B5CF6',
-  '#EF4444',
-  '#14B8A6',
-  '#A16207',
-  '#0EA5E9',
-  '#6366F1',
-  '#D97706',
-  '#F43F5E',
-  '#0D9488',
-  '#2563EB',
-  '#DB2777',
-  '#7C3AED',
-  '#059669',
-  '#EA580C',
-  '#64748B',
-  '#0F172A',
+  '#EF4444', // red
+  '#F43F5E', // rose
+  '#EA580C', // orange
+  '#E67E22', // orange
+  '#D97706', // amber
+  '#A16207', // brown amber
+  '#2EAD5B', // green
+  '#059669', // emerald
+  '#14B8A6', // teal
+  '#0D9488', // teal
+  '#0EA5E9', // sky
+  '#3B82F6', // blue
+  '#2563EB', // blue
+  '#6366F1', // indigo
+  '#8B5CF6', // violet
+  '#7C3AED', // violet
+  '#DB2777', // pink
+  '#EC4899', // pink
+  '#64748B', // slate
+  '#0F172A', // near black
 ];
 
 /// Parses `#RRGGBB` / `RRGGBB`; returns null if invalid.

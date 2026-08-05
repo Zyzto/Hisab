@@ -170,6 +170,8 @@
   "add_photo": "Add Photo",
   "photos_section": "Photos",
   "photos_count": "Photos ({}/{})",
+  "photo_rotate_left": "Rotate left",
+  "photo_rotate_right": "Rotate right",
   "camera": "Camera",
   "gallery": "Gallery",
   "receipt_camera_hint": "Align receipt inside the frame",

@@ -157,7 +157,7 @@ class _CreateInviteSheetState extends ConsumerState<_CreateInviteSheet> {
         left: ThemeConfig.spacingL,
         right: ThemeConfig.spacingL,
         top: ThemeConfig.spacingL,
-        bottom: MediaQuery.of(context).padding.bottom + ThemeConfig.spacingL,
+        bottom: ThemeConfig.spacingL,
       ),
       child: SingleChildScrollView(
         child: Column(

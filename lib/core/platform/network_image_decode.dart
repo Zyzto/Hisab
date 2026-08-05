@@ -24,6 +24,9 @@ abstract final class NetworkImageDecode {
   }
 
   /// Width/height pair for a box of [logicalWidth] × [logicalHeight].
+  ///
+  /// Prefer [cacheSizePreserveAspect] for photos — passing both dimensions
+  /// forces the decoder to stretch to that exact size.
   static ({int? width, int? height}) cacheSize(
     BuildContext context, {
     double? logicalWidth,
@@ -33,5 +36,13 @@ abstract final class NetworkImageDecode {
       width: logicalWidth == null ? null : cachePx(context, logicalWidth),
       height: logicalHeight == null ? null : cachePx(context, logicalHeight),
     );
+  }
+
+  /// Decode bound that keeps the source aspect ratio (only one edge is set).
+  static ({int? width, int? height}) cacheSizePreserveAspect(
+    BuildContext context, {
+    required double logicalMaxEdge,
+  }) {
+    return (width: cachePx(context, logicalMaxEdge), height: null);
   }
 }

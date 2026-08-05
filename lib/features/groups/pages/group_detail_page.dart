@@ -24,6 +24,7 @@ import '../../../core/navigation/decorative_route.dart';
 import '../../../core/navigation/invite_auth_helpers.dart';
 import '../../../core/navigation/nav_back.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/navigation/route_transition_ready.dart';
 import '../../../core/widgets/missing_route_page.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -188,7 +189,8 @@ class _GroupDetailContent extends ConsumerStatefulWidget {
       _GroupDetailContentState();
 }
 
-class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
+class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
+    with RouteTransitionReady {
   int _selectedTabIndex = 0;
 
   /// Stable seed for [CustomSlidingSegmentedControl.initialValue]. The package
@@ -280,6 +282,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
         parentPath: RoutePaths.home,
         currentPath: _targetPathForTabIndex(_selectedTabIndex),
       );
+      ensureRouteReady(context);
     });
   }
 
@@ -294,6 +297,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
 
   @override
   void dispose() {
+    disposeRouteReady();
     _tabIndexNotifier.dispose();
     _pageController.dispose();
     _segmentController.dispose();
@@ -507,6 +511,7 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
 
   @override
   Widget build(BuildContext context) {
+    ensureRouteReady(context);
     final localOnly = ref.watch(effectiveLocalOnlyProvider);
     final myRoleAsync = localOnly
         ? const AsyncValue.data(null)
@@ -523,6 +528,20 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent> {
         },
         child: LayoutBuilder(
           builder: (context, layoutConstraints) {
+            if (!routeReady) {
+              return Scaffold(
+                appBar: ContentAlignedAppBar(
+                  contentAreaWidth: layoutConstraints.maxWidth,
+                  centerTitle: false,
+                  leading: IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: _navigateBack,
+                  ),
+                  title: _buildAppBarTitle(context),
+                ),
+                body: const SizedBox.shrink(),
+              );
+            }
             return Scaffold(
               floatingActionButtonLocation: ContentAlignedFabLocation.of(
                 context,

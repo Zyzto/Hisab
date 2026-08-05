@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:easy_localization/easy_localization.dart' hide TextDirection;
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 
 import '../../../core/celebration/celebration_controller.dart';
@@ -434,15 +434,13 @@ class _SheetPerson extends StatelessWidget {
   }
 }
 
-/// Arrow from payer → payee; flips with [TextDirection] so RTL stays correct.
+/// Arrow from payer → payee; [Icons.arrow_forward_rounded] mirrors in RTL.
 class _PaymentFlowArrow extends StatelessWidget {
   const _PaymentFlowArrow();
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    // Explicit flip: arrow_forward_rounded is not always matchTextDirection.
-    final pointsForward = Directionality.of(context) != TextDirection.rtl;
     return Container(
       width: 40,
       height: 40,
@@ -453,9 +451,7 @@ class _PaymentFlowArrow extends StatelessWidget {
       ),
       alignment: Alignment.center,
       child: Icon(
-        pointsForward
-            ? Icons.arrow_forward_rounded
-            : Icons.arrow_back_rounded,
+        Icons.arrow_forward_rounded,
         color: cs.primary,
         size: 22,
       ),

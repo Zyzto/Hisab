@@ -9,10 +9,9 @@ import '../platform/network_image_decode.dart';
 /// Tap the dimmed area or the close button to dismiss; pinch to zoom.
 void showImageDialogForUrl(BuildContext context, String url) {
   final size = MediaQuery.sizeOf(context);
-  final decode = NetworkImageDecode.cacheSize(
+  final decode = NetworkImageDecode.cacheSizePreserveAspect(
     context,
-    logicalWidth: size.width,
-    logicalHeight: size.height,
+    logicalMaxEdge: size.longestSide,
   );
   showAppDialog<void>(
     context: context,

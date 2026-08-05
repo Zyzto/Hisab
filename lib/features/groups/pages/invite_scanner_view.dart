@@ -12,6 +12,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../../core/motion/app_motion.dart';
 import '../../../core/navigation/invite_link_handler.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/navigation/route_transition_ready.dart';
 import '../../../core/services/permission_service.dart';
 import '../../../core/widgets/toast.dart';
 
@@ -42,6 +43,8 @@ class _InviteScannerViewState extends State<InviteScannerView>
   DateTime? _lastInvalidToast;
   MobileScannerController? _controller;
   late final AnimationController _scanLine;
+  VoidCallback? _cancelArmHardware;
+  bool _hardwareStarted = false;
 
   Duration get _motion {
     if (!mounted) return AppMotion.page;
@@ -57,8 +60,31 @@ class _InviteScannerViewState extends State<InviteScannerView>
     _scanLine = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2200),
-    )..repeat(reverse: true);
-    _bootstrap();
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      // Sheet roll and GoRouter fade+slide both expose ModalRoute.animation.
+      if (MediaQuery.disableAnimationsOf(context)) {
+        _startHardware();
+        return;
+      }
+      _cancelArmHardware = armWhenAnimationReady(
+        context: context,
+        action: () {
+          if (!mounted) return;
+          _startHardware();
+        },
+      );
+    });
+  }
+
+  void _startHardware() {
+    if (_hardwareStarted) return;
+    _hardwareStarted = true;
+    if (!_scanLine.isAnimating) {
+      _scanLine.repeat(reverse: true);
+    }
+    unawaited(_bootstrap());
   }
 
   Future<void> _bootstrap() async {
@@ -101,6 +127,7 @@ class _InviteScannerViewState extends State<InviteScannerView>
 
   @override
   void dispose() {
+    _cancelArmHardware?.call();
     WidgetsBinding.instance.removeObserver(this);
     _scanLine.dispose();
     _controller?.dispose();
@@ -315,22 +342,24 @@ class _ScannerBodyState extends State<_ScannerBody> {
               ),
             ),
         ],
-        SafeArea(
-          top: widget.expanded,
-          child: Column(
-            children: [
-              _TopBar(
-                controller: widget.controller,
-                expanded: widget.expanded,
-                onClose: widget.onClose,
-                onToggleExpanded: widget.onToggleExpanded,
-                onToggleTorch: widget.onToggleTorch,
-                motion: widget.motion,
-                showTorch: !_hasError,
-              ),
-              const Spacer(),
-              if (!_hasError)
-                Padding(
+        // Handle already clears the status bar — don't double-pad (that left a
+        // gap above the top bar). Stretch the bar edge-to-edge.
+        Column(
+          children: [
+            _TopBar(
+              controller: widget.controller,
+              expanded: widget.expanded,
+              onClose: widget.onClose,
+              onToggleExpanded: widget.onToggleExpanded,
+              onToggleTorch: widget.onToggleTorch,
+              motion: widget.motion,
+              showTorch: !_hasError,
+            ),
+            const Spacer(),
+            if (!_hasError)
+              SafeArea(
+                top: false,
+                child: Padding(
                   padding: const EdgeInsets.fromLTRB(24, 0, 24, 28),
                   child: AnimatedOpacity(
                     opacity: widget.successFlash ? 0 : 1,
@@ -355,8 +384,8 @@ class _ScannerBodyState extends State<_ScannerBody> {
                     ),
                   ),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
       ],
     );
@@ -385,47 +414,52 @@ class _TopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.black.withValues(alpha: 0.4),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-        child: Row(
-          children: [
-            IconButton(
-              tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-              onPressed: onClose,
-              icon: const Icon(Icons.close, color: Colors.white),
-            ),
-            Expanded(
-              child: Text(
-                'scan_invite_title'.tr(),
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
+      color: Colors.black.withValues(alpha: 0.55),
+      child: SizedBox(
+        width: double.infinity,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: Row(
+            children: [
+              IconButton(
+                tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+                onPressed: onClose,
+                icon: const Icon(Icons.close, color: Colors.white),
+              ),
+              Expanded(
+                child: Text(
+                  'scan_invite_title'.tr(),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-            ),
-            if (showTorch)
-              _TorchButton(
-                controller: controller,
-                onToggleTorch: onToggleTorch,
-                motion: motion,
-              ),
-            IconButton(
-              tooltip: expanded
-                  ? 'receipt_camera_collapse'.tr()
-                  : 'receipt_camera_expand'.tr(),
-              onPressed: onToggleExpanded,
-              icon: AnimatedSwitcher(
-                duration: motion,
-                child: Icon(
-                  expanded ? Icons.close_fullscreen : Icons.open_in_full,
-                  key: ValueKey(expanded),
-                  color: Colors.white,
+              if (showTorch)
+                _TorchButton(
+                  controller: controller,
+                  onToggleTorch: onToggleTorch,
+                  motion: motion,
+                )
+              else
+                const SizedBox(width: 48),
+              IconButton(
+                tooltip: expanded
+                    ? 'receipt_camera_collapse'.tr()
+                    : 'receipt_camera_expand'.tr(),
+                onPressed: onToggleExpanded,
+                icon: AnimatedSwitcher(
+                  duration: motion,
+                  child: Icon(
+                    expanded ? Icons.close_fullscreen : Icons.open_in_full,
+                    key: ValueKey(expanded),
+                    color: Colors.white,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

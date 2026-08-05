@@ -87,7 +87,8 @@ class SheetHandleBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Full-screen sheets draw under the status bar — keep the grabber reachable.
+    // Clear the status bar, then sit lower so a drag doesn't open notifications.
+    final topPad = expanded ? 22.0 : 12.0;
     return SafeArea(
       top: expanded,
       bottom: false,
@@ -101,17 +102,14 @@ class SheetHandleBar extends StatelessWidget {
           onVerticalDragEnd: onVerticalDragEnd,
           onVerticalDragCancel: onVerticalDragCancel,
           child: Padding(
-            padding: EdgeInsets.only(
-              top: expanded ? 8 : 10,
-              bottom: expanded ? 4 : 6,
-            ),
+            padding: EdgeInsets.only(top: topPad, bottom: expanded ? 8 : 6),
             child: Center(
               child: Container(
-                width: 40,
+                width: 44,
                 height: 5,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.35),
-                  borderRadius: BorderRadius.circular(2),
+                  color: Colors.white.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(2.5),
                 ),
               ),
             ),

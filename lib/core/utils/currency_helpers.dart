@@ -97,7 +97,7 @@ class CurrencyHelpers {
       child: Builder(
         builder: (ctx) => Padding(
           padding: EdgeInsets.only(
-            bottom: MediaQuery.of(ctx).padding.bottom + 24,
+            bottom: 24,
           ),
           child: AppCurrencyPickerList(
             onSelect: (currency) {
