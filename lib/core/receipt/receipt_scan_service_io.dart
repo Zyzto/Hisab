@@ -6,7 +6,7 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../features/settings/providers/settings_framework_providers.dart';
+import '../settings/providers/settings_framework_providers.dart';
 import 'receipt_ai_backend.dart';
 import 'receipt_local_extractor.dart';
 import 'receipt_nano_service.dart';
@@ -25,11 +25,7 @@ const _ocrTimeout = Duration(seconds: 55);
 const _nanoStatusTimeout = Duration(seconds: 3);
 const _cloudTimeout = Duration(seconds: 45);
 
-Future<T> _withTimeout<T>(
-  Future<T> future,
-  Duration timeout,
-  String label,
-) {
+Future<T> _withTimeout<T>(Future<T> future, Duration timeout, String label) {
   return future.timeout(
     timeout,
     onTimeout: () {
@@ -39,10 +35,7 @@ Future<T> _withTimeout<T>(
   );
 }
 
-Future<String> _runOcr(
-  XFile file,
-  ReceiptScanCancelToken? cancel,
-) async {
+Future<String> _runOcr(XFile file, ReceiptScanCancelToken? cancel) async {
   cancel?.throwIfCancelled();
   Log.debug('Receipt scan: OCR start path=${file.path}');
   try {

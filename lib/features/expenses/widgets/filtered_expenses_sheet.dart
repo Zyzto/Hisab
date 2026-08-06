@@ -218,11 +218,7 @@ class _TileActionButton extends StatelessWidget {
           child: SizedBox(
             width: 40,
             child: Center(
-              child: Icon(
-                icon,
-                size: 18,
-                color: colorScheme.onSurfaceVariant,
-              ),
+              child: Icon(icon, size: 18, color: colorScheme.onSurfaceVariant),
             ),
           ),
         ),

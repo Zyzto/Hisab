@@ -71,10 +71,7 @@ Vector2 randomBurstSpeed(
 }) {
   final angle = rng.nextDouble() * math.pi * 2;
   final mag = 60 + rng.nextDouble() * spread;
-  return Vector2(
-    math.cos(angle) * mag,
-    math.sin(angle) * mag - upwardBias,
-  );
+  return Vector2(math.cos(angle) * mag, math.sin(angle) * mag - upwardBias);
 }
 
 /// Screen-wide radial burst of circles from [origin].
@@ -128,7 +125,8 @@ CelebrationParticles mistOrbs({
           rng.nextDouble() * area.x,
           rng.nextDouble() * area.y,
         );
-        final to = from +
+        final to =
+            from +
             Vector2(
               (rng.nextDouble() - 0.5) * area.x * 0.35,
               -40 - rng.nextDouble() * area.y * 0.2,
@@ -177,11 +175,7 @@ CelebrationParticles shapedBurst({
               final a = (1.0 - particle.progress) * 0.9;
               canvas.save();
               canvas.rotate(spin * particle.progress);
-              draw(
-                canvas,
-                Paint()..color = color.withValues(alpha: a),
-                size,
-              );
+              draw(canvas, Paint()..color = color.withValues(alpha: a), size);
               canvas.restore();
             },
           ),
@@ -218,15 +212,13 @@ CelebrationParticles screenRain({
           to: Vector2(x + (rng.nextDouble() - 0.5) * 80, toY),
           child: ComputedParticle(
             renderer: (canvas, particle) {
-              final a = (1.0 - (particle.progress - 0.5).abs() * 1.6)
-                  .clamp(0.0, 0.85);
+              final a = (1.0 - (particle.progress - 0.5).abs() * 1.6).clamp(
+                0.0,
+                0.85,
+              );
               canvas.save();
               canvas.rotate(spin * particle.progress);
-              draw(
-                canvas,
-                Paint()..color = color.withValues(alpha: a),
-                size,
-              );
+              draw(canvas, Paint()..color = color.withValues(alpha: a), size);
               canvas.restore();
             },
           ),
@@ -270,7 +262,14 @@ void drawTropicalLeaf(Canvas canvas, Paint paint, double size) {
     Path()
       ..moveTo(0, size * 0.8)
       ..cubicTo(size * 0.5, size * 0.2, size, -size * 0.2, size * 0.9, -size)
-      ..cubicTo(size * 0.3, -size * 0.6, -size * 0.2, -size * 0.4, 0, size * 0.8)
+      ..cubicTo(
+        size * 0.3,
+        -size * 0.6,
+        -size * 0.2,
+        -size * 0.4,
+        0,
+        size * 0.8,
+      )
       ..close(),
     paint,
   );

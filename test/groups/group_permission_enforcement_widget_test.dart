@@ -12,7 +12,7 @@ import 'package:hisab/features/expenses/pages/expense_form_page.dart';
 import 'package:hisab/features/groups/pages/group_settings_page.dart';
 import 'package:hisab/features/groups/providers/group_member_provider.dart';
 import 'package:hisab/features/groups/providers/groups_provider.dart';
-import 'package:hisab/features/settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 
 import '../widget_test_helpers.dart';
 

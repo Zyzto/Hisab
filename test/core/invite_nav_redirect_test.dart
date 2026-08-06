@@ -123,34 +123,34 @@ void main() {
       );
     });
 
-    test(
-      'leftover pending after accept would bounce group detail → invite '
-      '(must clear pending before leaving /invite)',
-      () {
-        expect(
-          pendingInviteRedirectTarget(
-            pendingToken: 'tok',
-            currentPath: '/groups/group-1',
-            onOnboarding: false,
-            onPrivacyPolicy: false,
-          ),
-          '/invite/tok',
-        );
-      },
-    );
+    test('leftover pending after accept would bounce group detail → invite '
+        '(must clear pending before leaving /invite)', () {
+      expect(
+        pendingInviteRedirectTarget(
+          pendingToken: 'tok',
+          currentPath: '/groups/group-1',
+          onOnboarding: false,
+          onPrivacyPolicy: false,
+        ),
+        '/invite/tok',
+      );
+    });
   });
 
   group('shouldRestoreLastRoute', () {
-    test('restores non-home last path when onboarded and no pending invite', () {
-      expect(
-        shouldRestoreLastRoute(
-          lastPath: '/groups/g1',
-          pendingToken: '',
-          onboardingCompleted: true,
-        ),
-        isTrue,
-      );
-    });
+    test(
+      'restores non-home last path when onboarded and no pending invite',
+      () {
+        expect(
+          shouldRestoreLastRoute(
+            lastPath: '/groups/g1',
+            pendingToken: '',
+            onboardingCompleted: true,
+          ),
+          isTrue,
+        );
+      },
+    );
 
     test('pending invite wins over last-route restore', () {
       expect(
@@ -200,30 +200,21 @@ void main() {
   group('shouldRedirectPendingInvite', () {
     test('token + auto-join → true', () {
       expect(
-        shouldRedirectPendingInvite(
-          pendingToken: 'tok',
-          autoJoinFlag: true,
-        ),
+        shouldRedirectPendingInvite(pendingToken: 'tok', autoJoinFlag: true),
         isTrue,
       );
     });
 
     test('token without auto-join → false', () {
       expect(
-        shouldRedirectPendingInvite(
-          pendingToken: 'tok',
-          autoJoinFlag: false,
-        ),
+        shouldRedirectPendingInvite(pendingToken: 'tok', autoJoinFlag: false),
         isFalse,
       );
     });
 
     test('empty token → false', () {
       expect(
-        shouldRedirectPendingInvite(
-          pendingToken: '',
-          autoJoinFlag: true,
-        ),
+        shouldRedirectPendingInvite(pendingToken: '', autoJoinFlag: true),
         isFalse,
       );
     });

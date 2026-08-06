@@ -191,9 +191,7 @@ class _MonthGalleryCalendarState extends State<MonthGalleryCalendar> {
           child: PageView.builder(
             controller: _pageController,
             itemCount: _months.length,
-            physics: const BouncingScrollPhysics(
-              parent: PageScrollPhysics(),
-            ),
+            physics: const BouncingScrollPhysics(parent: PageScrollPhysics()),
             onPageChanged: (index) {
               setState(() => _pageIndex = index);
               if (!_syncingFromParent) {
@@ -322,7 +320,8 @@ class _DayCell extends StatelessWidget {
             rangeStart != null && monthGallerySameDay(day, rangeStart);
         final isEnd = rangeEnd != null && monthGallerySameDay(day, rangeEnd);
         isEndpoint = isStart || isEnd;
-        inRange = rangeStart != null &&
+        inRange =
+            rangeStart != null &&
             rangeEnd != null &&
             !day.isBefore(rangeStart) &&
             !day.isAfter(rangeEnd);
@@ -331,13 +330,13 @@ class _DayCell extends StatelessWidget {
     final bg = isEndpoint
         ? cs.primary
         : inRange
-            ? cs.primary.withValues(alpha: 0.18)
-            : null;
+        ? cs.primary.withValues(alpha: 0.18)
+        : null;
     final fg = !enabled
         ? cs.onSurface.withValues(alpha: 0.28)
         : isEndpoint
-            ? cs.onPrimary
-            : cs.onSurface;
+        ? cs.onPrimary
+        : cs.onSurface;
 
     final BorderRadius radius;
     if (selection case MonthGalleryRangeSelection(:final start, :final end)) {

@@ -6,7 +6,7 @@ import '../../../core/utils/expense_totals.dart';
 import '../../../core/widgets/amount_with_secondary_display.dart';
 import '../../../domain/domain.dart';
 import '../../settings/providers/display_currency_rate_provider.dart';
-import '../../settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 import 'profile_data_providers.dart';
 
 class ProfileBalanceRow {

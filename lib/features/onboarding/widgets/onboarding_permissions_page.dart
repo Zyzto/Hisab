@@ -8,7 +8,7 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import '../../../core/pwa/pwa_capabilities.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/widgets/toast.dart';
-import '../../settings/settings_definitions.dart';
+import 'package:hisab/core/settings/settings_definitions.dart';
 import 'onboarding_shared.dart';
 
 class OnboardingPermissionsPage extends ConsumerWidget {
@@ -68,7 +68,8 @@ class OnboardingPermissionsPage extends ConsumerWidget {
                   context,
                   icon: Icons.notifications_outlined,
                   title: 'onboarding_permission_notifications'.tr(),
-                  subtitle: kIsWeb &&
+                  subtitle:
+                      kIsWeb &&
                           pwaNotificationSupport ==
                               PwaNotificationSupport.needsInstall
                       ? 'onboarding_permission_notifications_needs_install'.tr()

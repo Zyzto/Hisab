@@ -26,12 +26,7 @@ void main() {
   Widget wrapWithRouter(Widget home) {
     final router = GoRouter(
       initialLocation: '/',
-      routes: [
-        GoRoute(
-          path: '/',
-          builder: (context, state) => home,
-        ),
-      ],
+      routes: [GoRoute(path: '/', builder: (context, state) => home)],
     );
     return EasyLocalization(
       path: 'assets/translations',
@@ -114,9 +109,7 @@ void main() {
     await tester.pumpWidget(
       wrapWithRouter(
         const Scaffold(
-          body: SettlementMethodGuideCard(
-            method: SettlementMethod.treasurer,
-          ),
+          body: SettlementMethodGuideCard(method: SettlementMethod.treasurer),
         ),
       ),
     );
@@ -166,9 +159,7 @@ void main() {
     await tester.pumpWidget(
       wrapWithRouter(
         const Scaffold(
-          body: SettlementMethodGuideCard(
-            method: SettlementMethod.pairwise,
-          ),
+          body: SettlementMethodGuideCard(method: SettlementMethod.pairwise),
         ),
       ),
     );
@@ -184,11 +175,7 @@ void main() {
   testWidgets('SettleUpExplainerBody renders three beats', (tester) async {
     setPhoneViewport(tester);
     await tester.pumpWidget(
-      wrapWithRouter(
-        const Scaffold(
-          body: SettleUpExplainerBody(),
-        ),
-      ),
+      wrapWithRouter(const Scaffold(body: SettleUpExplainerBody())),
     );
     await tester.pumpAndSettle();
 

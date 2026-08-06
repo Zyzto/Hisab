@@ -2,8 +2,8 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../features/settings/providers/settings_framework_providers.dart';
-import '../../features/settings/settings_definitions.dart';
+import '../settings/providers/settings_framework_providers.dart';
+import '../settings/settings_definitions.dart';
 import 'invite_nav_redirect.dart';
 
 /// Persist [path] so a process kill (common when opening the system camera)
@@ -36,7 +36,9 @@ void setPendingImagePickMode(WidgetRef ref, String mode) {
   if (settings == null) return;
   final current = ref.read(settings.provider(pendingImagePickModeSettingDef));
   if (current == mode) return;
-  ref.read(settings.provider(pendingImagePickModeSettingDef).notifier).set(mode);
+  ref
+      .read(settings.provider(pendingImagePickModeSettingDef).notifier)
+      .set(mode);
 }
 
 String readPendingImagePickMode(WidgetRef ref) {

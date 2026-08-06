@@ -13,7 +13,7 @@ import '../../core/services/migration_service.dart';
 import '../../core/services/notification_service.dart';
 import '../../core/widgets/sheet_helpers.dart';
 import '../../core/widgets/toast.dart';
-import 'settings_definitions.dart';
+import 'package:hisab/core/settings/settings_definitions.dart';
 import 'widgets/migration_progress_sheet.dart';
 
 /// Shared account / online-mode actions used by Profile and Settings.

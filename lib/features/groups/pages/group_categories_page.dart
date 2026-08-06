@@ -16,7 +16,7 @@ import '../../../core/widgets/user_text.dart';
 import '../../../domain/domain.dart';
 import '../../expenses/category_icons.dart';
 import '../../expenses/widgets/tag_style_fields.dart';
-import '../../settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 import '../providers/group_member_provider.dart';
 import '../providers/groups_provider.dart';
 
@@ -436,10 +436,7 @@ class _EditTagSheetState extends State<_EditTagSheet> {
             onPressed: () => Navigator.of(ctx).pop(),
             child: Text('cancel'.tr()),
           ),
-        FilledButton(
-          onPressed: _submit,
-          child: Text('done'.tr()),
-        ),
+        FilledButton(onPressed: _submit, child: Text('done'.tr())),
       ],
     );
   }

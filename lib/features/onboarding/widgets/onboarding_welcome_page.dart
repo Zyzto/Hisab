@@ -84,7 +84,10 @@ class _OnboardingWelcomePageState extends State<OnboardingWelcomePage>
       return;
     }
 
-    _heroController = AnimationController(vsync: this, duration: AppMotion.page);
+    _heroController = AnimationController(
+      vsync: this,
+      duration: AppMotion.page,
+    );
     _heroFade = CurvedAnimation(
       parent: _heroController!,
       curve: AppMotion.enterCurve,

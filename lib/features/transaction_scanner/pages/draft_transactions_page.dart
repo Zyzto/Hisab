@@ -32,9 +32,7 @@ class DraftTransactionsPage extends ConsumerWidget {
         child: draftsAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(
-            child: Text(
-              'error_with_details'.tr(namedArgs: {'details': '$e'}),
-            ),
+            child: Text('error_with_details'.tr(namedArgs: {'details': '$e'})),
           ),
           data: (drafts) => drafts.isEmpty
               ? _buildEmptyState(context)
@@ -229,9 +227,7 @@ class _DraftCard extends ConsumerWidget {
     final now = DateTime.now();
     final diff = now.difference(date);
     if (diff.inMinutes < 60) {
-      return 'time_minutes_ago'.tr(
-        namedArgs: {'count': '${diff.inMinutes}'},
-      );
+      return 'time_minutes_ago'.tr(namedArgs: {'count': '${diff.inMinutes}'});
     }
     if (diff.inHours < 24) {
       return 'time_hours_ago'.tr(namedArgs: {'count': '${diff.inHours}'});
@@ -253,8 +249,8 @@ class _ConfidenceIndicator extends StatelessWidget {
     final color = confidence >= 0.7
         ? Colors.green
         : confidence >= 0.4
-            ? Colors.orange
-            : Colors.red;
+        ? Colors.orange
+        : Colors.red;
 
     return SizedBox(
       width: 36,

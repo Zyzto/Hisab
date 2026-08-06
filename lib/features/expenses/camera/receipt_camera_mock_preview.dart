@@ -40,8 +40,7 @@ class ReceiptCameraMockPreview extends StatefulWidget {
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
     image.dispose();
     if (bytes == null) return null;
-    final name =
-        'receipt_mock_${DateTime.now().millisecondsSinceEpoch}.png';
+    final name = 'receipt_mock_${DateTime.now().millisecondsSinceEpoch}.png';
     return XFile.fromData(
       bytes.buffer.asUint8List(),
       mimeType: 'image/png',

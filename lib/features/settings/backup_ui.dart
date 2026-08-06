@@ -12,8 +12,8 @@ import '../../core/widgets/sheet_helpers.dart';
 import '../../core/widgets/toast.dart';
 import 'backup_service.dart';
 import 'backup_types.dart';
-import 'providers/settings_framework_providers.dart';
-import 'settings_definitions.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/settings_definitions.dart';
 
 Future<void> runBackupExportFlow(BuildContext context, WidgetRef ref) async {
   final kind = await showOptionPickerSheet<BackupExportKind>(
@@ -246,7 +246,9 @@ Future<void> runBackupImportFlow(BuildContext context, WidgetRef ref) async {
     Log.warning('Backup import failed', error: e, stackTrace: st);
     try {
       ref.read(dataSyncServiceProvider.notifier).resume();
-    } catch (_) {}
+    } catch (e) {
+      Log.debug('Resume sync after import failure failed', error: e);
+    }
     if (context.mounted) context.showError('import_failed'.tr());
   }
 }

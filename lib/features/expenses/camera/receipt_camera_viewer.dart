@@ -346,9 +346,7 @@ class _ReceiptCameraViewerState extends State<ReceiptCameraViewer>
           children: [
             _buildBody(theme, cs),
             if (_flashVisible)
-              const IgnorePointer(
-                child: ColoredBox(color: Color(0x66FFFFFF)),
-              ),
+              const IgnorePointer(child: ColoredBox(color: Color(0x66FFFFFF))),
           ],
         ),
       ),
@@ -423,9 +421,7 @@ class _ReceiptCameraViewerState extends State<ReceiptCameraViewer>
     } else {
       livePreview = const ColoredBox(
         color: Colors.black,
-        child: Center(
-          child: CircularProgressIndicator(color: Colors.white),
-        ),
+        child: Center(child: CircularProgressIndicator(color: Colors.white)),
       );
     }
 
@@ -608,33 +604,28 @@ class _SensorEdge extends StatelessWidget {
     // Map sensor → dock side on the portrait-locked canvas.
     // Do not offset tools by MediaQuery.padding.top: the host already places
     // SheetHandleBar (with SafeArea) above this viewer — pad.top left a gap.
-    final useTop = orientation == DeviceOrientation.portraitDown ||
+    final useTop =
+        orientation == DeviceOrientation.portraitDown ||
         orientation == DeviceOrientation.landscapeRight;
     final useBottom = !useTop;
 
     return switch (edge) {
-      _ChromeEdge.tools => useTop
-          ? Positioned(left: 0, right: 0, bottom: 0, child: child)
-          : Positioned(left: 0, right: 0, top: 0, child: child),
-      _ChromeEdge.capture => useBottom
-          ? Positioned(left: 0, right: 0, bottom: 0, child: child)
-          : Positioned(left: 0, right: 0, top: 0, child: child),
-      _ChromeEdge.filmstrip => useBottom
-          ? Positioned(
-              left: 0,
-              right: 0,
-              bottom: 168,
-              child: child,
-            )
-          : Positioned(
-              left: 0,
-              right: 0,
-              top: 168,
-              child: child,
-            ),
-      _ChromeEdge.hint => useBottom
-          ? Positioned(left: 0, right: 0, bottom: 200, child: child)
-          : Positioned(left: 0, right: 0, top: 200, child: child),
+      _ChromeEdge.tools =>
+        useTop
+            ? Positioned(left: 0, right: 0, bottom: 0, child: child)
+            : Positioned(left: 0, right: 0, top: 0, child: child),
+      _ChromeEdge.capture =>
+        useBottom
+            ? Positioned(left: 0, right: 0, bottom: 0, child: child)
+            : Positioned(left: 0, right: 0, top: 0, child: child),
+      _ChromeEdge.filmstrip =>
+        useBottom
+            ? Positioned(left: 0, right: 0, bottom: 168, child: child)
+            : Positioned(left: 0, right: 0, top: 168, child: child),
+      _ChromeEdge.hint =>
+        useBottom
+            ? Positioned(left: 0, right: 0, bottom: 200, child: child)
+            : Positioned(left: 0, right: 0, top: 200, child: child),
     };
   }
 }
@@ -1240,11 +1231,7 @@ class _ZoomRulerPainter extends CustomPainter {
       ..color = accent
       ..strokeWidth = 2.2
       ..strokeCap = StrokeCap.round;
-    canvas.drawLine(
-      Offset(midX, 6),
-      Offset(midX, size.height - 6),
-      needle,
-    );
+    canvas.drawLine(Offset(midX, 6), Offset(midX, size.height - 6), needle);
   }
 
   @override
@@ -1756,11 +1743,7 @@ class _CaptureDock extends StatelessWidget {
         padding: EdgeInsets.fromLTRB(28, 10, 28, 16 + bottomPad),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: [
-            zoomBar,
-            const SizedBox(height: 12),
-            rail,
-          ],
+          children: [zoomBar, const SizedBox(height: 12), rail],
         ),
       ),
     );

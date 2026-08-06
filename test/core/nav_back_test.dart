@@ -40,10 +40,7 @@ void main() {
   group('isStrictAncestorPath', () {
     test('expense detail is under group expenses', () {
       expect(
-        isStrictAncestorPath(
-          '/groups/g1/expenses',
-          '/groups/g1/expenses/e1',
-        ),
+        isStrictAncestorPath('/groups/g1/expenses', '/groups/g1/expenses/e1'),
         isTrue,
       );
       expect(

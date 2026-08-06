@@ -64,9 +64,9 @@ class ContentAlignedAppBar extends StatelessWidget
       // Symmetric insets keep the title centered despite leading/actions skew.
       final symmetricInset =
           (leadingReservedWidth > actionsReservedWidth
-                  ? leadingReservedWidth
-                  : actionsReservedWidth) +
-              titleButtonGap;
+              ? leadingReservedWidth
+              : actionsReservedWidth) +
+          titleButtonGap;
       final inset = symmetricInset.clamp(0.0, bandWidth / 2).toDouble();
       titleStartInset = inset;
       titleEndInset = inset;

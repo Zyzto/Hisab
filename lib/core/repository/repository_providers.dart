@@ -5,7 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants/supabase_config.dart';
 import '../database/database_providers.dart';
 import '../services/connectivity_service.dart';
-import '../../features/settings/providers/settings_framework_providers.dart';
+import '../settings/providers/settings_framework_providers.dart';
 import 'group_repository.dart';
 import 'group_member_repository.dart';
 import 'group_invite_repository.dart';

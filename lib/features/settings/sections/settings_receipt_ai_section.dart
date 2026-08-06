@@ -8,8 +8,8 @@ import '../../../core/receipt/receipt_nano_service.dart';
 import '../../../core/receipt/receipt_scan_capability.dart';
 import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/toast.dart';
-import '../settings_definitions.dart';
-import '../providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/settings_definitions.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 
 /// Callback to show the API key dialog. Called when user taps a Gemini/OpenAI key tile.
 typedef ShowApiKeyDialogCallback =
@@ -64,8 +64,7 @@ List<Widget> buildReceiptAiSectionTiles(
         receiptAiProviderSettingDef.key,
         _receiptAiProviderTile(context, ref, settings, provider),
       ),
-      if (provider == 'gemini' ||
-          ref.watch(geminiApiKeyProvider).isNotEmpty)
+      if (provider == 'gemini' || ref.watch(geminiApiKeyProvider).isNotEmpty)
         wrap(
           geminiApiKeySettingDef.key,
           ListTile(
@@ -85,8 +84,7 @@ List<Widget> buildReceiptAiSectionTiles(
             ),
           ),
         ),
-      if (provider == 'openai' ||
-          ref.watch(openaiApiKeyProvider).isNotEmpty)
+      if (provider == 'openai' || ref.watch(openaiApiKeyProvider).isNotEmpty)
         wrap(
           openaiApiKeySettingDef.key,
           ListTile(
@@ -119,10 +117,9 @@ Widget _receiptScanModeTile(
   final modes = ReceiptScanCapability.availableModes();
   // Keep showing the stored mode label even if this platform can't offer it
   // in the picker (e.g. Nano on iOS) — the note tile explains the fallback.
-  final labelKey = _modeLabelKeys[value] ?? _modeLabelKeys[ReceiptScanMode.off]!;
-  final pickerSelected = modes.contains(value)
-      ? value
-      : ReceiptScanMode.local;
+  final labelKey =
+      _modeLabelKeys[value] ?? _modeLabelKeys[ReceiptScanMode.off]!;
+  final pickerSelected = modes.contains(value) ? value : ReceiptScanMode.local;
   return ListTile(
     leading: Icon(receiptScanModeSettingDef.icon),
     title: Text('receipt_scan_mode'.tr()),
@@ -183,9 +180,7 @@ Widget _receiptAiProviderTile(
         ref
             .read(settings.provider(receiptAiProviderSettingDef).notifier)
             .set(chosen);
-        Log.info(
-          'Setting changed: ${receiptAiProviderSettingDef.key}=$chosen',
-        );
+        Log.info('Setting changed: ${receiptAiProviderSettingDef.key}=$chosen');
       }
     },
   );

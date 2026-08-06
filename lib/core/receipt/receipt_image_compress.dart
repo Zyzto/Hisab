@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 
 /// Max dimension for receipt photos stored / uploaded (stream-friendly).
 const int kReceiptImageMaxDimension = 1280;
@@ -93,7 +94,9 @@ Future<Uint8List?> rotateReceiptImage(Uint8List imageBytes, int degrees) async {
         keepExif: false,
       );
       if (result.isNotEmpty) return result;
-    } catch (_) {}
+    } catch (e) {
+      Log.debug('Native receipt rotate failed; using codec fallback', error: e);
+    }
   }
 
   return _rotateWithCodec(imageBytes, normalized);

@@ -46,17 +46,18 @@ class ProfileExpensesFiltersBar extends ConsumerWidget {
 
     final tagKeys = <String>{};
     for (final item in allItems) {
-      final tag = (item.expense.tag == null || item.expense.tag!.isEmpty)
-          ? 'untagged'
-          : item.expense.tag!;
+      final tag = item.expense.hasBlankTag ? 'untagged' : item.expense.tag!;
       tagKeys.add(tag);
     }
     final tagList = tagKeys.toList()
       ..sort((a, b) {
         if (a == 'untagged') return 1;
         if (b == 'untagged') return -1;
-        return _profileTagLabel(a, customTags, groups)
-            .compareTo(_profileTagLabel(b, customTags, groups));
+        return _profileTagLabel(
+          a,
+          customTags,
+          groups,
+        ).compareTo(_profileTagLabel(b, customTags, groups));
       });
 
     final period = switch (filter.range) {
@@ -181,7 +182,8 @@ class ProfileExpensesFiltersBar extends ConsumerWidget {
                 vertical: 12,
               ),
             ),
-            onChanged: (value) => onFilterChanged(filter.copyWith(query: value)),
+            onChanged: (value) =>
+                onFilterChanged(filter.copyWith(query: value)),
           ),
         ),
         Padding(
@@ -369,8 +371,9 @@ String _profileTagLabel(
   final base = resolved.startsWith('category_') ? resolved.tr() : resolved;
   final custom = customTags.where((t) => t.id == tagId).firstOrNull;
   if (custom == null) return base;
-  final sameLabelCount =
-      customTags.where((t) => t.label == custom.label).length;
+  final sameLabelCount = customTags
+      .where((t) => t.label == custom.label)
+      .length;
   if (sameLabelCount <= 1) return base;
   final groupName = groupNames[custom.groupId];
   if (groupName == null || groupName.isEmpty) return base;

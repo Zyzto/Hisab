@@ -17,7 +17,7 @@ import '../../../core/utils/form_validators.dart';
 import '../../../core/widgets/group_section_header.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../domain/domain.dart';
-import '../../settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 import '../providers/group_invite_provider.dart';
 import '../utils/invite_share_helper.dart';
 
@@ -396,42 +396,42 @@ class _InviteResultViewState extends State<_InviteResultView> {
                 child: DecoratedBox(
                   decoration: AccentSurfaces.flatPanel(colorScheme, radius: 16),
                   child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: SizedBox(
-                    width: qrSize,
-                    height: qrSize,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        PrettyQrView.data(
-                          data: url,
-                          errorCorrectLevel: QrErrorCorrectLevel.H,
-                          decoration: PrettyQrDecoration(
-                            shape: PrettyQrSmoothSymbol(
-                              color: colorScheme.onSurface,
-                            ),
-                            background: colorScheme.surface,
-                            quietZone: PrettyQrQuietZone.zero,
-                          ),
-                        ),
-                        IgnorePointer(
-                          child: Container(
-                            width: logoSize,
-                            height: logoSize,
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: colorScheme.surface,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Image.asset(
-                              _qrCenterLogoAsset,
-                              fit: BoxFit.contain,
+                    padding: const EdgeInsets.all(16),
+                    child: SizedBox(
+                      width: qrSize,
+                      height: qrSize,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          PrettyQrView.data(
+                            data: url,
+                            errorCorrectLevel: QrErrorCorrectLevel.H,
+                            decoration: PrettyQrDecoration(
+                              shape: PrettyQrSmoothSymbol(
+                                color: colorScheme.onSurface,
+                              ),
+                              background: colorScheme.surface,
+                              quietZone: PrettyQrQuietZone.zero,
                             ),
                           ),
-                        ),
-                      ],
+                          IgnorePointer(
+                            child: Container(
+                              width: logoSize,
+                              height: logoSize,
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: colorScheme.surface,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Image.asset(
+                                _qrCenterLogoAsset,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
                   ),
                 ),
               );

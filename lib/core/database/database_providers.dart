@@ -7,7 +7,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../auth/auth_providers.dart';
 import '../constants/supabase_config.dart';
 import '../services/connectivity_service.dart';
-import '../../features/settings/providers/settings_framework_providers.dart';
+import '../settings/providers/settings_framework_providers.dart';
 import 'sync_backend.dart';
 import 'sync_engine.dart';
 import 'sync_errors.dart';

@@ -17,3 +17,5 @@ linter:
     prefer_const_literals_to_create_immutables: true
     always_declare_return_types: true
     prefer_final_locals: true
+    empty_catches: true
+    unawaited_futures: true

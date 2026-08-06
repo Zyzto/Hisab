@@ -211,9 +211,7 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
 
   Widget _wrapEnter(Widget child) {
     if (_awaitingEnter) {
-      return IgnorePointer(
-        child: Opacity(opacity: 0, child: child),
-      );
+      return IgnorePointer(child: Opacity(opacity: 0, child: child));
     }
     Widget result = child;
     if (_enterSlide != null && _enterController != null) {
@@ -254,23 +252,18 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
     }
 
     final Expense? expense =
-        sorted != null &&
-            index >= 0 &&
-            sorted[index].groupId == widget.groupId
+        sorted != null && index >= 0 && sorted[index].groupId == widget.groupId
         ? sorted[index]
         : null;
 
     final prevId = sorted != null && index > 0 ? sorted[index - 1].id : null;
-    final nextId = sorted != null &&
-            index >= 0 &&
-            index < sorted.length - 1
+    final nextId = sorted != null && index >= 0 && index < sorted.length - 1
         ? sorted[index + 1].id
         : null;
 
     final pages = sorted;
     final pageController = _pageController;
-    final pagingReady =
-        pages != null && index >= 0 && pageController != null;
+    final pagingReady = pages != null && index >= 0 && pageController != null;
 
     void goPrev() {
       if (pages == null) return;
@@ -307,10 +300,7 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
               ? (value) async {
                   if (value == 'edit') {
                     await context.push(
-                      RoutePaths.groupExpenseEdit(
-                        widget.groupId,
-                        activeId,
-                      ),
+                      RoutePaths.groupExpenseEdit(widget.groupId, activeId),
                     );
                     if (context.mounted) {
                       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -398,10 +388,7 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
             actions: appBarActions,
           ),
           body: ConstrainedContent(
-            child: IgnorePointer(
-              ignoring: _blockInteraction,
-              child: body,
-            ),
+            child: IgnorePointer(ignoring: _blockInteraction, child: body),
           ),
         ),
       ),

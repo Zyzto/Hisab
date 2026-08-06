@@ -2,8 +2,8 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../constants/supabase_config.dart';
-import '../../features/settings/providers/settings_framework_providers.dart';
-import '../../features/settings/settings_definitions.dart';
+import '../settings/providers/settings_framework_providers.dart';
+import '../settings/settings_definitions.dart';
 import 'invite_nav_redirect.dart';
 import 'last_route_restore.dart';
 

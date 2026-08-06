@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 const _channel = MethodChannel('hisab/gallery_thumb');
@@ -25,11 +26,15 @@ Future<Uint8List?> fetchLatestGalleryThumb() async {
       return bytes.isEmpty ? null : bytes;
     }
     return null;
-  } on PlatformException catch (e) {
-    debugPrint('fetchLatestGalleryThumb: ${e.code} ${e.message}');
+  } on PlatformException catch (e, st) {
+    Log.warning(
+      'fetchLatestGalleryThumb: ${e.code} ${e.message}',
+      error: e,
+      stackTrace: st,
+    );
     return null;
-  } catch (e) {
-    debugPrint('fetchLatestGalleryThumb failed: $e');
+  } catch (e, st) {
+    Log.warning('fetchLatestGalleryThumb failed', error: e, stackTrace: st);
     return null;
   }
 }

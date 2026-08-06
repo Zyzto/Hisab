@@ -8,10 +8,7 @@ import 'sheet_helpers.dart';
 
 /// Opens platform-specific "Add to Home Screen" / install instructions.
 Future<void> showPwaInstallGuide(BuildContext context) {
-  final iosGuide = useIosInstallGuide(
-    mode: pwaInstallMode,
-    isIos: isPwaIos,
-  );
+  final iosGuide = useIosInstallGuide(mode: pwaInstallMode, isIos: isPwaIos);
   final title = 'install_app_how_to_title'.tr();
   final isTablet = LayoutBreakpoints.isTabletOrWider(context);
 
@@ -133,9 +130,9 @@ class _InstallStepRow extends StatelessWidget {
                 Expanded(
                   child: Text(
                     text,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      height: 1.35,
-                    ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(height: 1.35),
                   ),
                 ),
               ],

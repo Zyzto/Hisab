@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 
-import '../settings_definitions.dart';
+import 'package:hisab/core/settings/settings_definitions.dart';
 import '../widgets/setting_tile_helper.dart';
 
 /// Returns the list of tiles for the Functional section (expense form toggles).

@@ -346,10 +346,7 @@ int? participantSplitShareCents(Expense expense, String participantId) {
 /// Signed contribution of [participantId]'s share toward a "your share" total.
 /// Expenses add the share, income subtracts it, transfers are 0.
 /// Independent of whether balances are settled.
-int participantShareContributionCents(
-  Expense expense,
-  String participantId,
-) {
+int participantShareContributionCents(Expense expense, String participantId) {
   final share = participantSplitShareCents(expense, participantId);
   if (share == null) return 0;
   switch (expense.transactionType) {
@@ -413,22 +410,14 @@ PairExpenseBreakdown computePairExpenseBreakdown({
       final amount = shares[fromParticipantId] ?? 0;
       if (amount > 0) {
         owedByFromToTo.add(
-          SettlementItem(
-            expenseId: e.id,
-            title: e.title,
-            amountCents: amount,
-          ),
+          SettlementItem(expenseId: e.id, title: e.title, amountCents: amount),
         );
       }
     } else if (payer == fromParticipantId) {
       final amount = shares[toParticipantId] ?? 0;
       if (amount > 0) {
         owedByToToFrom.add(
-          SettlementItem(
-            expenseId: e.id,
-            title: e.title,
-            amountCents: amount,
-          ),
+          SettlementItem(expenseId: e.id, title: e.title, amountCents: amount),
         );
       }
     }

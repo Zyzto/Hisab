@@ -28,29 +28,23 @@ void main() {
       ReceiptScanCapability.effectiveMode(ReceiptScanMode.nano),
       ReceiptScanMode.local,
     );
-    expect(
-      ReceiptScanCapability.scanUiEnabled(ReceiptScanMode.nano),
-      isTrue,
-    );
+    expect(ReceiptScanCapability.scanUiEnabled(ReceiptScanMode.nano), isTrue);
   });
 
   test('off disables scan UI on native', () {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
-    expect(
-      ReceiptScanCapability.scanUiEnabled(ReceiptScanMode.off),
-      isFalse,
-    );
+    expect(ReceiptScanCapability.scanUiEnabled(ReceiptScanMode.off), isFalse);
   });
 
-  test('iOS still enables scan UI when stored mode is nano (coerced to local)', () {
-    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-    expect(
-      ReceiptScanCapability.scanUiEnabled(ReceiptScanMode.nano),
-      isTrue,
-    );
-    expect(
-      ReceiptScanCapability.effectiveMode(ReceiptScanMode.nano),
-      isNot(ReceiptScanMode.nano),
-    );
-  });
+  test(
+    'iOS still enables scan UI when stored mode is nano (coerced to local)',
+    () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      expect(ReceiptScanCapability.scanUiEnabled(ReceiptScanMode.nano), isTrue);
+      expect(
+        ReceiptScanCapability.effectiveMode(ReceiptScanMode.nano),
+        isNot(ReceiptScanMode.nano),
+      );
+    },
+  );
 }

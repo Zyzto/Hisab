@@ -14,7 +14,9 @@ void main() {
     EasyLocalization.logger.enableBuildModes = [];
   });
 
-  testWidgets('no-camera state offers gallery escape and close', (tester) async {
+  testWidgets('no-camera state offers gallery escape and close', (
+    tester,
+  ) async {
     ReceiptCameraResult? popped;
     final controller = ReceiptCameraController.forTest(
       initialStatus: ReceiptCameraStatus.noCamera,

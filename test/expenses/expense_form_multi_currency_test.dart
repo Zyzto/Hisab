@@ -11,7 +11,7 @@ import 'package:hisab/domain/domain.dart';
 import 'package:hisab/features/expenses/pages/expense_form_page.dart';
 import 'package:hisab/features/groups/providers/group_member_provider.dart';
 import 'package:hisab/features/groups/providers/groups_provider.dart';
-import 'package:hisab/features/settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 
 import '../widget_test_helpers.dart';
 
@@ -40,72 +40,93 @@ void main() {
     EasyLocalization.logger.enableBuildModes = [];
   });
 
-  testWidgets('typing in converted amount field does not overwrite it (multi-currency)', (tester) async {
-    final group = Group(
-      id: groupId,
-      name: 'Trip',
-      currencyCode: 'SAR',
-      createdAt: now,
-      updatedAt: now,
-      isPersonal: false,
-    );
-    const expenseId = 'e1';
-    final expense = Expense(
-      id: expenseId,
-      groupId: groupId,
-      payerParticipantId: participant.id,
-      amountCents: 10000,
-      currencyCode: 'USD',
-      exchangeRate: 100 / 375,
-      baseAmountCents: 37500,
-      title: 'Coffee',
-      date: now,
-      splitType: SplitType.equal,
-      splitShares: {participant.id: 10000},
-      createdAt: now,
-      updatedAt: now,
-    );
-    final fakeGroupRepo = FakeGroupRepository(group);
-    final fakeParticipantRepo = FakeParticipantRepository([participant]);
-    final fakeExpenseRepo = FakeExpenseRepositoryWithGetById(expense);
+  testWidgets(
+    'typing in converted amount field does not overwrite it (multi-currency)',
+    (tester) async {
+      final group = Group(
+        id: groupId,
+        name: 'Trip',
+        currencyCode: 'SAR',
+        createdAt: now,
+        updatedAt: now,
+        isPersonal: false,
+      );
+      const expenseId = 'e1';
+      final expense = Expense(
+        id: expenseId,
+        groupId: groupId,
+        payerParticipantId: participant.id,
+        amountCents: 10000,
+        currencyCode: 'USD',
+        exchangeRate: 100 / 375,
+        baseAmountCents: 37500,
+        title: 'Coffee',
+        date: now,
+        splitType: SplitType.equal,
+        splitShares: {participant.id: 10000},
+        createdAt: now,
+        updatedAt: now,
+      );
+      final fakeGroupRepo = FakeGroupRepository(group);
+      final fakeParticipantRepo = FakeParticipantRepository([participant]);
+      final fakeExpenseRepo = FakeExpenseRepositoryWithGetById(expense);
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          effectiveLocalOnlyProvider.overrideWith((ref) => false),
-          groupRepositoryProvider.overrideWithValue(fakeGroupRepo),
-          participantRepositoryProvider.overrideWithValue(fakeParticipantRepo),
-          expenseRepositoryProvider.overrideWithValue(fakeExpenseRepo),
-          futureGroupProvider(groupId).overrideWithValue(AsyncValue.data(group)),
-          participantsByGroupProvider(groupId).overrideWithValue(AsyncValue.data([participant])),
-          activeParticipantsByGroupProvider(groupId).overrideWithValue(AsyncValue.data([participant])),
-          tagsByGroupProvider(groupId).overrideWithValue(const AsyncValue.data(<ExpenseTag>[])),
-          myRoleInGroupProvider(groupId).overrideWithValue(const AsyncValue.data(GroupRole.owner)),
-          myMemberInGroupProvider(groupId).overrideWithValue(AsyncValue.data(member)),
-        ],
-        child: EasyLocalization(
-          path: 'assets/translations',
-          supportedLocales: testSupportedLocales,
-          fallbackLocale: const Locale('en'),
-          startLocale: const Locale('en'),
-          child: const MaterialApp(
-            home: ExpenseFormPage(groupId: groupId, expenseId: expenseId),
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            effectiveLocalOnlyProvider.overrideWith((ref) => false),
+            groupRepositoryProvider.overrideWithValue(fakeGroupRepo),
+            participantRepositoryProvider.overrideWithValue(
+              fakeParticipantRepo,
+            ),
+            expenseRepositoryProvider.overrideWithValue(fakeExpenseRepo),
+            futureGroupProvider(
+              groupId,
+            ).overrideWithValue(AsyncValue.data(group)),
+            participantsByGroupProvider(
+              groupId,
+            ).overrideWithValue(AsyncValue.data([participant])),
+            activeParticipantsByGroupProvider(
+              groupId,
+            ).overrideWithValue(AsyncValue.data([participant])),
+            tagsByGroupProvider(
+              groupId,
+            ).overrideWithValue(const AsyncValue.data(<ExpenseTag>[])),
+            myRoleInGroupProvider(
+              groupId,
+            ).overrideWithValue(const AsyncValue.data(GroupRole.owner)),
+            myMemberInGroupProvider(
+              groupId,
+            ).overrideWithValue(AsyncValue.data(member)),
+          ],
+          child: EasyLocalization(
+            path: 'assets/translations',
+            supportedLocales: testSupportedLocales,
+            fallbackLocale: const Locale('en'),
+            startLocale: const Locale('en'),
+            child: const MaterialApp(
+              home: ExpenseFormPage(groupId: groupId, expenseId: expenseId),
+            ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    final baseAmountFinder = find.byKey(const Key('expense_form_base_amount'));
-    expect(baseAmountFinder, findsOneWidget);
-    await tester.enterText(baseAmountFinder, '376');
-    await tester.pumpAndSettle();
+      final baseAmountFinder = find.byKey(
+        const Key('expense_form_base_amount'),
+      );
+      expect(baseAmountFinder, findsOneWidget);
+      await tester.enterText(baseAmountFinder, '376');
+      await tester.pumpAndSettle();
 
-    final baseAmountField = tester.widget<TextFormField>(baseAmountFinder);
-    expect(baseAmountField.controller?.text, '376');
-  });
+      final baseAmountField = tester.widget<TextFormField>(baseAmountFinder);
+      expect(baseAmountField.controller?.text, '376');
+    },
+  );
 
-  testWidgets('changing amount field updates converted amount (recalc runs)', (tester) async {
+  testWidgets('changing amount field updates converted amount (recalc runs)', (
+    tester,
+  ) async {
     final group = Group(
       id: groupId,
       name: 'Trip',
@@ -141,12 +162,24 @@ void main() {
           groupRepositoryProvider.overrideWithValue(fakeGroupRepo),
           participantRepositoryProvider.overrideWithValue(fakeParticipantRepo),
           expenseRepositoryProvider.overrideWithValue(fakeExpenseRepo),
-          futureGroupProvider(groupId).overrideWithValue(AsyncValue.data(group)),
-          participantsByGroupProvider(groupId).overrideWithValue(AsyncValue.data([participant])),
-          activeParticipantsByGroupProvider(groupId).overrideWithValue(AsyncValue.data([participant])),
-          tagsByGroupProvider(groupId).overrideWithValue(const AsyncValue.data(<ExpenseTag>[])),
-          myRoleInGroupProvider(groupId).overrideWithValue(const AsyncValue.data(GroupRole.owner)),
-          myMemberInGroupProvider(groupId).overrideWithValue(AsyncValue.data(member)),
+          futureGroupProvider(
+            groupId,
+          ).overrideWithValue(AsyncValue.data(group)),
+          participantsByGroupProvider(
+            groupId,
+          ).overrideWithValue(AsyncValue.data([participant])),
+          activeParticipantsByGroupProvider(
+            groupId,
+          ).overrideWithValue(AsyncValue.data([participant])),
+          tagsByGroupProvider(
+            groupId,
+          ).overrideWithValue(const AsyncValue.data(<ExpenseTag>[])),
+          myRoleInGroupProvider(
+            groupId,
+          ).overrideWithValue(const AsyncValue.data(GroupRole.owner)),
+          myMemberInGroupProvider(
+            groupId,
+          ).overrideWithValue(AsyncValue.data(member)),
         ],
         child: EasyLocalization(
           path: 'assets/translations',
@@ -259,8 +292,7 @@ class FakeParticipantRepository implements IParticipantRepository {
   Stream<List<Participant>> watchAll() => Stream.value(participants);
 
   @override
-  Future<List<Participant>> getByGroupId(String groupId) async =>
-      participants;
+  Future<List<Participant>> getByGroupId(String groupId) async => participants;
 
   @override
   Stream<List<Participant>> watchByGroupId(String groupId) =>
@@ -308,12 +340,10 @@ class FakeExpenseRepository implements IExpenseRepository {
   Stream<List<Expense>> watchAll() => Stream.value(const <Expense>[]);
 
   @override
-  Future<List<Expense>> getByGroupId(String groupId) async =>
-      const <Expense>[];
+  Future<List<Expense>> getByGroupId(String groupId) async => const <Expense>[];
 
   @override
-  Stream<List<Expense>> watchByGroupId(String groupId) =>
-      const Stream.empty();
+  Stream<List<Expense>> watchByGroupId(String groupId) => const Stream.empty();
 
   @override
   Future<Expense?> getById(String id) async => null;

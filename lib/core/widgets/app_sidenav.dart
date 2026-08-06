@@ -12,7 +12,7 @@ import '../auth/auth_providers.dart';
 import '../layout/layout_breakpoints.dart';
 import '../navigation/route_paths.dart';
 import '../theme/accent_style.dart';
-import '../../features/settings/providers/settings_framework_providers.dart';
+import '../settings/providers/settings_framework_providers.dart';
 import 'participant_avatar.dart';
 import 'user_text.dart';
 
@@ -70,7 +70,8 @@ class AppSidenav extends ConsumerWidget {
     final profile = ref.watch(authUserProfileProvider).asData?.value;
     final user = ref.watch(currentUserProvider);
     final signedIn = user != null;
-    final displayName = profile?.name ??
+    final displayName =
+        profile?.name ??
         profile?.email ??
         user?.email ??
         (signedIn ? 'account'.tr() : 'sign_in'.tr());
@@ -146,9 +147,7 @@ class AppSidenav extends ConsumerWidget {
               ),
               Padding(
                 padding: EdgeInsetsDirectional.only(
-                  start: asDrawer
-                      ? 16
-                      : LayoutBreakpoints.shellNavWidthCompact,
+                  start: asDrawer ? 16 : LayoutBreakpoints.shellNavWidthCompact,
                   end: 16,
                   top: 4,
                   bottom: 12,

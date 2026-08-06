@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Whether the error is an auth failure (401/403). No retry.
@@ -26,6 +27,8 @@ int? syncErrorStatusCode(Object e) {
     final dynamic d = e;
     if (d.status != null) return d.status as int?;
     if (d.statusCode != null) return d.statusCode as int?;
-  } catch (_) {}
+  } catch (probeError) {
+    Log.debug('syncErrorStatusCode probe failed', error: probeError);
+  }
   return null;
 }

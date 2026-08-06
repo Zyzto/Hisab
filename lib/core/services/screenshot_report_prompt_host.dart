@@ -3,10 +3,11 @@ import 'dart:async';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:feedback/feedback.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/settings/feedback_handler.dart';
-import '../../features/settings/providers/settings_framework_providers.dart';
+import '../settings/providers/settings_framework_providers.dart';
 import '../navigation/app_router.dart';
 import '../platform/screenshot_report_support.dart';
 import '../widgets/toast.dart';
@@ -121,8 +122,11 @@ class _ScreenshotReportPromptHostState
   void _onScreenshot() {
     if (!mounted) return;
     final enabled = ref.read(screenshotReportPromptEnabledProvider);
-    final navContext =
-        ref.read(routerProvider).routerDelegate.navigatorKey.currentContext;
+    final navContext = ref
+        .read(routerProvider)
+        .routerDelegate
+        .navigatorKey
+        .currentContext;
     var feedbackOpen = false;
     if (navContext != null && navContext.mounted) {
       try {
@@ -150,8 +154,11 @@ class _ScreenshotReportPromptHostState
 
   void _showPrompt() {
     if (!mounted) return;
-    final navContext =
-        ref.read(routerProvider).routerDelegate.navigatorKey.currentContext;
+    final navContext = ref
+        .read(routerProvider)
+        .routerDelegate
+        .navigatorKey
+        .currentContext;
     if (navContext == null || !navContext.mounted) return;
 
     var feedbackOpen = false;
@@ -170,10 +177,12 @@ class _ScreenshotReportPromptHostState
         if (!navContext.mounted) return;
         try {
           BetterFeedback.of(navContext).hide();
-          BetterFeedback.of(navContext).show(
-            (feedback) => handleFeedback(navContext, feedback: feedback),
-          );
-        } catch (_) {}
+          BetterFeedback.of(
+            navContext,
+          ).show((feedback) => handleFeedback(navContext, feedback: feedback));
+        } catch (e) {
+          Log.debug('BetterFeedback show after screenshot failed', error: e);
+        }
       },
     );
   }

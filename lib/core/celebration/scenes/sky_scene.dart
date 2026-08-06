@@ -7,7 +7,8 @@ import '../celebration_fx.dart';
 import '../celebration_game.dart';
 
 /// Full-screen sky farewell — clouds + birds across the viewport (person left).
-class SkyScene extends PositionComponent with HasGameReference<CelebrationGame> {
+class SkyScene extends PositionComponent
+    with HasGameReference<CelebrationGame> {
   SkyScene({math.Random? rng}) : _rng = rng ?? math.Random();
 
   final math.Random _rng;
@@ -59,12 +60,7 @@ class SkyScene extends PositionComponent with HasGameReference<CelebrationGame> 
       );
     });
     add(
-      mistOrbs(
-        rng: _rng,
-        tint: const Color(0xFFBBDEFB),
-        area: size,
-        count: 12,
-      ),
+      mistOrbs(rng: _rng, tint: const Color(0xFFBBDEFB), area: size, count: 12),
     );
   }
 
@@ -153,11 +149,7 @@ class _Cloud {
 }
 
 class _Bird {
-  _Bird({
-    required this.offset,
-    required this.speed,
-    required this.flapPhase,
-  });
+  _Bird({required this.offset, required this.speed, required this.flapPhase});
   Vector2 offset;
   final double speed;
   final double flapPhase;

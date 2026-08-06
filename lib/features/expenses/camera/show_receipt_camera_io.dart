@@ -78,9 +78,7 @@ class _ReceiptCameraHostState extends State<_ReceiptCameraHost> {
   void initState() {
     super.initState();
     // Keep Flutter layout portrait; sensor orientation drives chrome + capture.
-    SystemChrome.setPreferredOrientations(const [
-      DeviceOrientation.portraitUp,
-    ]);
+    SystemChrome.setPreferredOrientations(const [DeviceOrientation.portraitUp]);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       // Skip hardware during sheet roll; mount viewer when open settles.
@@ -262,16 +260,12 @@ class _ReceiptCameraHostState extends State<_ReceiptCameraHost> {
                   final progress = _rollProgress();
                   final revealH = panelH * progress;
                   final rolling =
-                      widget.openAnimation.status ==
-                          AnimationStatus.forward ||
+                      widget.openAnimation.status == AnimationStatus.forward ||
                       widget.openAnimation.status == AnimationStatus.reverse;
                   return Align(
                     alignment: Alignment.bottomCenter,
                     child: Transform.translate(
-                      offset: Offset(
-                        0,
-                        _drag.translateY(expanded: _expanded),
-                      ),
+                      offset: Offset(0, _drag.translateY(expanded: _expanded)),
                       child: AnimatedContainer(
                         duration: rolling || _drag.offset != 0
                             ? Duration.zero

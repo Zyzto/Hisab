@@ -15,5 +15,4 @@ Future<void> downloadNanoFeature({void Function()? onCompleted}) async {
 Future<String?> extractReceiptJsonWithNano({
   String? ocrText,
   String? imagePath,
-}) async =>
-    null;
+}) async => null;

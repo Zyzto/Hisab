@@ -128,83 +128,83 @@ void main() {
     expect(find.textContaining('50'), findsAny);
   });
 
-  testWidgets('BalanceList orders balances: most credited first, then most debited first', (
-    tester,
-  ) async {
-    fakeResult = GroupBalanceResult(
-      group: Group(
-        id: groupId,
-        name: 'Ordering Group',
-        currencyCode: 'USD',
-        createdAt: now,
-        updatedAt: now,
-      ),
-      participants: [
-        Participant(
-          id: 'p-1',
-          groupId: groupId,
-          name: 'LargestCreditor',
-          order: 0,
+  testWidgets(
+    'BalanceList orders balances: most credited first, then most debited first',
+    (tester) async {
+      fakeResult = GroupBalanceResult(
+        group: Group(
+          id: groupId,
+          name: 'Ordering Group',
+          currencyCode: 'USD',
           createdAt: now,
           updatedAt: now,
         ),
-        Participant(
-          id: 'p-2',
-          groupId: groupId,
-          name: 'SmallDebtor',
-          order: 1,
-          createdAt: now,
-          updatedAt: now,
-        ),
-        Participant(
-          id: 'p-3',
-          groupId: groupId,
-          name: 'BigDebtor',
-          order: 2,
-          createdAt: now,
-          updatedAt: now,
-        ),
-      ],
-      // Intentionally unsorted input order to verify UI sorting.
-      balances: const [
-        ParticipantBalance(
-          participantId: 'p-3',
-          balanceCents: -3000,
-          currencyCode: 'USD',
-        ),
-        ParticipantBalance(
-          participantId: 'p-1',
-          balanceCents: 7000,
-          currencyCode: 'USD',
-        ),
-        ParticipantBalance(
-          participantId: 'p-2',
-          balanceCents: -500,
-          currencyCode: 'USD',
-        ),
-      ],
-      settlements: const [],
-    );
+        participants: [
+          Participant(
+            id: 'p-1',
+            groupId: groupId,
+            name: 'LargestCreditor',
+            order: 0,
+            createdAt: now,
+            updatedAt: now,
+          ),
+          Participant(
+            id: 'p-2',
+            groupId: groupId,
+            name: 'SmallDebtor',
+            order: 1,
+            createdAt: now,
+            updatedAt: now,
+          ),
+          Participant(
+            id: 'p-3',
+            groupId: groupId,
+            name: 'BigDebtor',
+            order: 2,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        ],
+        // Intentionally unsorted input order to verify UI sorting.
+        balances: const [
+          ParticipantBalance(
+            participantId: 'p-3',
+            balanceCents: -3000,
+            currencyCode: 'USD',
+          ),
+          ParticipantBalance(
+            participantId: 'p-1',
+            balanceCents: 7000,
+            currencyCode: 'USD',
+          ),
+          ParticipantBalance(
+            participantId: 'p-2',
+            balanceCents: -500,
+            currencyCode: 'USD',
+          ),
+        ],
+        settlements: const [],
+      );
 
-    await pumpBalanceList(tester);
-    await tester.pumpAndSettle();
+      await pumpBalanceList(tester);
+      await tester.pumpAndSettle();
 
-    final allTexts = tester.widgetList<Text>(find.byType(Text)).toList();
-    int indexOfExactText(String value) => allTexts.indexWhere(
-      (t) => t.data == value,
-    );
+      final allTexts = tester.widgetList<Text>(find.byType(Text)).toList();
+      int indexOfExactText(String value) =>
+          allTexts.indexWhere((t) => t.data == value);
 
-    final largestCreditorIndex = indexOfExactText('LargestCreditor');
-    final smallDebtorIndex = indexOfExactText('SmallDebtor');
-    final bigDebtorIndex = indexOfExactText('BigDebtor');
+      final largestCreditorIndex = indexOfExactText('LargestCreditor');
+      final smallDebtorIndex = indexOfExactText('SmallDebtor');
+      final bigDebtorIndex = indexOfExactText('BigDebtor');
 
-    expect(largestCreditorIndex, greaterThanOrEqualTo(0));
-    expect(smallDebtorIndex, greaterThanOrEqualTo(0));
-    expect(bigDebtorIndex, greaterThanOrEqualTo(0));
+      expect(largestCreditorIndex, greaterThanOrEqualTo(0));
+      expect(smallDebtorIndex, greaterThanOrEqualTo(0));
+      expect(bigDebtorIndex, greaterThanOrEqualTo(0));
 
-    expect(largestCreditorIndex, lessThan(bigDebtorIndex));
-    expect(bigDebtorIndex, lessThan(smallDebtorIndex));
-  });
+      expect(largestCreditorIndex, lessThan(bigDebtorIndex));
+      expect(bigDebtorIndex, lessThan(smallDebtorIndex));
+    },
+  );
 
   testWidgets('BalanceList hides participants with zero balance', (
     tester,
@@ -330,35 +330,36 @@ void main() {
     expect(find.byIcon(Icons.payments_outlined), findsOneWidget);
   });
 
-  testWidgets('BalanceList shows You Owe hero and excludes self from everyone else', (
-    tester,
-  ) async {
-    final memberAsBob = GroupMember(
-      id: 'm1',
-      groupId: groupId,
-      userId: 'u1',
-      role: 'member',
-      participantId: 'p-b',
-      joinedAt: now,
-    );
-    await pumpBalanceList(
-      tester,
-      myMemberOverride: AsyncValue.data(memberAsBob),
-      myRoleOverride: const AsyncValue.data(GroupRole.member),
-    );
-    await tester.pumpAndSettle();
+  testWidgets(
+    'BalanceList shows You Owe hero and excludes self from everyone else',
+    (tester) async {
+      final memberAsBob = GroupMember(
+        id: 'm1',
+        groupId: groupId,
+        userId: 'u1',
+        role: 'member',
+        participantId: 'p-b',
+        joinedAt: now,
+      );
+      await pumpBalanceList(
+        tester,
+        myMemberOverride: AsyncValue.data(memberAsBob),
+        myRoleOverride: const AsyncValue.data(GroupRole.member),
+      );
+      await tester.pumpAndSettle();
 
-    // EasyLocalization falls back to keys in this widget-test harness.
-    // Hero + settle overlay total chip both use you_owe.
-    expect(find.text('you_owe'), findsWidgets);
-    expect(find.text('everyone_else'), findsOneWidget);
-    expect(find.text('Alice'), findsWidgets);
-    expect(find.text('balance_is_owed'), findsOneWidget);
-    // Bob is implied in "your balance" — not listed under everyone else.
-    expect(find.text('balance_owes'), findsNothing);
-    // Sticky overlay peeks the counterparty (not the current user name).
-    expect(find.text('settle_pay'), findsOneWidget);
-  });
+      // EasyLocalization falls back to keys in this widget-test harness.
+      // Hero + settle overlay total chip both use you_owe.
+      expect(find.text('you_owe'), findsWidgets);
+      expect(find.text('everyone_else'), findsOneWidget);
+      expect(find.text('Alice'), findsWidgets);
+      expect(find.text('balance_is_owed'), findsOneWidget);
+      // Bob is implied in "your balance" — not listed under everyone else.
+      expect(find.text('balance_owes'), findsNothing);
+      // Sticky overlay peeks the counterparty (not the current user name).
+      expect(find.text('settle_pay'), findsOneWidget);
+    },
+  );
 
   testWidgets('BalanceList shows You are owed hero for creditor', (
     tester,
@@ -729,7 +730,9 @@ void main() {
     expect(btn.onPressed, isNull);
   });
 
-  testWidgets('BalanceList disables record when group is archived', (tester) async {
+  testWidgets('BalanceList disables record when group is archived', (
+    tester,
+  ) async {
     fakeResult = GroupBalanceResult(
       group: Group(
         id: groupId,

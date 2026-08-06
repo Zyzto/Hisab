@@ -155,8 +155,7 @@ class _RecordSettlementSheet extends ConsumerWidget {
     final toOwesTotal = toOwesItems.fold<int>(0, (s, i) => s + i.amountCents);
     final pairNet = fromOwesTotal - toOwesTotal;
     final explainsTransfer = fromOwesItems.isNotEmpty || toOwesItems.isNotEmpty;
-    final isOptimized =
-        explainsTransfer && pairNet != settlement.amountCents;
+    final isOptimized = explainsTransfer && pairNet != settlement.amountCents;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -178,10 +177,7 @@ class _RecordSettlementSheet extends ConsumerWidget {
             const SizedBox(height: 12),
           ],
           DecoratedBox(
-            decoration: AccentSurfaces.panel(
-              cs,
-              subtle: context.subtleAccents,
-            ),
+            decoration: AccentSurfaces.panel(cs, subtle: context.subtleAccents),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 16, 12, 16),
               child: Column(
@@ -450,11 +446,7 @@ class _PaymentFlowArrow extends StatelessWidget {
         border: Border.all(color: cs.primary.withValues(alpha: 0.28)),
       ),
       alignment: Alignment.center,
-      child: Icon(
-        Icons.arrow_forward_rounded,
-        color: cs.primary,
-        size: 22,
-      ),
+      child: Icon(Icons.arrow_forward_rounded, color: cs.primary, size: 22),
     );
   }
 }

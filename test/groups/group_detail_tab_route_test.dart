@@ -31,7 +31,10 @@ void main() {
         2,
       );
       expect(
-        groupDetailTabIndexFromPath(path: '/groups/other/balance', groupId: 'g1'),
+        groupDetailTabIndexFromPath(
+          path: '/groups/other/balance',
+          groupId: 'g1',
+        ),
         isNull,
       );
       expect(
@@ -48,9 +51,18 @@ void main() {
 
   group('RoutePaths URL sync helpers', () {
     test('builds invite preview tab paths', () {
-      expect(RoutePaths.invitePreviewExpenses('tok'), '/invite/tok/preview/expenses');
-      expect(RoutePaths.invitePreviewBalance('tok'), '/invite/tok/preview/balance');
-      expect(RoutePaths.invitePreviewPeople('tok'), '/invite/tok/preview/people');
+      expect(
+        RoutePaths.invitePreviewExpenses('tok'),
+        '/invite/tok/preview/expenses',
+      );
+      expect(
+        RoutePaths.invitePreviewBalance('tok'),
+        '/invite/tok/preview/balance',
+      );
+      expect(
+        RoutePaths.invitePreviewPeople('tok'),
+        '/invite/tok/preview/people',
+      );
     });
 
     test('builds onboarding step paths', () {
@@ -69,7 +81,10 @@ void main() {
         RoutePaths.groupCreatePersonalDetails,
         '/groups/create-personal/details',
       );
-      expect(RoutePaths.groupCreatePersonalStyle, '/groups/create-personal/style');
+      expect(
+        RoutePaths.groupCreatePersonalStyle,
+        '/groups/create-personal/style',
+      );
       expect(
         RoutePaths.groupCreatePersonalReview,
         '/groups/create-personal/review',

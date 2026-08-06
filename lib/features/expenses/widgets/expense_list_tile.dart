@@ -100,9 +100,7 @@ class ExpenseListTile extends StatelessWidget {
     final content = Row(
       children: [
         Semantics(
-          label: expense.tag == null || expense.tag!.isEmpty
-              ? 'no_category'.tr()
-              : 'category'.tr(),
+          label: expense.hasBlankTag ? 'no_category'.tr() : 'category'.tr(),
           child: Container(
             width: 44,
             height: 44,
@@ -144,9 +142,7 @@ class ExpenseListTile extends StatelessWidget {
                 const SizedBox(height: 3),
                 UserText(
                   detailLine ??
-                      'paid_by'.tr(
-                        namedArgs: {'name': isolateBidi(payerName)},
-                      ),
+                      'paid_by'.tr(namedArgs: {'name': isolateBidi(payerName)}),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),

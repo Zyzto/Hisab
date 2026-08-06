@@ -5,8 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 
 import '../../../core/layout/constrained_content.dart';
-import '../../settings/providers/settings_framework_providers.dart';
-import '../../settings/settings_definitions.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/settings_definitions.dart';
 import '../services/notification_bridge.dart';
 import 'sender_rules_page.dart';
 
@@ -104,9 +104,7 @@ class _ScannerSetupPageState extends ConsumerState<ScannerSetupPage> {
               final settings = ref.read(hisabSettingsProvidersProvider);
               if (settings != null) {
                 ref
-                    .read(
-                      settings.provider(scannerEnabledSettingDef).notifier,
-                    )
+                    .read(settings.provider(scannerEnabledSettingDef).notifier)
                     .set(true);
                 Log.info(
                   'Setting changed: ${scannerEnabledSettingDef.key}=true',
@@ -121,9 +119,7 @@ class _ScannerSetupPageState extends ConsumerState<ScannerSetupPage> {
         return _StepDone(
           onManageSenders: () {
             Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const SenderRulesPage(),
-              ),
+              MaterialPageRoute<void>(builder: (_) => const SenderRulesPage()),
             );
           },
           onFinish: () => Navigator.pop(context, true),
@@ -163,14 +159,20 @@ class _StepExplain extends StatelessWidget {
         ),
         const SizedBox(height: 24),
         _bulletPoint(context, Icons.lock_outline, 'scanner_setup_privacy'.tr()),
-        _bulletPoint(context, Icons.filter_alt_outlined, 'scanner_setup_filter'.tr()),
-        _bulletPoint(context, Icons.visibility_outlined, 'scanner_setup_review'.tr()),
+        _bulletPoint(
+          context,
+          Icons.filter_alt_outlined,
+          'scanner_setup_filter'.tr(),
+        ),
+        _bulletPoint(
+          context,
+          Icons.visibility_outlined,
+          'scanner_setup_review'.tr(),
+        ),
         const Spacer(),
         FilledButton(
           onPressed: onNext,
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(48),
-          ),
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
           child: Text('scanner_setup_continue'.tr()),
         ),
       ],
@@ -186,9 +188,7 @@ class _StepExplain extends StatelessWidget {
         children: [
           Icon(icon, size: 20, color: theme.colorScheme.primary),
           const SizedBox(width: 12),
-          Expanded(
-            child: Text(text, style: theme.textTheme.bodyMedium),
-          ),
+          Expanded(child: Text(text, style: theme.textTheme.bodyMedium)),
         ],
       ),
     );
@@ -220,8 +220,7 @@ class _StepPermission extends StatelessWidget {
         Icon(
           listenerEnabled ? Icons.check_circle : Icons.notifications_outlined,
           size: 48,
-          color:
-              listenerEnabled ? Colors.green : theme.colorScheme.primary,
+          color: listenerEnabled ? Colors.green : theme.colorScheme.primary,
         ),
         const SizedBox(height: 16),
         Text(
@@ -282,9 +281,7 @@ class _StepPermission extends StatelessWidget {
         const Spacer(),
         FilledButton(
           onPressed: listenerEnabled ? onNext : null,
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(48),
-          ),
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
           child: Text('scanner_setup_continue'.tr()),
         ),
       ],
@@ -296,10 +293,7 @@ class _StepDone extends StatelessWidget {
   final VoidCallback onManageSenders;
   final VoidCallback onFinish;
 
-  const _StepDone({
-    required this.onManageSenders,
-    required this.onFinish,
-  });
+  const _StepDone({required this.onManageSenders, required this.onFinish});
 
   @override
   Widget build(BuildContext context) {
@@ -317,10 +311,7 @@ class _StepDone extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        Text(
-          'scanner_setup_done_body'.tr(),
-          style: theme.textTheme.bodyLarge,
-        ),
+        Text('scanner_setup_done_body'.tr(), style: theme.textTheme.bodyLarge),
         const SizedBox(height: 24),
         OutlinedButton.icon(
           onPressed: onManageSenders,
@@ -333,9 +324,7 @@ class _StepDone extends StatelessWidget {
         const Spacer(),
         FilledButton(
           onPressed: onFinish,
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(48),
-          ),
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
           child: Text('scanner_setup_finish'.tr()),
         ),
       ],

@@ -8,11 +8,7 @@ import '../platform/ui_perf.dart';
 /// On iOS web (`UiPerf.preferFadeOnlyPageTransitions`), skips motion entirely
 /// (identity) — Opacity + slide is expensive on that surface.
 class WizardStepEnter extends StatefulWidget {
-  const WizardStepEnter({
-    super.key,
-    required this.child,
-    this.slidePx = 20,
-  });
+  const WizardStepEnter({super.key, required this.child, this.slidePx = 20});
 
   final Widget child;
   final double slidePx;

@@ -24,9 +24,7 @@ void main() {
         '/groups/create/style',
       );
       expect(
-        appRoutePathFromBrowserUri(
-          Uri.parse('https://hisab.app/#/settings'),
-        ),
+        appRoutePathFromBrowserUri(Uri.parse('https://hisab.app/#/settings')),
         '/settings',
       );
       expect(
@@ -59,10 +57,7 @@ void main() {
         ),
         '/groups/g1/balance',
       );
-      expect(
-        appRoutePathFromBrowserUri(Uri.parse('https://hisab.app/')),
-        '/',
-      );
+      expect(appRoutePathFromBrowserUri(Uri.parse('https://hisab.app/')), '/');
     });
 
     test('ignores OAuth-style fragment without leading slash', () {

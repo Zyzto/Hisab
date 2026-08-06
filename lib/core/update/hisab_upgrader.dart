@@ -1,3 +1,4 @@
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:upgrader/upgrader.dart';
 import 'package:version/version.dart';
 
@@ -45,8 +46,8 @@ class HisabUpgrader extends Upgrader {
         updateState(state.copyWithNull(versionInfo: true));
         return null;
       }
-    } catch (_) {
-      // Keep versionInfo on parse error; let package logic decide.
+    } catch (e) {
+      Log.debug('Version parse failed in HisabUpgrader', error: e);
     }
     return versionInfo;
   }

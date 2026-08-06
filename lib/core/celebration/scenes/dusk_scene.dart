@@ -7,7 +7,8 @@ import '../celebration_fx.dart';
 import '../celebration_game.dart';
 
 /// Full-screen quiet dusk sky + moon (personal list).
-class DuskScene extends PositionComponent with HasGameReference<CelebrationGame> {
+class DuskScene extends PositionComponent
+    with HasGameReference<CelebrationGame> {
   DuskScene({math.Random? rng}) : _rng = rng ?? math.Random();
 
   final math.Random _rng;
@@ -53,12 +54,7 @@ class DuskScene extends PositionComponent with HasGameReference<CelebrationGame>
         ..anchor = Anchor.center,
     );
     add(
-      mistOrbs(
-        rng: _rng,
-        tint: const Color(0xFF9FA8DA),
-        area: size,
-        count: 12,
-      ),
+      mistOrbs(rng: _rng, tint: const Color(0xFF9FA8DA), area: size, count: 12),
     );
     add(
       burstCircles(
@@ -100,8 +96,7 @@ class DuskScene extends PositionComponent with HasGameReference<CelebrationGame>
     );
 
     for (final s in _stars) {
-      final tw =
-          0.3 + 0.7 * (0.5 + 0.5 * math.sin(game.elapsed * 5 + s.phase));
+      final tw = 0.3 + 0.7 * (0.5 + 0.5 * math.sin(game.elapsed * 5 + s.phase));
       canvas.drawCircle(
         Offset(s.offset.x, s.offset.y),
         s.size * intro,
@@ -121,9 +116,7 @@ class DuskScene extends PositionComponent with HasGameReference<CelebrationGame>
             const Color(0xFFFFAB40).withValues(alpha: 0.0),
             const Color(0xFFFF8A65).withValues(alpha: 0.18 * a * intro),
           ],
-        ).createShader(
-          Rect.fromLTWH(0, size.y * 0.72, size.x, size.y * 0.28),
-        ),
+        ).createShader(Rect.fromLTWH(0, size.y * 0.72, size.x, size.y * 0.28)),
     );
 
     // Slow cloud

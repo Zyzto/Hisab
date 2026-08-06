@@ -73,8 +73,9 @@ class FloatingNavBar extends ConsumerWidget {
             ],
           );
 
-    final tabAnimDuration =
-        UiPerf.preferInstantShellTabs ? Duration.zero : AppMotion.shellTab;
+    final tabAnimDuration = UiPerf.preferInstantShellTabs
+        ? Duration.zero
+        : AppMotion.shellTab;
 
     return SafeArea(
       child: Container(

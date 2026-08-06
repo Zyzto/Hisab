@@ -27,8 +27,8 @@ import '../../../domain/domain.dart';
 import '../providers/group_invite_provider.dart';
 import '../providers/invite_preview_provider.dart';
 import '../providers/groups_provider.dart';
-import '../../settings/providers/settings_framework_providers.dart';
-import '../../settings/settings_definitions.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/settings_definitions.dart';
 
 /// Shown when a post-frame [GoRouter.go] did not leave the page (web/router edge cases).
 Widget _inviteStalledNavigationBody(
@@ -135,7 +135,9 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
       if (d.message is String) message = d.message as String;
       if (d.details is String) details = d.details as String;
       if (d.hint is String) hint = d.hint as String;
-    } catch (_) {}
+    } catch (e) {
+      Log.debug('Invite error field probe failed', error: e);
+    }
 
     if (statusCode == 401 || statusCode == 403) {
       return _InviteAcceptErrorKind.unauthenticated;
@@ -172,7 +174,9 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
       if (d.message is String && (d.message as String).trim().isNotEmpty) {
         return d.message as String;
       }
-    } catch (_) {}
+    } catch (e) {
+      Log.debug('Invite error message probe failed', error: e);
+    }
     return error.toString();
   }
 

@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart' show WidgetRef;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart' show ShareParams, SharePlus;
@@ -13,7 +14,7 @@ import '../services/connectivity_service.dart';
 import '../telemetry/telemetry_service.dart';
 import '../../features/settings/feedback_clipboard.dart';
 import '../../features/settings/feedback_upload.dart';
-import '../../features/settings/providers/settings_framework_providers.dart';
+import '../settings/providers/settings_framework_providers.dart';
 
 const int _maxMessageForShare = 2000;
 const int _maxMessageForTelemetry = 200;
@@ -80,7 +81,9 @@ Future<({String plainText, String githubBody})> buildErrorReportPayload({
   try {
     final info = await PackageInfo.fromPlatform();
     version = '${info.version}+${info.buildNumber}';
-  } catch (_) {}
+  } catch (e) {
+    Log.debug('PackageInfo lookup failed', error: e);
+  }
 
   final sanitizedMessage = _sanitizeForReport(message, _maxMessageForShare);
   final sanitizedSummaryEn = summaryEnglish != null && summaryEnglish.isNotEmpty
@@ -140,7 +143,8 @@ Future<({String plainText, String githubBody})> buildErrorReportPayload({
   }
 
   final githubBody = buffer.toString();
-  final plainText = 'Hisab error report (English template)\n'
+  final plainText =
+      'Hisab error report (English template)\n'
       'Version: $version | Platform: ${_platformLabelEnglish()} | '
       'UI locale: ${uiLocaleTag ?? 'unknown'}\n'
       '${sanitizedSummaryEn != null ? 'Summary (en): $sanitizedSummaryEn\n' : ''}'
@@ -165,6 +169,7 @@ Future<void> shareErrorReport(
   String? details,
   StackTrace? stackTrace,
   String? summaryEnglish,
+
   /// When null, derived from [context] (prefer passing from the caller surface).
   String? uiLocaleTag,
 }) async {
@@ -178,7 +183,9 @@ Future<void> shareErrorReport(
   if (!context.mounted) return;
   try {
     await SharePlus.instance.share(ShareParams(text: payload.plainText));
-  } catch (_) {}
+  } catch (e) {
+    Log.debug('Share error report failed', error: e);
+  }
 }
 
 /// Opens GitHub issue with prefilled title and body, or copies body to clipboard if [reportIssueUrl] is empty.
@@ -189,6 +196,7 @@ Future<void> openErrorReportGitHubIssue(
   String? details,
   StackTrace? stackTrace,
   String? summaryEnglish,
+
   /// When null, derived from [context] (prefer passing from the caller surface).
   String? uiLocaleTag,
   VoidCallback? onCopied,
@@ -278,8 +286,8 @@ Future<bool> submitUserBugReport(
   }
   try {
     await setFeedbackClipboard(payload.githubBody, screenshotPng);
-  } catch (_) {
-    // Ignore clipboard failure; caller may still show a toast.
+  } catch (e) {
+    Log.debug('Clipboard write for error report failed', error: e);
   }
   return copiedAsPrimary;
 }

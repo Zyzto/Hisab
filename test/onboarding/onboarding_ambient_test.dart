@@ -6,9 +6,7 @@ void main() {
   testWidgets('OnboardingBreathing builds child', (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
-        home: Scaffold(
-          body: OnboardingBreathing(child: Text('logo')),
-        ),
+        home: Scaffold(body: OnboardingBreathing(child: Text('logo'))),
       ),
     );
     expect(find.text('logo'), findsOneWidget);

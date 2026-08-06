@@ -10,7 +10,7 @@ import '../../../core/navigation/route_paths.dart';
 import '../../../core/platform/ui_perf.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/theme/theme_config.dart';
-import '../../settings/settings_definitions.dart';
+import 'package:hisab/core/settings/settings_definitions.dart';
 import 'onboarding_shared.dart';
 
 class OnboardingConnectPage extends ConsumerWidget {
@@ -59,9 +59,7 @@ class OnboardingConnectPage extends ConsumerWidget {
                   ref
                       .read(settings.provider(localOnlySettingDef).notifier)
                       .set(true);
-                  Log.info(
-                    'Setting changed: ${localOnlySettingDef.key}=true',
-                  );
+                  Log.info('Setting changed: ${localOnlySettingDef.key}=true');
                 },
               ),
               _ModeTile(
@@ -74,9 +72,7 @@ class OnboardingConnectPage extends ConsumerWidget {
                   ref
                       .read(settings.provider(localOnlySettingDef).notifier)
                       .set(false);
-                  Log.info(
-                    'Setting changed: ${localOnlySettingDef.key}=false',
-                  );
+                  Log.info('Setting changed: ${localOnlySettingDef.key}=false');
                 },
               ),
               _OnlineDetailsReveal(
@@ -193,8 +189,7 @@ class _ModeDescSwitcher extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fadeOnly = UiPerf.preferFadeOnlyPageTransitions;
-    final anim =
-        UiPerf.preferInstantShellTabs ? Duration.zero : AppMotion.page;
+    final anim = UiPerf.preferInstantShellTabs ? Duration.zero : AppMotion.page;
     return AnimatedSize(
       duration: anim,
       curve: AppMotion.enterCurve,
@@ -206,10 +201,7 @@ class _ModeDescSwitcher extends StatelessWidget {
         layoutBuilder: (currentChild, previousChildren) {
           return Stack(
             alignment: AlignmentDirectional.topStart,
-            children: <Widget>[
-              ...previousChildren,
-              ?currentChild,
-            ],
+            children: <Widget>[...previousChildren, ?currentChild],
           );
         },
         transitionBuilder: (child, animation) {
@@ -236,10 +228,7 @@ class _ModeDescSwitcher extends StatelessWidget {
 
 /// Expands/collapses the online sign-in + disclaimer block.
 class _OnlineDetailsReveal extends StatelessWidget {
-  const _OnlineDetailsReveal({
-    required this.visible,
-    required this.child,
-  });
+  const _OnlineDetailsReveal({required this.visible, required this.child});
 
   final bool visible;
   final Widget child;
@@ -247,8 +236,7 @@ class _OnlineDetailsReveal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fadeOnly = UiPerf.preferFadeOnlyPageTransitions;
-    final anim =
-        UiPerf.preferInstantShellTabs ? Duration.zero : AppMotion.page;
+    final anim = UiPerf.preferInstantShellTabs ? Duration.zero : AppMotion.page;
     return AnimatedSize(
       duration: anim,
       curve: AppMotion.enterCurve,
@@ -316,8 +304,9 @@ class _ModeTile extends StatelessWidget {
         : colorScheme.onSurfaceVariant;
 
     final anim = UiPerf.preferInstantShellTabs ? Duration.zero : AppMotion.page;
-    final checkAnim =
-        UiPerf.preferInstantShellTabs ? Duration.zero : AppMotion.shellTab;
+    final checkAnim = UiPerf.preferInstantShellTabs
+        ? Duration.zero
+        : AppMotion.shellTab;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: ThemeConfig.spacingS),
@@ -327,10 +316,7 @@ class _ModeTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: fill,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: border,
-            width: selected ? 1.75 : 1,
-          ),
+          border: Border.all(color: border, width: selected ? 1.75 : 1),
         ),
         child: Material(
           color: Colors.transparent,
@@ -446,14 +432,15 @@ class _InfoPanel extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: (bodySmall
-                      ? Theme.of(context).textTheme.bodySmall
-                      : Theme.of(context).textTheme.bodyMedium)
-                  ?.copyWith(
-                    color: textColor,
-                    fontWeight: bodySmall ? null : FontWeight.w500,
-                    height: 1.45,
-                  ),
+              style:
+                  (bodySmall
+                          ? Theme.of(context).textTheme.bodySmall
+                          : Theme.of(context).textTheme.bodyMedium)
+                      ?.copyWith(
+                        color: textColor,
+                        fontWeight: bodySmall ? null : FontWeight.w500,
+                        height: 1.45,
+                      ),
             ),
           ),
         ],

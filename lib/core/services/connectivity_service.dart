@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/legacy.dart' show StateProvider;
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../features/settings/providers/settings_framework_providers.dart';
+import '../settings/providers/settings_framework_providers.dart';
 
 part 'connectivity_service.g.dart';
 

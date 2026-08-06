@@ -26,9 +26,7 @@ class NavigationTrace {
           '_No navigation recorded yet in this session._\n\n';
     }
     final buf = StringBuffer();
-    buf.writeln(
-      '**Recent screens (route changes, oldest first):**',
-    );
+    buf.writeln('**Recent screens (route changes, oldest first):**');
     buf.writeln(
       '_Each line is UTC time and app path (query string included if present)._',
     );

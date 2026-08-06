@@ -18,12 +18,11 @@ class ScannerHubPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isEnabled = ref.watch(scannerEnabledProvider);
-    final pendingCount = ref.watch(pendingDraftCountProvider).asData?.value ?? 0;
+    final pendingCount =
+        ref.watch(pendingDraftCountProvider).asData?.value ?? 0;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('scanner_hub_title'.tr()),
-      ),
+      appBar: AppBar(title: Text('scanner_hub_title'.tr())),
       body: ConstrainedContent(
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -46,8 +45,9 @@ class ScannerHubPage extends ConsumerWidget {
                 iconColor: Colors.green,
                 title: 'scanner_active_title'.tr(),
                 subtitle: pendingCount > 0
-                    ? 'scanner_pending_count'
-                        .tr(args: [pendingCount.toString()])
+                    ? 'scanner_pending_count'.tr(
+                        args: [pendingCount.toString()],
+                      )
                     : 'scanner_no_pending'.tr(),
                 action: pendingCount > 0
                     ? FilledButton.icon(
@@ -93,18 +93,14 @@ class ScannerHubPage extends ConsumerWidget {
   }
 
   void _openSetup(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute<bool>(
-        builder: (_) => const ScannerSetupPage(),
-      ),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<bool>(builder: (_) => const ScannerSetupPage()));
   }
 
   void _openReview(BuildContext context) {
     Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const DraftTransactionsPage(),
-      ),
+      MaterialPageRoute<void>(builder: (_) => const DraftTransactionsPage()),
     );
   }
 }
@@ -163,10 +159,7 @@ class _StatusCard extends StatelessWidget {
                 ),
               ],
             ),
-            if (action != null) ...[
-              const SizedBox(height: 16),
-              action!,
-            ],
+            if (action != null) ...[const SizedBox(height: 16), action!],
           ],
         ),
       ),
@@ -220,10 +213,7 @@ class _NavTile extends StatelessWidget {
               ),
             ),
           const SizedBox(width: 4),
-          Icon(
-            Icons.chevron_right,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
+          Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
         ],
       ),
       onTap: onTap,

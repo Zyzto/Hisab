@@ -9,8 +9,8 @@ import '../../../core/theme/flex_theme_builder.dart'
     show flexSchemeOptionIds, primaryColorForSchemeId;
 import '../../../core/utils/currency_helpers.dart';
 import '../../../core/widgets/sheet_helpers.dart';
-import '../../settings/providers/settings_framework_providers.dart';
-import '../../settings/settings_definitions.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/settings_definitions.dart';
 import 'onboarding_shared.dart';
 
 /// Predefined theme schemes only (no custom) for simpler onboarding.
@@ -256,9 +256,7 @@ List<Widget> _buildPreferencesTiles(
                       decoration: BoxDecoration(
                         color: chipColor != Colors.transparent
                             ? chipColor
-                            : Theme.of(ctx)
-                                .colorScheme
-                                .surfaceContainerHighest,
+                            : Theme.of(ctx).colorScheme.surfaceContainerHighest,
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: Theme.of(ctx).colorScheme.outline,
@@ -294,9 +292,7 @@ List<Widget> _buildPreferencesTiles(
       trailing: Switch(
         value: subtleAccents,
         onChanged: (v) {
-          ref
-              .read(settings.provider(subtleAccentsSettingDef).notifier)
-              .set(v);
+          ref.read(settings.provider(subtleAccentsSettingDef).notifier).set(v);
           Log.info('Setting changed: ${subtleAccentsSettingDef.key}=$v');
         },
       ),

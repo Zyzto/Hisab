@@ -30,7 +30,9 @@ class CelebrationDedupe {
     await _ensureLoaded();
     // Another isolate/session may have persisted it; memory already has key.
     final prefs = await SharedPreferences.getInstance();
-    final stored = List<String>.from(prefs.getStringList(_prefsKey) ?? const []);
+    final stored = List<String>.from(
+      prefs.getStringList(_prefsKey) ?? const [],
+    );
     if (stored.contains(key)) {
       return false;
     }
@@ -46,7 +48,9 @@ class CelebrationDedupe {
   Future<void> seed(Iterable<String> keys) async {
     await _ensureLoaded();
     final prefs = await SharedPreferences.getInstance();
-    final stored = List<String>.from(prefs.getStringList(_prefsKey) ?? const []);
+    final stored = List<String>.from(
+      prefs.getStringList(_prefsKey) ?? const [],
+    );
     var changed = false;
     for (final key in keys) {
       if (_memory.add(key)) {

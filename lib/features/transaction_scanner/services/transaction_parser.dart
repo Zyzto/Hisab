@@ -68,19 +68,26 @@ class TransactionParser {
   ];
 
   static final _cardPatterns = <RegExp>[
-    RegExp(r'(?:card|ending)\s*(?:in\s+|ending\s+|\*+)?\s*(\d{4})', caseSensitive: false),
+    RegExp(
+      r'(?:card|ending)\s*(?:in\s+|ending\s+|\*+)?\s*(\d{4})',
+      caseSensitive: false,
+    ),
     RegExp(r'\*{1,}(\d{4})'),
     RegExp(r'x{1,4}(\d{4})', caseSensitive: false),
     RegExp(r'(?:ending|ends|last)\s+(\d{4})', caseSensitive: false),
   ];
 
   static final _merchantPatterns = <RegExp>[
-    RegExp(r'(?:at|from|to)\s+([A-Za-z][A-Za-z\s&'
-        r"'\-.]{1,40}?)(?:\s+on\s|\s*[,.]|\s*$)",
-        caseSensitive: false),
-    RegExp(r'(?:paid|purchase|payment|spent|debit)\s+(?:at|to|for)\s+([A-Za-z][A-Za-z\s&'
-        r"'\-.]{1,40})",
-        caseSensitive: false),
+    RegExp(
+      r'(?:at|from|to)\s+([A-Za-z][A-Za-z\s&'
+      r"'\-.]{1,40}?)(?:\s+on\s|\s*[,.]|\s*$)",
+      caseSensitive: false,
+    ),
+    RegExp(
+      r'(?:paid|purchase|payment|spent|debit)\s+(?:at|to|for)\s+([A-Za-z][A-Za-z\s&'
+      r"'\-.]{1,40})",
+      caseSensitive: false,
+    ),
   ];
 
   static final _refundKeywords = RegExp(
@@ -138,10 +145,9 @@ class TransactionParser {
 
       String? merchant;
       if (pattern.merchantRegex != null) {
-        merchant = RegExp(pattern.merchantRegex!)
-            .firstMatch(body)
-            ?.group(1)
-            ?.trim();
+        merchant = RegExp(
+          pattern.merchantRegex!,
+        ).firstMatch(body)?.group(1)?.trim();
       }
 
       DateTime? date;
@@ -190,8 +196,9 @@ class TransactionParser {
     if (merchant != null) conf += 0.15;
     if (card != null) conf += 0.15;
 
-    final effectiveAmount =
-        (amountCents != null && isRefund) ? -amountCents : amountCents;
+    final effectiveAmount = (amountCents != null && isRefund)
+        ? -amountCents
+        : amountCents;
 
     return ParseResult(
       amountCents: effectiveAmount,
@@ -249,9 +256,18 @@ class TransactionParser {
   }
 
   static const _arabicDigits = <String, String>{
-    '\u0660': '0', '\u0661': '1', '\u0662': '2', '\u0663': '3', '\u0664': '4',
-    '\u0665': '5', '\u0666': '6', '\u0667': '7', '\u0668': '8', '\u0669': '9',
-    '\u066B': '.', '\u066C': ',',
+    '\u0660': '0',
+    '\u0661': '1',
+    '\u0662': '2',
+    '\u0663': '3',
+    '\u0664': '4',
+    '\u0665': '5',
+    '\u0666': '6',
+    '\u0667': '7',
+    '\u0668': '8',
+    '\u0669': '9',
+    '\u066B': '.',
+    '\u066C': ',',
   };
 
   static int? _parseAmountToCents(String raw) {

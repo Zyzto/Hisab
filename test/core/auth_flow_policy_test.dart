@@ -50,8 +50,14 @@ void main() {
     });
 
     test('onboarding/settings matrix: pending results set online_pending', () {
-      expect(signInResultSetsOnlinePending(SignInResult.pendingEmailLink), isTrue);
-      expect(signInResultSetsOnlinePending(SignInResult.pendingRedirect), isTrue);
+      expect(
+        signInResultSetsOnlinePending(SignInResult.pendingEmailLink),
+        isTrue,
+      );
+      expect(
+        signInResultSetsOnlinePending(SignInResult.pendingRedirect),
+        isTrue,
+      );
       expect(signInResultSetsOnlinePending(SignInResult.success), isFalse);
       expect(signInResultSetsOnlinePending(SignInResult.cancelled), isFalse);
     });

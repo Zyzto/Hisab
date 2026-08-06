@@ -79,8 +79,7 @@ class _MembershipCelebrationBinderState
         CelebrationDedupe.instance.seed([
           for (final id in active)
             CelebrationKeys.personJoined(widget.groupId, id),
-          for (final id in left)
-            CelebrationKeys.personLeft(widget.groupId, id),
+          for (final id in left) CelebrationKeys.personLeft(widget.groupId, id),
         ]),
       );
       return;
@@ -105,11 +104,7 @@ class _MembershipCelebrationBinderState
           (myUserId == null || joinedUserId != myUserId);
       if (isOtherMemberJoin && _isRecent(person?.createdAt)) {
         unawaited(
-          fireCelebration(
-            ref,
-            CelebrationKind.personJoined,
-            dedupeKey: key,
-          ),
+          fireCelebration(ref, CelebrationKind.personJoined, dedupeKey: key),
         );
       } else {
         // Manual add, self-join, or late sync — mark seen, do not celebrate.
@@ -121,11 +116,7 @@ class _MembershipCelebrationBinderState
       final leftAt = byId[id]?.leftAt;
       if (_isRecent(leftAt)) {
         unawaited(
-          fireCelebration(
-            ref,
-            CelebrationKind.personLeft,
-            dedupeKey: key,
-          ),
+          fireCelebration(ref, CelebrationKind.personLeft, dedupeKey: key),
         );
       } else {
         unawaited(CelebrationDedupe.instance.seed([key]));

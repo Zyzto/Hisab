@@ -41,6 +41,28 @@ void main() {
       );
       expect(expense.effectiveBaseAmountCents, 2500);
     });
+
+    test('hasBlankTag / isBlankTag treat null and empty as blank', () {
+      expect(Expense.isBlankTag(null), isTrue);
+      expect(Expense.isBlankTag(''), isTrue);
+      expect(Expense.isBlankTag('Food'), isFalse);
+
+      Expense blank() => Expense(
+        id: 'e1',
+        groupId: 'g1',
+        payerParticipantId: 'p1',
+        amountCents: 100,
+        currencyCode: 'USD',
+        title: 't',
+        date: DateTime(2025, 1, 1),
+        splitType: SplitType.equal,
+        splitShares: const {},
+        createdAt: DateTime(2025, 1, 1),
+        updatedAt: DateTime(2025, 1, 1),
+      );
+      expect(blank().hasBlankTag, isTrue);
+      expect(blank().copyWith(tag: 'Food').hasBlankTag, isFalse);
+    });
   });
 
   group('ParticipantBalance', () {

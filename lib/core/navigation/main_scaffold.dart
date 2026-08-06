@@ -11,8 +11,8 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import '../../features/home/pages/home_page.dart';
 import '../../features/home/routes.dart';
 import '../../features/settings/pages/settings_page.dart';
-import '../../features/settings/providers/settings_framework_providers.dart';
-import '../../features/settings/settings_definitions.dart';
+import '../settings/providers/settings_framework_providers.dart';
+import '../settings/settings_definitions.dart';
 import '../layout/layout_breakpoints.dart';
 import '../motion/app_motion.dart';
 import '../platform/ui_perf.dart';
@@ -44,6 +44,7 @@ class MainScaffold extends ConsumerStatefulWidget {
 class _MainScaffoldState extends ConsumerState<MainScaffold> {
   int _currentIndex = 0;
   final _homePage = const HomePage();
+
   /// Lazily created on first visit so Home does not pay Settings build cost.
   Widget? _settingsPage;
   DateTime? _lastBackPressAt;
@@ -170,10 +171,11 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
   @override
   void didUpdateWidget(MainScaffold oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final wasMain = _isHomePath(oldWidget.location) ||
+    final wasMain =
+        _isHomePath(oldWidget.location) ||
         oldWidget.location == RoutePaths.settings;
-    final isMain = _isHomePath(widget.location) ||
-        widget.location == RoutePaths.settings;
+    final isMain =
+        _isHomePath(widget.location) || widget.location == RoutePaths.settings;
     if (!wasMain && isMain) {
       _snapTabIndex = true;
     }
@@ -205,7 +207,9 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
       _ => current,
     };
     if (normalized == fromPath) return;
-    ref.read(settings.provider(homeListDisplaySettingDef).notifier).set(fromPath);
+    ref
+        .read(settings.provider(homeListDisplaySettingDef).notifier)
+        .set(fromPath);
     Log.info(
       'Setting changed: ${homeListDisplaySettingDef.key}=$fromPath (from route)',
     );
@@ -277,10 +281,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     }
   }
 
-  void _syncReservedWidth({
-    required bool showNavBar,
-    required bool isDesktop,
-  }) {
+  void _syncReservedWidth({required bool showNavBar, required bool isDesktop}) {
     final next = (showNavBar && isDesktop)
         ? (_desktopNavCollapsed
               ? LayoutBreakpoints.shellNavWidthCompact
@@ -300,12 +301,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     return Stack(
       children: [
         _buildMainContent(),
-        const Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: ConnectionBanner(),
-        ),
+        const Positioned(top: 0, left: 0, right: 0, child: ConnectionBanner()),
         if (showNavBar && _currentIndex == 0)
           Positioned(
             left: 16,
@@ -372,9 +368,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
                     _menuButtonFocusNode.requestFocus();
                   }
                 },
-                drawer: isMid
-                    ? _buildShellDrawer(asTemporary: true)
-                    : null,
+                drawer: isMid ? _buildShellDrawer(asTemporary: true) : null,
                 body: _buildContentStack(showNavBar: showNavBar),
               ),
             ),
@@ -458,8 +452,8 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
   }
 
   Widget _buildMainContent() {
-    final isMainPage = _isHomePath(widget.location) ||
-        widget.location == RoutePaths.settings;
+    final isMainPage =
+        _isHomePath(widget.location) || widget.location == RoutePaths.settings;
 
     final snap = _snapTabIndex;
     if (snap) {
@@ -480,19 +474,13 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
       index: _currentIndex,
       visible: isMainPage,
       snap: snap || UiPerf.preferInstantShellTabs,
-      children: [
-        _homePage,
-        _settingsPage ?? const SizedBox.shrink(),
-      ],
+      children: [_homePage, _settingsPage ?? const SizedBox.shrink()],
     );
 
     return Stack(
       fit: StackFit.expand,
       children: [
-        Offstage(
-          offstage: !isMainPage,
-          child: tabStack,
-        ),
+        Offstage(offstage: !isMainPage, child: tabStack),
         if (!isMainPage) widget.child,
       ],
     );
@@ -530,10 +518,8 @@ class _ShellTabCrossfadeState extends State<_ShellTabCrossfade>
   void initState() {
     super.initState();
     _shownIndex = widget.index;
-    _controller = AnimationController(
-      vsync: this,
-      duration: AppMotion.shellTab,
-    )..addStatusListener((status) {
+    _controller = AnimationController(vsync: this, duration: AppMotion.shellTab)
+      ..addStatusListener((status) {
         if (status == AnimationStatus.completed && mounted) {
           setState(() {
             _fromIndex = null;
@@ -605,10 +591,7 @@ class _ShellTabCrossfadeState extends State<_ShellTabCrossfade>
         offstage: !show,
         child: TickerMode(
           enabled: show,
-          child: Opacity(
-            opacity: opacity,
-            child: widget.children[i],
-          ),
+          child: Opacity(opacity: opacity, child: widget.children[i]),
         ),
       ),
     );

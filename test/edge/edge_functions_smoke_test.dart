@@ -34,9 +34,9 @@ bool get _configured =>
     _serviceRoleKey.isNotEmpty;
 
 Uri _fn(String name, [Map<String, String>? query]) {
-  return Uri.parse('$_supabaseUrl/functions/v1/$name').replace(
-    queryParameters: query,
-  );
+  return Uri.parse(
+    '$_supabaseUrl/functions/v1/$name',
+  ).replace(queryParameters: query);
 }
 
 Future<HttpClientResponse> _send(
@@ -60,10 +60,12 @@ Future<HttpClientResponse> _send(
 }
 
 Future<String> _readBody(HttpClientResponse response) async {
-  return utf8.decode(await response.fold<List<int>>(
-    <int>[],
-    (prev, chunk) => prev..addAll(chunk),
-  ));
+  return utf8.decode(
+    await response.fold<List<int>>(
+      <int>[],
+      (prev, chunk) => prev..addAll(chunk),
+    ),
+  );
 }
 
 Future<String?> _signInAccessToken(
@@ -75,10 +77,7 @@ Future<String?> _signInAccessToken(
     client,
     method: 'POST',
     uri: uri,
-    headers: {
-      'apikey': _anonKey,
-      'Authorization': 'Bearer $_anonKey',
-    },
+    headers: {'apikey': _anonKey, 'Authorization': 'Bearer $_anonKey'},
     body: {'email': email, 'password': _testPassword},
   );
   final text = await _readBody(response);
@@ -95,8 +94,7 @@ Future<String?> _createGroupWithOwner(
   String accessToken, {
   String ownerId = _userAId,
 }) async {
-  final groupName =
-      'Edge Smoke Group ${DateTime.now().millisecondsSinceEpoch}';
+  final groupName = 'Edge Smoke Group ${DateTime.now().millisecondsSinceEpoch}';
 
   final groupRes = await _send(
     client,
@@ -107,11 +105,7 @@ Future<String?> _createGroupWithOwner(
       'Authorization': 'Bearer $accessToken',
       'Prefer': 'return=representation',
     },
-    body: {
-      'name': groupName,
-      'currency_code': 'USD',
-      'owner_id': ownerId,
-    },
+    body: {'name': groupName, 'currency_code': 'USD', 'owner_id': ownerId},
   );
   final groupBody = await _readBody(groupRes);
   if (groupRes.statusCode < 200 || groupRes.statusCode >= 300) {
@@ -130,11 +124,7 @@ Future<String?> _createGroupWithOwner(
       'Authorization': 'Bearer $accessToken',
       'Prefer': 'return=representation',
     },
-    body: {
-      'group_id': groupId,
-      'user_id': ownerId,
-      'role': 'owner',
-    },
+    body: {'group_id': groupId, 'user_id': ownerId, 'role': 'owner'},
   );
   final memberBody = await _readBody(memberRes);
   if (memberRes.statusCode < 200 || memberRes.statusCode >= 300) {
@@ -144,7 +134,10 @@ Future<String?> _createGroupWithOwner(
   return groupId;
 }
 
-Future<String?> _createInviteToken(HttpClient client, String accessToken) async {
+Future<String?> _createInviteToken(
+  HttpClient client,
+  String accessToken,
+) async {
   final groupId = await _createGroupWithOwner(client, accessToken);
   if (groupId == null) return null;
 
@@ -152,10 +145,7 @@ Future<String?> _createInviteToken(HttpClient client, String accessToken) async 
     client,
     method: 'POST',
     uri: Uri.parse('$_supabaseUrl/rest/v1/rpc/create_invite'),
-    headers: {
-      'apikey': _anonKey,
-      'Authorization': 'Bearer $accessToken',
-    },
+    headers: {'apikey': _anonKey, 'Authorization': 'Bearer $accessToken'},
     body: {'p_group_id': groupId},
   );
   final inviteBody = await _readBody(inviteRes);
@@ -205,14 +195,14 @@ void main() {
         client,
         method: 'POST',
         uri: _fn('telemetry'),
-        headers: {
-          'apikey': _anonKey,
-          'Authorization': 'Bearer $_anonKey',
+        headers: {'apikey': _anonKey, 'Authorization': 'Bearer $_anonKey'},
+        body: {
+          'data': {'suite': 'edge'},
         },
-        body: {'data': {'suite': 'edge'}},
       );
       expect(response.statusCode, 400);
-      final body = jsonDecode(await _readBody(response)) as Map<String, dynamic>;
+      final body =
+          jsonDecode(await _readBody(response)) as Map<String, dynamic>;
       expect(body['error'], contains('event'));
     }, skip: skipReason);
 
@@ -222,10 +212,7 @@ void main() {
         client,
         method: 'POST',
         uri: _fn('telemetry'),
-        headers: {
-          'apikey': _anonKey,
-          'Authorization': 'Bearer $_anonKey',
-        },
+        headers: {'apikey': _anonKey, 'Authorization': 'Bearer $_anonKey'},
         body: {
           'event': 'Bad Event!',
           'timestamp': DateTime.now().toUtc().toIso8601String(),
@@ -240,10 +227,7 @@ void main() {
         client,
         method: 'POST',
         uri: _fn('telemetry'),
-        headers: {
-          'apikey': _anonKey,
-          'Authorization': 'Bearer $_anonKey',
-        },
+        headers: {'apikey': _anonKey, 'Authorization': 'Bearer $_anonKey'},
         body: {
           'event': 'integration.edge_telemetry_ok',
           'timestamp': DateTime.now().toUtc().toIso8601String(),
@@ -262,10 +246,7 @@ void main() {
         client,
         method: 'GET',
         uri: _fn('invite-redirect'),
-        headers: {
-          'apikey': _anonKey,
-          'Authorization': 'Bearer $_anonKey',
-        },
+        headers: {'apikey': _anonKey, 'Authorization': 'Bearer $_anonKey'},
       );
       expect(response.statusCode, 302);
       final location = response.headers.value(HttpHeaders.locationHeader);
@@ -285,10 +266,7 @@ void main() {
         client,
         method: 'GET',
         uri: _fn('invite-redirect', {'token': token!}),
-        headers: {
-          'apikey': _anonKey,
-          'Authorization': 'Bearer $_anonKey',
-        },
+        headers: {'apikey': _anonKey, 'Authorization': 'Bearer $_anonKey'},
       );
       expect(response.statusCode, 302);
       final location = response.headers.value(HttpHeaders.locationHeader);
@@ -298,127 +276,135 @@ void main() {
       expect(location, isNot(contains('error=')));
     }, skip: skipReason);
 
-    test('invite-redirect unknown token fails closed to error=expired', () async {
-      if (skipReason != null) return;
-      final response = await _send(
-        client,
-        method: 'GET',
-        uri: _fn('invite-redirect', {
-          'token': 'not-a-real-invite-token-zzzz',
-        }),
-        headers: {
-          'apikey': _anonKey,
-          'Authorization': 'Bearer $_anonKey',
-        },
-      );
-      expect(response.statusCode, 302);
-      final location = response.headers.value(HttpHeaders.locationHeader);
-      expect(location, isNotNull);
-      expect(location, contains('error=expired'));
-      expect(location, isNot(contains('token=not-a-real')));
-    }, skip: skipReason);
-
-    test('og-invite-image returns PNG for token', () async {
-      if (skipReason != null) return;
-      final access = await _signInAccessToken(client);
-      expect(access, isNotNull);
-      final token = await _createInviteToken(client, access!);
-      expect(token, isNotNull);
-
-      // First boot pulls esm.sh deps; retry briefly under local Edge.
-      HttpClientResponse? response;
-      List<int> bytes = const [];
-      String lastReason = '';
-      Object? lastError;
-      for (var attempt = 1; attempt <= 3; attempt++) {
-        try {
-          response = await _send(
-            client,
-            method: 'GET',
-            uri: _fn('og-invite-image', {'token': token!}),
-            headers: {
-              'apikey': _anonKey,
-              'Authorization': 'Bearer $_anonKey',
-            },
-          ).timeout(const Duration(seconds: 20));
-          bytes = await response
-              .fold<List<int>>(
-                <int>[],
-                (prev, chunk) => prev..addAll(chunk),
-              )
-              .timeout(const Duration(seconds: 10));
-          if (response.statusCode == 200) break;
-          lastReason =
-              'attempt $attempt status=${response.statusCode} body=${utf8.decode(bytes)}';
-        } on Object catch (e) {
-          lastError = e;
-          lastReason = 'attempt $attempt error=$e';
-          // Recreate client after aborted connections.
-          client.close(force: true);
-          client = HttpClient();
-        }
-        await Future<void>.delayed(Duration(seconds: attempt));
-      }
-      final bodyText = utf8.decode(bytes, allowMalformed: true);
-      // Local Edge often cannot cold-boot React/og_edge (esm.sh) under Podman
-      // (503 BOOT_ERROR / worker timeout / connection reset).
-      final bootFailed = response == null ||
-          (response.statusCode == 503 &&
-              (bodyText.contains('BOOT_ERROR') ||
-                  bodyText.contains('Worker failed to boot'))) ||
-          lastError != null && response.statusCode != 200;
-      if (bootFailed && response?.statusCode != 200) {
-        print(
-          'WARN: og-invite-image failed to boot locally ($lastReason). '
-          'Treating as environment limitation.',
+    test(
+      'invite-redirect unknown token fails closed to error=expired',
+      () async {
+        if (skipReason != null) return;
+        final response = await _send(
+          client,
+          method: 'GET',
+          uri: _fn('invite-redirect', {
+            'token': 'not-a-real-invite-token-zzzz',
+          }),
+          headers: {'apikey': _anonKey, 'Authorization': 'Bearer $_anonKey'},
         );
-        return;
-      }
-      expect(
-        response!.statusCode,
-        200,
-        reason: 'og-invite-image; $lastReason; bodyLen=${bytes.length}',
-      );
-      final contentType = response.headers.contentType?.mimeType ?? '';
-      expect(
-        contentType.contains('png') || contentType.contains('image'),
-        isTrue,
-        reason: 'expected image content-type, got $contentType',
-      );
-      expect(bytes.length, greaterThan(100));
-      // PNG magic bytes
-      expect(bytes.take(4).toList(), [0x89, 0x50, 0x4E, 0x47]);
-    }, skip: skipReason, timeout: const Timeout(Duration(seconds: 90)));
+        expect(response.statusCode, 302);
+        final location = response.headers.value(HttpHeaders.locationHeader);
+        expect(location, isNotNull);
+        expect(location, contains('error=expired'));
+        expect(location, isNot(contains('token=not-a-real')));
+      },
+      skip: skipReason,
+    );
 
-    test('send-notification accepts service role (dry_run or FCM path)', () async {
-      if (skipReason != null) return;
-      final response = await _send(
-        client,
-        method: 'POST',
-        uri: _fn('send-notification'),
-        headers: {
-          'apikey': _serviceRoleKey,
-          'Authorization': 'Bearer $_serviceRoleKey',
-        },
-        body: {
-          'group_id': 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-          'actor_user_id': 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-          'action': 'expense_created',
-          'expense_title': 'Edge smoke',
-          'amount_cents': 100,
-          'currency_code': 'USD',
-        },
-      );
-      final text = await _readBody(response);
-      expect(response.statusCode, 200, reason: text);
-      final body = jsonDecode(text) as Map<String, dynamic>;
-      // Without FCM secrets: dry_run. With secrets loaded: real path (may send 0).
-      if (body['dry_run'] == true) {
-        expect(body['ok'], isTrue);
-      } else {
-        expect(body['sent'], isNotNull, reason: text);
-      }
-    }, skip: skipReason);
+    test(
+      'og-invite-image returns PNG for token',
+      () async {
+        if (skipReason != null) return;
+        final access = await _signInAccessToken(client);
+        expect(access, isNotNull);
+        final token = await _createInviteToken(client, access!);
+        expect(token, isNotNull);
+
+        // First boot pulls esm.sh deps; retry briefly under local Edge.
+        HttpClientResponse? response;
+        List<int> bytes = const [];
+        String lastReason = '';
+        Object? lastError;
+        for (var attempt = 1; attempt <= 3; attempt++) {
+          try {
+            response = await _send(
+              client,
+              method: 'GET',
+              uri: _fn('og-invite-image', {'token': token!}),
+              headers: {
+                'apikey': _anonKey,
+                'Authorization': 'Bearer $_anonKey',
+              },
+            ).timeout(const Duration(seconds: 20));
+            bytes = await response
+                .fold<List<int>>(<int>[], (prev, chunk) => prev..addAll(chunk))
+                .timeout(const Duration(seconds: 10));
+            if (response.statusCode == 200) break;
+            lastReason =
+                'attempt $attempt status=${response.statusCode} body=${utf8.decode(bytes)}';
+          } on Object catch (e) {
+            lastError = e;
+            lastReason = 'attempt $attempt error=$e';
+            // Recreate client after aborted connections.
+            client.close(force: true);
+            client = HttpClient();
+          }
+          await Future<void>.delayed(Duration(seconds: attempt));
+        }
+        final bodyText = utf8.decode(bytes, allowMalformed: true);
+        // Local Edge often cannot cold-boot React/og_edge (esm.sh) under Podman
+        // (503 BOOT_ERROR / worker timeout / connection reset).
+        final bootFailed =
+            response == null ||
+            (response.statusCode == 503 &&
+                (bodyText.contains('BOOT_ERROR') ||
+                    bodyText.contains('Worker failed to boot'))) ||
+            lastError != null && response.statusCode != 200;
+        if (bootFailed && response?.statusCode != 200) {
+          print(
+            'WARN: og-invite-image failed to boot locally ($lastReason). '
+            'Treating as environment limitation.',
+          );
+          return;
+        }
+        expect(
+          response!.statusCode,
+          200,
+          reason: 'og-invite-image; $lastReason; bodyLen=${bytes.length}',
+        );
+        final contentType = response.headers.contentType?.mimeType ?? '';
+        expect(
+          contentType.contains('png') || contentType.contains('image'),
+          isTrue,
+          reason: 'expected image content-type, got $contentType',
+        );
+        expect(bytes.length, greaterThan(100));
+        // PNG magic bytes
+        expect(bytes.take(4).toList(), [0x89, 0x50, 0x4E, 0x47]);
+      },
+      skip: skipReason,
+      timeout: const Timeout(Duration(seconds: 90)),
+    );
+
+    test(
+      'send-notification accepts service role (dry_run or FCM path)',
+      () async {
+        if (skipReason != null) return;
+        final response = await _send(
+          client,
+          method: 'POST',
+          uri: _fn('send-notification'),
+          headers: {
+            'apikey': _serviceRoleKey,
+            'Authorization': 'Bearer $_serviceRoleKey',
+          },
+          body: {
+            'group_id': 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+            'actor_user_id': 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+            'action': 'expense_created',
+            'expense_title': 'Edge smoke',
+            'amount_cents': 100,
+            'currency_code': 'USD',
+          },
+        );
+        final text = await _readBody(response);
+        expect(response.statusCode, 200, reason: text);
+        final body = jsonDecode(text) as Map<String, dynamic>;
+        // Without FCM secrets: dry_run. With secrets loaded: real path (may send 0).
+        if (body['dry_run'] == true) {
+          expect(body['ok'], isTrue);
+        } else {
+          expect(body['sent'], isNotNull, reason: text);
+        }
+      },
+      skip: skipReason,
+    );
 
     test('send-notification rejects unauthorized', () async {
       if (skipReason != null) return;
@@ -426,10 +412,7 @@ void main() {
         client,
         method: 'POST',
         uri: _fn('send-notification'),
-        headers: {
-          'apikey': _anonKey,
-          'Authorization': 'Bearer $_anonKey',
-        },
+        headers: {'apikey': _anonKey, 'Authorization': 'Bearer $_anonKey'},
         body: {
           'group_id': 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
           'actor_user_id': 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
@@ -466,23 +449,28 @@ void main() {
           'locale': 'en',
         },
       );
-      expect(seedRes.statusCode, lessThan(300), reason: await _readBody(seedRes));
+      expect(
+        seedRes.statusCode,
+        lessThan(300),
+        reason: await _readBody(seedRes),
+      );
 
       final claimRes = await _send(
         client,
         method: 'POST',
         uri: Uri.parse('$_supabaseUrl/rest/v1/rpc/claim_device_token'),
-        headers: {
-          'apikey': _anonKey,
-          'Authorization': 'Bearer $accessA',
-        },
+        headers: {'apikey': _anonKey, 'Authorization': 'Bearer $accessA'},
         body: {
           'p_token': sharedToken,
           'p_platform': 'android',
           'p_locale': 'en',
         },
       );
-      expect(claimRes.statusCode, lessThan(300), reason: await _readBody(claimRes));
+      expect(
+        claimRes.statusCode,
+        lessThan(300),
+        reason: await _readBody(claimRes),
+      );
 
       final listRes = await _send(
         client,
@@ -520,13 +508,13 @@ void main() {
           'Authorization': 'Bearer $_serviceRoleKey',
           'Prefer': 'return=minimal',
         },
-        body: {
-          'group_id': groupId,
-          'user_id': _userBId,
-          'role': 'member',
-        },
+        body: {'group_id': groupId, 'user_id': _userBId, 'role': 'member'},
       );
-      expect(joinRes.statusCode, lessThan(300), reason: await _readBody(joinRes));
+      expect(
+        joinRes.statusCode,
+        lessThan(300),
+        reason: await _readBody(joinRes),
+      );
 
       final notifyRes = await _send(
         client,

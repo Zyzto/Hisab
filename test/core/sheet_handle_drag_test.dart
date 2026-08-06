@@ -10,7 +10,10 @@ void main() {
         drag.end(expanded: false, velocity: 0),
         SheetHandleDragAction.expand,
       );
-      expect(drag.panelHeight(expanded: false, compactH: 650, fullH: 1000), 750);
+      expect(
+        drag.panelHeight(expanded: false, compactH: 650, fullH: 1000),
+        750,
+      );
     });
 
     test('pull down from compact dismisses', () {
@@ -30,10 +33,7 @@ void main() {
         drag.end(expanded: true, velocity: 0),
         SheetHandleDragAction.collapse,
       );
-      expect(
-        drag.panelHeight(expanded: true, compactH: 650, fullH: 1000),
-        900,
-      );
+      expect(drag.panelHeight(expanded: true, compactH: 650, fullH: 1000), 900);
     });
   });
 }

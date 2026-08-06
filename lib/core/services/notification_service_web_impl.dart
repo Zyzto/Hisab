@@ -3,6 +3,7 @@
 import 'dart:js_interop';
 
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:web/web.dart' as web;
 
 /// Shows a browser Notification with [title] and [body]. On click, focuses the
@@ -12,8 +13,8 @@ void showWebForegroundNotification(String title, String body, String? groupId) {
   try {
     if (web.Notification.permission != 'granted') return;
     _show(title, body, groupId);
-  } catch (_) {
-    // Notifications not supported or permission denied; ignore.
+  } catch (e) {
+    Log.debug('Web foreground notification failed', error: e);
   }
 }
 

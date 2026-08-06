@@ -19,7 +19,7 @@ import '../../../domain/domain.dart';
 import '../../groups/providers/groups_provider.dart';
 import '../../groups/widgets/group_card.dart';
 import '../../settings/account_mode_actions.dart';
-import '../../settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 import '../../transaction_scanner/providers/scanner_providers.dart';
 import '../providers/notification_providers.dart';
 import '../providers/profile_activity_provider.dart';
@@ -235,8 +235,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final data = dashboardAsync.asData?.value;
     final entries = _entriesFor(data);
     final entryIds = {for (final e in entries) e.id};
-    final activeId = (_activeSectionId != null &&
-            entryIds.contains(_activeSectionId))
+    final activeId =
+        (_activeSectionId != null && entryIds.contains(_activeSectionId))
         ? _activeSectionId
         : entries.firstOrNull?.id;
 
@@ -245,9 +245,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final contentLoading =
         (!dashboardAsync.hasValue && !dashboardAsync.hasError) ||
         (!activityAsync.hasValue && !activityAsync.hasError);
-    final contentError = (!dashboardAsync.hasValue
-            ? dashboardAsync.asError
-            : null) ??
+    final contentError =
+        (!dashboardAsync.hasValue ? dashboardAsync.asError : null) ??
         (!activityAsync.hasValue ? activityAsync.asError : null);
 
     final canPop = routerCanPop(context);
@@ -257,103 +256,105 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         if (!didPop) popOrGo(context, RoutePaths.home);
       },
       child: LayoutBuilder(
-      builder: (context, layoutConstraints) {
-        // Use the same width ConstrainedContent will see (scaffold body).
-        final showSideIndex = _canShowSideIndex(
-          context,
-          layoutConstraints.maxWidth,
-        );
-        return Scaffold(
-          appBar: ContentAlignedAppBar(
-            contentAreaWidth: layoutConstraints.maxWidth,
-            title: Text('profile'.tr()),
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => popOrGo(context, RoutePaths.home),
-            ),
-            actions: [
-              if (ref.watch(hisabSettingsProvidersProvider)
-                  case final settings?)
-                IconButton(
-                  tooltip: 'sign_out'.tr(),
-                  icon: const Icon(Icons.logout),
-                  onPressed: () => AccountModeActions.handleSignOut(
-                    context,
-                    ref,
-                    settings,
-                  ),
-                ),
-            ],
-          ),
-          body: ConstrainedContent(
-            aside: showSideIndex
-                ? PageSectionIndex(
-                    entries: entries,
-                    activeId: activeId,
-                    onSelect: _jumpTo,
-                  )
-                : null,
-            child: Stack(
-              children: [
-                RefreshIndicator(
-                  onRefresh: () async {
-                    await ref.read(dataSyncServiceProvider.notifier).syncNow();
-                    // Batch watches update from PowerSync; only refresh
-                    // one-shot counts so the body doesn't flash skeleton.
-                    ref.invalidate(pendingDraftCountProvider);
-                    ref.invalidate(unreadNotificationCountProvider);
-                    ref.invalidate(userNotificationsProvider);
-                  },
-                  child: NotificationListener<ScrollNotification>(
-                    onNotification: _onScroll,
-                    child: CustomScrollView(
-                      key: _scrollViewKey,
-                      controller: _scrollController,
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      cacheExtent: 2400,
-                      slivers: [
-                        SliverToBoxAdapter(
-                          child: KeyedSubtree(
-                            key: _accountKey,
-                            child: const ProfileAccountSection(),
-                          ),
-                        ),
-                        const SliverToBoxAdapter(child: Divider(height: 24)),
-                        if (contentLoading)
-                          const SliverToBoxAdapter(
-                            child: _ProfileContentSkeleton(),
-                          )
-                        else if (contentError != null)
-                          SliverToBoxAdapter(
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Text('${contentError.error}'),
-                            ),
-                          )
-                        else if (data != null) ...[
-                          ..._profileDataSlivers(context, data),
-                        ],
-                        SliverPadding(
-                          padding: EdgeInsets.only(
-                            bottom: showSideIndex ? 32 : 88,
-                          ),
-                        ),
-                      ],
+        builder: (context, layoutConstraints) {
+          // Use the same width ConstrainedContent will see (scaffold body).
+          final showSideIndex = _canShowSideIndex(
+            context,
+            layoutConstraints.maxWidth,
+          );
+          return Scaffold(
+            appBar: ContentAlignedAppBar(
+              contentAreaWidth: layoutConstraints.maxWidth,
+              title: Text('profile'.tr()),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => popOrGo(context, RoutePaths.home),
+              ),
+              actions: [
+                if (ref.watch(hisabSettingsProvidersProvider)
+                    case final settings?)
+                  IconButton(
+                    tooltip: 'sign_out'.tr(),
+                    icon: const Icon(Icons.logout),
+                    onPressed: () => AccountModeActions.handleSignOut(
+                      context,
+                      ref,
+                      settings,
                     ),
-                  ),
-                ),
-                if (!showSideIndex)
-                  PageSectionIndexOverlay(
-                    entries: entries,
-                    activeId: activeId,
-                    onSelect: _jumpTo,
                   ),
               ],
             ),
-          ),
-        );
-      },
-    ),
+            body: ConstrainedContent(
+              aside: showSideIndex
+                  ? PageSectionIndex(
+                      entries: entries,
+                      activeId: activeId,
+                      onSelect: _jumpTo,
+                    )
+                  : null,
+              child: Stack(
+                children: [
+                  RefreshIndicator(
+                    onRefresh: () async {
+                      await ref
+                          .read(dataSyncServiceProvider.notifier)
+                          .syncNow();
+                      // Batch watches update from PowerSync; only refresh
+                      // one-shot counts so the body doesn't flash skeleton.
+                      ref.invalidate(pendingDraftCountProvider);
+                      ref.invalidate(unreadNotificationCountProvider);
+                      ref.invalidate(userNotificationsProvider);
+                    },
+                    child: NotificationListener<ScrollNotification>(
+                      onNotification: _onScroll,
+                      child: CustomScrollView(
+                        key: _scrollViewKey,
+                        controller: _scrollController,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        cacheExtent: 2400,
+                        slivers: [
+                          SliverToBoxAdapter(
+                            child: KeyedSubtree(
+                              key: _accountKey,
+                              child: const ProfileAccountSection(),
+                            ),
+                          ),
+                          const SliverToBoxAdapter(child: Divider(height: 24)),
+                          if (contentLoading)
+                            const SliverToBoxAdapter(
+                              child: _ProfileContentSkeleton(),
+                            )
+                          else if (contentError != null)
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Text('${contentError.error}'),
+                              ),
+                            )
+                          else if (data != null) ...[
+                            ..._profileDataSlivers(context, data),
+                          ],
+                          SliverPadding(
+                            padding: EdgeInsets.only(
+                              bottom: showSideIndex ? 32 : 88,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (!showSideIndex)
+                    PageSectionIndexOverlay(
+                      entries: entries,
+                      activeId: activeId,
+                      onSelect: _jumpTo,
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -407,8 +408,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   groupCurrencyCode: row.currencyCode,
                   isNegative: row.youOwe,
                 ),
-                onTap: () =>
-                    context.push(RoutePaths.groupDetail(row.group.id)),
+                onTap: () => context.push(RoutePaths.groupDetail(row.group.id)),
               );
             },
             childCount: data.balanceRows.length,
@@ -422,9 +422,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             key: _budgetsKey,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: GroupSectionHeader(
-                label: 'profile_personal_budgets'.tr(),
-              ),
+              child: GroupSectionHeader(label: 'profile_personal_budgets'.tr()),
             ),
           ),
         ),
@@ -454,9 +452,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
             child: GroupSectionHeader(
               label: 'profile_recent_activity'.tr(),
               trailing: TextButton(
-                onPressed: () => setState(
-                  () => _chronologicalFeed = !_chronologicalFeed,
-                ),
+                onPressed: () =>
+                    setState(() => _chronologicalFeed = !_chronologicalFeed),
                 child: Text(
                   _chronologicalFeed
                       ? 'profile_feed_grouped'.tr()
@@ -467,10 +464,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           ),
         ),
       ),
-      _ActivityFeed(
-        chronological: _chronologicalFeed,
-        groups: data.groups,
-      ),
+      _ActivityFeed(chronological: _chronologicalFeed, groups: data.groups),
       if (data.groups.isNotEmpty) ...[
         SliverToBoxAdapter(
           child: KeyedSubtree(
@@ -540,7 +534,9 @@ class _ProfileContentSkeleton extends StatelessWidget {
               children: [
                 for (var i = 0; i < 3; i++) ...[
                   if (i > 0) const SizedBox(width: 8),
-                  Expanded(child: block(height: 88, radius: BorderRadius.circular(12))),
+                  Expanded(
+                    child: block(height: 88, radius: BorderRadius.circular(12)),
+                  ),
                 ],
               ],
             ),
@@ -552,7 +548,9 @@ class _ProfileContentSkeleton extends StatelessWidget {
             children: [
               for (var i = 0; i < 3; i++) ...[
                 if (i > 0) const SizedBox(width: 8),
-                Expanded(child: block(height: 72, radius: BorderRadius.circular(12))),
+                Expanded(
+                  child: block(height: 72, radius: BorderRadius.circular(12)),
+                ),
               ],
             ],
           ),
@@ -729,9 +727,9 @@ class _KpiStrip extends StatelessWidget {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
                 ),
               ],
             ),
@@ -847,9 +845,7 @@ class _ActivityFeed extends ConsumerWidget {
                   final leading = CircleAvatar(
                     backgroundColor: unread
                         ? Theme.of(context).colorScheme.primaryContainer
-                        : Theme.of(
-                            context,
-                          ).colorScheme.surfaceContainerHighest,
+                        : Theme.of(context).colorScheme.surfaceContainerHighest,
                     child: Icon(
                       item.actionFamily == 'member'
                           ? Icons.person_add_alt_1_outlined
@@ -866,8 +862,9 @@ class _ActivityFeed extends ConsumerWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontWeight:
-                              unread ? FontWeight.w700 : FontWeight.w500,
+                          fontWeight: unread
+                              ? FontWeight.w700
+                              : FontWeight.w500,
                         ),
                       ),
                       subtitle: UserText(

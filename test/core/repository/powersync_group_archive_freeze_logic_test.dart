@@ -17,7 +17,9 @@ void main() {
     expect(shouldAutoUnfreezeOnUnarchive(null), isFalse);
     expect(shouldAutoUnfreezeOnUnarchive(''), isFalse);
     expect(
-      shouldAutoUnfreezeOnUnarchive('{"frozenAt":1,"balances":[],"settlements":[]}'),
+      shouldAutoUnfreezeOnUnarchive(
+        '{"frozenAt":1,"balances":[],"settlements":[]}',
+      ),
       isFalse,
     );
   });

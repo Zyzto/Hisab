@@ -157,8 +157,9 @@ class TagStyleFields extends StatelessWidget {
                           border: Border.all(
                             color: selected
                                 ? theme.colorScheme.onSurface
-                                : theme.colorScheme.outline
-                                    .withValues(alpha: 0.35),
+                                : theme.colorScheme.outline.withValues(
+                                    alpha: 0.35,
+                                  ),
                             width: selected ? 2.5 : 1,
                           ),
                         ),
@@ -265,8 +266,8 @@ class TagEditorSheetShell extends StatelessWidget {
           // Prefer the sheet body max. Only fall back when unbounded (should
           // be rare); never invent a height larger than a finite parent max
           // (IME / landscape would overflow).
-          final height = constraints.maxHeight.isFinite &&
-                  constraints.maxHeight > 0
+          final height =
+              constraints.maxHeight.isFinite && constraints.maxHeight > 0
               ? constraints.maxHeight
               : math.max(_minShellHeight, screenH * 0.75);
 
@@ -321,15 +322,22 @@ class TagEditorSheetShell extends StatelessWidget {
                       10,
                       _padding,
                       // Host clears the IME; keep footer tight above keyboard.
-                      MediaQuery.viewInsetsOf(context).bottom > 0 ? 8 : _padding,
+                      MediaQuery.viewInsetsOf(context).bottom > 0
+                          ? 8
+                          : _padding,
                     ),
-                    // Preview at start; actions anchored at end (LTR right /
-                    // RTL left) — same trailing edge as floating dialog chrome.
+                    // Preview at start; Cancel/Done on the trailing edge
+                    // (LTR right / RTL left). Expanded + directional Align so
+                    // unused chip width does not leave a gap after actions.
                     child: Row(
                       children: [
-                        Flexible(fit: FlexFit.loose, child: preview),
+                        Expanded(
+                          child: Align(
+                            alignment: AlignmentDirectional.centerStart,
+                            child: preview,
+                          ),
+                        ),
                         if (actions.isNotEmpty) ...[
-                          const Spacer(),
                           const SizedBox(width: 12),
                           for (int i = 0; i < actions.length; i++) ...[
                             if (i > 0) const SizedBox(width: _actionsGap),

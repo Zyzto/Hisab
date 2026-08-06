@@ -12,12 +12,7 @@ class GroveScene extends BiomeSceneBase {
   @override
   void spawnAmbient() {
     add(
-      mistOrbs(
-        rng: rng,
-        tint: const Color(0xFFC8E6C9),
-        area: area,
-        count: 14,
-      ),
+      mistOrbs(rng: rng, tint: const Color(0xFFC8E6C9), area: area, count: 14),
     );
     add(
       shapedBurst(
@@ -74,7 +69,8 @@ class GroveScene extends BiomeSceneBase {
     // Meadow band
     canvas.drawRect(
       Rect.fromLTWH(0, h * 0.7, w, h * 0.3),
-      Paint()..color = const Color(0xFF558B2F).withValues(alpha: 0.3 * a * intro),
+      Paint()
+        ..color = const Color(0xFF558B2F).withValues(alpha: 0.3 * a * intro),
     );
   }
 }

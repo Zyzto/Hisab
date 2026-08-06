@@ -10,10 +10,8 @@ final supabaseClientProvider = Provider<SupabaseClient>(
   (ref) => Supabase.instance.client,
 );
 
-typedef InvitePreviewRpc = Future<dynamic> Function(
-  String rpcName,
-  Map<String, dynamic> params,
-);
+typedef InvitePreviewRpc =
+    Future<dynamic> Function(String rpcName, Map<String, dynamic> params);
 
 final invitePreviewRpcProvider = Provider<InvitePreviewRpc>((ref) {
   final client = ref.read(supabaseClientProvider);
@@ -109,9 +107,11 @@ Future<Map<String, dynamic>?> _loadInvitePreviewGroupRow({
     'group_treasurer_participant_id': null,
     'group_allow_member_settle_for_others': false,
     'group_created_at':
-        legacyRow['group_created_at'] ?? DateTime.now().toUtc().toIso8601String(),
+        legacyRow['group_created_at'] ??
+        DateTime.now().toUtc().toIso8601String(),
     'group_updated_at':
-        legacyRow['group_updated_at'] ?? DateTime.now().toUtc().toIso8601String(),
+        legacyRow['group_updated_at'] ??
+        DateTime.now().toUtc().toIso8601String(),
   };
 }
 
@@ -171,7 +171,10 @@ TransactionType _parseTransactionType(String? value) {
 List<String>? _parseImagePaths(Object? value) {
   if (value == null) return null;
   if (value is List) {
-    final items = value.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
+    final items = value
+        .map((e) => e.toString())
+        .where((e) => e.isNotEmpty)
+        .toList();
     return items.isEmpty ? null : items;
   }
   if (value is String) {
@@ -192,108 +195,108 @@ List<String>? _parseImagePaths(Object? value) {
   return null;
 }
 
-final invitePreviewDataProvider = FutureProvider.family<InvitePreviewData?, String>((
-  ref,
-  token,
-) async {
-  final rpc = ref.read(invitePreviewRpcProvider);
+final invitePreviewDataProvider =
+    FutureProvider.family<InvitePreviewData?, String>((ref, token) async {
+      final rpc = ref.read(invitePreviewRpcProvider);
 
-  final groupRow = await _loadInvitePreviewGroupRow(rpc: rpc, token: token);
-  if (groupRow == null) return null;
+      final groupRow = await _loadInvitePreviewGroupRow(rpc: rpc, token: token);
+      if (groupRow == null) return null;
 
-  final participantsResult = await rpc('get_invite_preview_participants', {
-    'p_token': token,
-  });
-  final participantsRows = (participantsResult is List)
-      ? participantsResult.cast<Map<String, dynamic>>()
-      : <Map<String, dynamic>>[];
+      final participantsResult = await rpc('get_invite_preview_participants', {
+        'p_token': token,
+      });
+      final participantsRows = (participantsResult is List)
+          ? participantsResult.cast<Map<String, dynamic>>()
+          : <Map<String, dynamic>>[];
 
-  final expensesResult = await rpc('get_invite_preview_expenses', {
-    'p_token': token,
-    'p_limit': 200,
-  });
-  final expensesRows = (expensesResult is List)
-      ? expensesResult.cast<Map<String, dynamic>>()
-      : <Map<String, dynamic>>[];
+      final expensesResult = await rpc('get_invite_preview_expenses', {
+        'p_token': token,
+        'p_limit': 200,
+      });
+      final expensesRows = (expensesResult is List)
+          ? expensesResult.cast<Map<String, dynamic>>()
+          : <Map<String, dynamic>>[];
 
-  final group = Group(
-    id: groupRow['group_id'] as String,
-    name: groupRow['group_name'] as String? ?? '',
-    currencyCode: groupRow['group_currency_code'] as String? ?? 'USD',
-    createdAt: _parseDateTime(groupRow['group_created_at']),
-    updatedAt: _parseDateTime(groupRow['group_updated_at']),
-    settlementMethod: _parseSettlementMethod(
-      groupRow['group_settlement_method'] as String?,
-    ),
-    treasurerParticipantId: groupRow['group_treasurer_participant_id'] as String?,
-    allowMemberSettleForOthers:
-        groupRow['group_allow_member_settle_for_others'] == true,
-  );
-
-  final invite = GroupInvite(
-    id: groupRow['invite_id'] as String,
-    groupId: groupRow['group_id'] as String,
-    token: token,
-    role: 'member',
-    createdAt: DateTime.now(),
-    accessMode: InviteAccessMode.fromValue(
-      groupRow['invite_access_mode'] as String?,
-    ),
-  );
-
-  final participants = participantsRows
-      .map(
-        (row) => Participant(
-          id: row['id'] as String,
-          groupId: row['group_id'] as String,
-          name: row['name'] as String? ?? '',
-          order: (row['sort_order'] as num?)?.toInt() ?? 0,
-          userId: row['user_id'] as String?,
-          avatarId: row['avatar_id'] as String?,
-          leftAt: _parseDateTimeNullable(row['left_at']),
-          createdAt: _parseDateTime(row['created_at']),
-          updatedAt: _parseDateTime(row['updated_at']),
+      final group = Group(
+        id: groupRow['group_id'] as String,
+        name: groupRow['group_name'] as String? ?? '',
+        currencyCode: groupRow['group_currency_code'] as String? ?? 'USD',
+        createdAt: _parseDateTime(groupRow['group_created_at']),
+        updatedAt: _parseDateTime(groupRow['group_updated_at']),
+        settlementMethod: _parseSettlementMethod(
+          groupRow['group_settlement_method'] as String?,
         ),
-      )
-      .toList();
+        treasurerParticipantId:
+            groupRow['group_treasurer_participant_id'] as String?,
+        allowMemberSettleForOthers:
+            groupRow['group_allow_member_settle_for_others'] == true,
+      );
 
-  final participantRoles = <String, String?>{
-    for (final row in participantsRows)
-      row['id'] as String: row['member_role'] as String?,
-  };
-
-  final expenses = expensesRows
-      .map(
-        (row) => Expense(
-          id: row['id'] as String,
-          groupId: row['group_id'] as String,
-          payerParticipantId: row['payer_participant_id'] as String,
-          amountCents: (row['amount_cents'] as num?)?.toInt() ?? 0,
-          currencyCode: row['currency_code'] as String? ?? group.currencyCode,
-          exchangeRate: (row['exchange_rate'] as num?)?.toDouble() ?? 1.0,
-          baseAmountCents: (row['base_amount_cents'] as num?)?.toInt(),
-          title: row['title'] as String? ?? '',
-          description: null,
-          date: _parseDateTime(row['date']),
-          splitType: _parseSplitType(row['split_type'] as String?),
-          splitShares: _parseSplitShares(row['split_shares_json']),
-          createdAt: _parseDateTime(row['created_at']),
-          updatedAt: _parseDateTime(row['updated_at']),
-          transactionType: _parseTransactionType(row['type'] as String?),
-          toParticipantId: row['to_participant_id'] as String?,
-          tag: null,
-          lineItems: null,
-          imagePath: row['image_path'] as String?,
-          imagePaths: _parseImagePaths(row['image_paths']),
+      final invite = GroupInvite(
+        id: groupRow['invite_id'] as String,
+        groupId: groupRow['group_id'] as String,
+        token: token,
+        role: 'member',
+        createdAt: DateTime.now(),
+        accessMode: InviteAccessMode.fromValue(
+          groupRow['invite_access_mode'] as String?,
         ),
-      )
-      .toList();
+      );
 
-  return InvitePreviewData(
-    invite: invite,
-    group: group,
-    participants: participants,
-    expenses: expenses,
-    participantRoles: participantRoles,
-  );
-});
+      final participants = participantsRows
+          .map(
+            (row) => Participant(
+              id: row['id'] as String,
+              groupId: row['group_id'] as String,
+              name: row['name'] as String? ?? '',
+              order: (row['sort_order'] as num?)?.toInt() ?? 0,
+              userId: row['user_id'] as String?,
+              avatarId: row['avatar_id'] as String?,
+              leftAt: _parseDateTimeNullable(row['left_at']),
+              createdAt: _parseDateTime(row['created_at']),
+              updatedAt: _parseDateTime(row['updated_at']),
+            ),
+          )
+          .toList();
+
+      final participantRoles = <String, String?>{
+        for (final row in participantsRows)
+          row['id'] as String: row['member_role'] as String?,
+      };
+
+      final expenses = expensesRows
+          .map(
+            (row) => Expense(
+              id: row['id'] as String,
+              groupId: row['group_id'] as String,
+              payerParticipantId: row['payer_participant_id'] as String,
+              amountCents: (row['amount_cents'] as num?)?.toInt() ?? 0,
+              currencyCode:
+                  row['currency_code'] as String? ?? group.currencyCode,
+              exchangeRate: (row['exchange_rate'] as num?)?.toDouble() ?? 1.0,
+              baseAmountCents: (row['base_amount_cents'] as num?)?.toInt(),
+              title: row['title'] as String? ?? '',
+              description: null,
+              date: _parseDateTime(row['date']),
+              splitType: _parseSplitType(row['split_type'] as String?),
+              splitShares: _parseSplitShares(row['split_shares_json']),
+              createdAt: _parseDateTime(row['created_at']),
+              updatedAt: _parseDateTime(row['updated_at']),
+              transactionType: _parseTransactionType(row['type'] as String?),
+              toParticipantId: row['to_participant_id'] as String?,
+              tag: null,
+              lineItems: null,
+              imagePath: row['image_path'] as String?,
+              imagePaths: _parseImagePaths(row['image_paths']),
+            ),
+          )
+          .toList();
+
+      return InvitePreviewData(
+        invite: invite,
+        group: group,
+        participants: participants,
+        expenses: expenses,
+        participantRoles: participantRoles,
+      );
+    });

@@ -82,9 +82,9 @@ class ProfileActivitySection extends ConsumerWidget {
                     icon: Icons.all_inclusive_rounded,
                   ),
                 ],
-                onSelected: (value) => ref
-                    .read(profileAnalyticsRangeProvider.notifier)
-                    .state = value,
+                onSelected: (value) =>
+                    ref.read(profileAnalyticsRangeProvider.notifier).state =
+                        value,
               );
             },
           ),
@@ -95,10 +95,8 @@ class ProfileActivitySection extends ConsumerWidget {
             padding: EdgeInsets.all(24),
             child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
           ),
-          error: (e, _) => Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text('$e'),
-          ),
+          error: (e, _) =>
+              Padding(padding: const EdgeInsets.all(16), child: Text('$e')),
           data: (data) => Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -126,10 +124,8 @@ class ProfileActivitySection extends ConsumerWidget {
             padding: EdgeInsets.all(16),
             child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
           ),
-          error: (e, _) => Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text('$e'),
-          ),
+          error: (e, _) =>
+              Padding(padding: const EdgeInsets.all(16), child: Text('$e')),
           data: (expenses) {
             final preview = expenses.take(_profileExpensePreviewLimit).toList();
             if (preview.isEmpty) {
@@ -150,8 +146,7 @@ class ProfileActivitySection extends ConsumerWidget {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                   child: OutlinedButton.icon(
-                    onPressed: () =>
-                        context.push(RoutePaths.profileExpenses),
+                    onPressed: () => context.push(RoutePaths.profileExpenses),
                     icon: const Icon(Icons.receipt_long_outlined),
                     label: Text(
                       expenses.length > _profileExpensePreviewLimit
@@ -200,7 +195,9 @@ class _AnalyticsKpis extends StatelessWidget {
               Expanded(
                 child: _KpiCard(
                   label: 'analytics_kpi_my_spend'.tr(),
-                  value: analytics.mySpendCents < 0 ? '−$spendLabel' : spendLabel,
+                  value: analytics.mySpendCents < 0
+                      ? '−$spendLabel'
+                      : spendLabel,
                 ),
               ),
               const SizedBox(width: 8),

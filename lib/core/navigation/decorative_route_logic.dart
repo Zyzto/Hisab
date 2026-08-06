@@ -24,7 +24,8 @@ bool isLeakedAppPathname(String pathname) {
 }
 
 /// Document pathname for hash URL strategy (usually `/`).
-@visibleForTesting
+///
+/// Used by web decorative-route helpers; also covered by unit tests.
 String hashStrategyPathname(String pathname) {
   if (pathname.endsWith('.html')) return pathname;
   if (isLeakedAppPathname(pathname)) return '/';

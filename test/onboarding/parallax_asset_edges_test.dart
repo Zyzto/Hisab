@@ -15,18 +15,11 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  const layers = [
-    'hills_far',
-    'hills_mid',
-    'grass',
-    'grass_front',
-  ];
+  const layers = ['hills_far', 'hills_mid', 'grass', 'grass_front'];
 
   Future<(int, int, ByteData)> loadRgba(String name) async {
     final bytes = await rootBundle.load('assets/images/parallax/$name.webp');
-    final codec = await ui.instantiateImageCodec(
-      bytes.buffer.asUint8List(),
-    );
+    final codec = await ui.instantiateImageCodec(bytes.buffer.asUint8List());
     final frame = await codec.getNextFrame();
     final data = await frame.image.toByteData(
       format: ui.ImageByteFormat.rawRgba,
@@ -67,7 +60,8 @@ void main() {
           for (var y = 0; y < height; y++) {
             final o = (y * width + x) * 4;
             if (data.getUint8(o + 3) != 255) continue;
-            final luma = (data.getUint8(o) * 2 +
+            final luma =
+                (data.getUint8(o) * 2 +
                     data.getUint8(o + 1) * 5 +
                     data.getUint8(o + 2)) ~/
                 8;
@@ -79,7 +73,8 @@ void main() {
             final a = data.getUint8(o + 3);
             if (a < 128 || a == 255) continue;
             sampled++;
-            final luma = (data.getUint8(o) * 2 +
+            final luma =
+                (data.getUint8(o) * 2 +
                     data.getUint8(o + 1) * 5 +
                     data.getUint8(o + 2)) ~/
                 8;
@@ -92,7 +87,8 @@ void main() {
           // Repaired assets sit near 1.5% (genuinely shadowed edges); the
           // premultiplied exports were above 6%.
           lessThan(0.03),
-          reason: '$name looks premultiplied: $darkened of $sampled edge '
+          reason:
+              '$name looks premultiplied: $darkened of $sampled edge '
               'pixels are far darker than their column artwork',
         );
       });

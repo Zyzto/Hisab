@@ -15,12 +15,9 @@ import '../../../core/platform/ui_perf.dart';
 /// The disc itself is always a clean circle. Only the sun's glow layers
 /// undulate; the moon keeps a plain, still halo.
 class OnboardingCelestial extends PositionComponent {
-  OnboardingCelestial({
-    required bool night,
-    math.Random? rng,
-    super.priority,
-  })  : _night = night,
-        _rng = rng ?? math.Random(7);
+  OnboardingCelestial({required bool night, math.Random? rng, super.priority})
+    : _night = night,
+      _rng = rng ?? math.Random(7);
 
   /// Y (from the top of the full screen) just below the solid sun/moon disc.
   ///
@@ -28,8 +25,10 @@ class OnboardingCelestial extends PositionComponent {
   /// clearing the whole soft halo.
   static double contentStartY(Size screen) {
     if (screen.width <= 0 || screen.height <= 0) return 0;
-    final radius =
-        (math.min(screen.width, screen.height) * 0.075).clamp(22.0, 56.0);
+    final radius = (math.min(screen.width, screen.height) * 0.075).clamp(
+      22.0,
+      56.0,
+    );
     final haloRadius = radius * 3.0;
     final centerY = math.max(screen.height * 0.15, haloRadius * 0.9);
     return centerY + radius;
@@ -83,8 +82,7 @@ class OnboardingCelestial extends PositionComponent {
   }
 
   void _buildPaints() {
-    final haloTint =
-        _night ? const Color(0xFFDCE9FF) : const Color(0xFFFFE066);
+    final haloTint = _night ? const Color(0xFFDCE9FF) : const Color(0xFFFFE066);
     const coronaTint = Color(0xFFFFF8DC);
     final peak = _night ? 0.46 : 0.78;
     _halo = Paint()
@@ -98,23 +96,22 @@ class OnboardingCelestial extends PositionComponent {
           haloTint.withValues(alpha: 0),
         ],
         stops: const [0.0, 0.30, 0.58, 1.0],
-      ).createShader(
-        Rect.fromCircle(center: Offset.zero, radius: _haloRadius),
-      );
+      ).createShader(Rect.fromCircle(center: Offset.zero, radius: _haloRadius));
     // Tight bloom hugging the disc so the sun reads as the light source
     // rather than a soft blob floating in haze.
     _corona = _rippling
         ? (Paint()
-          ..shader = RadialGradient(
-            colors: [
-              coronaTint.withValues(alpha: 0.72),
-              coronaTint.withValues(alpha: 0.40),
-              coronaTint.withValues(alpha: 0),
-            ],
-            stops: const [0.0, 0.62, 1.0],
-          ).createShader(
-            Rect.fromCircle(center: Offset.zero, radius: _coronaRadius),
-          ))
+            ..shader =
+                RadialGradient(
+                  colors: [
+                    coronaTint.withValues(alpha: 0.72),
+                    coronaTint.withValues(alpha: 0.40),
+                    coronaTint.withValues(alpha: 0),
+                  ],
+                  stops: const [0.0, 0.62, 1.0],
+                ).createShader(
+                  Rect.fromCircle(center: Offset.zero, radius: _coronaRadius),
+                ))
         : null;
     _disc = Paint()
       ..shader = RadialGradient(
@@ -122,16 +119,10 @@ class OnboardingCelestial extends PositionComponent {
         // like a real one blown out against the sky.
         colors: _night
             ? const [Color(0xFFFFFDF0), Color(0xFFE8E2C8)]
-            : const [
-                Color(0xFFFFFFFF),
-                Color(0xFFFFFAE8),
-                Color(0xFFFFEDB4),
-              ],
+            : const [Color(0xFFFFFFFF), Color(0xFFFFFAE8), Color(0xFFFFEDB4)],
         stops: _night ? const [0.0, 1.0] : const [0.0, 0.52, 1.0],
         center: const Alignment(-0.2, -0.3),
-      ).createShader(
-        Rect.fromCircle(center: Offset.zero, radius: _radius),
-      );
+      ).createShader(Rect.fromCircle(center: Offset.zero, radius: _radius));
   }
 
   void _seedMotes() {
@@ -186,7 +177,8 @@ class OnboardingCelestial extends PositionComponent {
     final segments = _cheap ? 28 : 44;
     final points = List<Offset>.generate(segments, (i) {
       final theta = i / segments * math.pi * 2;
-      final wave = 0.66 * math.sin(lobes * theta + phase) +
+      final wave =
+          0.66 * math.sin(lobes * theta + phase) +
           0.34 * math.sin((lobes + 3) * theta - phase * 0.7);
       // The gradient fades to zero alpha exactly at [radius], so the outline
       // is biased fully outside it — a wave that dips back inside clips the
@@ -263,8 +255,7 @@ class OnboardingCelestial extends PositionComponent {
       // Fade in from the rim, fade out at the end of the drift.
       final fade = math.sin(mote.life * math.pi);
       if (fade <= 0.01) continue;
-      final twinkle =
-          0.6 + 0.4 * math.sin(_elapsed * 3 + mote.twinklePhase);
+      final twinkle = 0.6 + 0.4 * math.sin(_elapsed * 3 + mote.twinklePhase);
       final distance = _radius * (1.2 + 2.0 * mote.life);
       final angle = mote.angle + mote.drift * mote.life;
       final offset = Offset(

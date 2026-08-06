@@ -149,7 +149,10 @@ class SettleUpExplainerBody extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final steps = <(IconData, String)>[
-      (Icons.account_balance_wallet_outlined, 'settle_up_explainer_balance'.tr()),
+      (
+        Icons.account_balance_wallet_outlined,
+        'settle_up_explainer_balance'.tr(),
+      ),
       (Icons.swap_horiz_rounded, 'settle_up_explainer_suggestions'.tr()),
       (Icons.touch_app_outlined, 'settle_up_explainer_one_at_a_time'.tr()),
     ];
@@ -244,8 +247,7 @@ Future<SettlementMethod?> showSettlementMethodPickerSheet(
                         _SettlementMethodOption(
                           method: method,
                           selected: method == selected,
-                          emphasizeLiveChip:
-                              method == SettlementMethod.greedy,
+                          emphasizeLiveChip: method == SettlementMethod.greedy,
                           onTap: () => Navigator.pop(ctx, method),
                         ),
                         const SizedBox(height: 8),

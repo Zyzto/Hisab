@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../features/settings/providers/settings_framework_providers.dart';
+import '../settings/providers/settings_framework_providers.dart';
 import '../debug/integration_test_mode.dart';
 import '../platform/ui_perf.dart';
 import '../theme/theme_config.dart';
@@ -86,15 +86,16 @@ class AppFab extends ConsumerStatefulWidget {
   ConsumerState<AppFab> createState() => _AppFabState();
 }
 
-class _AppFabState extends ConsumerState<AppFab>
-    with TickerProviderStateMixin {
+class _AppFabState extends ConsumerState<AppFab> with TickerProviderStateMixin {
   static const Duration _pressInDuration = Duration(milliseconds: 90);
   static const Duration _releaseDuration = Duration(milliseconds: 320);
   static const Duration _releaseReducedDuration = Duration(milliseconds: 160);
   static const Duration _wiggleDuration = Duration(milliseconds: 1500);
   static const Duration _leafDuration = Duration(milliseconds: 720);
+
   /// ~0.45s grow + ~5s windy stay + ~0.55s leave.
   static const Duration _bloomDuration = Duration(milliseconds: 6000);
+
   /// Shorter cycle in the debug FAB playground.
   static const Duration _bloomPreviewDuration = Duration(milliseconds: 4000);
 
@@ -131,49 +132,45 @@ class _AppFabState extends ConsumerState<AppFab>
       vsync: this,
       duration: _pressInDuration,
     );
-    _releaseController = AnimationController(
-      vsync: this,
-      duration: _releaseDuration,
-    )..addStatusListener((status) {
-        if (status == AnimationStatus.completed && mounted) {
-          _releaseController.value = 0;
-          _lastCompress = 0;
-        }
-      });
-    _wiggleController = AnimationController(
-      vsync: this,
-      duration: _wiggleDuration,
-    )..addStatusListener((status) {
-        if (status == AnimationStatus.completed && mounted) {
-          _releaseAmbientSlot();
-          _scheduleAmbientBloom(
-            delay: widget.previewAmbientBloom
-                ? const Duration(milliseconds: 600)
-                : null,
-          );
-        }
-      });
-    _leafController = AnimationController(
-      vsync: this,
-      duration: _leafDuration,
-    );
-    _bloomController = AnimationController(
-      vsync: this,
-      duration: widget.previewAmbientBloom
-          ? _bloomPreviewDuration
-          : _bloomDuration,
-    )..addStatusListener((status) {
-        if (status == AnimationStatus.completed && mounted) {
-          _bloomController.value = 0;
-          _plantKind = null;
-          _bloomBouquet = false;
-          _releaseAmbientSlot();
-          // Preview mode is tap-driven; don't auto-queue the next bloom.
-          if (!widget.previewAmbientBloom) {
-            _scheduleAmbientBloom();
+    _releaseController =
+        AnimationController(vsync: this, duration: _releaseDuration)
+          ..addStatusListener((status) {
+            if (status == AnimationStatus.completed && mounted) {
+              _releaseController.value = 0;
+              _lastCompress = 0;
+            }
+          });
+    _wiggleController =
+        AnimationController(vsync: this, duration: _wiggleDuration)
+          ..addStatusListener((status) {
+            if (status == AnimationStatus.completed && mounted) {
+              _releaseAmbientSlot();
+              _scheduleAmbientBloom(
+                delay: widget.previewAmbientBloom
+                    ? const Duration(milliseconds: 600)
+                    : null,
+              );
+            }
+          });
+    _leafController = AnimationController(vsync: this, duration: _leafDuration);
+    _bloomController =
+        AnimationController(
+          vsync: this,
+          duration: widget.previewAmbientBloom
+              ? _bloomPreviewDuration
+              : _bloomDuration,
+        )..addStatusListener((status) {
+          if (status == AnimationStatus.completed && mounted) {
+            _bloomController.value = 0;
+            _plantKind = null;
+            _bloomBouquet = false;
+            _releaseAmbientSlot();
+            // Preview mode is tap-driven; don't auto-queue the next bloom.
+            if (!widget.previewAmbientBloom) {
+              _scheduleAmbientBloom();
+            }
           }
-        }
-      });
+        });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -240,8 +237,9 @@ class _AppFabState extends ConsumerState<AppFab>
 
   void _applyExtrasSetting(bool settingEnabled) {
     final next = _platformAllowsExtras() && settingEnabled;
-    _releaseController.duration =
-        next ? _releaseDuration : _releaseReducedDuration;
+    _releaseController.duration = next
+        ? _releaseDuration
+        : _releaseReducedDuration;
     final was = _extras;
     _extras = next;
     if (!next) {
@@ -271,8 +269,7 @@ class _AppFabState extends ConsumerState<AppFab>
     if (!_ambientAllowed) return;
     // Debug playground: only the first auto bloom; further kinds via tap.
     if (widget.previewAmbientBloom && delay == null) return;
-    final wait =
-        delay ?? Duration(milliseconds: 16000 + _rng.nextInt(14000));
+    final wait = delay ?? Duration(milliseconds: 16000 + _rng.nextInt(14000));
     _ambientTimer = Timer(wait, () {
       if (!_ambientAllowed) return;
       if (_bloomController.isAnimating || _leafController.isAnimating) {
@@ -290,8 +287,10 @@ class _AppFabState extends ConsumerState<AppFab>
       }
       setState(() {
         // Classic original kinds as hero; sometimes a multi-plant bouquet too.
-        _plantKind = appFabOriginalPlantKinds[
-            _rng.nextInt(appFabOriginalPlantKinds.length)];
+        _plantKind =
+            appFabOriginalPlantKinds[_rng.nextInt(
+              appFabOriginalPlantKinds.length,
+            )];
         _bloomBouquet = _rng.nextBool();
       });
       _bloomController
@@ -308,8 +307,8 @@ class _AppFabState extends ConsumerState<AppFab>
       _releaseAmbientSlot();
       _acquireAmbientSlot();
     }
-    final entry = _previewBloomCatalog[
-        _previewBloomIndex % _previewBloomCatalog.length];
+    final entry =
+        _previewBloomCatalog[_previewBloomIndex % _previewBloomCatalog.length];
     _previewBloomIndex++;
     setState(() {
       _plantKind = entry.$1;
@@ -377,8 +376,9 @@ class _AppFabState extends ConsumerState<AppFab>
     }
     if (_releaseController.isAnimating || _releaseController.value > 0) {
       final raw = _releaseController.value.clamp(0.0, 1.0);
-      final t = (_extras ? Curves.elasticOut : Curves.easeOutCubic)
-          .transform(raw);
+      final t = (_extras ? Curves.elasticOut : Curves.easeOutCubic).transform(
+        raw,
+      );
       return _lastCompress * (1.0 - t);
     }
     return 0;
@@ -418,8 +418,9 @@ class _AppFabState extends ConsumerState<AppFab>
     // Use the resolved flag for this frame so press/nature match the setting
     // even before the post-frame sync runs.
     _extras = nextExtras;
-    _releaseController.duration =
-        _extras ? _releaseDuration : _releaseReducedDuration;
+    _releaseController.duration = _extras
+        ? _releaseDuration
+        : _releaseReducedDuration;
 
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
@@ -453,11 +454,13 @@ class _AppFabState extends ConsumerState<AppFab>
               children: [
                 if (_extras)
                   Positioned(
-                    left: (AppFabNaturePainter.fabSize -
+                    left:
+                        (AppFabNaturePainter.fabSize -
                             AppFabNaturePainter.paintSize.width) /
                         2,
                     // Bias canvas upward so heads grow above the FAB; stems root on it.
-                    top: (AppFabNaturePainter.fabSize -
+                    top:
+                        (AppFabNaturePainter.fabSize -
                                 AppFabNaturePainter.paintSize.height) /
                             2 -
                         AppFabNaturePainter.paintLift,
@@ -493,16 +496,14 @@ class _AppFabState extends ConsumerState<AppFab>
                         highlightColor: Colors.transparent,
                         // Visual press on down/up; invoke via onTap so
                         // tester.tap / semantics activation always fire.
-                        onTapDown:
-                            widget.onPressed == null ? null : _onTapDown,
+                        onTapDown: widget.onPressed == null ? null : _onTapDown,
                         onTapUp: widget.onPressed == null
                             ? null
                             : (_) => _finishPress(invoke: false),
-                        onTapCancel:
-                            widget.onPressed == null ? null : _onTapCancel,
-                        onTap: widget.onPressed == null
+                        onTapCancel: widget.onPressed == null
                             ? null
-                            : _queuePressed,
+                            : _onTapCancel,
+                        onTap: widget.onPressed == null ? null : _queuePressed,
                         onLongPress: widget.onLongPress == null
                             ? null
                             : _onLongPress,
@@ -552,9 +553,7 @@ class _AppFabState extends ConsumerState<AppFab>
         const SizedBox(height: 6),
         Text(
           label,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: scheme.onSurface,
-          ),
+          style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurface),
         ),
       ],
     );

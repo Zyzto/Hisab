@@ -8,7 +8,7 @@ import 'accent_style.dart';
 import 'experiment_styles.dart';
 import 'flex_theme_builder.dart';
 import '../debug/debug_menu.dart';
-import '../../features/settings/providers/settings_framework_providers.dart';
+import '../settings/providers/settings_framework_providers.dart';
 
 part 'theme_providers.g.dart';
 

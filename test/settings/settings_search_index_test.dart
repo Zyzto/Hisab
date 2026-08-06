@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hisab/features/settings/settings_definitions.dart';
+import 'package:hisab/core/settings/settings_definitions.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -11,18 +11,14 @@ void main() {
   late SearchIndex index;
 
   setUpAll(() async {
-    final enRaw = jsonDecode(
-      await rootBundle.loadString('assets/translations/en.json'),
-    ) as Map;
-    final arRaw = jsonDecode(
-      await rootBundle.loadString('assets/translations/ar.json'),
-    ) as Map;
-    final en = enRaw.map(
-      (k, v) => MapEntry(k.toString(), v?.toString() ?? ''),
-    );
-    final ar = arRaw.map(
-      (k, v) => MapEntry(k.toString(), v?.toString() ?? ''),
-    );
+    final enRaw =
+        jsonDecode(await rootBundle.loadString('assets/translations/en.json'))
+            as Map;
+    final arRaw =
+        jsonDecode(await rootBundle.loadString('assets/translations/ar.json'))
+            as Map;
+    final en = enRaw.map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''));
+    final ar = arRaw.map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''));
 
     index = SearchIndex(
       registry: createHisabSettingsRegistry(),
@@ -70,18 +66,12 @@ void main() {
       byOnboarding.map((r) => r.setting.key),
       isNot(contains('onboarding_online_pending')),
     );
-    expect(
-      index.getTermsForSetting('pending_invite_token'),
-      isNotEmpty,
-    );
+    expect(index.getTermsForSetting('pending_invite_token'), isNotEmpty);
   });
 
   test('home_list display is indexed but settings page filters separately', () {
     final results = index.search('home_list_display');
     // Still in registry/index; UI excludes the section.
-    expect(
-      results.any((r) => r.setting.section == 'home_list'),
-      isTrue,
-    );
+    expect(results.any((r) => r.setting.section == 'home_list'), isTrue);
   });
 }

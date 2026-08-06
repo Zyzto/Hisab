@@ -57,7 +57,8 @@ class _ExpensePhotoGalleryDialog extends StatefulWidget {
       _ExpensePhotoGalleryDialogState();
 }
 
-class _ExpensePhotoGalleryDialogState extends State<_ExpensePhotoGalleryDialog> {
+class _ExpensePhotoGalleryDialogState
+    extends State<_ExpensePhotoGalleryDialog> {
   late List<ExpensePhotoItem> _images;
   late PageController _pageController;
   late int _index;
@@ -378,9 +379,9 @@ class _ToolButton extends StatelessWidget {
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: color,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.labelSmall?.copyWith(color: color),
               ),
             ],
           ),
@@ -487,13 +488,17 @@ class _BrokenPhoto extends StatelessWidget {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Icon(Icons.broken_image_outlined, color: Colors.white54, size: 48),
+        const Icon(
+          Icons.broken_image_outlined,
+          color: Colors.white54,
+          size: 48,
+        ),
         const SizedBox(height: 8),
         Text(
           'image_unavailable'.tr(),
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Colors.white70,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
         ),
       ],
     );

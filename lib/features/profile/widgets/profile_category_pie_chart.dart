@@ -122,9 +122,7 @@ class ProfileCategoryPieChart extends ConsumerWidget {
         .toSet();
 
     final filtered = rangeExpenses.where((item) {
-      final tag = (item.expense.tag == null || item.expense.tag!.isEmpty)
-          ? 'untagged'
-          : item.expense.tag!;
+      final tag = item.expense.hasBlankTag ? 'untagged' : item.expense.tag!;
       if (slice.id == _kOtherId) return otherTagIds.contains(tag);
       return tag == slice.id;
     }).toList();

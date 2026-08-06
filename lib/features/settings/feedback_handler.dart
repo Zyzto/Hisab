@@ -11,8 +11,9 @@ Future<void> handleFeedback(
   required UserFeedback feedback,
 }) async {
   final message = feedback.text.trim().isEmpty ? '—' : feedback.text.trim();
-  final screenshotPng =
-      feedback.screenshot.isNotEmpty ? feedback.screenshot : null;
+  final screenshotPng = feedback.screenshot.isNotEmpty
+      ? feedback.screenshot
+      : null;
 
   final copiedAsPrimary = await submitUserBugReport(
     context,

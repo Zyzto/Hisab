@@ -25,8 +25,7 @@ class _FakeRpcBuilder extends Fake implements PostgrestFilterBuilder<dynamic> {
   Future<R> then<R>(
     FutureOr<R> Function(dynamic value) onValue, {
     Function? onError,
-  }) =>
-      Future<R>.sync(() => onValue(value));
+  }) => Future<R>.sync(() => onValue(value));
 }
 
 void main() {

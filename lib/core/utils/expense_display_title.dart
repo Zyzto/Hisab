@@ -26,14 +26,8 @@ String expenseDisplayTitle(
 
   final from = fromName?.trim();
   final to = toName?.trim();
-  if (from != null &&
-      from.isNotEmpty &&
-      to != null &&
-      to.isNotEmpty) {
-    return t(
-      'settlement_expense_title',
-      namedArgs: {'from': from, 'to': to},
-    );
+  if (from != null && from.isNotEmpty && to != null && to.isNotEmpty) {
+    return t('settlement_expense_title', namedArgs: {'from': from, 'to': to});
   }
   return t('transfer');
 }

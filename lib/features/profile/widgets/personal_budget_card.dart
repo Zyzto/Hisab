@@ -49,9 +49,7 @@ class PersonalBudgetCard extends ConsumerWidget {
     final hasBudget = budgetCents != null && budgetCents! > 0;
     final overBudget = hasBudget && spentCents >= budgetCents!;
     final nearBudget =
-        hasBudget &&
-        !overBudget &&
-        spentCents >= (budgetCents! * 0.8).round();
+        hasBudget && !overBudget && spentCents >= (budgetCents! * 0.8).round();
     final attentionColor = overBudget
         ? colorScheme.error
         : (nearBudget ? colorScheme.tertiary : null);

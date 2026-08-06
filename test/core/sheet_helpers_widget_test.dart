@@ -140,7 +140,9 @@ void main() {
     expect(find.byIcon(Icons.close), findsNothing);
   });
 
-  testWidgets('showOptionPickerSheet uses SheetOptionTile rows', (tester) async {
+  testWidgets('showOptionPickerSheet uses SheetOptionTile rows', (
+    tester,
+  ) async {
     setPhoneViewport(tester);
     String? chosen;
     await tester.pumpWidget(
@@ -169,65 +171,64 @@ void main() {
     expect(chosen, 'b');
   });
 
-  testWidgets(
-    'showOptionPickerSheet supports subtitle, disabled, and header',
-    (tester) async {
-      setPhoneViewport(tester);
-      String? chosen;
-      await tester.pumpWidget(
-        buildApp(
-          onOpen: (ctx) async {
-            chosen = await showOptionPickerSheet<String>(
-              ctx,
-              title: 'Import',
-              header: const Text('Preview counts'),
-              options: const [
-                SheetPickerOption(
-                  value: 'add',
-                  label: 'Add copies',
-                  subtitle: 'Keeps existing data',
-                ),
-                SheetPickerOption(
-                  value: 'replace',
-                  label: 'Replace',
-                  subtitle: 'Requires offline mode',
-                  enabled: false,
-                ),
-              ],
-            );
-          },
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Open'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Preview counts'), findsOneWidget);
-      expect(find.text('Keeps existing data'), findsOneWidget);
-      expect(find.text('Requires offline mode'), findsOneWidget);
-
-      final disabled = tester.widget<SheetOptionTile>(
-        find.widgetWithText(SheetOptionTile, 'Replace'),
-      );
-      expect(disabled.enabled, isFalse);
-
-      await tester.tap(find.text('Replace'));
-      await tester.pumpAndSettle();
-      expect(chosen, isNull);
-      expect(find.byType(SheetOptionTile), findsNWidgets(2));
-
-      await tester.tap(find.text('Add copies'));
-      await tester.pumpAndSettle();
-      expect(chosen, 'add');
-    },
-  );
-
-  testWidgets('text input sheet lifts above keyboard viewInsets', (tester) async {
+  testWidgets('showOptionPickerSheet supports subtitle, disabled, and header', (
+    tester,
+  ) async {
     setPhoneViewport(tester);
+    String? chosen;
     await tester.pumpWidget(
       buildApp(
-        onOpen: (ctx) => showTextInputSheet(ctx, title: 'Tag name'),
+        onOpen: (ctx) async {
+          chosen = await showOptionPickerSheet<String>(
+            ctx,
+            title: 'Import',
+            header: const Text('Preview counts'),
+            options: const [
+              SheetPickerOption(
+                value: 'add',
+                label: 'Add copies',
+                subtitle: 'Keeps existing data',
+              ),
+              SheetPickerOption(
+                value: 'replace',
+                label: 'Replace',
+                subtitle: 'Requires offline mode',
+                enabled: false,
+              ),
+            ],
+          );
+        },
       ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Preview counts'), findsOneWidget);
+    expect(find.text('Keeps existing data'), findsOneWidget);
+    expect(find.text('Requires offline mode'), findsOneWidget);
+
+    final disabled = tester.widget<SheetOptionTile>(
+      find.widgetWithText(SheetOptionTile, 'Replace'),
+    );
+    expect(disabled.enabled, isFalse);
+
+    await tester.tap(find.text('Replace'));
+    await tester.pumpAndSettle();
+    expect(chosen, isNull);
+    expect(find.byType(SheetOptionTile), findsNWidgets(2));
+
+    await tester.tap(find.text('Add copies'));
+    await tester.pumpAndSettle();
+    expect(chosen, 'add');
+  });
+
+  testWidgets('text input sheet lifts above keyboard viewInsets', (
+    tester,
+  ) async {
+    setPhoneViewport(tester);
+    await tester.pumpWidget(
+      buildApp(onOpen: (ctx) => showTextInputSheet(ctx, title: 'Tag name')),
     );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Open'));
@@ -248,12 +249,12 @@ void main() {
     expect(tester.getBottomLeft(find.byType(TextField)).dy, lessThan(500));
   });
 
-  testWidgets('tablet text sheet stays above keyboard viewInsets', (tester) async {
+  testWidgets('tablet text sheet stays above keyboard viewInsets', (
+    tester,
+  ) async {
     setTabletViewport(tester);
     await tester.pumpWidget(
-      buildApp(
-        onOpen: (ctx) => showTextInputSheet(ctx, title: 'Tag name'),
-      ),
+      buildApp(onOpen: (ctx) => showTextInputSheet(ctx, title: 'Tag name')),
     );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Open'));
@@ -296,7 +297,9 @@ void main() {
 
     expect(find.text('No fields here'), findsOneWidget);
     expect(
-      tester.getBottomLeft(find.byKey(const ValueKey('responsive_sheet_panel'))).dy,
+      tester
+          .getBottomLeft(find.byKey(const ValueKey('responsive_sheet_panel')))
+          .dy,
       closeTo(500, 1),
     );
   });
@@ -306,9 +309,7 @@ void main() {
   ) async {
     setPhoneViewport(tester);
     await tester.pumpWidget(
-      buildApp(
-        onOpen: (ctx) => showTextInputSheet(ctx, title: 'Tag name'),
-      ),
+      buildApp(onOpen: (ctx) => showTextInputSheet(ctx, title: 'Tag name')),
     );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Open'));
@@ -323,7 +324,8 @@ void main() {
     expect(tester.getBottomLeft(panel).dy, closeTo(restingBottom - 300, 1));
 
     tester.view.viewInsets = FakeViewPadding.zero;
-    await tester.pump(); // one frame — must already be back, not mid 320ms morph
+    await tester
+        .pump(); // one frame — must already be back, not mid 320ms morph
     expect(tester.getBottomLeft(panel).dy, closeTo(restingBottom, 1));
   });
 
@@ -338,9 +340,7 @@ void main() {
     addTearDown(tester.view.resetViewPadding);
 
     await tester.pumpWidget(
-      buildApp(
-        onOpen: (ctx) => showTextInputSheet(ctx, title: 'Tag name'),
-      ),
+      buildApp(onOpen: (ctx) => showTextInputSheet(ctx, title: 'Tag name')),
     );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Open'));
@@ -369,9 +369,7 @@ void main() {
   ) async {
     setPhoneViewport(tester);
     await tester.pumpWidget(
-      buildApp(
-        onOpen: (ctx) => showTextInputSheet(ctx, title: 'Tag name'),
-      ),
+      buildApp(onOpen: (ctx) => showTextInputSheet(ctx, title: 'Tag name')),
     );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Open'));

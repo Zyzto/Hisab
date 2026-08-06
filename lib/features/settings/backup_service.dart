@@ -346,7 +346,9 @@ class BackupService {
     }
 
     final pendingBefore = await db.getAll('SELECT id FROM pending_writes');
-    final pendingBeforeIds = pendingBefore.map((r) => r['id'] as String).toSet();
+    final pendingBeforeIds = pendingBefore
+        .map((r) => r['id'] as String)
+        .toSet();
 
     final failed = <String>[];
     var succeeded = 0;
@@ -355,10 +357,7 @@ class BackupService {
     Future<BackupImportResult> run() async {
       for (var i = 0; i < data.groups.length; i++) {
         final g = data.groups[i];
-        onProgress?.call(
-          'import_group',
-          total == 0 ? 1.0 : (i / total),
-        );
+        onProgress?.call('import_group', total == 0 ? 1.0 : (i / total));
         try {
           await _importOneGroup(
             g,
@@ -368,7 +367,11 @@ class BackupService {
           );
           succeeded++;
         } catch (e, st) {
-          Log.warning('Import group failed: ${g.name}', error: e, stackTrace: st);
+          Log.warning(
+            'Import group failed: ${g.name}',
+            error: e,
+            stackTrace: st,
+          );
           failed.add(g.name);
           // Fail-fast per plan: stop further groups after recording failure.
           break;
@@ -513,7 +516,9 @@ class BackupService {
           .toList();
       final storedPaths = <String>[];
       for (final rel in paths) {
-        final key = rel.startsWith('receipts/') ? rel : 'receipts/${rel.split('/').last}';
+        final key = rel.startsWith('receipts/')
+            ? rel
+            : 'receipts/${rel.split('/').last}';
         final bytes = zipReceipts[key] ?? zipReceipts[rel];
         if (bytes == null) continue;
         try {
@@ -528,9 +533,7 @@ class BackupService {
         }
       }
 
-      final remappedTag = e.tag == null
-          ? null
-          : (tagIds[e.tag!] ?? e.tag);
+      final remappedTag = e.tag == null ? null : (tagIds[e.tag!] ?? e.tag);
 
       final expense = Expense(
         id: '',
@@ -595,11 +598,8 @@ class BackupService {
   static bool _looksLikeZip(Uint8List bytes) =>
       bytes.length >= 4 && bytes[0] == 0x50 && bytes[1] == 0x4b;
 
-  static String _stamp() => DateTime.now()
-      .toIso8601String()
-      .replaceAll(':', '-')
-      .split('.')
-      .first;
+  static String _stamp() =>
+      DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
 
   static Map<String, dynamic> _expenseToExportMap(Expense e) => {
     'id': e.id,

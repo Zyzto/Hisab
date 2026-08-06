@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../utils/currency_formatter.dart';
 import '../utils/currency_helpers.dart';
-import '../../features/settings/providers/settings_framework_providers.dart';
+import '../settings/providers/settings_framework_providers.dart';
 import '../../features/settings/providers/display_currency_rate_provider.dart';
 import 'amount_text.dart';
 

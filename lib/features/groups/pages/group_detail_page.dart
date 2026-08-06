@@ -49,8 +49,8 @@ import '../../expenses/category_icons.dart';
 import '../providers/group_analytics_provider.dart';
 import '../../balance/widgets/balance_list.dart';
 import '../../profile/widgets/personal_budget_card.dart';
-import '../../settings/providers/settings_framework_providers.dart';
-import '../../settings/settings_definitions.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/settings_definitions.dart';
 import '../../../domain/domain.dart';
 import '../utils/group_icon_utils.dart';
 
@@ -1008,9 +1008,7 @@ class _ExpensesTabState extends ConsumerState<_ExpensesTab> {
 
             final tagKeys = <String>{};
             for (final e in expenses) {
-              final tag = (e.tag == null || e.tag!.isEmpty)
-                  ? 'untagged'
-                  : e.tag!;
+              final tag = e.hasBlankTag ? 'untagged' : e.tag!;
               tagKeys.add(tag);
             }
             final tagList = tagKeys.toList()
@@ -1025,9 +1023,7 @@ class _ExpensesTabState extends ConsumerState<_ExpensesTab> {
             final searchQ = _searchQuery.trim().toLowerCase();
             final filtered = expenses.where((e) {
               if (_tagFilter != null) {
-                final tag = (e.tag == null || e.tag!.isEmpty)
-                    ? 'untagged'
-                    : e.tag!;
+                final tag = e.hasBlankTag ? 'untagged' : e.tag!;
                 if (tag != _tagFilter) return false;
               }
               if (_dateRangeFilter != null) {
@@ -1385,7 +1381,9 @@ class _ExpensesTabState extends ConsumerState<_ExpensesTab> {
                         includeCategory: tagList.isNotEmpty,
                       );
                       return Padding(
-                        key: const ValueKey<String>('group_expenses_list_tools'),
+                        key: const ValueKey<String>(
+                          'group_expenses_list_tools',
+                        ),
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2314,14 +2312,8 @@ class _PeopleTab extends ConsumerWidget {
       title: 'change_role'.tr(),
       selected: member.role == 'admin' ? GroupRole.admin : GroupRole.member,
       options: [
-        SheetPickerOption(
-          value: GroupRole.admin,
-          label: 'group_admin'.tr(),
-        ),
-        SheetPickerOption(
-          value: GroupRole.member,
-          label: 'group_member'.tr(),
-        ),
+        SheetPickerOption(value: GroupRole.admin, label: 'group_admin'.tr()),
+        SheetPickerOption(value: GroupRole.member, label: 'group_member'.tr()),
       ],
     );
     if (role != null && context.mounted) {

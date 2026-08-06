@@ -30,8 +30,9 @@ class _DraftTransactionDetailPageState
   void initState() {
     super.initState();
     _isIncome = widget.draft.amountCents < 0;
-    _merchantController =
-        TextEditingController(text: widget.draft.merchantName ?? '');
+    _merchantController = TextEditingController(
+      text: widget.draft.merchantName ?? '',
+    );
     _amountController = TextEditingController(
       text: (widget.draft.amountCents.abs() / 100).toStringAsFixed(2),
     );
@@ -57,9 +58,7 @@ class _DraftTransactionDetailPageState
         actions: [
           IconButton(
             onPressed: () {
-              ref
-                  .read(scannerControllerProvider)
-                  .dismissDraft(draft.id);
+              ref.read(scannerControllerProvider).dismissDraft(draft.id);
               Navigator.pop(context);
             },
             icon: const Icon(Icons.delete_outline),
@@ -96,8 +95,9 @@ class _DraftTransactionDetailPageState
                     width: 120,
                     child: TextField(
                       controller: _amountController,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       decoration: const InputDecoration(
                         border: InputBorder.none,
                         isDense: true,
@@ -106,8 +106,10 @@ class _DraftTransactionDetailPageState
                   ),
                   const SizedBox(width: 8),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(6),
@@ -169,9 +171,7 @@ class _DraftTransactionDetailPageState
                 child: Row(
                   children: [
                     Icon(
-                      _showRaw
-                          ? Icons.expand_less
-                          : Icons.expand_more,
+                      _showRaw ? Icons.expand_less : Icons.expand_more,
                       color: colorScheme.onSurfaceVariant,
                     ),
                     const SizedBox(width: 8),
@@ -271,9 +271,7 @@ class _DraftTransactionDetailPageState
               ),
             ),
           ),
-          Expanded(
-            child: UserText(value, style: theme.textTheme.bodyMedium),
-          ),
+          Expanded(child: UserText(value, style: theme.textTheme.bodyMedium)),
         ],
       ),
     );
@@ -295,16 +293,12 @@ class _DraftTransactionDetailPageState
     if (highlights.isEmpty) {
       return SelectableText(
         raw,
-        style: theme.textTheme.bodySmall?.copyWith(
-          fontFamily: 'monospace',
-        ),
+        style: theme.textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
         textDirection: rawDirection,
       );
     }
 
-    final pattern = highlights
-        .map((h) => RegExp.escape(h))
-        .join('|');
+    final pattern = highlights.map((h) => RegExp.escape(h)).join('|');
     final regex = RegExp(pattern, caseSensitive: false);
     int lastEnd = 0;
 
@@ -312,14 +306,15 @@ class _DraftTransactionDetailPageState
       if (match.start > lastEnd) {
         spans.add(TextSpan(text: raw.substring(lastEnd, match.start)));
       }
-      spans.add(TextSpan(
-        text: match.group(0),
-        style: TextStyle(
-          backgroundColor:
-              theme.colorScheme.primary.withValues(alpha: 0.2),
-          fontWeight: FontWeight.w700,
+      spans.add(
+        TextSpan(
+          text: match.group(0),
+          style: TextStyle(
+            backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.2),
+            fontWeight: FontWeight.w700,
+          ),
         ),
-      ));
+      );
       lastEnd = match.end;
     }
     if (lastEnd < raw.length) {
@@ -349,12 +344,13 @@ class _DraftTransactionDetailPageState
       editedCents = _isIncome ? -absCents : absCents;
     }
 
-    ref.read(scannerControllerProvider).confirmDraft(
-      widget.draft.id,
-      overrideMerchant:
-          editedMerchant.isNotEmpty ? editedMerchant : null,
-      overrideAmountCents: editedCents,
-    );
+    ref
+        .read(scannerControllerProvider)
+        .confirmDraft(
+          widget.draft.id,
+          overrideMerchant: editedMerchant.isNotEmpty ? editedMerchant : null,
+          overrideAmountCents: editedCents,
+        );
     Navigator.pop(context);
   }
 }

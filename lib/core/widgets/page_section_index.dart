@@ -240,8 +240,8 @@ class _PageSectionIndexOverlayState extends State<PageSectionIndexOverlay>
                                       'page_index_title'.tr(),
                                       style: theme.textTheme.labelMedium
                                           ?.copyWith(
-                                        fontWeight: FontWeight.w800,
-                                      ),
+                                            fontWeight: FontWeight.w800,
+                                          ),
                                     ),
                                     Text(
                                       active.label,
@@ -249,8 +249,8 @@ class _PageSectionIndexOverlayState extends State<PageSectionIndexOverlay>
                                       overflow: TextOverflow.ellipsis,
                                       style: theme.textTheme.bodySmall
                                           ?.copyWith(
-                                        color: cs.onSurfaceVariant,
-                                      ),
+                                            color: cs.onSurfaceVariant,
+                                          ),
                                     ),
                                   ],
                                 ),
@@ -298,9 +298,7 @@ class _PopoverPanel extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: cs.outlineVariant.withValues(alpha: 0.5),
-            ),
+            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(16),

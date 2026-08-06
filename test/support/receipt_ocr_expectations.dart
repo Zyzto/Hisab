@@ -33,10 +33,7 @@ class ReceiptOcrScoreResult {
 }
 
 /// Scores [dir] of `*.txt` OCR dumps against [receiptOcrExpectations].
-ReceiptOcrScoreResult scoreOcrDir(
-  Directory dir, {
-  DateTime? fallbackDate,
-}) {
+ReceiptOcrScoreResult scoreOcrDir(Directory dir, {DateTime? fallbackDate}) {
   final fb = fallbackDate ?? DateTime(2020, 1, 1);
   var hits = 0;
   var checks = 0;

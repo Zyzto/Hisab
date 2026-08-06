@@ -1,7 +1,7 @@
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 
-import '../../features/settings/settings_definitions.dart';
+import '../settings/settings_definitions.dart';
 
 /// Completes onboarding/settings flows that were interrupted by OAuth or
 /// magic-link redirects once a session is available.

@@ -4,6 +4,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:feedback/feedback.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -11,8 +12,8 @@ import 'package:upgrader/upgrader.dart';
 
 import '../../features/expenses/camera/receipt_camera_debug.dart';
 import '../../features/settings/feedback_handler.dart';
-import '../../features/settings/providers/settings_framework_providers.dart';
-import '../../features/settings/settings_definitions.dart';
+import '../settings/providers/settings_framework_providers.dart';
+import '../settings/settings_definitions.dart';
 import '../celebration/celebration_controller.dart';
 import '../celebration/celebration_dedupe.dart';
 import '../celebration/celebration_kind.dart';
@@ -318,7 +319,9 @@ class _DebugMenuSheetState extends ConsumerState<_DebugMenuSheet> {
             BetterFeedback.of(
               host,
             ).show((feedback) => handleFeedback(host, feedback: feedback));
-          } catch (_) {}
+          } catch (e) {
+            Log.debug('BetterFeedback show from debug menu failed', error: e);
+          }
         },
       );
     });

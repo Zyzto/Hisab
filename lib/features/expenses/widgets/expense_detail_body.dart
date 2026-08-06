@@ -8,7 +8,7 @@ import '../../../core/receipt/receipt_image_view.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/widgets/amount_with_secondary_display.dart';
 import '../../../core/widgets/participant_avatar.dart';
-import '../../../features/settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/expense_display_title.dart';
 import '../../../core/widgets/missing_route_page.dart';
@@ -80,9 +80,7 @@ class ExpenseDetailBody extends ConsumerWidget {
               return const Center(child: CircularProgressIndicator());
             }
             final nameOf = {for (final p in participants) p.id: p.name};
-            final avatarOf = {
-              for (final p in participants) p.id: p.avatarId,
-            };
+            final avatarOf = {for (final p in participants) p.id: p.avatarId};
             final customTags = tagsAsync.asData?.value ?? const <ExpenseTag>[];
             final isPersonal = group?.isPersonal == true;
             final groupCurrencyCode = group?.currencyCode;
@@ -112,14 +110,14 @@ class ExpenseDetailBody extends ConsumerWidget {
               avatarOf,
               useGroupCurrency ? groupCurrencyCode : null,
             );
-            final showSplit = showPeopleSections &&
+            final showSplit =
+                showPeopleSections &&
                 shares.isNotEmpty &&
                 (isTransfer ||
                     shares.length > 1 ||
                     shares.first.participantId != expense.payerParticipantId);
-            final isSparse = !hasDescription &&
-                !hasLineItems &&
-                !showPeopleSections;
+            final isSparse =
+                !hasDescription && !hasLineItems && !showPeopleSections;
 
             final header = ExpenseDetailBodyHeader(
               expense: expense,
@@ -142,9 +140,9 @@ class ExpenseDetailBody extends ConsumerWidget {
                   label: 'expense_description'.tr(),
                   child: UserText(
                     expense.description!.trim(),
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      height: 1.45,
-                    ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(height: 1.45),
                   ),
                 ),
               ],
@@ -158,10 +156,9 @@ class ExpenseDetailBody extends ConsumerWidget {
                         if (i > 0)
                           Divider(
                             height: 20,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .outlineVariant
-                                .withValues(alpha: 0.5),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.outlineVariant.withValues(alpha: 0.5),
                           ),
                         _LineItemRow(
                           description:
@@ -435,11 +432,7 @@ class ExpenseDetailBodyHeader extends StatelessWidget {
                         ),
                       ),
                       alignment: Alignment.center,
-                      child: Icon(
-                        icon,
-                        size: 24,
-                        color: tagChrome.onContainer,
-                      ),
+                      child: Icon(icon, size: 24, color: tagChrome.onContainer),
                     ),
                     const SizedBox(height: 6),
                     _MetaChip(
@@ -549,20 +542,11 @@ class ExpenseDetailBodyHeader extends StatelessWidget {
   ) {
     switch (type) {
       case TransactionType.income:
-        return (
-          color: scheme.tertiary,
-          container: scheme.tertiaryContainer,
-        );
+        return (color: scheme.tertiary, container: scheme.tertiaryContainer);
       case TransactionType.transfer:
-        return (
-          color: scheme.secondary,
-          container: scheme.secondaryContainer,
-        );
+        return (color: scheme.secondary, container: scheme.secondaryContainer);
       case TransactionType.expense:
-        return (
-          color: scheme.primary,
-          container: scheme.primaryContainer,
-        );
+        return (color: scheme.primary, container: scheme.primaryContainer);
     }
   }
 
@@ -759,14 +743,15 @@ class _MetaChip extends StatelessWidget {
           ],
           UserText(
             label,
-            style: (compact
-                    ? theme.textTheme.labelMedium
-                    : theme.textTheme.labelLarge)
-                ?.copyWith(
-              color: foreground,
-              fontWeight: FontWeight.w700,
-              height: 1.1,
-            ),
+            style:
+                (compact
+                        ? theme.textTheme.labelMedium
+                        : theme.textTheme.labelLarge)
+                    ?.copyWith(
+                      color: foreground,
+                      fontWeight: FontWeight.w700,
+                      height: 1.1,
+                    ),
           ),
         ],
       ),

@@ -95,7 +95,8 @@ class _ExpenseDateRangeSheetBody extends StatefulWidget {
       _ExpenseDateRangeSheetBodyState();
 }
 
-class _ExpenseDateRangeSheetBodyState extends State<_ExpenseDateRangeSheetBody> {
+class _ExpenseDateRangeSheetBodyState
+    extends State<_ExpenseDateRangeSheetBody> {
   DateTime? _start;
   DateTime? _end;
   late DateTime _visibleMonth;
@@ -165,7 +166,9 @@ class _ExpenseDateRangeSheetBodyState extends State<_ExpenseDateRangeSheetBody> 
     if (navigator.canPop()) navigator.pop(result);
   }
 
-  List<({String id, String label, DateTimeRange range})> _presets(DateTime now) {
+  List<({String id, String label, DateTimeRange range})> _presets(
+    DateTime now,
+  ) {
     final today = _dateOnly(now);
     final yesterday = today.subtract(const Duration(days: 1));
     final lastWeekStart = today.subtract(const Duration(days: 6));
@@ -286,9 +289,7 @@ class _ExpenseDateRangeSheetBodyState extends State<_ExpenseDateRangeSheetBody> 
       onMonthChanged: (month) => setState(() => _visibleMonth = month),
       footer: Text(
         'expenses_date_range_hint'.tr(),
-        style: theme.textTheme.bodySmall?.copyWith(
-          color: cs.onSurfaceVariant,
-        ),
+        style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
       ),
     );
 
@@ -328,10 +329,7 @@ class _ExpenseDateRangeSheetBodyState extends State<_ExpenseDateRangeSheetBody> 
                     visualDensity: VisualDensity.compact,
                     onPressed: () =>
                         _pop(const ExpenseDateRangeSheetResult(null)),
-                    icon: Icon(
-                      Icons.close_rounded,
-                      color: cs.onSurfaceVariant,
-                    ),
+                    icon: Icon(Icons.close_rounded, color: cs.onSurfaceVariant),
                   ),
               ],
             ),
@@ -357,8 +355,10 @@ class _ExpenseDateRangeSheetBodyState extends State<_ExpenseDateRangeSheetBody> 
         if (widget.showTitleInBody)
           TextButton(
             onPressed: () {
-              final navigator =
-                  Navigator.of(widget.sheetContext, rootNavigator: true);
+              final navigator = Navigator.of(
+                widget.sheetContext,
+                rootNavigator: true,
+              );
               if (navigator.canPop()) navigator.pop();
             },
             child: Text('cancel'.tr()),

@@ -6,7 +6,7 @@ import 'package:hisab/domain/domain.dart';
 import 'package:hisab/features/expenses/pages/expense_detail_shell.dart';
 import 'package:hisab/features/expenses/widgets/expense_detail_body.dart';
 import 'package:hisab/features/groups/providers/groups_provider.dart';
-import 'package:hisab/features/settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 
 void main() {
   final now = DateTime(2025, 1, 15);
@@ -74,18 +74,18 @@ void main() {
         overrides: [
           // Bodies resolve from the group list (shared watch) — no need for
           // per-id futureExpense overrides when the list is present.
-          expensesByGroupProvider(groupId).overrideWithValue(
-            AsyncValue.data([newer, older]),
-          ),
-          participantsByGroupProvider(groupId).overrideWithValue(
-            AsyncValue.data(participants),
-          ),
-          futureGroupProvider(groupId).overrideWithValue(
-            AsyncValue.data(testGroup),
-          ),
-          tagsByGroupProvider(groupId).overrideWithValue(
-            const AsyncValue.data([]),
-          ),
+          expensesByGroupProvider(
+            groupId,
+          ).overrideWithValue(AsyncValue.data([newer, older])),
+          participantsByGroupProvider(
+            groupId,
+          ).overrideWithValue(AsyncValue.data(participants)),
+          futureGroupProvider(
+            groupId,
+          ).overrideWithValue(AsyncValue.data(testGroup)),
+          tagsByGroupProvider(
+            groupId,
+          ).overrideWithValue(const AsyncValue.data([])),
           use24HourFormatProvider.overrideWithValue(false),
         ],
         child: EasyLocalization(
