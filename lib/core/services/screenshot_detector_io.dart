@@ -7,8 +7,7 @@ import '../platform/screenshot_report_support.dart';
 class ScreenshotDetector {
   ScreenshotDetector();
 
-  Stream<void> get events =>
-      SsPreventer.screenshotStream.map((_) {});
+  Stream<void> get events => SsPreventer.screenshotStream.map((_) {});
 
   Future<void> setEnabled(bool enabled) async {
     if (!supportsScreenshotReportPrompt) return;

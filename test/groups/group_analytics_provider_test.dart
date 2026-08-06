@@ -345,23 +345,32 @@ void main() {
     addTearDown(container.dispose);
 
     expect(
-      container.read(groupAnalyticsUiStateByGroupProvider('g-default')).categoryChartMode,
+      container
+          .read(groupAnalyticsUiStateByGroupProvider('g-default'))
+          .categoryChartMode,
       AnalyticsCategoryChartMode.pie,
     );
     expect(
-      container.read(groupAnalyticsUiStateByGroupProvider('g-default')).trendChartMode,
+      container
+          .read(groupAnalyticsUiStateByGroupProvider('g-default'))
+          .trendChartMode,
       AnalyticsTrendChartMode.totalBar,
     );
 
     final notifier = container.read(groupAnalyticsUiStateProvider.notifier);
-    notifier.setTrendChartMode('g-default', AnalyticsTrendChartMode.userComparison);
+    notifier.setTrendChartMode(
+      'g-default',
+      AnalyticsTrendChartMode.userComparison,
+    );
     notifier.setCategoryChartMode('g-default', AnalyticsCategoryChartMode.bars);
     notifier.setPersonChartMode('g-default', AnalyticsCategoryChartMode.bars);
     notifier.toggleExcludedCategory('g-default', 'food');
     notifier.toggleExcludedCategory('g-default', 'transport');
     notifier.toggleExcludedPerson('g-default', 'p1');
 
-    final updated = container.read(groupAnalyticsUiStateByGroupProvider('g-default'));
+    final updated = container.read(
+      groupAnalyticsUiStateByGroupProvider('g-default'),
+    );
     expect(updated.trendChartMode, AnalyticsTrendChartMode.userComparison);
     expect(updated.categoryChartMode, AnalyticsCategoryChartMode.bars);
     expect(updated.personChartMode, AnalyticsCategoryChartMode.bars);

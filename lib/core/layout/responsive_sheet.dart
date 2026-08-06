@@ -345,10 +345,7 @@ class _AdaptiveSheetHost extends StatelessWidget {
                 ),
               ),
               clipBehavior: Clip.antiAlias,
-              child: Material(
-                color: Colors.transparent,
-                child: panelBody,
-              ),
+              child: Material(color: Colors.transparent, child: panelBody),
             ),
           );
 

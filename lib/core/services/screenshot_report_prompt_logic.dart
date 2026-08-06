@@ -2,9 +2,7 @@ import 'package:flutter/foundation.dart';
 
 /// Pure debounce / gate logic for the screenshot → report prompt.
 class ScreenshotReportPromptLogic {
-  ScreenshotReportPromptLogic({
-    this.debounce = const Duration(seconds: 5),
-  });
+  ScreenshotReportPromptLogic({this.debounce = const Duration(seconds: 5)});
 
   final Duration debounce;
   DateTime? _lastPromptAt;

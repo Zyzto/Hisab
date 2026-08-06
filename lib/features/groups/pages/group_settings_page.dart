@@ -40,7 +40,7 @@ import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../core/widgets/user_text.dart';
 import '../../../domain/domain.dart';
-import '../../settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 
 class GroupSettingsPage extends ConsumerStatefulWidget {
   final String groupId;
@@ -85,11 +85,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage>
     }
   }
 
-  Widget _settingsShell(
-    BuildContext context, {
-    String? title,
-    Widget? body,
-  }) {
+  Widget _settingsShell(BuildContext context, {String? title, Widget? body}) {
     final groupPath = RoutePaths.groupDetail(widget.groupId);
     return LayoutBuilder(
       builder: (context, layoutConstraints) {
@@ -864,7 +860,8 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage>
         }
         final selectedId =
             group.treasurerParticipantId ?? participants.first.id;
-        final selected = participants.where((p) => p.id == selectedId).firstOrNull ??
+        final selected =
+            participants.where((p) => p.id == selectedId).firstOrNull ??
             participants.first;
         final canEdit = !_saving && canEditSettings;
         return Column(

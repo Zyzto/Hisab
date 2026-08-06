@@ -30,8 +30,8 @@ import '../../../core/services/delete_my_data_service.dart';
 import '../../../core/services/github_user_client.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/utils/currency_helpers.dart';
-import '../settings_definitions.dart';
-import '../providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/settings_definitions.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 import '../backup_ui.dart';
 import '../backup_wipe.dart';
 import '../feedback_handler.dart';
@@ -180,7 +180,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final token = ++_scrollGeneration;
     final section = _sectionByKey(entry.id);
     final wasCollapsed =
-        section != null && !(_sectionExpanded[entry.id] ?? section.initiallyExpanded);
+        section != null &&
+        !(_sectionExpanded[entry.id] ?? section.initiallyExpanded);
 
     setState(() {
       _activeSectionId = entry.id;
@@ -204,10 +205,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
     if (!mounted || token != _scrollGeneration) return;
 
-    _captureVisibleOffsets(_indexEntries(
-      showReceiptAi: ReceiptScanCapability.showReceiptAiSettings,
-      showScanner: scannerAvailable,
-    ));
+    _captureVisibleOffsets(
+      _indexEntries(
+        showReceiptAi: ReceiptScanCapability.showReceiptAiSettings,
+        showScanner: scannerAvailable,
+      ),
+    );
     // Hold scroll-spy until ensureVisible settles so the index doesn't flash.
     await Future<void>.delayed(const Duration(milliseconds: 320));
     if (mounted && token == _scrollGeneration) {
@@ -301,8 +304,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         _rememberSectionOffset(sectionKey, sectionGlobalKey);
       }
     }
-    final sectionOffset =
-        sectionKey != null ? _sectionOffsets[sectionKey] : null;
+    final sectionOffset = sectionKey != null
+        ? _sectionOffsets[sectionKey]
+        : null;
 
     // Prefer section scroll first so the tile is built, then highlight.
     if (sectionKey != null) {
@@ -374,14 +378,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final entryIds = {for (final e in entries) e.id};
     final activeId =
         (_activeSectionId != null && entryIds.contains(_activeSectionId))
-            ? _activeSectionId
-            : entries.firstOrNull?.id;
+        ? _activeSectionId
+        : entries.firstOrNull?.id;
     final hasSearch = _searchQuery.isNotEmpty;
 
     return LayoutBuilder(
       builder: (context, layoutConstraints) {
         final showSideIndex =
-            !hasSearch && _canShowSideIndex(context, layoutConstraints.maxWidth);
+            !hasSearch &&
+            _canShowSideIndex(context, layoutConstraints.maxWidth);
         return Scaffold(
           appBar: ContentAlignedAppBar(
             contentAreaWidth: layoutConstraints.maxWidth,
@@ -518,12 +523,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ref,
         settings,
         functionalSection,
-        buildFunctionalSectionTiles(
-          context,
-          ref,
-          settings,
-          anchors: _anchors,
-        ),
+        buildFunctionalSectionTiles(context, ref, settings, anchors: _anchors),
       ),
       _buildSection(
         context,
@@ -582,12 +582,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ref,
         settings,
         privacySection,
-        buildPrivacySectionTiles(
-          context,
-          ref,
-          settings,
-          anchors: _anchors,
-        ),
+        buildPrivacySectionTiles(context, ref, settings, anchors: _anchors),
       ),
       _buildSection(
         context,
@@ -656,8 +651,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   ) {
     final profile = ref.watch(authUserProfileProvider).asData?.value;
     final colorScheme = Theme.of(context).colorScheme;
-    final displayName =
-        profile?.name ?? profile?.email ?? 'profile'.tr();
+    final displayName = profile?.name ?? profile?.email ?? 'profile'.tr();
 
     return _buildSection(context, ref, settings, accountSection, [
       _anchors.wrap(
@@ -1051,11 +1045,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     // Match default Icon size (24) so the swatch aligns with sibling leadings.
     const swatchSize = 24.0;
     return ListTile(
-      leading: _schemeColorSwatch(
-        context,
-        displayColor,
-        size: swatchSize,
-      ),
+      leading: _schemeColorSwatch(context, displayColor, size: swatchSize),
       title: Text('color_scheme'.tr()),
       subtitle: Text(currentLabel),
       onTap: () async {
@@ -1126,12 +1116,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                                       color: Color(preset.$1),
                                       shape: BoxShape.circle,
                                       border: Border.all(
-                                        color: Theme.of(ctx).colorScheme.outline,
+                                        color: Theme.of(
+                                          ctx,
+                                        ).colorScheme.outline,
                                       ),
                                     ),
                                   ),
-                                  onTap: () =>
-                                      Navigator.of(ctx).pop(preset.$1),
+                                  onTap: () => Navigator.of(ctx).pop(preset.$1),
                                 ),
                               SheetOptionTile(
                                 title: 'pick_custom_theme_color'.tr(),
@@ -1325,12 +1316,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       centerInFullViewport: false,
       favorite: favorites,
       onSelect: (currency) {
-        applySetting(
-          ref,
-          settings,
-          displayCurrencySettingDef,
-          currency.code,
-        );
+        applySetting(ref, settings, displayCurrencySettingDef, currency.code);
       },
     );
   }
@@ -1355,12 +1341,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         initial: current,
         onSave: (updated) {
           final encoded = CurrencyHelpers.encodeFavorites(updated);
-          applySetting(
-            ref,
-            settings,
-            favoriteCurrenciesSettingDef,
-            encoded,
-          );
+          applySetting(ref, settings, favoriteCurrenciesSettingDef, encoded);
         },
       ),
     );
@@ -1494,9 +1475,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               : Text('scanner_no_pending'.tr()),
           onTap: () {
             Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const ScannerHubPage(),
-              ),
+              MaterialPageRoute<void>(builder: (_) => const ScannerHubPage()),
             );
           },
         ),
@@ -1835,7 +1814,9 @@ class _AboutMeDialogContentState extends State<_AboutMeDialogContent> {
             final uri = Uri.parse(linkUrl);
             try {
               await launchUrl(uri, mode: LaunchMode.externalApplication);
-            } catch (_) {}
+            } catch (e) {
+              Log.debug('Failed to open profile link', error: e);
+            }
           },
           icon: const Icon(Icons.open_in_new, size: 18),
           label: Text('view_profile'.tr()),

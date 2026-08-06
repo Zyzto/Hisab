@@ -88,8 +88,7 @@ class _PwaInstallBannerState extends State<PwaInstallBanner>
 
   Future<void> _checkShouldShow() async {
     final prefs = await SharedPreferences.getInstance();
-    final wasDismissed =
-        prefs.getBool(PwaInstallBanner.dismissedKey) ?? false;
+    final wasDismissed = prefs.getBool(PwaInstallBanner.dismissedKey) ?? false;
 
     if (!mounted) return;
 
@@ -102,7 +101,8 @@ class _PwaInstallBannerState extends State<PwaInstallBanner>
     }
 
     final mode = pwaInstallMode;
-    final shouldShow = mode == PwaInstallMode.nativePrompt ||
+    final shouldShow =
+        mode == PwaInstallMode.nativePrompt ||
         mode == PwaInstallMode.manualIos ||
         mode == PwaInstallMode.manualAndroid;
 
@@ -157,8 +157,9 @@ class _PwaInstallBannerState extends State<PwaInstallBanner>
 
     final colorScheme = Theme.of(context).colorScheme;
     final useNative = _mode == PwaInstallMode.nativePrompt;
-    final actionLabel =
-        useNative ? 'install_app'.tr() : 'install_app_how_to'.tr();
+    final actionLabel = useNative
+        ? 'install_app'.tr()
+        : 'install_app_how_to'.tr();
     final description = useNative
         ? 'install_app_description'.tr()
         : (_mode == PwaInstallMode.manualIos

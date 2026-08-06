@@ -15,8 +15,7 @@ Future<ReceiptScanResult?> processReceiptFile(
   WidgetRef ref,
   DateTime fallbackDate, {
   ReceiptScanCancelToken? cancel,
-}) async =>
-    null;
+}) async => null;
 
 /// Web: receipt OCR/AI is unsupported.
 Future<ReceiptScanResult?> processReceiptBytes(
@@ -24,8 +23,7 @@ Future<ReceiptScanResult?> processReceiptBytes(
   WidgetRef ref,
   DateTime fallbackDate, {
   ReceiptScanCancelToken? cancel,
-}) async =>
-    null;
+}) async => null;
 
 /// Web: Nano never needs attention (scan UI hidden).
 Future<bool> nanoNeedsUserAttention(WidgetRef ref) async => false;

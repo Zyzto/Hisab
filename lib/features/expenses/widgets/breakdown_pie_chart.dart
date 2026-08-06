@@ -198,8 +198,7 @@ class BreakdownPieChartState extends State<BreakdownPieChart> {
           height: widget.height,
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final chartSize =
-                  constraints.maxWidth < constraints.maxHeight
+              final chartSize = constraints.maxWidth < constraints.maxHeight
                   ? constraints.maxWidth
                   : constraints.maxHeight;
               // Scale hole to chart size so the center overlay never covers slices.
@@ -219,79 +218,81 @@ class BreakdownPieChartState extends State<BreakdownPieChart> {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                  PieChart(
-                    PieChartData(
-                      centerSpaceRadius: centerRadius,
-                      sectionsSpace: 2.5,
-                      startDegreeOffset: -90,
-                      pieTouchData: PieTouchData(
-                        // Keep touch for slice selection (primary UX); bar/line
-                        // charts use UiPerf.preferCheapCharts for tooltips.
-                        enabled: true,
-                        // Use tap-down: fl_chart often clears touchedSection on
-                        // tap-up, and a remembered index made outside taps open
-                        // the already-selected slice's expense list.
-                        touchCallback: (event, response) {
-                          if (event is! FlTapDownEvent) return;
-                          if (!event.isInterestedForInteractions) return;
-                          final index =
-                              response?.touchedSection?.touchedSectionIndex;
-                          if (index == null ||
-                              index < 0 ||
-                              index >= slices.length) {
-                            _deselect();
-                            return;
-                          }
-                          _handleSliceTap(slices[index]);
-                        },
+                    PieChart(
+                      PieChartData(
+                        centerSpaceRadius: centerRadius,
+                        sectionsSpace: 2.5,
+                        startDegreeOffset: -90,
+                        pieTouchData: PieTouchData(
+                          // Keep touch for slice selection (primary UX); bar/line
+                          // charts use UiPerf.preferCheapCharts for tooltips.
+                          enabled: true,
+                          // Use tap-down: fl_chart often clears touchedSection on
+                          // tap-up, and a remembered index made outside taps open
+                          // the already-selected slice's expense list.
+                          touchCallback: (event, response) {
+                            if (event is! FlTapDownEvent) return;
+                            if (!event.isInterestedForInteractions) return;
+                            final index =
+                                response?.touchedSection?.touchedSectionIndex;
+                            if (index == null ||
+                                index < 0 ||
+                                index >= slices.length) {
+                              _deselect();
+                              return;
+                            }
+                            _handleSliceTap(slices[index]);
+                          },
+                        ),
+                        sections: [
+                          for (final slice in slices)
+                            _section(
+                              context,
+                              slice,
+                              total,
+                              selected: slice.id == selectedId,
+                              hasSelection: hasSelection,
+                              radius: sectionRadius,
+                            ),
+                        ],
                       ),
-                      sections: [
-                        for (final slice in slices)
-                          _section(
-                            context,
-                            slice,
-                            total,
-                            selected: slice.id == selectedId,
-                            hasSelection: hasSelection,
-                            radius: sectionRadius,
-                          ),
-                      ],
                     ),
-                  ),
-                  // Center hole only — keep smaller than the ring so slices stay tappable.
-                  SizedBox(
-                    width: holeHit,
-                    height: holeHit,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: () {
-                          final center = widget.centerOverride ?? _selected;
-                          if (center != null &&
-                              center.canOpen &&
-                              widget.onOpenSlice != null) {
-                            widget.onOpenSlice!(center);
-                            return;
-                          }
-                          _deselect();
-                        },
-                        child: Center(
-                          child: SizedBox(
-                            width: holeTextSize,
-                            height: holeTextSize * 0.45,
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                centerAmount,
-                                maxLines: 1,
-                                softWrap: false,
-                                textAlign: TextAlign.center,
-                                style: theme.textTheme.headlineSmall?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  height: 1,
-                                  letterSpacing: -0.5,
-                                  color: center?.color ?? cs.onSurface,
+                    // Center hole only — keep smaller than the ring so slices stay tappable.
+                    SizedBox(
+                      width: holeHit,
+                      height: holeHit,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: () {
+                            final center = widget.centerOverride ?? _selected;
+                            if (center != null &&
+                                center.canOpen &&
+                                widget.onOpenSlice != null) {
+                              widget.onOpenSlice!(center);
+                              return;
+                            }
+                            _deselect();
+                          },
+                          child: Center(
+                            child: SizedBox(
+                              width: holeTextSize,
+                              height: holeTextSize * 0.45,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  centerAmount,
+                                  maxLines: 1,
+                                  softWrap: false,
+                                  textAlign: TextAlign.center,
+                                  style: theme.textTheme.headlineSmall
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                        height: 1,
+                                        letterSpacing: -0.5,
+                                        color: center?.color ?? cs.onSurface,
+                                      ),
                                 ),
                               ),
                             ),
@@ -299,19 +300,18 @@ class BreakdownPieChartState extends State<BreakdownPieChart> {
                         ),
                       ),
                     ),
-                  ),
-                  if (hasSelection)
-                    PositionedDirectional(
-                      end: 0,
-                      bottom: 0,
-                      child: IconButton(
-                        key: const ValueKey('breakdown_pie_clear_selection'),
-                        tooltip: 'analytics_pie_clear_selection'.tr(),
-                        visualDensity: VisualDensity.compact,
-                        onPressed: _deselect,
-                        icon: const Icon(Icons.filter_alt_off_outlined),
+                    if (hasSelection)
+                      PositionedDirectional(
+                        end: 0,
+                        bottom: 0,
+                        child: IconButton(
+                          key: const ValueKey('breakdown_pie_clear_selection'),
+                          tooltip: 'analytics_pie_clear_selection'.tr(),
+                          visualDensity: VisualDensity.compact,
+                          onPressed: _deselect,
+                          icon: const Icon(Icons.filter_alt_off_outlined),
+                        ),
                       ),
-                    ),
                   ],
                 ),
               );
@@ -356,15 +356,13 @@ class BreakdownPieChartState extends State<BreakdownPieChart> {
       radius: radius,
       title: pct >= 9 ? '${pct.toStringAsFixed(0)}%' : '',
       titleStyle: Theme.of(context).textTheme.labelSmall?.copyWith(
-        color: Colors.white.withValues(alpha: !hasSelection || selected ? 1 : 0.7),
+        color: Colors.white.withValues(
+          alpha: !hasSelection || selected ? 1 : 0.7,
+        ),
         fontWeight: FontWeight.w800,
         fontSize: selected ? 12 : 11,
         shadows: const [
-          Shadow(
-            color: Color(0x99000000),
-            offset: Offset(0, 1),
-            blurRadius: 2,
-          ),
+          Shadow(color: Color(0x99000000), offset: Offset(0, 1), blurRadius: 2),
         ],
       ),
       borderSide: BorderSide.none,
@@ -394,8 +392,8 @@ class _DefaultLegendRow extends StatelessWidget {
     final pct = total <= 0
         ? 0
         : ((slice.amountCents.abs() / total) * 100).round();
-    final onIcon = ThemeData.estimateBrightnessForColor(slice.color) ==
-            Brightness.dark
+    final onIcon =
+        ThemeData.estimateBrightnessForColor(slice.color) == Brightness.dark
         ? Colors.white
         : const Color(0xFF0F172A);
 

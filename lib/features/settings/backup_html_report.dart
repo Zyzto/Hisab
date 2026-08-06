@@ -32,9 +32,11 @@ String buildBackupHtmlReport({
     groupRows.writeln(
       '<p class="total">Total (base): ${_money(total, g.currencyCode)}</p>',
     );
-    groupRows.writeln('<table><thead><tr>'
-        '<th>Date</th><th>Title</th><th>Amount</th><th>Tag</th>'
-        '</tr></thead><tbody>');
+    groupRows.writeln(
+      '<table><thead><tr>'
+      '<th>Date</th><th>Title</th><th>Amount</th><th>Tag</th>'
+      '</tr></thead><tbody>',
+    );
     for (final e in groupExpenses) {
       final tagLabel = exportDisplayTagLabel(e.tag, groupTags);
       groupRows.writeln(

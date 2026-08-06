@@ -239,10 +239,7 @@ class _BalanceListBodyState extends State<_BalanceListBody> {
     final myId = widget.myParticipantId;
     if (myId == null) return const [];
     final mine = widget.settlements
-        .where(
-          (s) =>
-              s.fromParticipantId == myId || s.toParticipantId == myId,
-        )
+        .where((s) => s.fromParticipantId == myId || s.toParticipantId == myId)
         .toList();
     mine.sort((a, b) {
       int rank(SettlementTransaction s) {
@@ -624,8 +621,9 @@ class _SettlementBottomOverlay extends ConsumerWidget {
                   builder: (context) {
                     final s = peek[i];
                     final iPay = s.fromParticipantId == myParticipantId;
-                    final otherId =
-                        iPay ? s.toParticipantId : s.fromParticipantId;
+                    final otherId = iPay
+                        ? s.toParticipantId
+                        : s.fromParticipantId;
                     final otherName = nameOf[otherId] ?? otherId;
                     final from =
                         nameOf[s.fromParticipantId] ?? s.fromParticipantId;
@@ -924,8 +922,9 @@ class _FrozenBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final titleKey =
-        snapshotCorrupt ? 'settlement_snapshot_corrupt' : 'settlement_frozen';
+    final titleKey = snapshotCorrupt
+        ? 'settlement_snapshot_corrupt'
+        : 'settlement_frozen';
     final hintKey = snapshotCorrupt
         ? 'settlement_snapshot_corrupt_hint'
         : 'settlement_frozen_hint';
@@ -996,10 +995,7 @@ class _SettledHintCard extends StatelessWidget {
   final String message;
   final IconData icon;
 
-  const _SettledHintCard({
-    required this.message,
-    required this.icon,
-  });
+  const _SettledHintCard({required this.message, required this.icon});
 
   @override
   Widget build(BuildContext context) {
@@ -1190,10 +1186,7 @@ class _SettleUpSectionState extends ConsumerState<_SettleUpSection> {
     final myId = widget.myParticipantId;
     if (_filter != _SettleFilter.me || myId == null) return sorted;
     return sorted
-        .where(
-          (s) =>
-              s.fromParticipantId == myId || s.toParticipantId == myId,
-        )
+        .where((s) => s.fromParticipantId == myId || s.toParticipantId == myId)
         .toList();
   }
 
@@ -1222,15 +1215,13 @@ class _SettleUpSectionState extends ConsumerState<_SettleUpSection> {
                 _SettleFilterChip(
                   label: 'settle_filter_me'.tr(),
                   selected: _filter == _SettleFilter.me,
-                  onSelected: () =>
-                      setState(() => _filter = _SettleFilter.me),
+                  onSelected: () => setState(() => _filter = _SettleFilter.me),
                 ),
                 const SizedBox(width: 6),
                 _SettleFilterChip(
                   label: 'settle_filter_all'.tr(),
                   selected: _filter == _SettleFilter.all,
-                  onSelected: () =>
-                      setState(() => _filter = _SettleFilter.all),
+                  onSelected: () => setState(() => _filter = _SettleFilter.all),
                 ),
                 const SizedBox(width: 4),
               ],
@@ -1382,15 +1373,9 @@ class _SettlementCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _SettlementNameChip(
-                      name: fromName,
-                      avatarId: fromAvatarId,
-                    ),
+                    _SettlementNameChip(name: fromName, avatarId: fromAvatarId),
                     const SizedBox(height: 6),
-                    _SettlementNameChip(
-                      name: toName,
-                      avatarId: toAvatarId,
-                    ),
+                    _SettlementNameChip(name: toName, avatarId: toAvatarId),
                   ],
                 ),
               ),
@@ -1437,10 +1422,7 @@ class _SettlementNameChip extends StatelessWidget {
   final String name;
   final String? avatarId;
 
-  const _SettlementNameChip({
-    required this.name,
-    this.avatarId,
-  });
+  const _SettlementNameChip({required this.name, this.avatarId});
 
   @override
   Widget build(BuildContext context) {

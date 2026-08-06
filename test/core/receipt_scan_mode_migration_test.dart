@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hisab/features/settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 
 void main() {
   group('receiptScanModeFromLegacy', () {

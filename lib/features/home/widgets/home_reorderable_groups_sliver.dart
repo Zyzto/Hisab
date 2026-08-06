@@ -97,8 +97,7 @@ class _HomeReorderableGroupsSliverState
 
   bool _isPinned(Group group) => widget.pinnedIds.contains(group.id);
 
-  bool _belongs(Group group) =>
-      widget.groups.any((g) => g.id == group.id);
+  bool _belongs(Group group) => widget.groups.any((g) => g.id == group.id);
 
   void _setHover(int insertBefore) {
     if (_insertBefore.value == insertBefore) return;
@@ -213,8 +212,9 @@ class _HomeReorderableGroupsSliverState
     }
     final bottomBox = _boxFor(_bottomKey);
     if (bottomBox != null) {
-      final listBottom =
-          bottomBox.localToGlobal(Offset(0, bottomBox.size.height)).dy;
+      final listBottom = bottomBox
+          .localToGlobal(Offset(0, bottomBox.size.height))
+          .dy;
       if (y >= listBottom) {
         _setHover(n);
         return;
@@ -376,9 +376,7 @@ class _HoldDragGroupRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     // Slightly longer press on mobile web reduces fight with scroll.
-    final delay = Duration(
-      milliseconds: UiPerf.isWebMobile ? 280 : 220,
-    );
+    final delay = Duration(milliseconds: UiPerf.isWebMobile ? 280 : 220);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -404,8 +402,7 @@ class _HoldDragGroupRow extends StatelessWidget {
               hapticFeedbackOnStart: false,
               maxSimultaneousDrags: 1,
               onDragStarted: onDragStarted,
-              onDragUpdate: (details) =>
-                  onDragUpdate(details.globalPosition),
+              onDragUpdate: (details) => onDragUpdate(details.globalPosition),
               onDragEnd: (details) => onDragEnd(details.wasAccepted),
               feedback: RepaintBoundary(
                 child: _DragFeedbackCard(
@@ -529,9 +526,7 @@ class _DragPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final border = Border.all(
-      color: cs.outlineVariant.withValues(alpha: 0.7),
-    );
+    final border = Border.all(color: cs.outlineVariant.withValues(alpha: 0.7));
 
     // iOS web: keep size without painting the card tree through Opacity.
     if (cheap) {

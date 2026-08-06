@@ -21,50 +21,49 @@ void main() {
     expect(text.textDirection, TextDirection.ltr);
   });
 
-  testWidgets(
-    'ExpenseListTile amount is LTR and chevron flips in RTL',
-    (tester) async {
-      final now = DateTime(2025, 1, 15);
-      final expense = Expense(
-        id: 'e1',
-        groupId: 'g1',
-        payerParticipantId: 'p1',
-        amountCents: 79250,
-        currencyCode: 'SAR',
-        title: 'Lunch',
-        date: now,
-        splitType: SplitType.equal,
-        splitShares: const {'p1': 79250},
-        createdAt: now,
-        updatedAt: now,
-      );
+  testWidgets('ExpenseListTile amount is LTR and chevron flips in RTL', (
+    tester,
+  ) async {
+    final now = DateTime(2025, 1, 15);
+    final expense = Expense(
+      id: 'e1',
+      groupId: 'g1',
+      payerParticipantId: 'p1',
+      amountCents: 79250,
+      currencyCode: 'SAR',
+      title: 'Lunch',
+      date: now,
+      splitType: SplitType.equal,
+      splitShares: const {'p1': 79250},
+      createdAt: now,
+      updatedAt: now,
+    );
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Directionality(
-            textDirection: TextDirection.rtl,
-            child: Scaffold(
-              body: ExpenseListTile(
-                expense: expense,
-                payerName: 'abcd',
-                groupCurrencyCode: 'SAR',
-                showPaidBy: false,
-                showDisclosure: true,
-              ),
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            body: ExpenseListTile(
+              expense: expense,
+              payerName: 'abcd',
+              groupCurrencyCode: 'SAR',
+              showPaidBy: false,
+              showDisclosure: true,
             ),
           ),
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      // AmountText keeps Flutter TextDirection.ltr (clash-safe vs intl).
-      final amount = tester.widget<Text>(find.textContaining('792.50'));
-      expect(amount.textDirection, TextDirection.ltr);
+    // AmountText keeps Flutter TextDirection.ltr (clash-safe vs intl).
+    final amount = tester.widget<Text>(find.textContaining('792.50'));
+    expect(amount.textDirection, TextDirection.ltr);
 
-      // Use chevron_right (matchTextDirection) so Flutter mirrors it in RTL;
-      // do not swap to chevron_left or it double-flips.
-      expect(find.byIcon(Icons.chevron_right_rounded), findsOneWidget);
-      expect(find.byIcon(Icons.chevron_left_rounded), findsNothing);
-    },
-  );
+    // Use chevron_right (matchTextDirection) so Flutter mirrors it in RTL;
+    // do not swap to chevron_left or it double-flips.
+    expect(find.byIcon(Icons.chevron_right_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.chevron_left_rounded), findsNothing);
+  });
 }

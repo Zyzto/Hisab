@@ -1,5 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:toastification/toastification.dart';
 
 import '../utils/error_report_helper.dart';
@@ -44,6 +45,7 @@ extension ToastContext on BuildContext {
     String message, {
     String? details,
     StackTrace? stackTrace,
+
     /// Short English line for GitHub / share (e.g. same as [Log.warning] text).
     String? summaryEnglish,
     Duration? duration,
@@ -111,7 +113,9 @@ extension ToastContext on BuildContext {
                             summaryEnglish: summaryEnglish,
                             uiLocaleTag: uiLocaleTag,
                           );
-                        } catch (_) {}
+                        } catch (e) {
+                          Log.debug('Share from error toast failed', error: e);
+                        }
                       },
                       child: Text('share'.tr()),
                     ),
@@ -135,7 +139,12 @@ extension ToastContext on BuildContext {
                               }
                             },
                           );
-                        } catch (_) {}
+                        } catch (e) {
+                          Log.debug(
+                            'Report issue from error toast failed',
+                            error: e,
+                          );
+                        }
                       },
                       child: Text('report_issue'.tr()),
                     ),

@@ -61,9 +61,8 @@ void main() {
         ),
         GoRoute(
           path: '/invite/:token/preview/expenses',
-          builder: (context, state) => InviteGroupPreviewPage(
-            token: state.pathParameters['token']!,
-          ),
+          builder: (context, state) =>
+              InviteGroupPreviewPage(token: state.pathParameters['token']!),
         ),
         GoRoute(
           path: '/invite/:token/preview/balance',
@@ -129,9 +128,11 @@ void main() {
     // Regression: preview balance tab must resolve data and never show
     // "Group not found" due to missing provider overrides.
     await tester.tap(
-      find.byWidgetPredicate(
-        (w) => w is Text && (w.data == 'Balance' || w.data == 'balance'),
-      ).first,
+      find
+          .byWidgetPredicate(
+            (w) => w is Text && (w.data == 'Balance' || w.data == 'balance'),
+          )
+          .first,
     );
     await tester.pumpAndSettle();
     expect(find.text('Group not found'), findsNothing);
@@ -227,9 +228,8 @@ void main() {
         ),
         GoRoute(
           path: '/invite/:token/preview/expenses',
-          builder: (context, state) => InviteGroupPreviewPage(
-            token: state.pathParameters['token']!,
-          ),
+          builder: (context, state) =>
+              InviteGroupPreviewPage(token: state.pathParameters['token']!),
         ),
         GoRoute(
           path: '/invite/:token/preview/expenses/:eid',
@@ -264,7 +264,9 @@ void main() {
         (w) =>
             w is Text &&
             ((w.data ?? '').toLowerCase().contains('join') ||
-                (w.data ?? '').toLowerCase().contains('invite_preview_join_cta')),
+                (w.data ?? '').toLowerCase().contains(
+                  'invite_preview_join_cta',
+                )),
       ),
       findsWidgets,
     );

@@ -36,10 +36,7 @@ Uint8List encodeBackupZip({
 }
 
 class DecodedBackupZip {
-  const DecodedBackupZip({
-    required this.backupJson,
-    this.receipts = const {},
-  });
+  const DecodedBackupZip({required this.backupJson, this.receipts = const {}});
   final String backupJson;
   final Map<String, Uint8List> receipts;
 }

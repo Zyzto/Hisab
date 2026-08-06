@@ -104,7 +104,10 @@ double? parseReceiptAmount(String raw) {
 String repairReceiptOcrText(String ocrText) {
   var t = ocrText;
   // Strip bidi / zero-width marks that break line anchors.
-  t = t.replaceAll(RegExp(r'[\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff]'), '');
+  t = t.replaceAll(
+    RegExp(r'[\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff]'),
+    '',
+  );
   // Latin / Arabic digit lookalikes → ASCII.
   const digits = {
     '٠': '0',
@@ -135,8 +138,10 @@ String repairReceiptOcrText(String ocrText) {
     (_) => 'VAT',
   );
   t = t.replaceAllMapped(
-    RegExp(r'amou?r?n?t\s*t[eo]\s*pay|mount\s*to\s*pay|amount\s*te\s*pi',
-        caseSensitive: false),
+    RegExp(
+      r'amou?r?n?t\s*t[eo]\s*pay|mount\s*to\s*pay|amount\s*te\s*pi',
+      caseSensitive: false,
+    ),
     (_) => 'Amount to pay',
   );
   t = t.replaceAllMapped(
@@ -147,10 +152,7 @@ String repairReceiptOcrText(String ocrText) {
     RegExp(r'\buBTOTAL\b', caseSensitive: false),
     (_) => 'SUBTOTAL',
   );
-  t = t.replaceAllMapped(
-    RegExp(r'\bOTF\b'),
-    (_) => 'TOTAL',
-  );
+  t = t.replaceAllMapped(RegExp(r'\bOTF\b'), (_) => 'TOTAL');
 
   // `162 .00`, `162. 00`, `49 ,00`, `1,899 00`, `162 00`
   t = t.replaceAllMapped(
@@ -189,8 +191,10 @@ String repairReceiptOcrText(String ocrText) {
 
   // Split VAT fragments like `24د ... 65` → `24.65 VAT`.
   t = t.replaceAllMapped(
-    RegExp(r'\b(\d{1,3})\s*[دد]\s*.{0,40}?(ضريبة|VAT).{0,20}?\b(\d{2})\b',
-        caseSensitive: false),
+    RegExp(
+      r'\b(\d{1,3})\s*[دد]\s*.{0,40}?(ضريبة|VAT).{0,20}?\b(\d{2})\b',
+      caseSensitive: false,
+    ),
     (m) => '${m.group(1)}.${m.group(3)} VAT',
   );
 
@@ -273,7 +277,12 @@ DateTime? parseReceiptDateTime(String line, [DateTime? fallback]) {
     final mm = slash.group(5) != null ? int.parse(slash.group(5)!) : 0;
     final ss = slash.group(6) != null ? int.parse(slash.group(6)!) : 0;
     final hour = _applyAmPm(hh, slash.group(7));
-    if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && y >= 2000 && y <= 2100) {
+    if (month >= 1 &&
+        month <= 12 &&
+        day >= 1 &&
+        day <= 31 &&
+        y >= 2000 &&
+        y <= 2100) {
       return DateTime(y, month, day, hour, mm, ss);
     }
   }
@@ -285,7 +294,12 @@ DateTime? parseReceiptDateTime(String line, [DateTime? fallback]) {
     var y = _repairOcrYear(int.parse(mon.group(3)!));
     final hh = mon.group(4) != null ? int.parse(mon.group(4)!) : 0;
     final mm = mon.group(5) != null ? int.parse(mon.group(5)!) : 0;
-    if (month >= 1 && month <= 12 && d >= 1 && d <= 31 && y >= 2000 && y <= 2100) {
+    if (month >= 1 &&
+        month <= 12 &&
+        d >= 1 &&
+        d <= 31 &&
+        y >= 2000 &&
+        y <= 2100) {
       return DateTime(y, month, d, hh, mm);
     }
   }
@@ -316,8 +330,10 @@ String? _extractStore(List<String> lines) {
       if (RegExp(r'sushi', caseSensitive: false).hasMatch(raw)) {
         return 'SUSHIART';
       }
-      if (RegExp(r'familymart|family\s*mart', caseSensitive: false)
-          .hasMatch(raw)) {
+      if (RegExp(
+        r'familymart|family\s*mart',
+        caseSensitive: false,
+      ).hasMatch(raw)) {
         return 'FamilyMart';
       }
       if (RegExp(r'laza', caseSensitive: false).hasMatch(raw)) {
@@ -403,7 +419,8 @@ double? _labeledAmount(
         r'^(?:SAR|SR|RM|USD)?\s*[\d.,]+\s*(?:SAR|SR|RM)?\s*$',
         caseSensitive: false,
       ).hasMatch(prev.trim());
-      final prevHasLabel = _totalLabelRe.hasMatch(prev) || _vatLabelRe.hasMatch(prev);
+      final prevHasLabel =
+          _totalLabelRe.hasMatch(prev) || _vatLabelRe.hasMatch(prev);
       if (prevIsAmountOnly || prevHasLabel) {
         for (final m in _amountRe.allMatches(prev)) {
           if (_amountIsPercentAnnotation(prev, m)) continue;
@@ -413,8 +430,9 @@ double? _labeledAmount(
       }
     }
     if (candidates.isEmpty) continue;
-    final candidate =
-        preferSmaller ? candidates.reduce((a, b) => a < b ? a : b) : candidates.last;
+    final candidate = preferSmaller
+        ? candidates.reduce((a, b) => a < b ? a : b)
+        : candidates.last;
     if (!preferSmaller) return candidate;
     if (best == null || candidate < best) best = candidate;
   }
@@ -471,13 +489,16 @@ bool _isVatOnlyLine(String line) {
   if (!hasVat) return false;
   // "Total Amount (Incl. Vat)" is a total line, not a VAT-only line.
   if (_totalLabelRe.hasMatch(line) &&
-      RegExp(r'incl|amount\s*due|grand|صافي|المبلغ\s*مع', caseSensitive: false)
-          .hasMatch(line)) {
+      RegExp(
+        r'incl|amount\s*due|grand|صافي|المبلغ\s*مع',
+        caseSensitive: false,
+      ).hasMatch(line)) {
     return false;
   }
-  if (RegExp(r'total\s*amount\s*\(?\s*incl|amount\s*due|grand\s*total|صافي',
-          caseSensitive: false)
-      .hasMatch(line)) {
+  if (RegExp(
+    r'total\s*amount\s*\(?\s*incl|amount\s*due|grand\s*total|صافي',
+    caseSensitive: false,
+  ).hasMatch(line)) {
     return false;
   }
   return !RegExp(
@@ -523,8 +544,10 @@ double? _extractTotal(List<String> lines) {
   // Prefer net / صافي / trailing "SR 172.00" when a slightly higher total exists.
   double? netPrefer;
   for (final line in lines.reversed) {
-    if (RegExp(r'net\s*ttl|\bصافي\b|^\s*SR\s*[\d.,]+', caseSensitive: false)
-        .hasMatch(line)) {
+    if (RegExp(
+      r'net\s*ttl|\bصافي\b|^\s*SR\s*[\d.,]+',
+      caseSensitive: false,
+    ).hasMatch(line)) {
       for (final m in _amountRe.allMatches(line)) {
         final a = parseReceiptAmount(m.group(1)!);
         if (a != null && a > 0) {
@@ -539,7 +562,8 @@ double? _extractTotal(List<String> lines) {
   final v1 = _labeledAmount(
     lines,
     strong,
-    skipLine: (l) => _isVatOnlyLine(l) ||
+    skipLine: (l) =>
+        _isVatOnlyLine(l) ||
         RegExp(r'sub\s*total|subtotal|excl', caseSensitive: false).hasMatch(l),
     stripLeadingJunk: true,
   );
@@ -554,8 +578,10 @@ double? _extractTotal(List<String> lines) {
     final cleaned = _stripSpuriousLeadingDigit(v1, preferSmall: true);
     if (cleaned < v1 &&
         !_looksLikeVatAmount(lines, cleaned) &&
-        RegExp(r'payment|total|due|pay', caseSensitive: false)
-            .hasMatch(lines.reversed.take(12).join('\n'))) {
+        RegExp(
+          r'payment|total|due|pay',
+          caseSensitive: false,
+        ).hasMatch(lines.reversed.take(12).join('\n'))) {
       // Only strip when a matching cleaned amount also appears in text.
       final blob = lines.join('\n');
       if (blob.contains(cleaned.toStringAsFixed(2)) ||
@@ -571,7 +597,10 @@ double? _extractTotal(List<String> lines) {
     _totalLabelRe,
     skipLine: (l) =>
         _isVatOnlyLine(l) ||
-        RegExp(r'sub\s*total|subtotal|excl', caseSensitive: false).hasMatch(l) ||
+        RegExp(
+          r'sub\s*total|subtotal|excl',
+          caseSensitive: false,
+        ).hasMatch(l) ||
         _looksLikeUnitPriceContext(lines, l),
     stripLeadingJunk: true,
   );
@@ -598,8 +627,10 @@ double? _extractTotal(List<String> lines) {
 
   // Incl − known pattern: take amount near "inc. tax" even if digits glued.
   for (final line in lines.reversed) {
-    if (!RegExp(r'inc\.?\s*tax|incl\.?\s*vat|مع\s*الضريب', caseSensitive: false)
-        .hasMatch(line)) {
+    if (!RegExp(
+      r'inc\.?\s*tax|incl\.?\s*vat|مع\s*الضريب',
+      caseSensitive: false,
+    ).hasMatch(line)) {
       continue;
     }
     for (final m in _amountRe.allMatches(line)) {
@@ -618,8 +649,10 @@ double? _extractTotal(List<String> lines) {
   double max = 0;
   for (var i = start; i < lines.length; i++) {
     final line = lines[i];
-    if (RegExp(r'unit\s*price|sub\s*total|subtotal|excl', caseSensitive: false)
-        .hasMatch(line)) {
+    if (RegExp(
+      r'unit\s*price|sub\s*total|subtotal|excl',
+      caseSensitive: false,
+    ).hasMatch(line)) {
       continue;
     }
     if (_looksLikeUnitPriceContext(lines, line)) continue;
@@ -639,8 +672,10 @@ double? _extractTotal(List<String> lines) {
 
   // Whole-receipt max (retail slips where total sits mid-page).
   for (final line in lines) {
-    if (RegExp(r'unit\s*price|warranty|discount\s*100', caseSensitive: false)
-        .hasMatch(line)) {
+    if (RegExp(
+      r'unit\s*price|warranty|discount\s*100',
+      caseSensitive: false,
+    ).hasMatch(line)) {
       continue;
     }
     for (final m in _amountRe.allMatches(line)) {
@@ -680,7 +715,10 @@ double? _extractVat(List<String> lines, {double? total}) {
   );
   final excl = _labeledAmount(
     lines,
-    RegExp(r'total\s*amount\s*\(?\s*excl|total\s*no\s*tax', caseSensitive: false),
+    RegExp(
+      r'total\s*amount\s*\(?\s*excl|total\s*no\s*tax',
+      caseSensitive: false,
+    ),
   );
   if (incl != null && excl != null && incl > excl) {
     final diff = double.parse((incl - excl).toStringAsFixed(2));
@@ -697,8 +735,10 @@ double? _extractVat(List<String> lines, {double? total}) {
         caseSensitive: false,
       ).hasMatch(line.trim());
       if (!only &&
-          !RegExp(r'total|tax|vat|ضريب|amount|pay', caseSensitive: false)
-              .hasMatch(line)) {
+          !RegExp(
+            r'total|tax|vat|ضريب|amount|pay',
+            caseSensitive: false,
+          ).hasMatch(line)) {
         continue;
       }
       for (final m in _amountRe.allMatches(line)) {
@@ -746,9 +786,10 @@ double? _extractVat(List<String> lines, {double? total}) {
     final hasVatCue = lines.any(
       (l) =>
           _vatLabelRe.hasMatch(l) ||
-          RegExp(r'ضريب|tax\s*invoice|incl\.?\s*vat|inc\.?\s*tax|amount\s*to\s*pay',
-                  caseSensitive: false)
-              .hasMatch(l),
+          RegExp(
+            r'ضريب|tax\s*invoice|incl\.?\s*vat|inc\.?\s*tax|amount\s*to\s*pay',
+            caseSensitive: false,
+          ).hasMatch(l),
     );
     if (hasVatCue) {
       final inferred = double.parse((total * 15 / 115).toStringAsFixed(2));
@@ -779,7 +820,8 @@ double? _inferTotalFromItems(List<String> lines, List<ReceiptLineItem> items) {
       if (v == null || v <= 0 || v >= 20) continue;
       final prefixed = line.substring(0, m.start);
       // Only a minus immediately before the amount counts (not "AllDay-Onigiri").
-      final explicitNeg = RegExp(r'-\s*$').hasMatch(prefixed) ||
+      final explicitNeg =
+          RegExp(r'-\s*$').hasMatch(prefixed) ||
           RegExp(r'\(\s*$').hasMatch(prefixed);
       if (explicitNeg ||
           RegExp(r'rounding|clearance', caseSensitive: false).hasMatch(line)) {
@@ -919,7 +961,10 @@ List<ReceiptLineItem> _extractItems(List<String> lines) {
           : unit;
       final amount = lineTotal ?? unit;
       name = name.replaceFirst(RegExp(r'^\d{6,}\s*'), '').trim();
-      name = name.replaceFirst(RegExp(r'^\d+\s+each\s*$', caseSensitive: false), 'Item');
+      name = name.replaceFirst(
+        RegExp(r'^\d+\s+each\s*$', caseSensitive: false),
+        'Item',
+      );
       if (amount != null &&
           amount >= 0.5 &&
           amount < 500000 &&
@@ -974,33 +1019,41 @@ String? _inferStoreFromBody(String ocrText, List<ReceiptLineItem> items) {
   if (RegExp(r'osh\s*plov|uzbek|laza', caseSensitive: false).hasMatch(blob)) {
     return 'LAZA UZBEK CUISINE';
   }
-  if (RegExp(r'familymart|family\s*mart|sunway', caseSensitive: false)
-      .hasMatch(blob)) {
+  if (RegExp(
+    r'familymart|family\s*mart|sunway',
+    caseSensitive: false,
+  ).hasMatch(blob)) {
     return 'FamilyMart';
   }
-  if (RegExp(r'texas|roadhouse|frcatch|cactuspet', caseSensitive: false)
-      .hasMatch(blob)) {
+  if (RegExp(
+    r'texas|roadhouse|frcatch|cactuspet',
+    caseSensitive: false,
+  ).hasMatch(blob)) {
     return 'Texas Roadhouse';
   }
   if (RegExp(
-        r'midea|dishwasher|sparky|\bextra\b|wqp\d|play\s*card',
-        caseSensitive: false,
-      ).hasMatch(blob)) {
+    r'midea|dishwasher|sparky|\bextra\b|wqp\d|play\s*card',
+    caseSensitive: false,
+  ).hasMatch(blob)) {
     return 'extra';
   }
   if (RegExp(
-        r'sushi|plateaux|plateau|lemonade|lunch\s*special|\bluneh?\b|'
-        r'fresh\s*juice',
-        caseSensitive: false,
-      ).hasMatch(blob)) {
+    r'sushi|plateaux|plateau|lemonade|lunch\s*special|\bluneh?\b|'
+    r'fresh\s*juice',
+    caseSensitive: false,
+  ).hasMatch(blob)) {
     return 'SUSHIART';
   }
-  if (RegExp(r'splonline|بريد|طرد\s*اقتصاد', caseSensitive: false)
-      .hasMatch(blob)) {
+  if (RegExp(
+    r'splonline|بريد|طرد\s*اقتصاد',
+    caseSensitive: false,
+  ).hasMatch(blob)) {
     return 'SPL';
   }
-  if (RegExp(r'asian\s*foods|tomyam|tempura', caseSensitive: false)
-      .hasMatch(blob)) {
+  if (RegExp(
+    r'asian\s*foods|tomyam|tempura',
+    caseSensitive: false,
+  ).hasMatch(blob)) {
     return 'ASIAN FOODS JEDDAH';
   }
   return null;
@@ -1035,10 +1088,7 @@ String? _buildDescription({
 }
 
 /// Rich on-device extraction used by tests and the scan pipeline.
-ReceiptDetails extractReceiptDetails(
-  String ocrText,
-  DateTime fallbackDate,
-) {
+ReceiptDetails extractReceiptDetails(String ocrText, DateTime fallbackDate) {
   final repaired = repairReceiptOcrText(ocrText);
   final lines = repaired
       .split(RegExp(r'[\r\n]+'))
@@ -1057,9 +1107,7 @@ ReceiptDetails extractReceiptDetails(
   // Also: when OCR latches onto a repeating item price (49/69) but items sum
   // much higher, prefer the sum.
   if (total == null ||
-      (items.length >= 5 &&
-          total < 20 &&
-          itemsSum > total * 2) ||
+      (items.length >= 5 && total < 20 && itemsSum > total * 2) ||
       (items.length >= 3 &&
           itemsSum > 0 &&
           total != null &&

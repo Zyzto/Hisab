@@ -73,9 +73,7 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
       Future.delayed(const Duration(milliseconds: 100), () {
         if (!mounted || node.hasFocus) return;
         final now = FocusManager.instance.primaryFocus;
-        if (now == _focusCurrent ||
-            now == _focusNew ||
-            now == _focusConfirm) {
+        if (now == _focusCurrent || now == _focusNew || now == _focusConfirm) {
           return;
         }
         node.requestFocus();
@@ -188,12 +186,7 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
     final textTheme = Theme.of(context).textTheme;
 
     return Padding(
-      padding: EdgeInsets.only(
-        left: 24,
-        right: 24,
-        top: 16,
-        bottom: 24,
-      ),
+      padding: EdgeInsets.only(left: 24, right: 24, top: 16, bottom: 24),
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,

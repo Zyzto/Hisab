@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hisab/core/navigation/invite_auth_helpers.dart';
-import 'package:hisab/features/settings/providers/settings_framework_providers.dart';
-import 'package:hisab/features/settings/settings_definitions.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/settings_definitions.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -33,9 +33,7 @@ void main() {
     final completer = <WidgetRef?>[null];
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          hisabSettingsProvidersProvider.overrideWithValue(settings),
-        ],
+        overrides: [hisabSettingsProvidersProvider.overrideWithValue(settings)],
         child: Consumer(
           builder: (context, ref, _) {
             completer[0] = ref;

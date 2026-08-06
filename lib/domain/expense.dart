@@ -76,6 +76,12 @@ class Expense {
     this.imagePaths,
   });
 
+  /// True when [tag] is null or empty (treat as uncategorized).
+  static bool isBlankTag(String? tag) => tag == null || tag.isEmpty;
+
+  /// True when this expense has no usable category tag.
+  bool get hasBlankTag => isBlankTag(tag);
+
   /// Effective list of attached image URLs: [imagePaths] if non-empty, else single [imagePath] if set.
   List<String> get effectiveImageUrls =>
       (imagePaths != null && imagePaths!.isNotEmpty)

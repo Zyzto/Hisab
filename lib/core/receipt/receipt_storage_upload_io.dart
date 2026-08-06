@@ -30,7 +30,12 @@ Future<String?> uploadExpenseImageToStorage(
         ? 'jpg'
         : path.extension(localPath).replaceFirst('.', ''),
   );
-  return uploadExpenseImageBytesToStorage(bytes, groupId, expenseId, fileExt: ext);
+  return uploadExpenseImageBytesToStorage(
+    bytes,
+    groupId,
+    expenseId,
+    fileExt: ext,
+  );
 }
 
 /// Uploads expense image [bytes] to Supabase Storage under

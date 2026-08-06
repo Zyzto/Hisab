@@ -16,8 +16,8 @@ class OnboardingSkyGame extends FlameGame {
   OnboardingSkyGame({
     required bool night,
     Color accent = const Color(0xFF64B5F6),
-  })  : _night = night,
-        _accent = accent;
+  }) : _night = night,
+       _accent = accent;
 
   bool _night;
   Color _accent;
@@ -110,10 +110,7 @@ class OnboardingSkyGame extends FlameGame {
       );
 
       final skyComponent = ParallaxComponent<OnboardingSkyGame>(
-        parallax: Parallax(
-          [sky],
-          baseVelocity: Vector2.zero(),
-        ),
+        parallax: Parallax([sky], baseVelocity: Vector2.zero()),
         priority: 0,
       );
       final components = <Component>[
@@ -132,18 +129,12 @@ class OnboardingSkyGame extends FlameGame {
           priority: 3,
         ),
         _BottomParallaxComponent(
-          parallax: Parallax(
-            [grass],
-            baseVelocity: Vector2(base, 0),
-          ),
+          parallax: Parallax([grass], baseVelocity: Vector2(base, 0)),
           heightFactor: 0.25,
           priority: 4,
         ),
         _BottomParallaxComponent(
-          parallax: Parallax(
-            [front],
-            baseVelocity: Vector2(base, 0),
-          ),
+          parallax: Parallax([front], baseVelocity: Vector2(base, 0)),
           heightFactor: 0.20,
           priority: 5,
         ),
@@ -160,17 +151,12 @@ class OnboardingSkyGame extends FlameGame {
 
 /// Gives a tightly cropped image strip only the portion of the viewport that
 /// it should occupy, instead of stretching it over the full screen.
-class _BottomParallaxComponent
-    extends ParallaxComponent<OnboardingSkyGame> {
+class _BottomParallaxComponent extends ParallaxComponent<OnboardingSkyGame> {
   _BottomParallaxComponent({
     required Parallax parallax,
     required this.heightFactor,
     required int priority,
-  }) : super(
-         parallax: parallax,
-         size: Vector2.zero(),
-         priority: priority,
-       );
+  }) : super(parallax: parallax, size: Vector2.zero(), priority: priority);
 
   final double heightFactor;
 

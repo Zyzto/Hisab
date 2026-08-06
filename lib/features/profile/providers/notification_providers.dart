@@ -6,7 +6,7 @@ import '../../../core/repository/powersync_repository.dart';
 import '../../../core/repository/user_notification_repository.dart';
 import '../../../core/services/connectivity_service.dart';
 import '../../../domain/domain.dart';
-import '../../settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 
 final userNotificationRepositoryProvider =
     Provider<IUserNotificationRepository>((ref) {
@@ -22,9 +22,7 @@ final userNotificationRepositoryProvider =
       );
     });
 
-final userNotificationsProvider = StreamProvider<List<UserNotification>>((
-  ref,
-) {
+final userNotificationsProvider = StreamProvider<List<UserNotification>>((ref) {
   return ref.watch(userNotificationRepositoryProvider).watchRecent();
 });
 

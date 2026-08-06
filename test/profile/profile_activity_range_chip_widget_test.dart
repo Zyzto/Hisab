@@ -8,7 +8,7 @@ import 'package:hisab/features/groups/providers/group_analytics_provider.dart';
 import 'package:hisab/features/profile/providers/profile_activity_provider.dart';
 import 'package:hisab/features/profile/providers/profile_my_expenses_provider.dart';
 import 'package:hisab/features/profile/widgets/profile_activity_section.dart';
-import 'package:hisab/features/settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 
 import '../widget_test_helpers.dart';
 
@@ -45,7 +45,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(ChoiceChip), findsNothing);
-      expect(find.byType(AnchoredDropdownChip<AnalyticsRangePreset>), findsOneWidget);
+      expect(
+        find.byType(AnchoredDropdownChip<AnalyticsRangePreset>),
+        findsOneWidget,
+      );
       expect(find.text('analytics_range_30d'.tr()), findsOneWidget);
     },
   );

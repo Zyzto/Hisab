@@ -4,8 +4,7 @@ import 'receipt_scan_cancel.dart';
 Future<String> recognizeReceiptText(
   String imagePath, {
   ReceiptScanCancelToken? cancel,
-}) async =>
-    '';
+}) async => '';
 
 /// Web: no-op.
 Future<void> cancelReceiptOcr() async {}

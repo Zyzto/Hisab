@@ -5,8 +5,9 @@ import 'package:hisab/features/expenses/category_icons.dart';
 void main() {
   group('tag contrast', () {
     for (final brightness in Brightness.values) {
-      final surface =
-          brightness == Brightness.dark ? const Color(0xFF121212) : Colors.white;
+      final surface = brightness == Brightness.dark
+          ? const Color(0xFF121212)
+          : Colors.white;
 
       test('preset tags meet AA on $brightness surface/container', () {
         for (final preset in presetCategoryTags) {

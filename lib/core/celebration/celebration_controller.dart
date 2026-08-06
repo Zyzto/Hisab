@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../features/settings/providers/settings_framework_providers.dart';
+import '../settings/providers/settings_framework_providers.dart';
 import '../debug/integration_test_mode.dart';
 import '../platform/ui_perf.dart';
 import 'celebration_dedupe.dart';

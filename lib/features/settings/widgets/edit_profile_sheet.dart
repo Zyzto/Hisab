@@ -13,7 +13,7 @@ import '../../../core/repository/repository_providers.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/utils/form_validators.dart';
 import '../../groups/providers/groups_provider.dart';
-import '../providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 
 /// Bottom sheet to edit display name and avatar. Updates Supabase user_metadata.
 Future<void> showEditProfileSheet(
@@ -82,11 +82,12 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
   Future<void> _save() async {
     final newName = _nameController.text.trim();
     // Empty clears display name in auth; non-empty must fit participants.name.
-    if (newName.isNotEmpty &&
-        FormValidators.participantName(newName) != null) {
-      setState(() => _error = 'field_too_long'.tr(
-            namedArgs: {'max': '${FormValidators.participantNameMax}'},
-          ));
+    if (newName.isNotEmpty && FormValidators.participantName(newName) != null) {
+      setState(
+        () => _error = 'field_too_long'.tr(
+          namedArgs: {'max': '${FormValidators.participantNameMax}'},
+        ),
+      );
       return;
     }
     setState(() {
@@ -144,12 +145,7 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
     final textTheme = Theme.of(context).textTheme;
 
     return Padding(
-      padding: EdgeInsets.only(
-        left: 24,
-        right: 24,
-        top: 16,
-        bottom: 24,
-      ),
+      padding: EdgeInsets.only(left: 24, right: 24, top: 16, bottom: 24),
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -230,8 +226,7 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                         return GestureDetector(
                           onTap: _saving
                               ? null
-                              : () =>
-                                  setState(() => _selectedAvatarId = e.key),
+                              : () => setState(() => _selectedAvatarId = e.key),
                           child: Container(
                             width: 44,
                             height: 44,
@@ -243,8 +238,9 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                               border: Border.all(
                                 color: selected
                                     ? colorScheme.primary
-                                    : colorScheme.outline
-                                        .withValues(alpha: 0.3),
+                                    : colorScheme.outline.withValues(
+                                        alpha: 0.3,
+                                      ),
                                 width: selected ? 2.5 : 1,
                               ),
                             ),

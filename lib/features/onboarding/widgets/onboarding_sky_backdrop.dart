@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/debug/integration_test_mode.dart';
-import '../../settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 import 'onboarding_ambient.dart';
 import 'onboarding_sky_game.dart';
 

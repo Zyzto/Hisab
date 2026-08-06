@@ -45,10 +45,7 @@ void main() {
     }
   });
 
-  Future<void> insertNotification({
-    required String id,
-    String? readAt,
-  }) async {
+  Future<void> insertNotification({required String id, String? readAt}) async {
     await db!.execute(
       '''INSERT INTO user_notifications
         (id, user_id, group_id, actor_user_id, action, title, body, expense_id,

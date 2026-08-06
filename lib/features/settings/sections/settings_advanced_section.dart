@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 
-import '../settings_definitions.dart';
+import 'package:hisab/core/settings/settings_definitions.dart';
 
 /// Returns the list of tiles for the Advanced section.
 List<Widget> buildAdvancedSectionTiles(

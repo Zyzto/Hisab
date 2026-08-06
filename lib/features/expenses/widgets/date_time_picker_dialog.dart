@@ -178,12 +178,12 @@ class _DateTimePickerSheetContentState
   }
 
   DateTime get _combined => DateTime(
-        _selectedDate.year,
-        _selectedDate.month,
-        _selectedDate.day,
-        _hour24,
-        _minute,
-      );
+    _selectedDate.year,
+    _selectedDate.month,
+    _selectedDate.day,
+    _hour24,
+    _minute,
+  );
 
   String _summaryLabel(bool use24h) {
     final format = use24h
@@ -265,61 +265,30 @@ class _DateTimePickerSheetContentState
             onDayTap: _onDayTap,
             onMonthChanged: (month) => setState(() => _visibleMonth = month),
           ),
-          const SizedBox(height: 12),
-          Semantics(
-            label: 'time'.tr(),
-            value: () {
-              final t = DateTime(2000, 1, 1, _hour24, _minute);
-              return use24h
-                  ? DateFormat.Hm().format(t)
-                  : DateFormat.jm().format(t);
-            }(),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _TimeColumn<int>(
-                  items: use24h
-                      ? List.generate(24, (i) => i)
-                      : List.generate(12, (i) => i == 0 ? 12 : i),
-                  value: use24h ? _hour24 : _hour12Value,
-                  onChanged: (v) => setState(() {
-                    _activePresetId = null;
-                    if (use24h) {
-                      _hour24 = v;
-                    } else {
-                      _hour24 = _hour24From12h(v, _isAm);
-                    }
-                  }),
-                  format: (v) => '$v',
-                  semanticLabel: 'hour'.tr(),
-                ),
-                const SizedBox(width: 8),
-                _TimeColumn<int>(
-                  items: List.generate(60, (i) => i),
-                  value: _minute,
-                  onChanged: (v) => setState(() {
-                    _activePresetId = null;
-                    _minute = v;
-                  }),
-                  format: (v) => v.toString().padLeft(2, '0'),
-                  semanticLabel: 'minute'.tr(),
-                ),
-                if (!use24h) ...[
-                  const SizedBox(width: 8),
-                  _TimeColumn<DayPeriod>(
-                    items: const [DayPeriod.am, DayPeriod.pm],
-                    value: _isAm ? DayPeriod.am : DayPeriod.pm,
-                    onChanged: (v) => setState(() {
-                      _activePresetId = null;
-                      _isAm = v == DayPeriod.am;
-                      _hour24 = _hour24From12h(_hour12Value, _isAm);
-                    }),
-                    format: (v) => v == DayPeriod.am ? 'AM' : 'PM',
-                    semanticLabel: 'period'.tr(),
-                  ),
-                ],
-              ],
-            ),
+          const SizedBox(height: 16),
+          _TimePickerPanel(
+            use24h: use24h,
+            hour24: _hour24,
+            hour12Value: _hour12Value,
+            minute: _minute,
+            isAm: _isAm,
+            onHourChanged: (v) => setState(() {
+              _activePresetId = null;
+              if (use24h) {
+                _hour24 = v;
+              } else {
+                _hour24 = _hour24From12h(v, _isAm);
+              }
+            }),
+            onMinuteChanged: (v) => setState(() {
+              _activePresetId = null;
+              _minute = v;
+            }),
+            onPeriodChanged: (isAm) => setState(() {
+              _activePresetId = null;
+              _isAm = isAm;
+              _hour24 = _hour24From12h(_hour12Value, _isAm);
+            }),
           ),
         ],
       ),
@@ -338,11 +307,172 @@ class _DateTimePickerSheetContentState
   }
 }
 
+/// Unified hour / minute (/ AM·PM) wheels in one panel with a shared selection band.
+class _TimePickerPanel extends StatelessWidget {
+  const _TimePickerPanel({
+    required this.use24h,
+    required this.hour24,
+    required this.hour12Value,
+    required this.minute,
+    required this.isAm,
+    required this.onHourChanged,
+    required this.onMinuteChanged,
+    required this.onPeriodChanged,
+  });
+
+  final bool use24h;
+  final int hour24;
+  final int hour12Value;
+  final int minute;
+  final bool isAm;
+  final ValueChanged<int> onHourChanged;
+  final ValueChanged<int> onMinuteChanged;
+  final ValueChanged<bool> onPeriodChanged;
+
+  static const double _itemExtent = 40;
+  static const double _panelHeight = 140;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final timeValue = () {
+      final t = DateTime(2000, 1, 1, hour24, minute);
+      return use24h ? DateFormat.Hm().format(t) : DateFormat.jm().format(t);
+    }();
+
+    return Semantics(
+      label: 'time'.tr(),
+      value: timeValue,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.schedule_rounded,
+                size: 18,
+                color: cs.onSurfaceVariant,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'time'.tr(),
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: cs.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            height: _panelHeight,
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            clipBehavior: Clip.hardEdge,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Shared selection band across all columns.
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  top: (_panelHeight - _itemExtent) / 2,
+                  height: _itemExtent,
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: cs.primaryContainer.withValues(alpha: 0.45),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _TimeColumn<int>(
+                        items: use24h
+                            ? List.generate(24, (i) => i)
+                            : List.generate(12, (i) => i == 0 ? 12 : i),
+                        value: use24h ? hour24 : hour12Value,
+                        onChanged: onHourChanged,
+                        format: (v) =>
+                            use24h ? v.toString().padLeft(2, '0') : '$v',
+                        itemExtent: _itemExtent,
+                        semanticLabel: 'hour'.tr(),
+                      ),
+                    ),
+                    IgnorePointer(
+                      child: Text(
+                        ':',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          color: cs.primary,
+                          fontWeight: FontWeight.w700,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: _TimeColumn<int>(
+                        items: List.generate(60, (i) => i),
+                        value: minute,
+                        onChanged: onMinuteChanged,
+                        format: (v) => v.toString().padLeft(2, '0'),
+                        itemExtent: _itemExtent,
+                        semanticLabel: 'minute'.tr(),
+                      ),
+                    ),
+                    if (!use24h)
+                      Expanded(
+                        child: _TimeColumn<DayPeriod>(
+                          items: const [DayPeriod.am, DayPeriod.pm],
+                          value: isAm ? DayPeriod.am : DayPeriod.pm,
+                          onChanged: (v) => onPeriodChanged(v == DayPeriod.am),
+                          format: (v) => v == DayPeriod.am ? 'AM' : 'PM',
+                          itemExtent: _itemExtent,
+                          semanticLabel: 'period'.tr(),
+                        ),
+                      ),
+                  ],
+                ),
+                // Soft fade above wheels so edge numbers recede.
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            cs.surfaceContainerHighest,
+                            cs.surfaceContainerHighest.withValues(alpha: 0),
+                            cs.surfaceContainerHighest.withValues(alpha: 0),
+                            cs.surfaceContainerHighest,
+                          ],
+                          stops: const [0, 0.28, 0.72, 1],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _TimeColumn<T> extends StatefulWidget {
   final List<T> items;
   final T value;
   final ValueChanged<T> onChanged;
   final String Function(T) format;
+  final double itemExtent;
   final String? semanticLabel;
 
   const _TimeColumn({
@@ -350,6 +480,7 @@ class _TimeColumn<T> extends StatefulWidget {
     required this.value,
     required this.onChanged,
     required this.format,
+    required this.itemExtent,
     this.semanticLabel,
   });
 
@@ -358,10 +489,6 @@ class _TimeColumn<T> extends StatefulWidget {
 }
 
 class _TimeColumnState<T> extends State<_TimeColumn<T>> {
-  static const double _itemExtent = 36;
-  static const double _columnWidth = 60;
-  static const double _columnHeight = 128;
-
   late FixedExtentScrollController _controller;
 
   @override
@@ -401,83 +528,35 @@ class _TimeColumnState<T> extends State<_TimeColumn<T>> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final child = SizedBox(
-      width: _columnWidth,
-      height: _columnHeight,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: theme.colorScheme.outline.withValues(alpha: 0.6),
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: theme.colorScheme.shadow.withValues(alpha: 0.06),
-                  blurRadius: 4,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-            ),
-            child: ListWheelScrollView.useDelegate(
-              controller: _controller,
-              itemExtent: _itemExtent,
-              diameterRatio: 1.4,
-              perspective: 0.003,
-              physics: const FixedExtentScrollPhysics(),
-              onSelectedItemChanged: (i) => widget.onChanged(widget.items[i]),
-              childDelegate: ListWheelChildBuilderDelegate(
-                childCount: widget.items.length,
-                builder: (context, index) {
-                  final item = widget.items[index];
-                  final selected = item == widget.value;
-                  return Center(
-                    child: Text(
-                      widget.format(item),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: selected
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.onSurface.withValues(
-                                alpha: selected ? 1 : 0.6,
-                              ),
-                        fontWeight: selected
-                            ? FontWeight.w600
-                            : FontWeight.w500,
-                      ),
-                    ),
-                  );
-                },
+    final child = ListWheelScrollView.useDelegate(
+      controller: _controller,
+      itemExtent: widget.itemExtent,
+      diameterRatio: 1.6,
+      perspective: 0.002,
+      overAndUnderCenterOpacity: 0.35,
+      physics: const FixedExtentScrollPhysics(),
+      onSelectedItemChanged: (i) {
+        HapticFeedback.selectionClick();
+        widget.onChanged(widget.items[i]);
+      },
+      childDelegate: ListWheelChildBuilderDelegate(
+        childCount: widget.items.length,
+        builder: (context, index) {
+          final item = widget.items[index];
+          final selected = item == widget.value;
+          return Center(
+            child: Text(
+              widget.format(item),
+              style: theme.textTheme.titleLarge?.copyWith(
+                color: selected
+                    ? theme.colorScheme.onSurface
+                    : theme.colorScheme.onSurface.withValues(alpha: 0.38),
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
-          ),
-          Positioned(
-            left: 10,
-            right: 10,
-            top: (_columnHeight - _itemExtent) / 2,
-            height: _itemExtent,
-            child: IgnorePointer(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? theme.colorScheme.primaryContainer.withValues(
-                          alpha: 0.5,
-                        )
-                      : theme.colorScheme.primaryContainer.withValues(
-                          alpha: 0.4,
-                        ),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
     if (widget.semanticLabel != null) {

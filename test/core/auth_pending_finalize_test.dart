@@ -1,7 +1,7 @@
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hisab/core/auth/auth_pending_finalize.dart';
-import 'package:hisab/features/settings/settings_definitions.dart';
+import 'package:hisab/core/settings/settings_definitions.dart';
 
 void main() {
   Future<SettingsController> buildController({
@@ -22,13 +22,16 @@ void main() {
     return controller;
   }
 
-  test('session + onboarding pending completes onboarding and online', () async {
-    final c = await buildController(onboardingPending: true);
-    finalizePendingOnlineAuth(controller: c, hasSession: true);
-    expect(c.get(onboardingOnlinePendingSettingDef), isFalse);
-    expect(c.get(localOnlySettingDef), isFalse);
-    expect(c.get(onboardingCompletedSettingDef), isTrue);
-  });
+  test(
+    'session + onboarding pending completes onboarding and online',
+    () async {
+      final c = await buildController(onboardingPending: true);
+      finalizePendingOnlineAuth(controller: c, hasSession: true);
+      expect(c.get(onboardingOnlinePendingSettingDef), isFalse);
+      expect(c.get(localOnlySettingDef), isFalse);
+      expect(c.get(onboardingCompletedSettingDef), isTrue);
+    },
+  );
 
   test('session + settings pending clears flag and sets online', () async {
     final c = await buildController(settingsPending: true);
@@ -55,26 +58,29 @@ void main() {
     expect(c.get(settingsOnlinePendingSettingDef), isFalse);
   });
 
-  test('warm resume (clearWhenNoSession=false) keeps flags until session', () async {
-    final c = await buildController(
-      onboardingPending: true,
-      settingsPending: true,
-    );
-    // Native magic-link: app resumes before deep-link session arrives.
-    finalizePendingOnlineAuth(
-      controller: c,
-      hasSession: false,
-      clearWhenNoSession: false,
-    );
-    expect(c.get(onboardingOnlinePendingSettingDef), isTrue);
-    expect(c.get(settingsOnlinePendingSettingDef), isTrue);
+  test(
+    'warm resume (clearWhenNoSession=false) keeps flags until session',
+    () async {
+      final c = await buildController(
+        onboardingPending: true,
+        settingsPending: true,
+      );
+      // Native magic-link: app resumes before deep-link session arrives.
+      finalizePendingOnlineAuth(
+        controller: c,
+        hasSession: false,
+        clearWhenNoSession: false,
+      );
+      expect(c.get(onboardingOnlinePendingSettingDef), isTrue);
+      expect(c.get(settingsOnlinePendingSettingDef), isTrue);
 
-    finalizePendingOnlineAuth(controller: c, hasSession: true);
-    expect(c.get(onboardingOnlinePendingSettingDef), isFalse);
-    expect(c.get(settingsOnlinePendingSettingDef), isFalse);
-    expect(c.get(localOnlySettingDef), isFalse);
-    expect(c.get(onboardingCompletedSettingDef), isTrue);
-  });
+      finalizePendingOnlineAuth(controller: c, hasSession: true);
+      expect(c.get(onboardingOnlinePendingSettingDef), isFalse);
+      expect(c.get(settingsOnlinePendingSettingDef), isFalse);
+      expect(c.get(localOnlySettingDef), isFalse);
+      expect(c.get(onboardingCompletedSettingDef), isTrue);
+    },
+  );
 
   test('idempotent when flags already clear', () async {
     final c = await buildController(

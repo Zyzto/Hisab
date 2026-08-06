@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hisab/features/onboarding/pages/onboarding_page.dart';
 import 'package:hisab/features/onboarding/widgets/onboarding_shared.dart';
 import 'package:hisab/features/onboarding/widgets/onboarding_welcome_page.dart';
-import 'package:hisab/features/settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 
 import '../widget_test_helpers.dart';
 
@@ -38,15 +38,18 @@ void main() {
     await tester.pump(const Duration(milliseconds: 350));
   }
 
-  test('translucent fills are flattened so the meadow cannot bleed through', () {
-    const scheme = ColorScheme.light();
-    final flattened = onboardingOpaqueFill(
-      scheme,
-      scheme.primaryContainer.withValues(alpha: 0.35),
-    );
-    expect(flattened.a, 1.0);
-    expect(flattened, isNot(scheme.primaryContainer.withValues(alpha: 0.35)));
-  });
+  test(
+    'translucent fills are flattened so the meadow cannot bleed through',
+    () {
+      const scheme = ColorScheme.light();
+      final flattened = onboardingOpaqueFill(
+        scheme,
+        scheme.primaryContainer.withValues(alpha: 0.35),
+      );
+      expect(flattened.a, 1.0);
+      expect(flattened, isNot(scheme.primaryContainer.withValues(alpha: 0.35)));
+    },
+  );
 
   test('sky ink flips with the meadow: white at night, deep at day', () {
     expect(
@@ -100,7 +103,9 @@ void main() {
 
   testWidgets('hero card renders the app mark at hero size', (tester) async {
     await pumpStep(tester, 0);
-    final logo = tester.widgetList<Image>(find.byType(Image)).firstWhere(
+    final logo = tester
+        .widgetList<Image>(find.byType(Image))
+        .firstWhere(
           (image) => image.width == OnboardingWelcomePage.heroLogoSize,
           orElse: () => throw StateError('no hero-sized logo found'),
         );

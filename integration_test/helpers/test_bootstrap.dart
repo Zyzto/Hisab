@@ -12,8 +12,8 @@ import 'package:hisab/core/database/database_providers.dart';
 import 'package:hisab/core/debug/integration_test_mode.dart';
 import 'package:hisab/core/database/powersync_schema.dart' as ps;
 import 'package:hisab/core/widgets/app_fab.dart';
-import 'package:hisab/features/settings/providers/settings_framework_providers.dart';
-import 'package:hisab/features/settings/settings_definitions.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/settings_definitions.dart';
 
 import 'test_db_path.dart';
 

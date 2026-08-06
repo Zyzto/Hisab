@@ -68,6 +68,16 @@ fi
 [[ -f .github/workflows/release.yml ]] || fail "Missing .github/workflows/release.yml"
 grep -q 'FLUTTER_VERSION:' .github/workflows/release.yml \
   || fail "release.yml missing FLUTTER_VERSION env"
+[[ -f .github/workflows/ci.yml ]] || fail "Missing .github/workflows/ci.yml"
+grep -q 'FLUTTER_VERSION:' .github/workflows/ci.yml \
+  || fail "ci.yml missing FLUTTER_VERSION env"
+release_flutter=$(grep -E 'FLUTTER_VERSION:' .github/workflows/release.yml | head -1)
+ci_flutter=$(grep -E 'FLUTTER_VERSION:' .github/workflows/ci.yml | head -1)
+# Compare version string only (ignore surrounding YAML/comments).
+release_ver=$(echo "$release_flutter" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+ci_ver=$(echo "$ci_flutter" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+[[ -n "$release_ver" && "$release_ver" == "$ci_ver" ]] \
+  || fail "FLUTTER_VERSION mismatch: release.yml=$release_ver ci.yml=$ci_ver"
 
 # ── Privacy / Play disclosure pages (Hosting copies these) ────────────────────
 echo "==> Checking static legal pages"

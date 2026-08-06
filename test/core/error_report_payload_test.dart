@@ -18,7 +18,10 @@ void main() {
         payload.githubBody,
         contains('![Screenshot](https://example.com/shot.png)'),
       );
-      expect(payload.plainText, contains('Screenshot: https://example.com/shot.png'));
+      expect(
+        payload.plainText,
+        contains('Screenshot: https://example.com/shot.png'),
+      );
     });
 
     test('adds English manual-attach note when upload failed', () async {
@@ -43,8 +46,14 @@ void main() {
         includeScreenshotManualNote: true,
       );
 
-      expect(payload.githubBody, contains('![Screenshot](https://example.com/a.png)'));
-      expect(payload.githubBody, isNot(contains(kScreenshotManualAttachNoteEnglish)));
+      expect(
+        payload.githubBody,
+        contains('![Screenshot](https://example.com/a.png)'),
+      );
+      expect(
+        payload.githubBody,
+        isNot(contains(kScreenshotManualAttachNoteEnglish)),
+      );
     });
 
     test('keeps English section headings with Arabic UI locale', () async {
@@ -54,7 +63,10 @@ void main() {
         uiLocaleTag: 'ar',
       );
 
-      expect(payload.githubBody, contains('### Hisab bug report (auto-generated)'));
+      expect(
+        payload.githubBody,
+        contains('### Hisab bug report (auto-generated)'),
+      );
       expect(payload.githubBody, contains('**Environment**'));
       expect(payload.githubBody, contains('**Summary (English)**'));
       expect(payload.githubBody, contains('User feedback'));

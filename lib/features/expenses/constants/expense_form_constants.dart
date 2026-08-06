@@ -25,3 +25,6 @@ const List<({String id, String label, IconData icon})> presetExpenseTags =
 
 /// Icon names for custom tag icon picker — canonical map in [selectableCategoryIcons].
 const Map<String, IconData> selectableExpenseIcons = selectableCategoryIcons;
+
+/// Max number of photos per expense (form + gallery).
+const int kMaxExpenseImages = 5;

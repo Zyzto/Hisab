@@ -35,7 +35,8 @@ class RoutePaths {
   static const String groupCreateReview = '/groups/create/review';
   static const String groupCreatePersonalDetails =
       '/groups/create-personal/details';
-  static const String groupCreatePersonalStyle = '/groups/create-personal/style';
+  static const String groupCreatePersonalStyle =
+      '/groups/create-personal/style';
   static const String groupCreatePersonalReview =
       '/groups/create-personal/review';
   static const String archivedGroups = '/archived';
@@ -47,9 +48,12 @@ class RoutePaths {
 
   static String inviteAccept(String token) => '/invite/$token';
   static String invitePreview(String token) => '/invite/$token/preview';
-  static String invitePreviewExpenses(String token) => '/invite/$token/preview/expenses';
-  static String invitePreviewBalance(String token) => '/invite/$token/preview/balance';
-  static String invitePreviewPeople(String token) => '/invite/$token/preview/people';
+  static String invitePreviewExpenses(String token) =>
+      '/invite/$token/preview/expenses';
+  static String invitePreviewBalance(String token) =>
+      '/invite/$token/preview/balance';
+  static String invitePreviewPeople(String token) =>
+      '/invite/$token/preview/people';
   static String invitePreviewExpenseDetail(String token, String expenseId) =>
       '/invite/$token/preview/expenses/$expenseId';
   static const String scanInvite = '/scan-invite';

@@ -37,8 +37,7 @@ bool routerCanPop(BuildContext context) {
 void popOrGo(BuildContext context, String fallbackPath) {
   if (fallbackPath.isEmpty) return;
   final router = GoRouter.maybeOf(context);
-  final currentPath =
-      router != null ? goRouterVisiblePath(router) : '';
+  final currentPath = router != null ? goRouterVisiblePath(router) : '';
 
   if (router != null &&
       currentPath.isNotEmpty &&
@@ -71,9 +70,7 @@ void seedParentHistoryForBrowserBack({
   required String currentPath,
 }) {
   if (!kIsWeb) return;
-  if (parentPath.isEmpty ||
-      currentPath.isEmpty ||
-      parentPath == currentPath) {
+  if (parentPath.isEmpty || currentPath.isEmpty || parentPath == currentPath) {
     return;
   }
   final router = GoRouter.maybeOf(context);
@@ -85,10 +82,7 @@ void seedParentHistoryForBrowserBack({
       _seededCurrentPaths.contains(currentPath)) {
     return;
   }
-  seedParentBrowserHistory(
-    parentPath: parentPath,
-    currentPath: currentPath,
-  );
+  seedParentBrowserHistory(parentPath: parentPath, currentPath: currentPath);
   _seededCurrentPaths.add(currentPath);
 }
 

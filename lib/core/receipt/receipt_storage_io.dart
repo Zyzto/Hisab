@@ -58,7 +58,9 @@ Future<void> clearReceiptAppStorage() async {
     await for (final entity in receiptsDir.list()) {
       try {
         await entity.delete(recursive: true);
-      } catch (_) {}
+      } catch (e) {
+        Log.debug('Receipt file delete failed', error: e);
+      }
     }
   } catch (e, st) {
     Log.warning('clearReceiptAppStorage failed', error: e, stackTrace: st);

@@ -34,11 +34,9 @@ class OnboardingPlaque extends StatelessWidget {
   final double radius;
 
   /// Compact variant for footnotes.
-  const OnboardingPlaque.compact({
-    super.key,
-    required this.child,
-  })  : padding = const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        radius = 14;
+  const OnboardingPlaque.compact({super.key, required this.child})
+    : padding = const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      radius = 14;
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +48,9 @@ class OnboardingPlaque extends StatelessWidget {
         color: colorScheme.surface.withValues(alpha: dark ? 0.78 : 0.84),
         borderRadius: BorderRadius.circular(radius),
         border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: dark ? 0.22 : 0.28),
+          color: colorScheme.outlineVariant.withValues(
+            alpha: dark ? 0.22 : 0.28,
+          ),
         ),
         boxShadow: UiPerf.preferCheapShadows
             ? null
@@ -87,10 +87,7 @@ Color onboardingSkyInkForBrightness(
 }
 
 Color onboardingSkyInk(BuildContext context, {double alpha = 0.94}) =>
-    onboardingSkyInkForBrightness(
-      Theme.of(context).brightness,
-      alpha: alpha,
-    );
+    onboardingSkyInkForBrightness(Theme.of(context).brightness, alpha: alpha);
 
 /// Wide, heavily faded halo opposite the ink — a soft wash, not a hard rim.
 List<Shadow> onboardingSkyTextShadowsForBrightness(Brightness brightness) {
@@ -104,15 +101,9 @@ List<Shadow> onboardingSkyTextShadowsForBrightness(Brightness brightness) {
       offset: const Offset(0, 1),
     ),
     // Mid bloom.
-    Shadow(
-      color: wash.withValues(alpha: night ? 0.12 : 0.16),
-      blurRadius: 40,
-    ),
+    Shadow(color: wash.withValues(alpha: night ? 0.12 : 0.16), blurRadius: 40),
     // Far, very faded glow.
-    Shadow(
-      color: wash.withValues(alpha: night ? 0.06 : 0.08),
-      blurRadius: 72,
-    ),
+    Shadow(color: wash.withValues(alpha: night ? 0.06 : 0.08), blurRadius: 72),
   ];
 }
 
@@ -123,11 +114,7 @@ List<Shadow> onboardingSkyTextShadows(BuildContext context) =>
 ///
 /// No plaque — sits on the sky with adaptive translucent ink.
 class OnboardingTitleBlock extends StatelessWidget {
-  const OnboardingTitleBlock({
-    super.key,
-    required this.title,
-    this.subtitle,
-  });
+  const OnboardingTitleBlock({super.key, required this.title, this.subtitle});
 
   final String title;
   final Widget? subtitle;
@@ -190,12 +177,7 @@ class OnboardingSectionLabel extends StatelessWidget {
           decoration: BoxDecoration(
             color: bar,
             borderRadius: BorderRadius.circular(2),
-            boxShadow: [
-              BoxShadow(
-                color: shadows.first.color,
-                blurRadius: 8,
-              ),
-            ],
+            boxShadow: [BoxShadow(color: shadows.first.color, blurRadius: 8)],
           ),
         ),
         const SizedBox(width: 10),
@@ -229,8 +211,7 @@ const double kOnboardingFooterChromeHeight = 152;
 /// (safe area included). Content is intentionally allowed under the soft
 /// fade extension so the next rows peek through.
 double onboardingFooterContentInset(BuildContext context) {
-  return kOnboardingFooterChromeHeight +
-      MediaQuery.paddingOf(context).bottom;
+  return kOnboardingFooterChromeHeight + MediaQuery.paddingOf(context).bottom;
 }
 
 /// Onboarding body with title (+ optional pinned header) fixed, content
@@ -278,17 +259,16 @@ Widget onboardingPageBodyWithFixedTitle(
           child: LayoutBuilder(
             builder: (context, scrollConstraints) {
               final minBody = scrollConstraints.maxHeight.isFinite
-                  ? (scrollConstraints.maxHeight - footerInset)
-                        .clamp(0.0, scrollConstraints.maxHeight)
+                  ? (scrollConstraints.maxHeight - footerInset).clamp(
+                      0.0,
+                      scrollConstraints.maxHeight,
+                    )
                   : 0.0;
               return SingleChildScrollView(
                 padding: EdgeInsets.only(bottom: footerInset + padding),
                 child: ConstrainedBox(
                   constraints: BoxConstraints(minHeight: minBody),
-                  child: Align(
-                    alignment: contentAlignment,
-                    child: content,
-                  ),
+                  child: Align(alignment: contentAlignment, child: content),
                 ),
               );
             },
@@ -386,9 +366,9 @@ class OnboardingListCard extends StatelessWidget {
                 DefaultTextStyle(
                   style: (theme.textTheme.bodySmall ?? const TextStyle())
                       .copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    height: 1.35,
-                  ),
+                        color: colorScheme.onSurfaceVariant,
+                        height: 1.35,
+                      ),
                   child: subtitle,
                 ),
               ],

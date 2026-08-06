@@ -46,19 +46,13 @@ class ConstrainedContent extends StatelessWidget {
           context,
           contentAreaWidth,
         );
-        final showAside =
-            aside != null && endFree >= asideMinGutter + 8;
-        final asideW = showAside
-            ? asideWidth.clamp(0.0, endFree)
-            : 0.0;
+        final showAside = aside != null && endFree >= asideMinGutter + 8;
+        final asideW = showAside ? asideWidth.clamp(0.0, endFree) : 0.0;
 
         Widget asideRail() => SizedBox(
-              width: asideW,
-              child: Align(
-                alignment: Alignment.topCenter,
-                child: aside,
-              ),
-            );
+          width: asideW,
+          child: Align(alignment: Alignment.topCenter, child: aside),
+        );
 
         // Force LTR so [leftOffset] stays a physical-left inset and matches
         // [ContentAlignedAppBar] (which uses Positioned.left). A plain Row

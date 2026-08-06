@@ -7,8 +7,16 @@ import 'group_member_provider.dart';
 import 'groups_provider.dart';
 
 enum AnalyticsRangePreset { days30, days90, all }
+
 enum TrendGranularity { daily, weekly, monthly }
-enum AnalyticsTrendChartMode { totalBar, totalLine, userComparison, categoryComparison }
+
+enum AnalyticsTrendChartMode {
+  totalBar,
+  totalLine,
+  userComparison,
+  categoryComparison,
+}
+
 enum AnalyticsCategoryChartMode { bars, pie }
 
 class GroupAnalyticsUiState {
@@ -55,26 +63,17 @@ class GroupAnalyticsUiStateNotifier
 
   void setTrendChartMode(String groupId, AnalyticsTrendChartMode mode) {
     final current = _stateFor(groupId);
-    _upsert(
-      groupId,
-      current.copyWith(trendChartMode: mode),
-    );
+    _upsert(groupId, current.copyWith(trendChartMode: mode));
   }
 
   void setCategoryChartMode(String groupId, AnalyticsCategoryChartMode mode) {
     final current = _stateFor(groupId);
-    _upsert(
-      groupId,
-      current.copyWith(categoryChartMode: mode),
-    );
+    _upsert(groupId, current.copyWith(categoryChartMode: mode));
   }
 
   void setPersonChartMode(String groupId, AnalyticsCategoryChartMode mode) {
     final current = _stateFor(groupId);
-    _upsert(
-      groupId,
-      current.copyWith(personChartMode: mode),
-    );
+    _upsert(groupId, current.copyWith(personChartMode: mode));
   }
 
   void toggleExcludedCategory(String groupId, String categoryId) {
@@ -85,10 +84,7 @@ class GroupAnalyticsUiStateNotifier
     } else {
       next.add(categoryId);
     }
-    _upsert(
-      groupId,
-      current.copyWith(excludedCategoryIds: next),
-    );
+    _upsert(groupId, current.copyWith(excludedCategoryIds: next));
   }
 
   void toggleExcludedPerson(String groupId, String personId) {
@@ -99,28 +95,19 @@ class GroupAnalyticsUiStateNotifier
     } else {
       next.add(personId);
     }
-    _upsert(
-      groupId,
-      current.copyWith(excludedPersonIds: next),
-    );
+    _upsert(groupId, current.copyWith(excludedPersonIds: next));
   }
 
   void clearExcludedCategories(String groupId) {
     final current = _stateFor(groupId);
     if (current.excludedCategoryIds.isEmpty) return;
-    _upsert(
-      groupId,
-      current.copyWith(excludedCategoryIds: const <String>{}),
-    );
+    _upsert(groupId, current.copyWith(excludedCategoryIds: const <String>{}));
   }
 
   void clearExcludedPersons(String groupId) {
     final current = _stateFor(groupId);
     if (current.excludedPersonIds.isEmpty) return;
-    _upsert(
-      groupId,
-      current.copyWith(excludedPersonIds: const <String>{}),
-    );
+    _upsert(groupId, current.copyWith(excludedPersonIds: const <String>{}));
   }
 
   void _upsert(String groupId, GroupAnalyticsUiState value) {
@@ -139,10 +126,11 @@ class GroupAnalyticsUiStateNotifier
   }
 }
 
-final groupAnalyticsUiStateProvider = NotifierProvider<
-  GroupAnalyticsUiStateNotifier,
-  Map<String, GroupAnalyticsUiState>
->(GroupAnalyticsUiStateNotifier.new);
+final groupAnalyticsUiStateProvider =
+    NotifierProvider<
+      GroupAnalyticsUiStateNotifier,
+      Map<String, GroupAnalyticsUiState>
+    >(GroupAnalyticsUiStateNotifier.new);
 
 final groupAnalyticsUiStateByGroupProvider =
     Provider.family<GroupAnalyticsUiState, String>((ref, groupId) {
@@ -174,7 +162,9 @@ class GroupAnalyticsQuery {
     return GroupAnalyticsQuery(
       groupId: groupId ?? this.groupId,
       range: range ?? this.range,
-      participantId: clearParticipant ? null : (participantId ?? this.participantId),
+      participantId: clearParticipant
+          ? null
+          : (participantId ?? this.participantId),
       tagId: clearTag ? null : (tagId ?? this.tagId),
     );
   }
@@ -207,7 +197,11 @@ class TrendPoint {
 }
 
 class TrendSeries {
-  const TrendSeries({required this.id, required this.label, required this.points});
+  const TrendSeries({
+    required this.id,
+    required this.label,
+    required this.points,
+  });
 
   final String id;
   final String label;
@@ -222,7 +216,11 @@ class TrendWindow {
 }
 
 class TrendBuildResult {
-  const TrendBuildResult({required this.granularity, required this.points, required this.windows});
+  const TrendBuildResult({
+    required this.granularity,
+    required this.points,
+    required this.windows,
+  });
 
   final TrendGranularity granularity;
   final List<TrendPoint> points;
@@ -266,6 +264,7 @@ class GroupAnalyticsData {
   final List<Participant> participants;
   final List<ExpenseTag> tags;
   final List<Expense> filteredExpenses;
+
   /// Tag ids seen on non-transfer expenses (before payer/category filters).
   final Set<String> availableCategoryIds;
   final int totalAmountCents;
@@ -286,7 +285,9 @@ final groupAnalyticsDataProvider =
       query,
     ) {
       final groupAsync = ref.watch(futureGroupProvider(query.groupId));
-      final participantsAsync = ref.watch(participantsByGroupProvider(query.groupId));
+      final participantsAsync = ref.watch(
+        participantsByGroupProvider(query.groupId),
+      );
       final expensesAsync = ref.watch(expensesByGroupProvider(query.groupId));
       final tagsAsync = ref.watch(tagsByGroupProvider(query.groupId));
       final myMemberAsync = ref.watch(myMemberInGroupProvider(query.groupId));
@@ -344,26 +345,28 @@ GroupAnalyticsData computeGroupAnalytics({
   DateTime? now,
 }) {
   final fallbackNow = now ?? DateTime.now();
-  final eligible = expenses.where((expense) => !_isTransferOnly(expense)).toList();
-  final activityEnd = _activityEndDay(eligible) ??
+  final eligible = expenses
+      .where((expense) => !_isTransferOnly(expense))
+      .toList();
+  final activityEnd =
+      _activityEndDay(eligible) ??
       DateTime(fallbackNow.year, fallbackNow.month, fallbackNow.day);
   final rangeStart = _rangeStart(query.range, activityEnd);
 
   final filtered = eligible.where((expense) {
-    final localDate = expense.date.isUtc ? expense.date.toLocal() : expense.date;
+    final localDate = expense.date.isUtc
+        ? expense.date.toLocal()
+        : expense.date;
     if (rangeStart != null && localDate.isBefore(rangeStart)) return false;
     if (query.participantId != null && query.participantId!.isNotEmpty) {
       if (expense.payerParticipantId != query.participantId) return false;
     }
     if (query.tagId != null && query.tagId!.isNotEmpty) {
-      final expenseTag = (expense.tag == null || expense.tag!.isEmpty)
-          ? 'untagged'
-          : expense.tag!;
+      final expenseTag = expense.hasBlankTag ? 'untagged' : expense.tag!;
       if (expenseTag != query.tagId) return false;
     }
     return true;
-  }).toList()
-    ..sort((a, b) => a.date.compareTo(b.date));
+  }).toList()..sort((a, b) => a.date.compareTo(b.date));
 
   int totalCents = 0;
   int myCents = 0;
@@ -407,7 +410,11 @@ GroupAnalyticsData computeGroupAnalytics({
       participants,
       trend.windows,
     ),
-    categoryTrendSeries: _buildCategoryTrendSeries(filtered, tags, trend.windows),
+    categoryTrendSeries: _buildCategoryTrendSeries(
+      filtered,
+      tags,
+      trend.windows,
+    ),
     byTag: _buildTagBreakdown(filtered, tags),
     byParticipant: _buildParticipantBreakdown(filtered, participants),
   );
@@ -507,7 +514,9 @@ TrendBuildResult _buildTrendPoints(
         DateTime firstDay = endDay;
         DateTime lastDay = endDay;
         for (final expense in expenses) {
-          final date = expense.date.isUtc ? expense.date.toLocal() : expense.date;
+          final date = expense.date.isUtc
+              ? expense.date.toLocal()
+              : expense.date;
           final day = DateTime(date.year, date.month, date.day);
           if (day.isBefore(firstDay)) firstDay = day;
           if (day.isAfter(lastDay)) lastDay = day;
@@ -553,10 +562,17 @@ TrendBuildResult _buildTrendPoints(
     }
   }
 
-  return TrendBuildResult(granularity: granularity, points: points, windows: windows);
+  return TrendBuildResult(
+    granularity: granularity,
+    points: points,
+    windows: windows,
+  );
 }
 
-List<TrendWindow> _buildDailyWindows(DateTime startDay, DateTime endDayInclusive) {
+List<TrendWindow> _buildDailyWindows(
+  DateTime startDay,
+  DateTime endDayInclusive,
+) {
   final start = DateTime(startDay.year, startDay.month, startDay.day);
   final end = DateTime(
     endDayInclusive.year,
@@ -573,7 +589,10 @@ List<TrendWindow> _buildDailyWindows(DateTime startDay, DateTime endDayInclusive
   return windows;
 }
 
-List<TrendWindow> _buildWeeklyWindows(DateTime startDay, DateTime endDayInclusive) {
+List<TrendWindow> _buildWeeklyWindows(
+  DateTime startDay,
+  DateTime endDayInclusive,
+) {
   final start = DateTime(startDay.year, startDay.month, startDay.day);
   final endExclusive = DateTime(
     endDayInclusive.year,
@@ -591,7 +610,10 @@ List<TrendWindow> _buildWeeklyWindows(DateTime startDay, DateTime endDayInclusiv
   return windows;
 }
 
-List<TrendWindow> _buildMonthlyWindows(DateTime startDay, DateTime endDayInclusive) {
+List<TrendWindow> _buildMonthlyWindows(
+  DateTime startDay,
+  DateTime endDayInclusive,
+) {
   final start = DateTime(startDay.year, startDay.month, 1);
   final end = DateTime(endDayInclusive.year, endDayInclusive.month, 1);
   final windows = <TrendWindow>[];
@@ -636,28 +658,25 @@ List<TrendSeries> _buildParticipantTrendSeries(
   }
   final rankedIds = totals.entries.toList()
     ..sort((a, b) => b.value.compareTo(a.value));
-  return rankedIds
-      .take(_maxComparisonSeries)
-      .map((entry) {
-        final participantId = entry.key;
-        final points = windows
-            .map(
-              (window) => _bucket(
-                expenses,
-                window.start,
-                window.end,
-                includeWhere: (expense) =>
-                    expense.payerParticipantId == participantId,
-              ),
-            )
-            .toList();
-        return TrendSeries(
-          id: participantId,
-          label: namesById[participantId] ?? participantId,
-          points: points,
-        );
-      })
-      .toList();
+  return rankedIds.take(_maxComparisonSeries).map((entry) {
+    final participantId = entry.key;
+    final points = windows
+        .map(
+          (window) => _bucket(
+            expenses,
+            window.start,
+            window.end,
+            includeWhere: (expense) =>
+                expense.payerParticipantId == participantId,
+          ),
+        )
+        .toList();
+    return TrendSeries(
+      id: participantId,
+      label: namesById[participantId] ?? participantId,
+      points: points,
+    );
+  }).toList();
 }
 
 List<TrendSeries> _buildCategoryTrendSeries(
@@ -668,39 +687,34 @@ List<TrendSeries> _buildCategoryTrendSeries(
   if (expenses.isEmpty || windows.isEmpty) return const [];
   final totals = <String, int>{};
   for (final expense in expenses) {
-    final key = (expense.tag == null || expense.tag!.isEmpty)
-        ? 'untagged'
-        : expense.tag!;
+    final key = expense.hasBlankTag ? 'untagged' : expense.tag!;
     totals[key] = (totals[key] ?? 0) + contributionToExpenseTotal(expense);
   }
   final rankedTags = totals.entries.toList()
     ..sort((a, b) => b.value.compareTo(a.value));
-  return rankedTags
-      .take(_maxComparisonSeries)
-      .map((entry) {
-        final tagId = entry.key;
-        final points = windows
-            .map(
-              (window) => _bucket(
-                expenses,
-                window.start,
-                window.end,
-                includeWhere: (expense) {
-                  final currentTag = (expense.tag == null || expense.tag!.isEmpty)
-                      ? 'untagged'
-                      : expense.tag!;
-                  return currentTag == tagId;
-                },
-              ),
-            )
-            .toList();
-        return TrendSeries(
-          id: tagId,
-          label: tagId == 'untagged' ? 'untagged' : resolveTagLabel(tagId, tags),
-          points: points,
-        );
-      })
-      .toList();
+  return rankedTags.take(_maxComparisonSeries).map((entry) {
+    final tagId = entry.key;
+    final points = windows
+        .map(
+          (window) => _bucket(
+            expenses,
+            window.start,
+            window.end,
+            includeWhere: (expense) {
+              final currentTag = expense.hasBlankTag
+                  ? 'untagged'
+                  : expense.tag!;
+              return currentTag == tagId;
+            },
+          ),
+        )
+        .toList();
+    return TrendSeries(
+      id: tagId,
+      label: tagId == 'untagged' ? 'untagged' : resolveTagLabel(tagId, tags),
+      points: points,
+    );
+  }).toList();
 }
 
 List<AmountBreakdownItem> _buildTagBreakdown(
@@ -709,9 +723,7 @@ List<AmountBreakdownItem> _buildTagBreakdown(
 ) {
   final map = <String, (String label, int amount, int count)>{};
   for (final expense in expenses) {
-    final key = (expense.tag == null || expense.tag!.isEmpty)
-        ? 'untagged'
-        : expense.tag!;
+    final key = expense.hasBlankTag ? 'untagged' : expense.tag!;
     final label = key == 'untagged' ? 'untagged' : resolveTagLabel(key, tags);
     final current = map[key];
     final amount = contributionToExpenseTotal(expense);

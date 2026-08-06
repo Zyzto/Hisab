@@ -3,7 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hisab/core/widgets/participant_avatar.dart';
 
 void main() {
-  testWidgets('ParticipantAvatar shows emoji for known avatarId', (tester) async {
+  testWidgets('ParticipantAvatar shows emoji for known avatarId', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(

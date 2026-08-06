@@ -11,8 +11,8 @@ import '../../../core/platform/screenshot_report_support.dart';
 import '../../../core/pwa/pwa_capabilities.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/widgets/toast.dart';
-import '../settings_definitions.dart';
-import '../providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/settings_definitions.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 import '../widgets/setting_tile_helper.dart';
 
 /// Returns the list of tiles for the Privacy section.
@@ -48,7 +48,8 @@ List<Widget> buildPrivacySectionTiles(
         ref,
         settings,
         notificationsEnabledSettingDef,
-        subtitleKey: kIsWeb &&
+        subtitleKey:
+            kIsWeb &&
                 pwaNotificationSupport == PwaNotificationSupport.needsInstall
             ? 'onboarding_permission_notifications_needs_install'
             : null,
@@ -58,7 +59,8 @@ List<Widget> buildPrivacySectionTiles(
             settings.provider(notificationsEnabledSettingDef).notifier,
           );
           if (v) {
-            final needsInstall = kIsWeb &&
+            final needsInstall =
+                kIsWeb &&
                 pwaNotificationSupport == PwaNotificationSupport.needsInstall;
             final ok = await ref
                 .read(notificationServiceProvider.notifier)

@@ -32,11 +32,7 @@ class PlantsScene extends BiomeSceneBase {
         rng: rng,
         area: area,
         count: 16,
-        colors: const [
-          Color(0xFFDCEDC8),
-          Color(0xFFC5E1A5),
-          Color(0xFFAED581),
-        ],
+        colors: const [Color(0xFFDCEDC8), Color(0xFFC5E1A5), Color(0xFFAED581)],
         draw: drawLeaf,
         fallDown: false,
       ),
@@ -120,11 +116,12 @@ class PlantsScene extends BiomeSceneBase {
       final lx = x + math.sin(tt * math.pi * 3 + game.elapsed) * 22 + sway * tt;
       canvas.save();
       canvas.translate(lx, y);
-      canvas.rotate((left ? -0.8 : 0.8) + math.sin(game.elapsed * 3 + i) * 0.15);
-      leaf.color = (i.isEven
-              ? const Color(0xFF7CB342)
-              : const Color(0xFF9CCC65))
-          .withValues(alpha: 0.88 * a);
+      canvas.rotate(
+        (left ? -0.8 : 0.8) + math.sin(game.elapsed * 3 + i) * 0.15,
+      );
+      leaf.color =
+          (i.isEven ? const Color(0xFF7CB342) : const Color(0xFF9CCC65))
+              .withValues(alpha: 0.88 * a);
       canvas.drawOval(
         Rect.fromCenter(center: Offset.zero, width: 28, height: 14),
         leaf,

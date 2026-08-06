@@ -104,8 +104,8 @@ class ExchangeRateService {
 
       await prefs.setString(key, jsonEncode(rates));
       await prefs.setInt(tsKey, DateTime.now().millisecondsSinceEpoch);
-    } catch (_) {
-      // Caching failure is not critical
+    } catch (e) {
+      Log.debug('Exchange rate cache write failed', error: e);
     }
   }
 }

@@ -73,9 +73,7 @@ abstract final class AccentSurfaces {
   }
 
   static Color sectionBar(ColorScheme colorScheme, {required bool subtle}) {
-    return subtle
-        ? colorScheme.outlineVariant
-        : colorScheme.primary;
+    return subtle ? colorScheme.outlineVariant : colorScheme.primary;
   }
 
   static Color emphasizedFill(ColorScheme colorScheme, {required bool subtle}) {

@@ -102,8 +102,9 @@ class DraftTransaction {
   }
 
   /// Human-readable display title for the review card.
-  String get displayTitle =>
-      merchantName?.isNotEmpty == true ? merchantName! : senderTitle ?? senderPackage;
+  String get displayTitle => merchantName?.isNotEmpty == true
+      ? merchantName!
+      : senderTitle ?? senderPackage;
 
   bool get hasLocation => latitude != null && longitude != null;
 }

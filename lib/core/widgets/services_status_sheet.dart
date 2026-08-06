@@ -6,7 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../layout/layout_breakpoints.dart';
 import '../layout/responsive_sheet.dart';
-import '../../features/settings/providers/settings_framework_providers.dart';
+import '../settings/providers/settings_framework_providers.dart';
 import '../constants/supabase_config.dart';
 import '../services/connectivity_service.dart';
 import '../services/firebase_status_client.dart';

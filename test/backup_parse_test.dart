@@ -154,11 +154,7 @@ void main() {
             amountCents: 100,
             currencyCode: 'USD',
             items: const [
-              SettlementItem(
-                expenseId: 'e1',
-                title: 'Food',
-                amountCents: 100,
-              ),
+              SettlementItem(expenseId: 'e1', title: 'Food', amountCents: 100),
             ],
           ),
         ],

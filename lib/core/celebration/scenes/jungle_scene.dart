@@ -41,17 +41,19 @@ class JungleScene extends BiomeSceneBase {
             final phase = i * 0.55;
             return ComputedParticle(
               renderer: (canvas, particle) {
-                final tt = particle.progress * math.pi * 2 + phase + game.elapsed;
+                final tt =
+                    particle.progress * math.pi * 2 + phase + game.elapsed;
                 final x = ox + math.cos(tt * 1.2) * orbit;
                 final y = oy + math.sin(tt * 1.6) * orbit * 0.5;
-                final tw = 0.3 +
-                    0.7 * (0.5 + 0.5 * math.sin(game.elapsed * 11 + i));
+                final tw =
+                    0.3 + 0.7 * (0.5 + 0.5 * math.sin(game.elapsed * 11 + i));
                 canvas.drawCircle(
                   Offset(x, y),
                   2.4 + (i.isEven ? 1.2 : 0),
                   Paint()
-                    ..color = const Color(0xFFFFF59D)
-                        .withValues(alpha: 0.7 * alpha * tw),
+                    ..color = const Color(
+                      0xFFFFF59D,
+                    ).withValues(alpha: 0.7 * alpha * tw),
                 );
               },
             );

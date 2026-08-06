@@ -8,7 +8,7 @@ import 'package:hisab/core/widgets/app_fab.dart';
 import 'package:hisab/domain/domain.dart';
 import 'package:hisab/features/home/pages/home_page.dart';
 import 'package:hisab/features/home/providers/home_list_provider.dart';
-import 'package:hisab/features/settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 
 void main() {
   setUpAll(() {

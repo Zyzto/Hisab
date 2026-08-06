@@ -12,7 +12,7 @@ import '../../../core/services/connectivity_service.dart';
 import '../../../core/widgets/participant_avatar.dart';
 import '../../../core/widgets/user_text.dart';
 import '../../settings/account_mode_actions.dart';
-import '../../settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 import '../../settings/widgets/change_password_sheet.dart';
 import '../../settings/widgets/edit_profile_sheet.dart';
 
@@ -37,7 +37,9 @@ class ProfileAccountSection extends ConsumerWidget {
     if (!onlineAvailable) {
       return ListTile(
         leading: CircleAvatar(
-          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+          backgroundColor: Theme.of(
+            context,
+          ).colorScheme.surfaceContainerHighest,
           child: Icon(
             Icons.cloud_off,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -116,7 +118,8 @@ class ProfileAccountSection extends ConsumerWidget {
         }
 
         final provider = AccountModeActions.providerLabel(user);
-        final canChangePassword = user != null &&
+        final canChangePassword =
+            user != null &&
             (user.appMetadata['provider'] as String?) == 'email';
 
         return Column(
@@ -302,11 +305,7 @@ class _AccountActionButton extends StatelessWidget {
           child: SizedBox(
             width: 44,
             child: Center(
-              child: Icon(
-                icon,
-                size: 20,
-                color: colorScheme.onSurfaceVariant,
-              ),
+              child: Icon(icon, size: 20, color: colorScheme.onSurfaceVariant),
             ),
           ),
         ),

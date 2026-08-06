@@ -492,10 +492,8 @@ class _SignInSheetState extends State<_SignInSheet> {
                 const SizedBox(height: 12),
                 _nonFocusableAction(
                   FilledButton(
-                    onPressed: () => Navigator.pop(
-                      context,
-                      SignInResult.pendingEmailLink,
-                    ),
+                    onPressed: () =>
+                        Navigator.pop(context, SignInResult.pendingEmailLink),
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),

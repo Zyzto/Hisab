@@ -77,11 +77,8 @@ class LayoutBreakpoints {
     final isRtl = Directionality.of(context) == TextDirection.rtl;
     final contentAreaLeftInViewport = isRtl ? 0.0 : effectiveRailWidth;
     final desiredBandLeftInViewport = (viewportWidth - maxW) / 2;
-    var leftOffset =
-        (desiredBandLeftInViewport - contentAreaLeftInViewport).clamp(
-          0.0,
-          double.infinity,
-        );
+    var leftOffset = (desiredBandLeftInViewport - contentAreaLeftInViewport)
+        .clamp(0.0, double.infinity);
     if (leftOffset > contentAreaWidth) leftOffset = 0.0;
     final bandWidth = (contentAreaWidth - leftOffset).clamp(0.0, maxW);
     return (leftOffset, bandWidth);

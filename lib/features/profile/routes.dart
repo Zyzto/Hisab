@@ -8,10 +8,8 @@ List<RouteBase> getProfileRoutes() {
   return [
     GoRoute(
       path: RoutePaths.profile,
-      pageBuilder: (context, state) => appFadeSlidePage(
-        key: state.pageKey,
-        child: const ProfilePage(),
-      ),
+      pageBuilder: (context, state) =>
+          appFadeSlidePage(key: state.pageKey, child: const ProfilePage()),
       routes: [
         GoRoute(
           path: 'expenses',

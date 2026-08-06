@@ -84,7 +84,11 @@ Future<SupabaseProjectHealthResult> fetchSupabaseProjectHealth() async {
     return result;
   } catch (e, st) {
     if (kDebugMode) {
-      Log.error('Supabase project health probe failed', error: e, stackTrace: st);
+      Log.error(
+        'Supabase project health probe failed',
+        error: e,
+        stackTrace: st,
+      );
     }
     return SupabaseProjectHealthUnreachable(e.toString());
   }

@@ -1,6 +1,7 @@
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:web/web.dart' as web;
 
 import 'pwa_capability_logic.dart';
@@ -50,7 +51,9 @@ bool get isPwaStandalone {
         (standalone as JSBoolean).toDart) {
       return true;
     }
-  } catch (_) {}
+  } catch (e) {
+    Log.debug('iOS standalone probe failed', error: e);
+  }
   return web.window.matchMedia('(display-mode: standalone)').matches ||
       web.window.matchMedia('(display-mode: fullscreen)').matches ||
       web.window.matchMedia('(display-mode: minimal-ui)').matches;

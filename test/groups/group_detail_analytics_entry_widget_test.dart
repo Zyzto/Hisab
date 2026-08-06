@@ -11,7 +11,7 @@ import 'package:hisab/features/groups/pages/group_detail_page.dart';
 import 'package:hisab/features/groups/providers/group_member_provider.dart';
 import 'package:hisab/features/groups/providers/groups_provider.dart';
 import 'package:hisab/features/groups/widgets/group_section_header.dart';
-import 'package:hisab/features/settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 
 import '../widget_test_helpers.dart';
 
@@ -182,7 +182,9 @@ void main() {
       ProviderScope(
         overrides: [
           effectiveLocalOnlyProvider.overrideWith((ref) => true),
-          futureGroupProvider(groupId).overrideWithValue(AsyncValue.data(group)),
+          futureGroupProvider(
+            groupId,
+          ).overrideWithValue(AsyncValue.data(group)),
           expensesByGroupProvider(
             groupId,
           ).overrideWithValue(AsyncValue.data(expenses)),
@@ -218,9 +220,7 @@ void main() {
     expect(find.text(userComparisonLabel), findsWidgets);
   });
 
-  testWidgets('category analytics renders with expense data', (
-    tester,
-  ) async {
+  testWidgets('category analytics renders with expense data', (tester) async {
     const groupId = 'g3';
     final now = DateTime.now();
     final group = Group(
@@ -301,7 +301,9 @@ void main() {
       ProviderScope(
         overrides: [
           effectiveLocalOnlyProvider.overrideWith((ref) => true),
-          futureGroupProvider(groupId).overrideWithValue(AsyncValue.data(group)),
+          futureGroupProvider(
+            groupId,
+          ).overrideWithValue(AsyncValue.data(group)),
           expensesByGroupProvider(
             groupId,
           ).overrideWithValue(AsyncValue.data(expenses)),

@@ -687,8 +687,7 @@ String _$use24HourFormatHash() => r'1d0dedb6f9ad10dcdc5dc1a32ba5dbb2a294bab8';
 @ProviderFor(subtleAccents)
 final subtleAccentsProvider = SubtleAccentsProvider._();
 
-final class SubtleAccentsProvider
-    extends $FunctionalProvider<bool, bool, bool>
+final class SubtleAccentsProvider extends $FunctionalProvider<bool, bool, bool>
     with $Provider<bool> {
   SubtleAccentsProvider._()
     : super(

@@ -8,8 +8,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hisab/core/constants/supabase_config.dart';
 import 'package:hisab/features/onboarding/pages/onboarding_page.dart';
 import 'package:hisab/features/onboarding/widgets/onboarding_welcome_page.dart';
-import 'package:hisab/features/settings/providers/settings_framework_providers.dart';
-import 'package:hisab/features/settings/settings_definitions.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/settings_definitions.dart';
 
 import '../widget_test_helpers.dart';
 
@@ -85,7 +85,8 @@ void main() {
 
       expect(find.byIcon(Icons.language), findsOneWidget);
       // Theme button cycles; at least one of the common demo icons is present.
-      final hasThemeIcon = find.byIcon(Icons.light_mode).evaluate().isNotEmpty ||
+      final hasThemeIcon =
+          find.byIcon(Icons.light_mode).evaluate().isNotEmpty ||
           find.byIcon(Icons.dark_mode).evaluate().isNotEmpty ||
           find.byIcon(Icons.motion_photos_auto).evaluate().isNotEmpty ||
           find.byIcon(Icons.brightness_auto).evaluate().isNotEmpty ||
@@ -108,7 +109,10 @@ void main() {
 
       await advancePage(tester);
 
-      expect(find.text('onboarding_preferences'.tr()).hitTestable(), findsOneWidget);
+      expect(
+        find.text('onboarding_preferences'.tr()).hitTestable(),
+        findsOneWidget,
+      );
       expect(find.byIcon(Icons.arrow_back), findsOneWidget);
       expect(find.byIcon(Icons.arrow_forward), findsOneWidget);
     });
@@ -117,7 +121,10 @@ void main() {
       await pumpOnboardingPage(tester);
 
       await advancePage(tester); // Preferences
-      expect(find.text('onboarding_preferences'.tr()).hitTestable(), findsOneWidget);
+      expect(
+        find.text('onboarding_preferences'.tr()).hitTestable(),
+        findsOneWidget,
+      );
 
       await advancePage(tester); // Permissions
       expect(
@@ -126,7 +133,10 @@ void main() {
       );
 
       await advancePage(tester); // Connect
-      expect(find.text('onboarding_connect'.tr()).hitTestable(), findsOneWidget);
+      expect(
+        find.text('onboarding_connect'.tr()).hitTestable(),
+        findsOneWidget,
+      );
       expect(find.byIcon(Icons.arrow_forward), findsNothing);
       expect(find.text('onboarding_complete'.tr()), findsOneWidget);
     });
@@ -139,20 +149,30 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 350));
 
-      expect(find.text('onboarding_welcome'.tr()).hitTestable(), findsOneWidget);
+      expect(
+        find.text('onboarding_welcome'.tr()).hitTestable(),
+        findsOneWidget,
+      );
       expect(find.byIcon(Icons.arrow_back), findsNothing);
     });
   });
 
   group('Deep links', () {
-    testWidgets('initialPage Preferences shows Back + prefs title', (tester) async {
+    testWidgets('initialPage Preferences shows Back + prefs title', (
+      tester,
+    ) async {
       await pumpOnboardingPage(tester, initialPage: 1);
 
       expect(find.byIcon(Icons.arrow_back), findsOneWidget);
-      expect(find.text('onboarding_preferences'.tr()).hitTestable(), findsOneWidget);
+      expect(
+        find.text('onboarding_preferences'.tr()).hitTestable(),
+        findsOneWidget,
+      );
     });
 
-    testWidgets('initialPage Permissions shows permissions title', (tester) async {
+    testWidgets('initialPage Permissions shows permissions title', (
+      tester,
+    ) async {
       await pumpOnboardingPage(tester, initialPage: 2);
 
       expect(find.byIcon(Icons.arrow_back), findsOneWidget);
@@ -167,7 +187,10 @@ void main() {
     testWidgets('initialPage Connect shows mode UI for config', (tester) async {
       await pumpOnboardingPage(tester, initialPage: 3);
 
-      expect(find.text('onboarding_connect'.tr()).hitTestable(), findsOneWidget);
+      expect(
+        find.text('onboarding_connect'.tr()).hitTestable(),
+        findsOneWidget,
+      );
       expect(find.text('onboarding_complete'.tr()), findsOneWidget);
       // Privacy CTA is Text.rich — match the linked label in the plain text.
       expect(find.textContaining('privacy_policy'.tr()), findsOneWidget);
@@ -185,7 +208,9 @@ void main() {
 
   group('Connect mode', () {
     ProviderContainer containerOf(WidgetTester tester) {
-      return ProviderScope.containerOf(tester.element(find.byType(OnboardingPage)));
+      return ProviderScope.containerOf(
+        tester.element(find.byType(OnboardingPage)),
+      );
     }
 
     testWidgets(

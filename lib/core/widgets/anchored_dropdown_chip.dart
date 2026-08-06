@@ -53,9 +53,7 @@ class AnchoredDropdownChip<T> extends StatelessWidget {
       style: MenuStyle(
         backgroundColor: WidgetStatePropertyAll(cs.surfaceContainerHigh),
         elevation: const WidgetStatePropertyAll(8),
-        shadowColor: WidgetStatePropertyAll(
-          cs.shadow.withValues(alpha: 0.28),
-        ),
+        shadowColor: WidgetStatePropertyAll(cs.shadow.withValues(alpha: 0.28)),
         shape: WidgetStatePropertyAll(
           RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -75,8 +73,7 @@ class AnchoredDropdownChip<T> extends StatelessWidget {
             ? cs.primaryContainer
             : cs.surfaceContainerHighest.withValues(alpha: 0.65);
         final fg = active ? cs.onPrimaryContainer : cs.onSurface;
-        final iconColor =
-            active ? cs.onPrimaryContainer : cs.onSurfaceVariant;
+        final iconColor = active ? cs.onPrimaryContainer : cs.onSurfaceVariant;
         final labelStyle = theme.textTheme.labelLarge?.copyWith(
           color: fg,
           fontWeight: active ? FontWeight.w700 : FontWeight.w500,

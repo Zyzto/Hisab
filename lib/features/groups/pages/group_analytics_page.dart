@@ -541,9 +541,7 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage>
     required String categoryLabel,
   }) {
     final expenses = data.filteredExpenses.where((expense) {
-      final normalizedTag = (expense.tag == null || expense.tag!.isEmpty)
-          ? 'untagged'
-          : expense.tag!;
+      final normalizedTag = expense.hasBlankTag ? 'untagged' : expense.tag!;
       return normalizedTag == categoryId;
     }).toList()..sort((a, b) => b.date.compareTo(a.date));
 
@@ -586,7 +584,7 @@ class _GroupAnalyticsPageState extends ConsumerState<GroupAnalyticsPage>
       emptyLabel: 'analytics_payer_expenses_empty'.tr(),
       expenses: expenses,
       subtitleFor: (expense, _) {
-        final tag = (expense.tag == null || expense.tag!.isEmpty)
+        final tag = expense.hasBlankTag
             ? 'analytics_untagged'.tr()
             : _translateCategoryLike(resolveTagLabel(expense.tag!, data.tags));
         return '${isolateBidi(tag)} • ${DateFormat.yMMMd().format(expense.date)}';

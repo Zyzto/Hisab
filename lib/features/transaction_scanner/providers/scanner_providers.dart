@@ -9,8 +9,8 @@ import 'package:uuid/uuid.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../domain/domain.dart';
-import '../../settings/providers/settings_framework_providers.dart';
-import '../../settings/settings_definitions.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/settings_definitions.dart';
 import '../domain/draft_transaction.dart';
 import '../domain/sender_rule.dart';
 import '../domain/scanner_pattern.dart';
@@ -46,8 +46,9 @@ final pendingDraftCountProvider = FutureProvider<int>((ref) async {
 });
 
 /// All pending draft transactions.
-final pendingDraftsProvider =
-    FutureProvider<List<DraftTransaction>>((ref) async {
+final pendingDraftsProvider = FutureProvider<List<DraftTransaction>>((
+  ref,
+) async {
   final repo = ref.watch(scannerRepositoryProvider);
   return repo.getPendingDrafts();
 });
@@ -59,8 +60,9 @@ final senderRulesProvider = FutureProvider<List<SenderRule>>((ref) async {
 });
 
 /// All scanner patterns.
-final scannerPatternsProvider =
-    FutureProvider<List<ScannerPattern>>((ref) async {
+final scannerPatternsProvider = FutureProvider<List<ScannerPattern>>((
+  ref,
+) async {
   final repo = ref.watch(scannerRepositoryProvider);
   return repo.getPatterns();
 });
@@ -128,7 +130,8 @@ class ScannerController {
           id: 'builtin_bank_en_1',
           name: 'scanner_pattern_bank_en',
           senderMatch: '*',
-          amountRegex: r'(?:SAR|USD|EUR|GBP|AED)\s*(\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?)',
+          amountRegex:
+              r'(?:SAR|USD|EUR|GBP|AED)\s*(\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?)',
           currencyRegex: r'\b(SAR|USD|EUR|GBP|AED|KWD|BHD|OMR|QAR|EGP)\b',
           cardRegex: r'\*(\d{4})',
           merchantRegex: r'(?:at|from|to)\s+(.+?)(?:\s+on\s|\.\s|$)',
@@ -139,10 +142,13 @@ class ScannerController {
           id: 'builtin_bank_ar_1',
           name: 'scanner_pattern_bank_ar',
           senderMatch: '*',
-          amountRegex: r'(\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?)\s*(?:\u0631\.\u0633|\u0631\u064A\u0627\u0644|\u062F\.\u0625|\u062F\u0631\u0647\u0645)',
-          currencyRegex: r'(\u0631\.\u0633|\u0631\u064A\u0627\u0644|\u062F\.\u0625|\u062F\u0631\u0647\u0645|\u062F\.\u0643|\u062F\.\u0628|\u0631\.\u0639|\u0631\.\u0642|\u062C\.\u0645)',
+          amountRegex:
+              r'(\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?)\s*(?:\u0631\.\u0633|\u0631\u064A\u0627\u0644|\u062F\.\u0625|\u062F\u0631\u0647\u0645)',
+          currencyRegex:
+              r'(\u0631\.\u0633|\u0631\u064A\u0627\u0644|\u062F\.\u0625|\u062F\u0631\u0647\u0645|\u062F\.\u0643|\u062F\.\u0628|\u0631\.\u0639|\u0631\.\u0642|\u062C\.\u0645)',
           cardRegex: r'\*(\d{4})',
-          merchantRegex: r'(?:\u0639\u0646\u062F|\u0641\u064A|\u0644\u062F\u0649)\s+(.+?)(?:\s|$)',
+          merchantRegex:
+              r'(?:\u0639\u0646\u062F|\u0641\u064A|\u0644\u062F\u0649)\s+(.+?)(?:\s|$)',
           isBuiltIn: true,
           createdAt: now,
         ),
@@ -292,8 +298,9 @@ class ScannerController {
         splitShares: {participants.first.id: cents.abs()},
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
-        transactionType:
-            cents < 0 ? TransactionType.income : TransactionType.expense,
+        transactionType: cents < 0
+            ? TransactionType.income
+            : TransactionType.expense,
         tag: draft.merchantCategory,
       );
 

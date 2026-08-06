@@ -8,8 +8,8 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'app_router.dart';
 import 'invite_auth_helpers.dart';
 import 'route_paths.dart';
-import '../../features/settings/providers/settings_framework_providers.dart';
-import '../../features/settings/settings_definitions.dart';
+import '../settings/providers/settings_framework_providers.dart';
+import '../settings/settings_definitions.dart';
 
 /// Scheme and host used by the invite-redirect edge function for app deep links.
 const String _inviteScheme = 'io.supabase.hisab';

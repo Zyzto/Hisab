@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/legacy.dart' show StateProvider;
 
 import '../../../domain/domain.dart';
 import '../../groups/providers/groups_provider.dart';
-import '../../settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 
 /// Ordered list of groups for the home page.
 ///

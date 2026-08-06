@@ -19,8 +19,7 @@ String buildExpensesCsv({
   buf.writeln(
     'date,group,title,amount,currency,exchange_rate,base_amount,payer,split_type,tag,transaction_type,description',
   );
-  final sorted = [...expenses]
-    ..sort((a, b) => a.date.compareTo(b.date));
+  final sorted = [...expenses]..sort((a, b) => a.date.compareTo(b.date));
   for (final e in sorted) {
     final g = groupById[e.groupId];
     final payer = participantById[e.payerParticipantId];

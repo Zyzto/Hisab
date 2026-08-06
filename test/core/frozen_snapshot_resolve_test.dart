@@ -7,7 +7,8 @@ import 'package:hisab/domain/domain.dart';
   List<SettlementTransaction> settlements,
   bool snapshotCorrupt,
   bool useLive,
-}) resolveFrozenSnapshot({
+})
+resolveFrozenSnapshot({
   required bool isFrozen,
   required String? snapshotJson,
   required String currencyCode,

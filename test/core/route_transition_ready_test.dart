@@ -3,27 +3,28 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hisab/core/navigation/route_transition_ready.dart';
 
 void main() {
-  testWidgets('armWhenAnimationReady fires immediately when animation completed', (
-    tester,
-  ) async {
-    var fired = 0;
-    final animation = AlwaysStoppedAnimation<double>(1);
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Builder(
-          builder: (context) {
-            armWhenAnimationReady(
-              context: context,
-              animation: animation,
-              action: () => fired++,
-            );
-            return const SizedBox();
-          },
+  testWidgets(
+    'armWhenAnimationReady fires immediately when animation completed',
+    (tester) async {
+      var fired = 0;
+      final animation = AlwaysStoppedAnimation<double>(1);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              armWhenAnimationReady(
+                context: context,
+                animation: animation,
+                action: () => fired++,
+              );
+              return const SizedBox();
+            },
+          ),
         ),
-      ),
-    );
-    expect(fired, 1);
-  });
+      );
+      expect(fired, 1);
+    },
+  );
 
   testWidgets('armWhenAnimationReady waits for forward animation to complete', (
     tester,
@@ -56,25 +57,22 @@ void main() {
     expect(fired, 1);
   });
 
-  testWidgets('RouteTransitionReady sync-ready without setState on completed route', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      const MaterialApp(home: _ReadyProbe()),
-    );
-    await tester.pump();
-    final state = tester.state<_ReadyProbeState>(find.byType(_ReadyProbe));
-    expect(state.routeReady, isTrue);
-    expect(find.text('ready'), findsOneWidget);
-  });
+  testWidgets(
+    'RouteTransitionReady sync-ready without setState on completed route',
+    (tester) async {
+      await tester.pumpWidget(const MaterialApp(home: _ReadyProbe()));
+      await tester.pump();
+      final state = tester.state<_ReadyProbeState>(find.byType(_ReadyProbe));
+      expect(state.routeReady, isTrue);
+      expect(find.text('ready'), findsOneWidget);
+    },
+  );
 
   testWidgets('RouteTransitionReady invokes late onReady after sync-ready', (
     tester,
   ) async {
     var fired = 0;
-    await tester.pumpWidget(
-      const MaterialApp(home: _ReadyProbe()),
-    );
+    await tester.pumpWidget(const MaterialApp(home: _ReadyProbe()));
     await tester.pump();
     final state = tester.state<_ReadyProbeState>(find.byType(_ReadyProbe));
     expect(state.routeReady, isTrue);

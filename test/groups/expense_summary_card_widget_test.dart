@@ -7,7 +7,7 @@ import 'package:hisab/core/utils/currency_formatter.dart';
 import 'package:hisab/core/widgets/amount_text.dart';
 import 'package:hisab/core/widgets/amount_with_secondary_display.dart';
 import 'package:hisab/features/groups/widgets/expense_summary_card.dart';
-import 'package:hisab/features/settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 
 /// Half-width phone card (matches expenses tab pair of summary chips).
 const _kNarrowCardWidth = 180.0;
@@ -18,9 +18,7 @@ Widget _wrapCard(
   TextDirection textDirection = TextDirection.rtl,
 }) {
   return ProviderScope(
-    overrides: [
-      displayCurrencyProvider.overrideWith((ref) => ''),
-    ],
+    overrides: [displayCurrencyProvider.overrideWith((ref) => '')],
     child: MaterialApp(
       home: Directionality(
         textDirection: textDirection,
@@ -88,10 +86,7 @@ void main() {
       expect(amountText.softWrap, isFalse);
 
       final paragraph = tester.renderObject<RenderParagraph>(
-        find.descendant(
-          of: amountFinder,
-          matching: find.byType(RichText),
-        ),
+        find.descendant(of: amountFinder, matching: find.byType(RichText)),
       );
       expect(paragraph.didExceedMaxLines, isFalse);
       expect(
@@ -102,34 +97,30 @@ void main() {
     },
   );
 
-  testWidgets(
-    'fallback Text amount stays single-line in a tight card',
-    (tester) async {
-      const value = '1,044.92 SAR';
-      await tester.pumpWidget(
-        _wrapCard(
-          const ExpenseSummaryCard(
-            label: 'You paid',
-            value: value,
-          ),
-          textDirection: TextDirection.ltr,
-        ),
-      );
-      await tester.pumpAndSettle();
+  testWidgets('fallback Text amount stays single-line in a tight card', (
+    tester,
+  ) async {
+    const value = '1,044.92 SAR';
+    await tester.pumpWidget(
+      _wrapCard(
+        const ExpenseSummaryCard(label: 'You paid', value: value),
+        textDirection: TextDirection.ltr,
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      final text = tester.widget<Text>(find.text(value));
-      expect(text.maxLines, 1);
-      expect(text.softWrap, isFalse);
+    final text = tester.widget<Text>(find.text(value));
+    expect(text.maxLines, 1);
+    expect(text.softWrap, isFalse);
 
-      final paragraph = tester.renderObject<RenderParagraph>(
-        find.descendant(
-          of: find.byType(ExpenseSummaryCard),
-          matching: find.text(value),
-        ),
-      );
-      expect(_visualLineCount(paragraph), 1);
-    },
-  );
+    final paragraph = tester.renderObject<RenderParagraph>(
+      find.descendant(
+        of: find.byType(ExpenseSummaryCard),
+        matching: find.text(value),
+      ),
+    );
+    expect(_visualLineCount(paragraph), 1);
+  });
 
   testWidgets(
     '8-digit amount uses overlay layout so label does not steal amount width',
@@ -187,10 +178,7 @@ void main() {
     const value = '12.00 SAR';
     await tester.pumpWidget(
       _wrapCard(
-        const ExpenseSummaryCard(
-          label: 'Share',
-          value: value,
-        ),
+        const ExpenseSummaryCard(label: 'Share', value: value),
         width: 320,
         textDirection: TextDirection.ltr,
       ),

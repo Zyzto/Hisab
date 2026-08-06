@@ -28,8 +28,8 @@ import 'core/database/delete_db_file.dart';
 import 'core/image_picker_init.dart';
 import 'core/database/powersync_schema.dart' as ps;
 import 'core/services/notification_service.dart';
-import 'features/settings/providers/settings_framework_providers.dart';
-import 'features/settings/settings_definitions.dart';
+import 'core/settings/providers/settings_framework_providers.dart';
+import 'core/settings/settings_definitions.dart';
 import 'app.dart';
 
 /// Web accessibility semantics are expensive on iOS Safari.
@@ -338,9 +338,7 @@ void main() {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             SemanticsBinding.instance.ensureSemantics();
           });
-          Log.info(
-            'main: Web semantics enabled via ENABLE_WEB_SEMANTICS=true',
-          );
+          Log.info('main: Web semantics enabled via ENABLE_WEB_SEMANTICS=true');
         } else if (kIsWeb) {
           Log.info(
             'main: Web semantics disabled by default (set ENABLE_WEB_SEMANTICS=true to enable)',

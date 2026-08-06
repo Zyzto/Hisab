@@ -16,7 +16,10 @@ void main() {
     EasyLocalization.logger.enableBuildModes = [];
   });
 
-  void setPhoneViewport(WidgetTester tester, {Size size = const Size(400, 800)}) {
+  void setPhoneViewport(
+    WidgetTester tester, {
+    Size size = const Size(400, 800),
+  }) {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -121,7 +124,7 @@ void main() {
     expect(find.text('Cancel'), findsOneWidget);
     expect(find.text('Coffee'), findsWidgets);
 
-    // Preview + actions share one footer row; Done is trailing-anchored.
+    // Preview + actions share one footer row; Done hugs the trailing edge.
     final previewY = tester.getCenter(find.byType(TagPreviewChip)).dy;
     final doneY = tester.getCenter(find.text('Done')).dy;
     expect((previewY - doneY).abs(), lessThan(24));
@@ -129,9 +132,21 @@ void main() {
       tester.getTopLeft(find.text('Done')).dx,
       greaterThan(tester.getTopRight(find.byType(TagPreviewChip)).dx),
     );
+    final shellRight = tester
+        .getBottomRight(find.byType(TagEditorSheetShell))
+        .dx;
+    final doneBtn = find.widgetWithText(FilledButton, 'Done');
+    expect(
+      shellRight - tester.getTopRight(doneBtn).dx,
+      lessThan(28),
+      reason: 'Done should sit on the trailing edge, not mid-row',
+    );
 
     // Scroll the icon grid; footer actions must remain on screen.
-    await tester.drag(find.byType(SingleChildScrollView).first, const Offset(0, -400));
+    await tester.drag(
+      find.byType(SingleChildScrollView).first,
+      const Offset(0, -400),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Done'), findsOneWidget);
@@ -171,6 +186,13 @@ void main() {
       tester.getTopRight(find.text('Done')).dx,
       lessThan(tester.getTopLeft(find.byType(TagPreviewChip)).dx),
     );
+    final shellLeft = tester.getBottomLeft(find.byType(TagEditorSheetShell)).dx;
+    final doneBtn = find.widgetWithText(FilledButton, 'Done');
+    expect(
+      tester.getTopLeft(doneBtn).dx - shellLeft,
+      lessThan(28),
+      reason: 'In RTL, Done should sit on the trailing (start-x) edge',
+    );
   });
 
   testWidgets('empty preview falls back to tag_name label', (tester) async {
@@ -195,7 +217,12 @@ void main() {
     expect(find.byType(TagPreviewChip), findsOneWidget);
     expect(
       tester.getSize(find.byType(TagPreviewChip)).width,
-      lessThanOrEqualTo(TagPreviewChip.defaultMaxWidth(tester.element(find.byType(TagPreviewChip))) + 0.5),
+      lessThanOrEqualTo(
+        TagPreviewChip.defaultMaxWidth(
+              tester.element(find.byType(TagPreviewChip)),
+            ) +
+            0.5,
+      ),
     );
   });
 

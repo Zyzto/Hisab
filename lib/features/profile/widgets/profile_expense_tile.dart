@@ -23,8 +23,9 @@ class ProfileExpenseTile extends StatelessWidget {
     bool showManageMenu = false,
   }) {
     final cs = Theme.of(context).colorScheme;
-    final paidLabel =
-        item.iPaid ? 'profile_expense_you_paid'.tr() : item.payerName;
+    final paidLabel = item.iPaid
+        ? 'profile_expense_you_paid'.tr()
+        : item.payerName;
 
     return FilteredExpenseRow(
       expense: item.expense,
@@ -49,8 +50,9 @@ class ProfileExpenseTile extends StatelessWidget {
                 ? Icons.person_rounded
                 : Icons.person_outline_rounded,
             label: paidLabel,
-            foreground:
-                item.iPaid ? cs.onSecondaryContainer : cs.onSurfaceVariant,
+            foreground: item.iPaid
+                ? cs.onSecondaryContainer
+                : cs.onSurfaceVariant,
             background: item.iPaid
                 ? cs.secondaryContainer.withValues(alpha: 0.85)
                 : cs.surfaceContainerHighest.withValues(alpha: 0.7),
@@ -67,11 +69,7 @@ class ProfileExpenseTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppExpenseTile(
-      row: toFilteredRow(
-        context,
-        item,
-        showManageMenu: showManageMenu,
-      ),
+      row: toFilteredRow(context, item, showManageMenu: showManageMenu),
     );
   }
 }

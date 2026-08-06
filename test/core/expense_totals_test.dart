@@ -30,17 +30,26 @@ void main() {
 
   group('contributionToExpenseTotal', () {
     test('expense type returns positive amount', () {
-      final e = expense(transactionType: TransactionType.expense, amountCents: 5000);
+      final e = expense(
+        transactionType: TransactionType.expense,
+        amountCents: 5000,
+      );
       expect(contributionToExpenseTotal(e), 5000);
     });
 
     test('income type returns negative amount', () {
-      final e = expense(transactionType: TransactionType.income, amountCents: 3000);
+      final e = expense(
+        transactionType: TransactionType.income,
+        amountCents: 3000,
+      );
       expect(contributionToExpenseTotal(e), -3000);
     });
 
     test('transfer type returns zero', () {
-      final e = expense(transactionType: TransactionType.transfer, amountCents: 2000);
+      final e = expense(
+        transactionType: TransactionType.transfer,
+        amountCents: 2000,
+      );
       expect(contributionToExpenseTotal(e), 0);
     });
 
@@ -69,7 +78,10 @@ void main() {
         expense(transactionType: TransactionType.transfer, amountCents: 2000),
         expense(transactionType: TransactionType.expense, amountCents: 500),
       ];
-      final total = list.fold<int>(0, (s, e) => s + contributionToExpenseTotal(e));
+      final total = list.fold<int>(
+        0,
+        (s, e) => s + contributionToExpenseTotal(e),
+      );
       expect(total, 10000 - 3000 + 0 + 500); // 7500
     });
   });

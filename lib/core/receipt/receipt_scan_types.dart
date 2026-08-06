@@ -37,11 +37,15 @@ class ReceiptScanFallback extends ReceiptScanResult {
 }
 
 /// Parse LLM JSON response (vendor/store, date, total, optional vat/items).
-({String vendor, DateTime date, double total, double? vat, List<ReceiptLineItem>? lineItems, String? description})?
-    parseReceiptJson(
-  String raw,
-  DateTime fallbackDate,
-) {
+({
+  String vendor,
+  DateTime date,
+  double total,
+  double? vat,
+  List<ReceiptLineItem>? lineItems,
+  String? description,
+})?
+parseReceiptJson(String raw, DateTime fallbackDate) {
   var s = raw.trim();
   final codeBlock = RegExp(r'^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$');
   final match = codeBlock.firstMatch(s);
@@ -49,10 +53,12 @@ class ReceiptScanFallback extends ReceiptScanResult {
   try {
     final map = jsonDecode(s) as Map<String, dynamic>?;
     if (map == null) return null;
-    final vendor = (map['vendor'] as String?)?.trim() ??
+    final vendor =
+        (map['vendor'] as String?)?.trim() ??
         (map['store'] as String?)?.trim() ??
         '';
-    final dateStr = (map['date'] as String?)?.trim() ??
+    final dateStr =
+        (map['date'] as String?)?.trim() ??
         (map['datetime'] as String?)?.trim();
     var date = fallbackDate;
     if (dateStr != null && dateStr.isNotEmpty) {
@@ -76,24 +82,27 @@ class ReceiptScanFallback extends ReceiptScanResult {
     List<ReceiptLineItem>? lineItems;
     final itemsRaw = map['items'];
     if (itemsRaw is List) {
-      lineItems = itemsRaw.map((e) {
-        if (e is Map<String, dynamic>) {
-          final desc =
-              (e['description'] as String?) ?? (e['name'] as String?) ?? '';
-          final amt = e['amount'] ?? e['price'];
-          var amount = 0.0;
-          if (amt is num) {
-            amount = amt.toDouble();
-          } else if (amt is String) {
-            amount = double.tryParse(amt) ?? 0;
-          }
-          return ReceiptLineItem(
-            description: desc,
-            amountCents: (amount * 100).round(),
-          );
-        }
-        return const ReceiptLineItem(description: '', amountCents: 0);
-      }).where((e) => e.description.isNotEmpty || e.amountCents > 0).toList();
+      lineItems = itemsRaw
+          .map((e) {
+            if (e is Map<String, dynamic>) {
+              final desc =
+                  (e['description'] as String?) ?? (e['name'] as String?) ?? '';
+              final amt = e['amount'] ?? e['price'];
+              var amount = 0.0;
+              if (amt is num) {
+                amount = amt.toDouble();
+              } else if (amt is String) {
+                amount = double.tryParse(amt) ?? 0;
+              }
+              return ReceiptLineItem(
+                description: desc,
+                amountCents: (amount * 100).round(),
+              );
+            }
+            return const ReceiptLineItem(description: '', amountCents: 0);
+          })
+          .where((e) => e.description.isNotEmpty || e.amountCents > 0)
+          .toList();
       if (lineItems.isEmpty) lineItems = null;
     }
     final description = (map['description'] as String?)?.trim();

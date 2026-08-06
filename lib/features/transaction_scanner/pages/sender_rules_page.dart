@@ -30,9 +30,7 @@ class SenderRulesPage extends ConsumerWidget {
             context,
             contentAreaWidth: layoutConstraints.maxWidth,
           ),
-          appBar: AppBar(
-            title: Text('scanner_senders_title'.tr()),
-          ),
+          appBar: AppBar(title: Text('scanner_senders_title'.tr())),
           body: ConstrainedContent(
             child: rulesAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -230,7 +228,9 @@ class _SenderRuleTile extends ConsumerWidget {
         value: rule.enabled,
         onChanged: (v) {
           final updated = rule.copyWith(enabled: v);
-          ref.read(scannerRepositoryProvider).upsertSenderRule(updated).then((_) {
+          ref.read(scannerRepositoryProvider).upsertSenderRule(updated).then((
+            _,
+          ) {
             ref.invalidate(senderRulesProvider);
             ref.read(scannerControllerProvider).syncSendersToNative();
           });

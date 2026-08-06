@@ -7,10 +7,8 @@ List<RouteBase> getSettingsRoutes() {
   return [
     GoRoute(
       path: RoutePaths.settings,
-      pageBuilder: (context, state) => appNoTransitionPage(
-        key: state.pageKey,
-        child: const SettingsPage(),
-      ),
+      pageBuilder: (context, state) =>
+          appNoTransitionPage(key: state.pageKey, child: const SettingsPage()),
     ),
     // Privacy policy lives on the top-level route in app_router (outside shell).
   ];

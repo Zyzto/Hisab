@@ -131,8 +131,8 @@ class PermissionService {
       return false;
     }
 
-    final granted =
-        await browser_notification.requestBrowserNotificationPermission();
+    final granted = await browser_notification
+        .requestBrowserNotificationPermission();
     if (!granted) {
       if (context.mounted) {
         showNotificationDeniedInfo(context);

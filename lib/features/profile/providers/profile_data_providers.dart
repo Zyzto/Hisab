@@ -117,11 +117,7 @@ AsyncValue<R> _combineAsync5<A, B, C, D, E, R>(
   if (e.hasError) {
     return AsyncValue.error(e.error!, e.stackTrace ?? StackTrace.current);
   }
-  if (!a.hasValue ||
-      !b.hasValue ||
-      !c.hasValue ||
-      !d.hasValue ||
-      !e.hasValue) {
+  if (!a.hasValue || !b.hasValue || !c.hasValue || !d.hasValue || !e.hasValue) {
     return const AsyncValue.loading();
   }
   return AsyncValue.data(

@@ -11,7 +11,7 @@ import '../../../core/platform/ui_perf.dart';
 import '../../../core/widgets/app_fab_nature.dart';
 import '../../../core/widgets/user_text.dart';
 import '../../../domain/domain.dart';
-import '../../settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 import '../category_icons.dart';
 import '../constants/expense_form_constants.dart';
 
@@ -136,8 +136,10 @@ class _CategoryAffordanceChipState extends ConsumerState<CategoryAffordanceChip>
 
   void _syncMotionAllowed() {
     final settingOn = ref.read(extraAnimationsEnabledProvider);
-    final disableAnims = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
-    _motionAllowed = !UiPerf.preferReducedChromeMotion &&
+    final disableAnims =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    _motionAllowed =
+        !UiPerf.preferReducedChromeMotion &&
         !isIntegrationTestMode &&
         _platformAllowsBreath() &&
         !disableAnims &&
@@ -219,7 +221,8 @@ class _CategoryAffordanceChipState extends ConsumerState<CategoryAffordanceChip>
   @override
   Widget build(BuildContext context) {
     final settingOn = ref.watch(extraAnimationsEnabledProvider);
-    final nextAllowed = !UiPerf.preferReducedChromeMotion &&
+    final nextAllowed =
+        !UiPerf.preferReducedChromeMotion &&
         !isIntegrationTestMode &&
         _platformAllowsBreath() &&
         !(MediaQuery.maybeOf(context)?.disableAnimations ?? false) &&
@@ -256,7 +259,8 @@ class _CategoryAffordanceChipState extends ConsumerState<CategoryAffordanceChip>
             ? (_motionAllowed ? 0.0 : 0.55)
             : _breathController.value;
         // EaseInOutBack-ish bounce without overshooting too hard.
-        final breathT = Curves.easeInOutBack.transform(rawT.clamp(0.0, 1.0))
+        final breathT = Curves.easeInOutBack
+            .transform(rawT.clamp(0.0, 1.0))
             .clamp(0.0, 1.2);
 
         final settleT = _settleController.value.clamp(0.0, 1.0);
@@ -291,8 +295,10 @@ class _CategoryAffordanceChipState extends ConsumerState<CategoryAffordanceChip>
               onTap: widget.onTap,
               borderRadius: BorderRadius.circular(20),
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: tagged
                       ? chrome!.container

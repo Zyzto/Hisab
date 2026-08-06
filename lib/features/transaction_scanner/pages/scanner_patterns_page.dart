@@ -28,9 +28,7 @@ class ScannerPatternsPage extends ConsumerWidget {
             context,
             contentAreaWidth: layoutConstraints.maxWidth,
           ),
-          appBar: AppBar(
-            title: Text('scanner_patterns_title'.tr()),
-          ),
+          appBar: AppBar(title: Text('scanner_patterns_title'.tr())),
           body: ConstrainedContent(
             child: patternsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -199,8 +197,7 @@ class _PatternEditorPage extends ConsumerStatefulWidget {
   const _PatternEditorPage({this.existing});
 
   @override
-  ConsumerState<_PatternEditorPage> createState() =>
-      _PatternEditorPageState();
+  ConsumerState<_PatternEditorPage> createState() => _PatternEditorPageState();
 }
 
 class _PatternEditorPageState extends ConsumerState<_PatternEditorPage> {
@@ -249,29 +246,47 @@ class _PatternEditorPageState extends ConsumerState<_PatternEditorPage> {
     final isNew = widget.existing == null;
     return Scaffold(
       appBar: AppBar(
-        title: Text(isNew
-            ? 'scanner_new_pattern'.tr()
-            : 'scanner_edit_pattern'.tr()),
+        title: Text(
+          isNew ? 'scanner_new_pattern'.tr() : 'scanner_edit_pattern'.tr(),
+        ),
       ),
       body: ConstrainedContent(
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
             _field(_nameCtrl, 'scanner_pattern_name'.tr()),
-            _field(_senderCtrl, 'scanner_pattern_sender'.tr(),
-                hint: 'com.example.*'),
-            _field(_amountCtrl, 'scanner_pattern_amount'.tr(),
-                hint: r'(\d+\.\d{2})', required: true),
-            _field(_currencyCtrl, 'scanner_pattern_currency'.tr(),
-                hint: r'(SAR|USD)'),
-            _field(_cardCtrl, 'scanner_pattern_card'.tr(),
-                hint: r'\*(\d{4})'),
-            _field(_merchantCtrl, 'scanner_pattern_merchant'.tr(),
-                hint: r'at\s+(.+?)\.'),
-            _field(_dateCtrl, 'scanner_pattern_date'.tr(),
-                hint: r'(\d{2}/\d{2}/\d{4})'),
-            _field(_dateFormatCtrl, 'scanner_pattern_date_format'.tr(),
-                hint: 'MM/dd/yyyy'),
+            _field(
+              _senderCtrl,
+              'scanner_pattern_sender'.tr(),
+              hint: 'com.example.*',
+            ),
+            _field(
+              _amountCtrl,
+              'scanner_pattern_amount'.tr(),
+              hint: r'(\d+\.\d{2})',
+              required: true,
+            ),
+            _field(
+              _currencyCtrl,
+              'scanner_pattern_currency'.tr(),
+              hint: r'(SAR|USD)',
+            ),
+            _field(_cardCtrl, 'scanner_pattern_card'.tr(), hint: r'\*(\d{4})'),
+            _field(
+              _merchantCtrl,
+              'scanner_pattern_merchant'.tr(),
+              hint: r'at\s+(.+?)\.',
+            ),
+            _field(
+              _dateCtrl,
+              'scanner_pattern_date'.tr(),
+              hint: r'(\d{2}/\d{2}/\d{4})',
+            ),
+            _field(
+              _dateFormatCtrl,
+              'scanner_pattern_date_format'.tr(),
+              hint: 'MM/dd/yyyy',
+            ),
 
             const SizedBox(height: 16),
             const Divider(),
@@ -302,17 +317,14 @@ class _PatternEditorPageState extends ConsumerState<_PatternEditorPage> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .surfaceContainerHighest,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   _testResult!,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(fontFamily: 'monospace'),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
                 ),
               ),
             ],
@@ -398,9 +410,7 @@ class _PatternEditorPageState extends ConsumerState<_PatternEditorPage> {
     if (pattern.cardRegex != null && pattern.cardRegex!.isNotEmpty) {
       final m = RegExp(pattern.cardRegex!).firstMatch(text);
       buf.writeln(
-        'scanner_test_card'.tr(
-          namedArgs: {'value': m?.group(1) ?? notFound},
-        ),
+        'scanner_test_card'.tr(namedArgs: {'value': m?.group(1) ?? notFound}),
       );
     }
     if (pattern.merchantRegex != null && pattern.merchantRegex!.isNotEmpty) {
@@ -414,9 +424,7 @@ class _PatternEditorPageState extends ConsumerState<_PatternEditorPage> {
     if (pattern.dateRegex != null && pattern.dateRegex!.isNotEmpty) {
       final m = RegExp(pattern.dateRegex!).firstMatch(text);
       buf.writeln(
-        'scanner_test_date'.tr(
-          namedArgs: {'value': m?.group(0) ?? notFound},
-        ),
+        'scanner_test_date'.tr(namedArgs: {'value': m?.group(0) ?? notFound}),
       );
     }
     return buf.toString().trim();
@@ -431,13 +439,11 @@ class _PatternEditorPageState extends ConsumerState<_PatternEditorPage> {
       currencyRegex: _currencyCtrl.text.trim().isEmpty
           ? null
           : _currencyCtrl.text.trim(),
-      cardRegex:
-          _cardCtrl.text.trim().isEmpty ? null : _cardCtrl.text.trim(),
+      cardRegex: _cardCtrl.text.trim().isEmpty ? null : _cardCtrl.text.trim(),
       merchantRegex: _merchantCtrl.text.trim().isEmpty
           ? null
           : _merchantCtrl.text.trim(),
-      dateRegex:
-          _dateCtrl.text.trim().isEmpty ? null : _dateCtrl.text.trim(),
+      dateRegex: _dateCtrl.text.trim().isEmpty ? null : _dateCtrl.text.trim(),
       dateFormat: _dateFormatCtrl.text.trim().isEmpty
           ? null
           : _dateFormatCtrl.text.trim(),
@@ -455,10 +461,7 @@ class _PatternEditorPageState extends ConsumerState<_PatternEditorPage> {
 
     final pattern = _buildPattern();
     final nav = Navigator.of(context);
-    ref
-        .read(scannerRepositoryProvider)
-        .upsertPattern(pattern)
-        .then((_) {
+    ref.read(scannerRepositoryProvider).upsertPattern(pattern).then((_) {
       ref.invalidate(scannerPatternsProvider);
       nav.pop();
     });

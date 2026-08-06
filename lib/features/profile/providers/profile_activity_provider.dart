@@ -5,7 +5,7 @@ import '../../../core/widgets/amount_with_secondary_display.dart';
 import '../../../domain/domain.dart';
 import '../../groups/providers/group_analytics_provider.dart';
 import '../../settings/providers/display_currency_rate_provider.dart';
-import '../../settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 import 'profile_my_expenses_provider.dart';
 
 export 'profile_my_expenses_provider.dart' show ProfileExpenseItem;
@@ -40,10 +40,7 @@ class ProfileAnalytics {
 }
 
 class ProfileActivityData {
-  const ProfileActivityData({
-    required this.expenses,
-    required this.analytics,
-  });
+  const ProfileActivityData({required this.expenses, required this.analytics});
 
   final List<ProfileExpenseItem> expenses;
   final ProfileAnalytics analytics;
@@ -126,15 +123,14 @@ final profileActivityProvider = Provider<AsyncValue<ProfileActivityData>>((
           displayCents = signed;
         }
         convertedSpend += displayCents;
-        final tag = (item.expense.tag == null || item.expense.tag!.isEmpty)
-            ? 'untagged'
-            : item.expense.tag!;
+        final tag = item.expense.hasBlankTag ? 'untagged' : item.expense.tag!;
         tagTotals[tag] = (tagTotals[tag] ?? 0) + displayCents;
       }
 
       if (inRange.isNotEmpty) {
         final earliestDay = earliest ?? activityEnd;
-        final start = rangeStart ??
+        final start =
+            rangeStart ??
             DateTime(earliestDay.year, earliestDay.month, earliestDay.day);
         final endDay = DateTime(
           activityEnd.year,
@@ -145,10 +141,11 @@ final profileActivityProvider = Provider<AsyncValue<ProfileActivityData>>((
         if (daySpan < 1) daySpan = 1;
       }
 
-      final byTag = tagTotals.entries
-          .map((e) => ProfileTagSpend(tagKey: e.key, amountCents: e.value))
-          .toList()
-        ..sort((a, b) => b.amountCents.compareTo(a.amountCents));
+      final byTag =
+          tagTotals.entries
+              .map((e) => ProfileTagSpend(tagKey: e.key, amountCents: e.value))
+              .toList()
+            ..sort((a, b) => b.amountCents.compareTo(a.amountCents));
 
       return AsyncValue.data(
         ProfileActivityData(
@@ -157,8 +154,9 @@ final profileActivityProvider = Provider<AsyncValue<ProfileActivityData>>((
             range: range,
             mySpendCents: convertedSpend,
             transactionCount: inRange.length,
-            averagePerDayCents:
-                inRange.isEmpty ? 0 : (convertedSpend / daySpan).round(),
+            averagePerDayCents: inRange.isEmpty
+                ? 0
+                : (convertedSpend / daySpan).round(),
             displayCurrencyCode: displayCurrency.isEmpty
                 ? (fallbackSpendCurrency ??
                       (inRange.isEmpty

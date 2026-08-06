@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:camera/camera.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/services/permission_service.dart';
@@ -50,10 +51,10 @@ class ReceiptCameraController extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   bool get torchOn => _torchOn;
   bool get torchSupported => _torchSupported;
+
   /// Rear zoom only — front uses the widest lens with no zoom UI.
   bool get zoomSupported =>
-      _lensDirection == CameraLensDirection.back &&
-      _maxZoom > _minZoom + 0.01;
+      _lensDirection == CameraLensDirection.back && _maxZoom > _minZoom + 0.01;
   double get minZoom => _minZoom;
   double get maxZoom => _maxZoom;
   double get zoom => _zoom;
@@ -81,9 +82,7 @@ class ReceiptCameraController extends ChangeNotifier {
     for (final candidate in const [1.0, 2.0, 3.0, 5.0, 10.0, 20.0, 30.0]) {
       if (candidate >= min - 0.05 && candidate <= max + 0.05) add(candidate);
     }
-    if (stops.isNotEmpty &&
-        max >= 40 &&
-        (max - stops.last).abs() > 0.5) {
+    if (stops.isNotEmpty && max >= 40 && (max - stops.last).abs() > 0.5) {
       add(max.roundToDouble());
     }
     return stops;
@@ -193,8 +192,11 @@ class ReceiptCameraController extends ChangeNotifier {
       _status = ReceiptCameraStatus.ready;
       notifyListeners();
     } catch (e, stack) {
-      debugPrint('ReceiptCameraController init failed: $e');
-      debugPrintStack(stackTrace: stack);
+      Log.warning(
+        'ReceiptCameraController init failed',
+        error: e,
+        stackTrace: stack,
+      );
       _errorMessage = e.toString();
       _status = ReceiptCameraStatus.error;
       notifyListeners();
@@ -277,10 +279,16 @@ class ReceiptCameraController extends ChangeNotifier {
           return true;
         } catch (e) {
           lastError = e;
-          debugPrint('Camera open failed ($preset): $e');
+          Log.warning('Camera open failed ($preset)', error: e);
           try {
             await controller?.dispose();
-          } catch (_) {}
+          } catch (disposeError, st) {
+            Log.debug(
+              'Camera dispose after open failure',
+              error: disposeError,
+              stackTrace: st,
+            );
+          }
           _camera = null;
         }
       }
@@ -309,7 +317,9 @@ class ReceiptCameraController extends ChangeNotifier {
     previous.removeListener(_onCameraValueChanged);
     try {
       await previous.dispose();
-    } catch (_) {}
+    } catch (e, st) {
+      Log.debug('Previous camera dispose failed', error: e, stackTrace: st);
+    }
   }
 
   void _onCameraValueChanged() {
@@ -330,8 +340,8 @@ class ReceiptCameraController extends ChangeNotifier {
     try {
       // Explicit lock so stills match the physical phone even with OS rotation lock.
       await cam.lockCaptureOrientation(orientation);
-    } catch (e) {
-      debugPrint('lockCaptureOrientation failed: $e');
+    } catch (e, st) {
+      Log.warning('lockCaptureOrientation failed', error: e, stackTrace: st);
     }
   }
 
@@ -342,7 +352,8 @@ class ReceiptCameraController extends ChangeNotifier {
     try {
       _minZoom = await cam.getMinZoomLevel();
       _maxZoom = await cam.getMaxZoomLevel();
-    } catch (_) {
+    } catch (e, st) {
+      Log.debug('Zoom range probe failed', error: e, stackTrace: st);
       _minZoom = 1;
       _maxZoom = 1;
     }
@@ -350,7 +361,9 @@ class ReceiptCameraController extends ChangeNotifier {
     _zoom = 1.0.clamp(_minZoom, _maxZoom);
     try {
       await cam.setZoomLevel(_zoom);
-    } catch (_) {}
+    } catch (e, st) {
+      Log.debug('Initial setZoomLevel failed', error: e, stackTrace: st);
+    }
 
     _deviceOrientation = cam.value.deviceOrientation;
     await _lockCaptureTo(_deviceOrientation);
@@ -363,8 +376,9 @@ class ReceiptCameraController extends ChangeNotifier {
       if (cam.value.flashMode != FlashMode.off) {
         await cam.setFlashMode(FlashMode.off);
       }
-    } catch (_) {
+    } catch (e, st) {
       // Leave torch control available; first user toggle will disable on failure.
+      Log.debug('Torch support probe failed', error: e, stackTrace: st);
     }
   }
 
@@ -438,8 +452,8 @@ class ReceiptCameraController extends ChangeNotifier {
       await cam.setFlashMode(on ? FlashMode.torch : FlashMode.off);
       _torchOn = on;
       notifyListeners();
-    } catch (e) {
-      debugPrint('Torch failed: $e');
+    } catch (e, st) {
+      Log.warning('Torch failed', error: e, stackTrace: st);
       _torchSupported = false;
       _torchOn = false;
       notifyListeners();
@@ -460,8 +474,8 @@ class ReceiptCameraController extends ChangeNotifier {
       await cam.setZoomLevel(clamped);
       _zoom = clamped;
       notifyListeners();
-    } catch (e) {
-      debugPrint('Zoom failed: $e');
+    } catch (e, st) {
+      Log.warning('Zoom failed', error: e, stackTrace: st);
     }
   }
 
@@ -478,16 +492,13 @@ class ReceiptCameraController extends ChangeNotifier {
     }
     try {
       // Re-assert just before capture — orientation events can race the shutter.
-      await _lockCaptureTo(
-        cam.value.deviceOrientation,
-      );
+      await _lockCaptureTo(cam.value.deviceOrientation);
       if (_disposed || !cam.value.isInitialized || cam.value.isTakingPicture) {
         return null;
       }
       return await cam.takePicture();
     } catch (e, stack) {
-      debugPrint('takePicture failed: $e');
-      debugPrintStack(stackTrace: stack);
+      Log.warning('takePicture failed', error: e, stackTrace: stack);
       return null;
     }
   }
@@ -506,8 +517,8 @@ class ReceiptCameraController extends ChangeNotifier {
     }
     try {
       await cam.pausePreview();
-    } catch (e) {
-      debugPrint('pausePreview failed: $e');
+    } catch (e, st) {
+      Log.warning('pausePreview failed', error: e, stackTrace: st);
     }
   }
 
@@ -541,8 +552,8 @@ class ReceiptCameraController extends ChangeNotifier {
     }
     try {
       await cam.resumePreview();
-    } catch (e) {
-      debugPrint('resumePreview failed: $e');
+    } catch (e, st) {
+      Log.warning('resumePreview failed', error: e, stackTrace: st);
       if (!context.mounted || _disposed) return;
       await initialize(context);
     }

@@ -36,7 +36,9 @@ AsyncValue<GroupBalanceResult?> groupBalance(Ref ref, String groupId) {
                 snapshotJson.isNotEmpty &&
                 !isArchiveAutoFreeze) {
               try {
-                final snapshot = SettlementSnapshot.fromJsonString(snapshotJson);
+                final snapshot = SettlementSnapshot.fromJsonString(
+                  snapshotJson,
+                );
                 balances = snapshot.balances;
                 settlements = snapshot.settlements;
               } catch (e) {

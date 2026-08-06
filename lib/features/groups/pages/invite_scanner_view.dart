@@ -5,6 +5,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -160,7 +161,9 @@ class _InviteScannerViewState extends State<InviteScannerView>
     if (c == null) return;
     try {
       await c.start();
-    } catch (_) {}
+    } catch (e) {
+      Log.debug('Invite scanner start failed', error: e);
+    }
   }
 
   Future<void> _onDetect(BarcodeCapture capture) async {
@@ -203,7 +206,9 @@ class _InviteScannerViewState extends State<InviteScannerView>
     if (c == null) return;
     try {
       await c.toggleTorch();
-    } catch (_) {}
+    } catch (e) {
+      Log.debug('Invite scanner torch toggle failed', error: e);
+    }
   }
 
   @override

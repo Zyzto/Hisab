@@ -89,8 +89,10 @@ class AppFabNaturePainter extends CustomPainter {
 
   void _paintLeaves(Canvas canvas, Offset origin) {
     for (final leaf in leaves) {
-      final local = ((leafProgress - leaf.delay) / (1.0 - leaf.delay))
-          .clamp(0.0, 1.0);
+      final local = ((leafProgress - leaf.delay) / (1.0 - leaf.delay)).clamp(
+        0.0,
+        1.0,
+      );
       if (local <= 0) continue;
       final ease = Curves.easeOutCubic.transform(local);
       final fade = (1.0 - Curves.easeIn.transform(local)).clamp(0.0, 1.0);
@@ -135,13 +137,13 @@ class AppFabNaturePainter extends CustomPainter {
     final growT = (t / AppFabBloomTimeline.growEnd).clamp(0.0, 1.0);
     final grow = Curves.easeOutBack.transform(growT);
 
-    final inStay = t >= AppFabBloomTimeline.growEnd &&
-        t < AppFabBloomTimeline.stayEnd;
+    final inStay =
+        t >= AppFabBloomTimeline.growEnd && t < AppFabBloomTimeline.stayEnd;
     final leaving = t >= AppFabBloomTimeline.stayEnd;
     final leaveT = leaving
         ? ((t - AppFabBloomTimeline.stayEnd) /
-                (1.0 - AppFabBloomTimeline.stayEnd))
-            .clamp(0.0, 1.0)
+                  (1.0 - AppFabBloomTimeline.stayEnd))
+              .clamp(0.0, 1.0)
         : 0.0;
 
     final sceneFade = leaving
@@ -151,7 +153,8 @@ class AppFabNaturePainter extends CustomPainter {
 
     // Multi-frequency wind: slow breeze + quicker gusts while staying.
     final windStrength = (inStay || leaving ? 1.0 : grow) * sceneFade;
-    final sway = (math.sin(t * math.pi * 18) * 0.14 +
+    final sway =
+        (math.sin(t * math.pi * 18) * 0.14 +
             math.sin(t * math.pi * 7.5 + 0.8) * 0.08 +
             math.sin(t * math.pi * 3.2) * 0.05) *
         windStrength;
@@ -301,8 +304,7 @@ class AppFabNaturePainter extends CustomPainter {
       final phase = (t * 2.2 + i * 0.27) % 1.0;
       final y = origin.dy - 88 + i * 16.0 + math.sin(t * math.pi * 6 + i) * 3;
       final x0 = origin.dx - 62 + phase * 124;
-      final alpha =
-          (0.18 * fade * math.sin(phase * math.pi)).clamp(0.0, 0.22);
+      final alpha = (0.18 * fade * math.sin(phase * math.pi)).clamp(0.0, 0.22);
       windPaint.color = Colors.white.withValues(alpha: alpha);
       final path = Path()
         ..moveTo(x0, y)
@@ -537,8 +539,7 @@ class AppFabNaturePainter extends CustomPainter {
           const Color(0xFF7E57C2),
           const Color(0xFFB39DDB),
           row / 7,
-        )!
-            .withValues(alpha: (0.88 - row * 0.04) * fade);
+        )!.withValues(alpha: (0.88 - row * 0.04) * fade);
         canvas.drawCircle(
           Offset(side * spread + sway * 1.5, y),
           2.1 - row * 0.12,

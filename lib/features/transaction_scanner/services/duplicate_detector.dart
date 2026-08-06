@@ -18,8 +18,10 @@ class DuplicateDetector {
       if (e.amountCents != candidate.amountCents) continue;
       if (e.currencyCode != candidate.currencyCode) continue;
 
-      final diff =
-          candidate.capturedAt.difference(e.capturedAt).inSeconds.abs();
+      final diff = candidate.capturedAt
+          .difference(e.capturedAt)
+          .inSeconds
+          .abs();
       if (diff <= _dedupeWindowSeconds) return true;
     }
     return false;

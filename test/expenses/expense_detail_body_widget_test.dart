@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hisab/domain/domain.dart';
 import 'package:hisab/features/expenses/widgets/expense_detail_body.dart';
 import 'package:hisab/features/groups/providers/groups_provider.dart';
-import 'package:hisab/features/settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 
 void main() {
   final now = DateTime(2025, 1, 15);
@@ -58,15 +58,13 @@ void main() {
     );
   });
 
-  testWidgets('ExpenseDetailBody shows title in header card', (
-    tester,
-  ) async {
+  testWidgets('ExpenseDetailBody shows title in header card', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          expensesByGroupProvider(groupId).overrideWithValue(
-            AsyncValue.data([testExpense]),
-          ),
+          expensesByGroupProvider(
+            groupId,
+          ).overrideWithValue(AsyncValue.data([testExpense])),
           futureExpenseProvider(
             expenseId,
           ).overrideWithValue(AsyncValue.data(testExpense)),
@@ -125,9 +123,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          expensesByGroupProvider(groupId).overrideWithValue(
-            AsyncValue.data([multiExpense]),
-          ),
+          expensesByGroupProvider(
+            groupId,
+          ).overrideWithValue(AsyncValue.data([multiExpense])),
           futureExpenseProvider(
             expenseId,
           ).overrideWithValue(AsyncValue.data(multiExpense)),
@@ -172,9 +170,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          expensesByGroupProvider(groupId).overrideWithValue(
-            AsyncValue.data([income]),
-          ),
+          expensesByGroupProvider(
+            groupId,
+          ).overrideWithValue(AsyncValue.data([income])),
           futureExpenseProvider(
             expenseId,
           ).overrideWithValue(AsyncValue.data(income)),
@@ -231,9 +229,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          expensesByGroupProvider(groupId).overrideWithValue(
-            AsyncValue.data([transfer]),
-          ),
+          expensesByGroupProvider(
+            groupId,
+          ).overrideWithValue(AsyncValue.data([transfer])),
           futureExpenseProvider(
             expenseId,
           ).overrideWithValue(AsyncValue.data(transfer)),
@@ -270,9 +268,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          expensesByGroupProvider(groupId).overrideWithValue(
-            AsyncValue.data([testExpense]),
-          ),
+          expensesByGroupProvider(
+            groupId,
+          ).overrideWithValue(AsyncValue.data([testExpense])),
           futureExpenseProvider(
             expenseId,
           ).overrideWithValue(AsyncValue.data(testExpense)),
@@ -315,9 +313,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          expensesByGroupProvider(groupId).overrideWithValue(
-            AsyncValue.data([testExpense]),
-          ),
+          expensesByGroupProvider(
+            groupId,
+          ).overrideWithValue(AsyncValue.data([testExpense])),
           futureExpenseProvider(
             expenseId,
           ).overrideWithValue(AsyncValue.data(testExpense)),

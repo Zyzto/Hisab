@@ -82,8 +82,9 @@ class SeaScene extends BiomeSceneBase {
     for (var i = 0; i < 7; i++) {
       final phase = (t * 1.1 + i * 0.14) % 1.0;
       final r = (40 + phase * math.min(w, h) * 0.55) * grow;
-      ripple.color =
-          const Color(0xFF4FC3F7).withValues(alpha: (1 - phase) * 0.45 * a);
+      ripple.color = const Color(
+        0xFF4FC3F7,
+      ).withValues(alpha: (1 - phase) * 0.45 * a);
       canvas.drawCircle(Offset(cx, cy), r, ripple);
     }
 
@@ -98,7 +99,8 @@ class SeaScene extends BiomeSceneBase {
       final path = Path();
       for (var i = 0; i <= 24; i++) {
         final x = w * i / 24;
-        final y = yBase +
+        final y =
+            yBase +
             math.sin(i * 0.7 + t * 3 + band) * 14 * grow +
             math.sin(i * 0.3 + t) * 6;
         if (i == 0) {

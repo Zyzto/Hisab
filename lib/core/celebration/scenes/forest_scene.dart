@@ -11,12 +11,7 @@ class ForestScene extends BiomeSceneBase {
   @override
   void spawnAmbient() {
     add(
-      mistOrbs(
-        rng: rng,
-        tint: const Color(0xFFA5D6A7),
-        area: area,
-        count: 16,
-      ),
+      mistOrbs(rng: rng, tint: const Color(0xFFA5D6A7), area: area, count: 16),
     );
     add(
       shapedBurst(
@@ -40,11 +35,7 @@ class ForestScene extends BiomeSceneBase {
         rng: rng,
         area: area,
         count: 18,
-        colors: const [
-          Color(0xFF66BB6A),
-          Color(0xFF81C784),
-          Color(0xFFA5D6A7),
-        ],
+        colors: const [Color(0xFF66BB6A), Color(0xFF81C784), Color(0xFFA5D6A7)],
         draw: drawNeedle,
         fallDown: true,
       ),
@@ -64,10 +55,7 @@ class ForestScene extends BiomeSceneBase {
     // Ground band
     final ground = Paint()
       ..color = const Color(0xFF33691E).withValues(alpha: 0.35 * a);
-    canvas.drawRect(
-      Rect.fromLTWH(0, h * 0.72, w, h * 0.28),
-      ground,
-    );
+    canvas.drawRect(Rect.fromLTWH(0, h * 0.72, w, h * 0.28), ground);
 
     // Row of pines across the bottom half
     final trees = celebrationBudget(7);

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:in_app_update/in_app_update.dart';
 import 'package:upgrader/upgrader.dart';
 
@@ -17,8 +18,8 @@ Future<void> handleAndroidUpdateThenStore(Upgrader upgrader) async {
       final result = await InAppUpdate.performImmediateUpdate();
       if (result == AppUpdateResult.success) return;
     }
-  } catch (_) {
-    // Not from Play Store or API not available; fall back to store link.
+  } catch (e) {
+    Log.debug('In-app update unavailable; falling back to store', error: e);
   }
 
   await upgrader.sendUserToAppStore();

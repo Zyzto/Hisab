@@ -28,8 +28,9 @@ class CapturedNotification {
       senderTitle: map['sender_title'] as String?,
       body: map['body'] as String,
       postedAt: DateTime.fromMillisecondsSinceEpoch(map['posted_at'] as int),
-      capturedAt:
-          DateTime.fromMillisecondsSinceEpoch(map['captured_at'] as int),
+      capturedAt: DateTime.fromMillisecondsSinceEpoch(
+        map['captured_at'] as int,
+      ),
     );
   }
 }
@@ -78,8 +79,9 @@ class NotificationBridge {
   static Future<List<CapturedNotification>> getPendingNotifications() async {
     if (!_isAndroid) return [];
     try {
-      final result =
-          await _method.invokeMethod<List<dynamic>>('getPendingNotifications');
+      final result = await _method.invokeMethod<List<dynamic>>(
+        'getPendingNotifications',
+      );
       if (result == null) return [];
       return result
           .cast<Map<dynamic, dynamic>>()

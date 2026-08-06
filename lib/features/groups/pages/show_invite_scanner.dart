@@ -178,16 +178,12 @@ class _InviteScannerHostState extends State<_InviteScannerHost> {
                   final progress = _rollProgress();
                   final revealH = panelH * progress;
                   final rolling =
-                      widget.openAnimation.status ==
-                          AnimationStatus.forward ||
+                      widget.openAnimation.status == AnimationStatus.forward ||
                       widget.openAnimation.status == AnimationStatus.reverse;
                   return Align(
                     alignment: Alignment.bottomCenter,
                     child: Transform.translate(
-                      offset: Offset(
-                        0,
-                        _drag.translateY(expanded: _expanded),
-                      ),
+                      offset: Offset(0, _drag.translateY(expanded: _expanded)),
                       // Window grows upward from the screen bottom; panel
                       // content is top-aligned so the handle leads the roll.
                       child: AnimatedContainer(

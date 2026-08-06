@@ -14,7 +14,7 @@ import '../constants/supabase_config.dart';
 import '../navigation/app_router.dart';
 import '../navigation/route_paths.dart';
 import '../pwa/pwa_capabilities.dart';
-import '../../features/settings/providers/settings_framework_providers.dart';
+import '../settings/providers/settings_framework_providers.dart';
 import 'permission_service.dart';
 import 'notification_service_web_stub.dart'
     if (dart.library.html) 'notification_service_web_impl.dart'
@@ -226,7 +226,9 @@ class NotificationService extends _$NotificationService {
       }
       if (kIsWeb &&
           pwaNotificationSupport == PwaNotificationSupport.unsupported) {
-        Log.warning('NotificationService: notifications unsupported in browser');
+        Log.warning(
+          'NotificationService: notifications unsupported in browser',
+        );
         return false;
       }
 
@@ -400,11 +402,7 @@ class NotificationService extends _$NotificationService {
       // Claim exclusive ownership of this FCM token (drops other users' rows).
       await client.rpc(
         'claim_device_token',
-        params: {
-          'p_token': token,
-          'p_platform': platform,
-          'p_locale': locale,
-        },
+        params: {'p_token': token, 'p_platform': platform, 'p_locale': locale},
       );
 
       Log.info('NotificationService: token registered ($platform)');

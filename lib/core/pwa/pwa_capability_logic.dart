@@ -30,9 +30,6 @@ PwaNotificationSupport resolvePwaNotificationSupport({
 }
 
 /// Whether the install guide should use iOS Share → Add to Home Screen copy.
-bool useIosInstallGuide({
-  required PwaInstallMode mode,
-  required bool isIos,
-}) {
+bool useIosInstallGuide({required PwaInstallMode mode, required bool isIos}) {
   return mode == PwaInstallMode.manualIos || isIos;
 }

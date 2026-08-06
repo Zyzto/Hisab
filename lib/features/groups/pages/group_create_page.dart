@@ -31,7 +31,7 @@ import '../../../core/widgets/sheet_option_tile.dart';
 import '../../../core/widgets/user_text.dart';
 import '../../../core/widgets/wizard_step_enter.dart';
 import '../../../domain/domain.dart';
-import '../../settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 import '../utils/group_icon_utils.dart';
 import '../widgets/group_color_picker.dart';
 import '../widgets/settlement_method_picker.dart';
@@ -400,7 +400,9 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
           'participantCount': _participants.length,
           'hasIcon': _selectedIcon != null,
         }, enabled: ref.read(telemetryEnabledProvider));
-      } catch (_) {}
+      } catch (e) {
+        Log.debug('Telemetry group_created failed', error: e);
+      }
       await fireCelebration(
         ref,
         widget.isPersonal

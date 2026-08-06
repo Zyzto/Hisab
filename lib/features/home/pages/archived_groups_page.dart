@@ -112,8 +112,9 @@ class _ArchivedGroupsPageState extends ConsumerState<ArchivedGroupsPage> {
                             (group) => GroupCard(
                               key: ValueKey('global-${group.id}'),
                               group: group,
-                              onTap: () => context
-                                  .push(RoutePaths.groupDetail(group.id)),
+                              onTap: () => context.push(
+                                RoutePaths.groupDetail(group.id),
+                              ),
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -132,8 +133,9 @@ class _ArchivedGroupsPageState extends ConsumerState<ArchivedGroupsPage> {
                               onUnhide: () => ref
                                   .read(groupRepositoryProvider)
                                   .clearLocalArchived(group.id),
-                              onTap: () => context
-                                  .push(RoutePaths.groupDetail(group.id)),
+                              onTap: () => context.push(
+                                RoutePaths.groupDetail(group.id),
+                              ),
                             ),
                           ),
                         ],

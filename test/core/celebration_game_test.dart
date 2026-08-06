@@ -29,19 +29,13 @@ void main() {
   });
 
   test('celebrationSceneType matches biome components', () {
-    expect(
-      celebrationSceneType(CelebrationKind.firstExpense),
-      ForestScene,
-    );
+    expect(celebrationSceneType(CelebrationKind.firstExpense), ForestScene);
     expect(celebrationSceneType(CelebrationKind.newExpense), PlantsScene);
     expect(celebrationSceneType(CelebrationKind.settlement), SeaScene);
     expect(celebrationSceneType(CelebrationKind.personJoined), JungleScene);
     expect(celebrationSceneType(CelebrationKind.personLeft), SkyScene);
     expect(celebrationSceneType(CelebrationKind.newGroup), GroveScene);
-    expect(
-      celebrationSceneType(CelebrationKind.newPersonalList),
-      DuskScene,
-    );
+    expect(celebrationSceneType(CelebrationKind.newPersonalList), DuskScene);
   });
 
   test('celebrationSceneAlpha fades in and out', () {
@@ -83,7 +77,8 @@ void main() {
       expect(
         game.camera.viewport.children.any((c) => c.runtimeType == expectedType),
         isTrue,
-        reason: 'missing scene for $kind '
+        reason:
+            'missing scene for $kind '
             '(viewport: ${game.camera.viewport.children.map((c) => c.runtimeType).toList()})',
       );
 

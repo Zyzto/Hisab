@@ -133,7 +133,8 @@ class _ReceiptCachedOrNetworkImage extends StatefulWidget {
       _ReceiptCachedOrNetworkImageState();
 }
 
-class _ReceiptCachedOrNetworkImageState extends State<_ReceiptCachedOrNetworkImage> {
+class _ReceiptCachedOrNetworkImageState
+    extends State<_ReceiptCachedOrNetworkImage> {
   late Future<String?> _cachedPathFuture;
 
   @override

@@ -96,9 +96,7 @@ class CurrencyHelpers {
       centerInFullViewport: centerInFullViewport,
       child: Builder(
         builder: (ctx) => Padding(
-          padding: EdgeInsets.only(
-            bottom: 24,
-          ),
+          padding: EdgeInsets.only(bottom: 24),
           child: AppCurrencyPickerList(
             onSelect: (currency) {
               onSelect(currency);

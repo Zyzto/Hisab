@@ -52,7 +52,10 @@ void main() {
     });
 
     test('detects Latin as LTR', () {
-      expect(resolveUserTextDirection('Dinner with friends'), TextDirection.ltr);
+      expect(
+        resolveUserTextDirection('Dinner with friends'),
+        TextDirection.ltr,
+      );
     });
 
     test('inherits for digits-only', () {

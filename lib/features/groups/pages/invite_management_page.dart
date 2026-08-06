@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
-import 'package:go_router/go_router.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 
 import '../../../core/constants/supabase_config.dart';
@@ -27,7 +26,7 @@ import '../../../domain/domain.dart';
 import '../providers/group_invite_provider.dart';
 import '../providers/group_member_provider.dart';
 import '../providers/groups_provider.dart';
-import '../../settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 import '../utils/invite_share_helper.dart';
 import '../widgets/create_invite_sheet.dart';
 

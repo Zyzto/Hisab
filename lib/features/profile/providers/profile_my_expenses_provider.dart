@@ -84,8 +84,9 @@ class ProfileExpensesFilter {
   }
 }
 
-final profileExpensesFilterProvider =
-    StateProvider<ProfileExpensesFilter>((ref) => const ProfileExpensesFilter());
+final profileExpensesFilterProvider = StateProvider<ProfileExpensesFilter>(
+  (ref) => const ProfileExpensesFilter(),
+);
 
 List<ProfileExpenseItem> _buildExpenseItems(ProfileDataSnapshot snap) {
   final items = <ProfileExpenseItem>[];
@@ -125,25 +126,26 @@ List<ProfileExpenseItem> _buildExpenseItems(ProfileDataSnapshot snap) {
 /// Waits for the batched profile snapshot — never emits partial per-group data.
 final profileMyExpensesProvider =
     Provider<AsyncValue<List<ProfileExpenseItem>>>((ref) {
-  final snapAsync = ref.watch(profileDataSnapshotProvider);
-  return snapAsync.when(
-    loading: () => const AsyncValue.loading(),
-    error: AsyncValue.error,
-    data: (snap) => AsyncValue.data(_buildExpenseItems(snap)),
-  );
-});
+      final snapAsync = ref.watch(profileDataSnapshotProvider);
+      return snapAsync.when(
+        loading: () => const AsyncValue.loading(),
+        error: AsyncValue.error,
+        data: (snap) => AsyncValue.data(_buildExpenseItems(snap)),
+      );
+    });
 
 final filteredProfileExpensesProvider =
     Provider<AsyncValue<List<ProfileExpenseItem>>>((ref) {
-  final allAsync = ref.watch(profileMyExpensesProvider);
-  final filter = ref.watch(profileExpensesFilterProvider);
+      final allAsync = ref.watch(profileMyExpensesProvider);
+      final filter = ref.watch(profileExpensesFilterProvider);
 
-  return allAsync.when(
-    loading: () => const AsyncValue.loading(),
-    error: AsyncValue.error,
-    data: (items) => AsyncValue.data(applyProfileExpensesFilter(items, filter)),
-  );
-});
+      return allAsync.when(
+        loading: () => const AsyncValue.loading(),
+        error: AsyncValue.error,
+        data: (items) =>
+            AsyncValue.data(applyProfileExpensesFilter(items, filter)),
+      );
+    });
 
 List<ProfileExpenseItem> applyProfileExpensesFilter(
   List<ProfileExpenseItem> items,
@@ -166,9 +168,7 @@ List<ProfileExpenseItem> applyProfileExpensesFilter(
     }
 
     if (filter.tagKey != null) {
-      final tag = (item.expense.tag == null || item.expense.tag!.isEmpty)
-          ? 'untagged'
-          : item.expense.tag!;
+      final tag = item.expense.hasBlankTag ? 'untagged' : item.expense.tag!;
       if (tag != filter.tagKey) return false;
     }
 

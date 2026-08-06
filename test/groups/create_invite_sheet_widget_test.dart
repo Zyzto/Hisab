@@ -88,16 +88,20 @@ void main() {
     expect(find.byIcon(Icons.add_link), findsOneWidget);
   });
 
-  testWidgets('CreateInviteSheet passes selected access mode', (tester) async {
-    await openCreateInviteSheet(tester);
+  testWidgets(
+    'CreateInviteSheet passes selected access mode',
+    (tester) async {
+      await openCreateInviteSheet(tester);
 
-    await tester.tap(find.text('Read-only only'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.add_link).first);
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('Read-only only'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.add_link).first);
+      await tester.pumpAndSettle();
 
-    expect(fakeInviteRepo.lastAccessMode, InviteAccessMode.readonlyOnly);
-  }, skip: !supabaseConfigAvailable);
+      expect(fakeInviteRepo.lastAccessMode, InviteAccessMode.readonlyOnly);
+    },
+    skip: !supabaseConfigAvailable,
+  );
 
   testWidgets('CreateInviteSheet in Arabic shows key content', (tester) async {
     await setViewportForSheet(tester);
@@ -190,8 +194,7 @@ class FakeGroupInviteRepository implements IGroupInviteRepository {
     String token, {
     String? newParticipantName,
     String? participantId,
-  }) async =>
-      'group-id';
+  }) async => 'group-id';
 
   @override
   Future<List<GroupInvite>> listByGroup(String groupId) async => [];

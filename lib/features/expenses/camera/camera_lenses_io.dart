@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_logging_service/flutter_logging_service.dart';
 
 import 'camera_lens_info.dart';
 
@@ -14,11 +15,15 @@ Future<List<CameraLensInfo>> fetchCameraLenses() async {
       for (final item in raw)
         if (item is Map) CameraLensInfo.fromMap(item),
     ];
-  } on PlatformException catch (e) {
-    debugPrint('fetchCameraLenses: ${e.code} ${e.message}');
+  } on PlatformException catch (e, st) {
+    Log.warning(
+      'fetchCameraLenses: ${e.code} ${e.message}',
+      error: e,
+      stackTrace: st,
+    );
     return const [];
-  } catch (e) {
-    debugPrint('fetchCameraLenses failed: $e');
+  } catch (e, st) {
+    Log.warning('fetchCameraLenses failed', error: e, stackTrace: st);
     return const [];
   }
 }

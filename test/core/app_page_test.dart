@@ -49,24 +49,25 @@ void main() {
     expect(find.byKey(const ValueKey('child')), findsOneWidget);
   });
 
-  testWidgets('buildHierarchicalPageTransition fadeOnly skips SlideTransition', (
-    tester,
-  ) async {
-    final animation = AlwaysStoppedAnimation<double>(0.5);
-    await tester.pumpWidget(
-      Directionality(
-        textDirection: TextDirection.ltr,
-        child: AppMotion.buildHierarchicalPageTransition(
-          animation: animation,
-          direction: TextDirection.ltr,
-          fadeOnly: true,
-          child: const SizedBox(key: ValueKey('child')),
+  testWidgets(
+    'buildHierarchicalPageTransition fadeOnly skips SlideTransition',
+    (tester) async {
+      final animation = AlwaysStoppedAnimation<double>(0.5);
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: AppMotion.buildHierarchicalPageTransition(
+            animation: animation,
+            direction: TextDirection.ltr,
+            fadeOnly: true,
+            child: const SizedBox(key: ValueKey('child')),
+          ),
         ),
-      ),
-    );
-    expect(find.byKey(const ValueKey('child')), findsOneWidget);
-    expect(find.byType(SlideTransition), findsNothing);
-  });
+      );
+      expect(find.byKey(const ValueKey('child')), findsOneWidget);
+      expect(find.byType(SlideTransition), findsNothing);
+    },
+  );
 
   testWidgets('buildHierarchicalPageTransition includes SlideTransition', (
     tester,

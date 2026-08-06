@@ -23,8 +23,8 @@ import '../../../core/services/permission_service.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/widgets/sheet_helpers.dart';
-import '../../settings/providers/settings_framework_providers.dart';
-import '../../settings/settings_definitions.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/settings_definitions.dart';
 import '../widgets/onboarding_connect_page.dart';
 import '../widgets/onboarding_permissions_page.dart';
 import '../widgets/onboarding_preferences_page.dart';
@@ -116,9 +116,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
     }
   }
 
-  Duration get _pageAnimDuration => UiPerf.preferInstantShellTabs
-      ? Duration.zero
-      : AppMotion.page;
+  Duration get _pageAnimDuration =>
+      UiPerf.preferInstantShellTabs ? Duration.zero : AppMotion.page;
 
   void _goToPage(int page) {
     if (_pageAnimDuration == Duration.zero) {
@@ -164,22 +163,20 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
     _hintTimer ??= Timer.periodic(const Duration(seconds: 4), (_) {
       if (mounted && !_isCompleting) {
         setState(() {
-          _hintLocaleIndex =
-              (_hintLocaleIndex + 1) % _hintLanguageKeys.length;
+          _hintLocaleIndex = (_hintLocaleIndex + 1) % _hintLanguageKeys.length;
         });
       }
     });
     if (_themeDemoRunning) {
-      _themeDemoTimer ??= Timer.periodic(
-        const Duration(milliseconds: 2500),
-        (_) {
-          if (mounted && _themeDemoRunning && !_isCompleting) {
-            setState(() {
-              _themeDemoIndex = (_themeDemoIndex + 1) % _themeDemoOrder.length;
-            });
-          }
-        },
-      );
+      _themeDemoTimer ??= Timer.periodic(const Duration(milliseconds: 2500), (
+        _,
+      ) {
+        if (mounted && _themeDemoRunning && !_isCompleting) {
+          setState(() {
+            _themeDemoIndex = (_themeDemoIndex + 1) % _themeDemoOrder.length;
+          });
+        }
+      });
     }
   }
 
@@ -212,12 +209,12 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
 
     // Integration/widget tests use pumpAndSettle; skip looping chrome/timers.
     // Release web minifies binding type names — prefer [isIntegrationTestMode].
-    final underTestBinding = isIntegrationTestMode ||
-        WidgetsBinding.instance.runtimeType
-            .toString()
-            .contains('TestWidgetsFlutterBinding');
-    final reduceChrome =
-        UiPerf.preferReducedChromeMotion || underTestBinding;
+    final underTestBinding =
+        isIntegrationTestMode ||
+        WidgetsBinding.instance.runtimeType.toString().contains(
+          'TestWidgetsFlutterBinding',
+        );
+    final reduceChrome = UiPerf.preferReducedChromeMotion || underTestBinding;
     if (reduceChrome) {
       _languagePulseStopped = true;
       _themeDemoRunning = false;
@@ -363,24 +360,22 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                                     permissionStatusFuture:
                                         _permissionStatusFuture,
                                     onRequestCamera: () async {
-                                      final result = await PermissionService
-                                          .requestCameraPermission(context);
+                                      final result =
+                                          await PermissionService.requestCameraPermission(
+                                            context,
+                                          );
                                       if (mounted) {
-                                        setState(
-                                          () => _cameraGranted = result,
-                                        );
+                                        setState(() => _cameraGranted = result);
                                       }
                                     },
                                     onRequestNotification: () async {
                                       final result =
-                                          await PermissionService
-                                              .requestNotificationPermission(
-                                                context,
-                                              );
+                                          await PermissionService.requestNotificationPermission(
+                                            context,
+                                          );
                                       if (mounted) {
                                         setState(
-                                          () =>
-                                              _notificationGranted = result,
+                                          () => _notificationGranted = result,
                                         );
                                       }
                                     },

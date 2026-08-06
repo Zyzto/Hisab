@@ -149,9 +149,7 @@ Widget buildSheetShell(
             if (actions.isNotEmpty) ...[
               const SizedBox(height: _kSheetBodyActionsGap),
               Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: _kSheetPadding,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: _kSheetPadding),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
@@ -180,10 +178,7 @@ Widget _sheetBodyPanel(BuildContext context, {required Widget child}) {
   // Horizontal inset comes from [buildSheetShell]; panel fills that band.
   return DecoratedBox(
     decoration: AccentSurfaces.flatPanel(cs),
-    child: Padding(
-      padding: const EdgeInsets.all(14),
-      child: child,
-    ),
+    child: Padding(padding: const EdgeInsets.all(14), child: child),
   );
 }
 

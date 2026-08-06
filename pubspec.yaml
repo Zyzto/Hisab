@@ -1,7 +1,7 @@
 name: hisab
 description: "Group expense splitting and settle-up app."
 publish_to: 'none'
-version: 0.7.11+81
+version: 0.7.12+82
 
 environment:
   sdk: ^3.11.0
@@ -23,6 +23,7 @@ dependencies:
 
   # Local storage
   shared_preferences: ^2.3.3
+  flutter_secure_storage: ^9.2.4
 
   # Backend & database
   supabase_flutter: ^2.8.4
@@ -62,7 +63,7 @@ dependencies:
   flutter_logging_service:
     git:
       url: https://github.com/Zyzto/siglat.git
-      ref: main
+      ref: v0.1.1
 
   # Settings (theme + "Local Only" toggle)
   flutter_settings_framework:
@@ -118,13 +119,13 @@ dev_dependencies:
     sdk: flutter
   mocktail: ^1.0.4
   plugin_platform_interface: ^2.1.8
-  supabase: ^2.0.0
+  supabase: ^2.8.4
   flutter_lints: ^6.0.0
   build_runner: ^2.13.1
   riverpod_generator: ^4.0.3
   flutter_launcher_icons: ^0.14.4
 
-# langchain_google 0.7.x still expects ApiException.code; googleai_dart 3.6 renamed it.
+# Tracked: langchain_google latest (0.7.1+2) still needs googleai_dart 3.0.0 — ApiException.code renamed in 3.6.
 dependency_overrides:
   googleai_dart: 3.0.0
 

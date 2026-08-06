@@ -163,7 +163,9 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
   });
 
-  testWidgets('Desktop sidenav collapse preference is restored', (tester) async {
+  testWidgets('Desktop sidenav collapse preference is restored', (
+    tester,
+  ) async {
     SharedPreferences.setMockInitialValues({
       ShellNavLayout.desktopNavCollapsedKey: true,
     });
@@ -180,15 +182,23 @@ void main() {
     final router = _buildRouter(RoutePaths.settings);
     await pumpRouterApp(tester, router: router);
 
-    expect(router.routerDelegate.currentConfiguration.uri.path, RoutePaths.settings);
+    expect(
+      router.routerDelegate.currentConfiguration.uri.path,
+      RoutePaths.settings,
+    );
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
 
-    expect(router.routerDelegate.currentConfiguration.uri.path, RoutePaths.home);
+    expect(
+      router.routerDelegate.currentConfiguration.uri.path,
+      RoutePaths.home,
+    );
   });
 
-  testWidgets('Back on /home mode path shows home back behavior', (tester) async {
+  testWidgets('Back on /home mode path shows home back behavior', (
+    tester,
+  ) async {
     final router = _buildRouter('${RoutePaths.homeModeBase}/combined');
     await pumpRouterApp(tester, router: router);
 
@@ -225,9 +235,14 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pump();
 
-    final popCalls = calls.where((call) => call.method == 'SystemNavigator.pop');
+    final popCalls = calls.where(
+      (call) => call.method == 'SystemNavigator.pop',
+    );
     expect(popCalls.length, 0);
-    expect(router.routerDelegate.currentConfiguration.uri.path, RoutePaths.home);
+    expect(
+      router.routerDelegate.currentConfiguration.uri.path,
+      RoutePaths.home,
+    );
     await tester.pump(const Duration(seconds: 5));
   });
 
@@ -251,7 +266,9 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pump();
 
-    final popCalls = calls.where((call) => call.method == 'SystemNavigator.pop');
+    final popCalls = calls.where(
+      (call) => call.method == 'SystemNavigator.pop',
+    );
     expect(popCalls.length, 1);
     await tester.pump(const Duration(seconds: 5));
   });

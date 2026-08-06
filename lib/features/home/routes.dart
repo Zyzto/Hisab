@@ -28,10 +28,8 @@ List<RouteBase> getHomeRoutes() {
   return [
     GoRoute(
       path: RoutePaths.home,
-      pageBuilder: (context, state) => appNoTransitionPage(
-        key: state.pageKey,
-        child: const HomePage(),
-      ),
+      pageBuilder: (context, state) =>
+          appNoTransitionPage(key: state.pageKey, child: const HomePage()),
     ),
     GoRoute(
       path: '${RoutePaths.homeModeBase}/:mode',

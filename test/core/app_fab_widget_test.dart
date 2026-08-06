@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hisab/core/widgets/app_fab.dart';
 import 'package:hisab/core/widgets/app_fab_nature.dart';
-import 'package:hisab/features/settings/providers/settings_framework_providers.dart';
+import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 
 Widget _wrap(Widget child, {bool extraAnimations = true}) {
   return ProviderScope(
@@ -30,12 +30,7 @@ void main() {
   ) async {
     var pressed = 0;
     await tester.pumpWidget(
-      _wrap(
-        AppFab(
-          icon: Icons.add,
-          onPressed: () => pressed++,
-        ),
-      ),
+      _wrap(AppFab(icon: Icons.add, onPressed: () => pressed++)),
     );
     await tester.pump();
     expect(find.byIcon(Icons.add), findsOneWidget);
@@ -54,10 +49,7 @@ void main() {
     var pressed = 0;
     await tester.pumpWidget(
       _wrap(
-        AppFab(
-          icon: Icons.add,
-          onPressed: () => pressed++,
-        ),
+        AppFab(icon: Icons.add, onPressed: () => pressed++),
         extraAnimations: false,
       ),
     );
@@ -107,14 +99,7 @@ void main() {
   testWidgets('AppFab paints nature layer after press when extras on', (
     tester,
   ) async {
-    await tester.pumpWidget(
-      _wrap(
-        AppFab(
-          icon: Icons.add,
-          onPressed: () {},
-        ),
-      ),
-    );
+    await tester.pumpWidget(_wrap(AppFab(icon: Icons.add, onPressed: () {})));
     await tester.pump();
     await tester.tap(find.byIcon(Icons.add));
     await tester.pump();

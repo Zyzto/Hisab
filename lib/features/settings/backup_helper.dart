@@ -187,9 +187,7 @@ BackupParseResult parseBackupJson(String jsonString) {
         participants.length > BackupLimits.maxParticipants ||
         expenses.length > BackupLimits.maxExpenses ||
         expenseTags.length > BackupLimits.maxTags) {
-      return const BackupParseResult(
-        errorMessageKey: 'backup_parse_too_large',
-      );
+      return const BackupParseResult(errorMessageKey: 'backup_parse_too_large');
     }
 
     return BackupParseResult(
@@ -239,8 +237,7 @@ Group _mapToGroup(Map<String, dynamic> m) {
     BackupLimits.maxGroupIcon,
   );
   final snapshot = m['settlementSnapshotJson'] as String?;
-  if (snapshot != null &&
-      snapshot.length > BackupLimits.maxSnapshotJsonBytes) {
+  if (snapshot != null && snapshot.length > BackupLimits.maxSnapshotJsonBytes) {
     throw FormatException('settlement snapshot too large');
   }
   return Group(

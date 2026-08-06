@@ -7,9 +7,7 @@ void main() {
     final t0 = DateTime.utc(2026, 7, 31, 12);
 
     setUp(() {
-      logic = ScreenshotReportPromptLogic(
-        debounce: const Duration(seconds: 5),
-      );
+      logic = ScreenshotReportPromptLogic(debounce: const Duration(seconds: 5));
     });
 
     test('prompts when enabled, in foreground, and feedback closed', () {

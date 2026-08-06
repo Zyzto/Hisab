@@ -38,14 +38,8 @@ void main() {
                   ],
                 ),
                 actions: [
-                  IconButton(
-                    icon: Icon(Icons.person_add),
-                    onPressed: _noop,
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.settings),
-                    onPressed: _noop,
-                  ),
+                  IconButton(icon: Icon(Icons.person_add), onPressed: _noop),
+                  IconButton(icon: Icon(Icons.settings), onPressed: _noop),
                 ],
               ),
               body: SizedBox.shrink(),
@@ -60,14 +54,8 @@ void main() {
       final backButtonRect = tester.getRect(find.byIcon(Icons.arrow_back));
       final inviteButtonRect = tester.getRect(find.byIcon(Icons.person_add));
 
-      expect(
-        titleRect.left,
-        greaterThanOrEqualTo(backButtonRect.right),
-      );
-      expect(
-        titleRect.right,
-        lessThanOrEqualTo(inviteButtonRect.left),
-      );
+      expect(titleRect.left, greaterThanOrEqualTo(backButtonRect.right));
+      expect(titleRect.right, lessThanOrEqualTo(inviteButtonRect.left));
     },
   );
 
@@ -105,14 +93,8 @@ void main() {
                   ],
                 ),
                 actions: [
-                  IconButton(
-                    icon: Icon(Icons.person_add),
-                    onPressed: _noop,
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.settings),
-                    onPressed: _noop,
-                  ),
+                  IconButton(icon: Icon(Icons.person_add), onPressed: _noop),
+                  IconButton(icon: Icon(Icons.settings), onPressed: _noop),
                 ],
               ),
               body: SizedBox.shrink(),
@@ -136,68 +118,55 @@ void main() {
     },
   );
 
-  testWidgets(
-    'start-aligned title hugs start edge in RTL',
-    (tester) async {
-      const titleRowKey = Key('group-title-row');
-      const viewportWidth = 360.0;
+  testWidgets('start-aligned title hugs start edge in RTL', (tester) async {
+    const titleRowKey = Key('group-title-row');
+    const viewportWidth = 360.0;
 
-      final view = tester.view;
-      view.physicalSize = const Size(viewportWidth, 800);
-      view.devicePixelRatio = 1.0;
-      addTearDown(view.resetPhysicalSize);
-      addTearDown(view.resetDevicePixelRatio);
+    final view = tester.view;
+    view.physicalSize = const Size(viewportWidth, 800);
+    view.devicePixelRatio = 1.0;
+    addTearDown(view.resetPhysicalSize);
+    addTearDown(view.resetDevicePixelRatio);
 
-      await tester.pumpWidget(
-        MaterialApp(
-          builder: (context, child) => Directionality(
-            textDirection: TextDirection.rtl,
-            child: child!,
-          ),
-          home: const Scaffold(
-            appBar: ContentAlignedAppBar(
-              contentAreaWidth: viewportWidth,
-              centerTitle: false,
-              leading: IconButton(
-                icon: Icon(Icons.arrow_back),
-                onPressed: _noop,
-              ),
-              title: Row(
-                key: titleRowKey,
-                children: [
-                  CircleAvatar(radius: 18),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'اسم مجموعة طويل جداً للتحقق',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) =>
+            Directionality(textDirection: TextDirection.rtl, child: child!),
+        home: const Scaffold(
+          appBar: ContentAlignedAppBar(
+            contentAreaWidth: viewportWidth,
+            centerTitle: false,
+            leading: IconButton(icon: Icon(Icons.arrow_back), onPressed: _noop),
+            title: Row(
+              key: titleRowKey,
+              children: [
+                CircleAvatar(radius: 18),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'اسم مجموعة طويل جداً للتحقق',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ],
-              ),
-              actions: [
-                IconButton(
-                  icon: Icon(Icons.settings),
-                  onPressed: _noop,
                 ),
               ],
             ),
-            body: SizedBox.shrink(),
+            actions: [IconButton(icon: Icon(Icons.settings), onPressed: _noop)],
           ),
+          body: SizedBox.shrink(),
         ),
-      );
+      ),
+    );
 
-      await tester.pumpAndSettle();
+    await tester.pumpAndSettle();
 
-      final titleRect = tester.getRect(find.byKey(titleRowKey));
-      final backButtonRect = tester.getRect(find.byIcon(Icons.arrow_back));
+    final titleRect = tester.getRect(find.byKey(titleRowKey));
+    final backButtonRect = tester.getRect(find.byIcon(Icons.arrow_back));
 
-      // RTL: leading is on the right; title fills toward it from start.
-      expect(titleRect.right, lessThanOrEqualTo(backButtonRect.left + 1));
-      expect(titleRect.right, greaterThan(backButtonRect.left - 24));
-    },
-  );
+    // RTL: leading is on the right; title fills toward it from start.
+    expect(titleRect.right, lessThanOrEqualTo(backButtonRect.left + 1));
+    expect(titleRect.right, greaterThan(backButtonRect.left - 24));
+  });
 
   testWidgets(
     'content band stays viewport-centered in RTL with a right-side rail',
@@ -216,10 +185,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          builder: (context, child) => Directionality(
-            textDirection: TextDirection.rtl,
-            child: child!,
-          ),
+          builder: (context, child) =>
+              Directionality(textDirection: TextDirection.rtl, child: child!),
           home: const Row(
             textDirection: TextDirection.rtl,
             children: [

@@ -9,10 +9,7 @@ import 'scenes/celebration_scenes.dart';
 
 /// Short-lived Flame overlay for one [CelebrationKind] biome.
 class CelebrationGame extends FlameGame {
-  CelebrationGame({
-    required this.kind,
-    required this.onComplete,
-  });
+  CelebrationGame({required this.kind, required this.onComplete});
 
   final CelebrationKind kind;
   final VoidCallback onComplete;
