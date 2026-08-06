@@ -147,6 +147,12 @@ jobs:
           # Pin for reproducible CI (avoid transient regressions when `latest` moves).
           version: 2.95.4
 
+      - name: Write local Edge secrets for CI
+        run: |
+          # invite-redirect reads SITE_URL from [edge_runtime.secrets]; without this
+          # it falls back to the production host and smoke tests fail.
+          printf 'SITE_URL=http://localhost:8080\n' > supabase/.env
+
       - name: Start local Supabase
         run: supabase start
 
@@ -229,7 +235,8 @@ jobs:
           flutter test test/edge/edge_functions_smoke_test.dart \
             --dart-define=SUPABASE_URL=${{ steps.supabase.outputs.url }} \
             --dart-define=SUPABASE_ANON_KEY=${{ steps.supabase.outputs.anon_key }} \
-            --dart-define=SUPABASE_SERVICE_ROLE_KEY=${{ steps.supabase.outputs.service_role_key }}
+            --dart-define=SUPABASE_SERVICE_ROLE_KEY=${{ steps.supabase.outputs.service_role_key }} \
+            --dart-define=SITE_URL=http://localhost:8080
 
       - name: Stop local Supabase
         if: always()
