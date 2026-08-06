@@ -859,8 +859,10 @@ void main() {
         });
 
         await stage('standard invite has no preview cta', () async {
-          await waitForWidget(tester, find.text('Accept Invite'));
+          // Signed-out standard invites show the sign-in landing, not Accept.
+          await waitForWidget(tester, find.text('Sign in or register'));
           expect(find.text('Open group preview'), findsNothing);
+          expect(find.text('Accept Invite'), findsNothing);
         });
 
         await stage('cleanup standard ui test group', () async {
