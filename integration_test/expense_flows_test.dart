@@ -337,8 +337,8 @@ void main() {
 
           await scrollUntilVisible(tester, find.text('Equally'));
           await tapAndSettle(tester, find.text('Equally'));
-          await waitForWidget(tester, find.text('Exact amounts'));
-          await tapAndSettle(tester, find.text('Exact amounts'));
+          await waitForWidget(tester, find.text('Exact'));
+          await tapAndSettle(tester, find.text('Exact'));
 
           await tapSubmitExpenseButton(tester);
           await ensureFormClosed(tester);

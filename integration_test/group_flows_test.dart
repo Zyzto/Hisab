@@ -251,8 +251,8 @@ void main() {
 
       // ── Stage: change settlement method ──
       await stage('change settlement method', () async {
-        // Section title is "Settlement"; picker shows "Fewest payments" by default.
-        await scrollUntilVisible(tester, find.text('Settlement'));
+        // Section title is "How to settle"; picker shows "Minimal moves" by default.
+        await scrollUntilVisible(tester, find.text('How to settle'));
         final picker = find.byKey(const Key('settlement_method_picker_button'));
         await waitForWidget(tester, picker);
         await tester.ensureVisible(picker);
@@ -263,7 +263,7 @@ void main() {
           timeout: const Duration(seconds: 10),
           reason: 'Settlement method picker did not open',
         );
-        final pairwiseOption = find.text('Shared pairs');
+        final pairwiseOption = find.text('Partners only');
         await waitForWidget(tester, pairwiseOption);
         await tapAndPump(tester, pairwiseOption.first, pumps: 10);
         await waitForResponsiveSheetClosed(tester);
