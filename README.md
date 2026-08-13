@@ -1,18 +1,24 @@
-# Hisab
-
 <!-- markdownlint-disable MD033 MD060 -->
 
 <p align="center">
-  <img src="assets/Hisab.png" alt="Hisab" width="120" />
+  <img src="assets/Hisab.png" alt="Hisab" width="200" />
 </p>
 
-<p align="center">
-  <strong>Split expenses. Settle cleanly. Work offline.</strong>
-</p>
+<h1 align="center">Hisab - حساب</h1>
 
 <p align="center">
+  <strong>Split expenses. Settle cleanly. Work offline.</strong><br/>
   Shared trips, household costs, and personal budgets — with balances that stay clear<br/>
   when everyone chips in. Flutter · offline-first · optional Supabase sync.
+</p>
+
+<p align="center">
+  <a href="https://github.com/Zyzto/Hisab/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/Zyzto/Hisab?style=flat-square&color=2E7D32" /></a>
+  <a href="https://github.com/Zyzto/Hisab"><img alt="repo" src="https://img.shields.io/badge/github-Zyzto%2FHisab-C0C0C0?style=flat-square" /></a>
+  <a href="https://hisab.shenepoy.com"><img alt="web" src="https://img.shields.io/badge/web-hisab.shenepoy.com-2E7D32?style=flat-square" /></a>
+  <a href="https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/Zyzto/Hisab/releases"><img alt="Obtainium" src="https://img.shields.io/badge/Obtainium-add-2E7D32?style=flat-square&logo=android&logoColor=white" /></a>
+  <img alt="flutter" src="https://img.shields.io/badge/Flutter-%3E%3D3.11-C0C0C0?style=flat-square&logo=flutter&logoColor=white" />
+  <img alt="license" src="https://img.shields.io/badge/license-CC%20BY--NC--SA%204.0-2E7D32?style=flat-square" />
 </p>
 
 <p align="center">
@@ -23,6 +29,22 @@
   <a href="docs/README.md">Documentation</a>
 </p>
 
+<p align="center">
+  <a href="#what-you-get">What you get</a> ·
+  <a href="#screenshots">Screenshots</a> ·
+  <a href="#install">Install</a> ·
+  <a href="#develop">Develop</a> ·
+  <a href="#docs">Docs</a> ·
+  <a href="README.ar.md">العربية</a>
+</p>
+
+<p align="center">
+  The name <strong>Hisab</strong> comes from Arabic
+  <span dir="rtl"><strong>حساب</strong></span>
+  (<em>ḥisāb</em>): account / reckoning —
+  settling who owes whom.
+</p>
+
 ---
 
 ## What you get
@@ -30,7 +52,7 @@
 | | |
 |---|---|
 | **Groups & people** | Trips, events, or household lists — with participants linked to real accounts when online. |
-| **Expenses** | Multi-currency amounts, categories, receipts, equal / parts / amounts splits, transfers. |
+| **Expenses** | Multi-currency amounts, categories, receipts, equally / shares / exact-amount splits, transfers. |
 | **Balance & settle-up** | Who owes whom, minimal settlement suggestions, record payments in one tap. |
 | **Profile** | Cross-group dashboard: net balances, KPIs, personal budgets, and an in-app activity feed (online). |
 | **Personal lists** | Solo budgets and spending (no split UI); optional Android notification scanner drafts. |
@@ -50,21 +72,56 @@ Temporarily offline in online mode: expense writes queue and sync later. Invites
 
 ## Screenshots
 
+### Onboarding
+
 <p align="center">
-  <img src="screenshots/2.png" alt="Groups" width="180" />
-  <img src="screenshots/3.png" alt="Expenses" width="180" />
-  <img src="screenshots/4.png" alt="Balance" width="180" />
-  <img src="screenshots/5.png" alt="People" width="180" />
+  <img src="screenshots/welcome.png" alt="Welcome" width="180" />
+  <img src="screenshots/connection.png" alt="Connection mode" width="180" />
 </p>
 
 <p align="center">
-  <img src="screenshots/6.gif" alt="Hisab demo" width="360" />
+  <sub>Welcome · Connection (local-only)</sub>
+</p>
+
+### Groups & expenses
+
+<p align="center">
+  <img src="screenshots/groups.png" alt="Groups home" width="180" />
+  <img src="screenshots/add-expense.png" alt="Add expense" width="180" />
+  <img src="screenshots/settlement.png" alt="Settlement" width="180" />
 </p>
 
 <p align="center">
-  <img src="screenshots/7.png" alt="Settings" width="180" />
-  <img src="screenshots/8.png" alt="Detail" width="180" />
+  <sub>Groups · Add expense · Settlement</sub>
 </p>
+
+### Demo
+
+<p align="center">
+  <img src="screenshots/onboarding.gif" alt="Onboarding: welcome to local-only" width="220" />
+  <img src="screenshots/expense-settle.gif" alt="Open a group, add an expense, settle" width="220" />
+</p>
+
+<p align="center">
+  <sub>Onboarding · Open a group, add an expense, settle</sub>
+</p>
+
+<details>
+<summary>Dark theme</summary>
+
+<p align="center">
+  <img src="screenshots/welcome-dark.png" alt="Welcome (dark)" width="140" />
+  <img src="screenshots/connection-dark.png" alt="Connection (dark)" width="140" />
+  <img src="screenshots/groups-dark.png" alt="Groups (dark)" width="140" />
+  <img src="screenshots/add-expense-dark.png" alt="Add expense (dark)" width="140" />
+  <img src="screenshots/settlement-dark.png" alt="Settlement (dark)" width="140" />
+</p>
+
+<p align="center">
+  <sub>Welcome · Connection · Groups · Add expense · Settlement</sub>
+</p>
+
+</details>
 
 ---
 
@@ -79,7 +136,7 @@ Install from the in-app banner when offered (Chromium Android uses the native in
 
 | Option | |
 |--------|--|
-| **Obtainium** (recommended) | [Add Hisab](https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/Zyzto/Hisab) — tracks [GitHub Releases](https://github.com/Zyzto/Hisab/releases) |
+| **Obtainium** (recommended) | [![Obtainium](https://img.shields.io/badge/Obtainium-add-2E7D32?style=flat-square&logo=android&logoColor=white)](https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/Zyzto/Hisab/releases) — tracks [GitHub Releases](https://github.com/Zyzto/Hisab/releases) |
 | **APK** | Download `app-release.apk` from [latest release](https://github.com/Zyzto/Hisab/releases/latest) |
 | **Play Store** | [Listing](https://play.google.com/store/apps/details?id=com.shenepoy.hisab) (WIP / when published) |
 
@@ -87,7 +144,7 @@ Install from the in-app banner when offered (Chromium Android uses the native in
 
 ## Develop
 
-**Requirements:** Flutter / Dart `^3.10`
+**Requirements:** Flutter / Dart `^3.11`
 
 ```bash
 flutter pub get
