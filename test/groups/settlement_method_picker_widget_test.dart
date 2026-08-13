@@ -146,7 +146,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byIcon(Icons.bolt_outlined), findsWidgets);
-    // Live-plan chip only on Fewest payments.
+    // Live-plan chip only on Minimal moves (greedy).
     expect(
       find.text('settlement_live_plan_chip_reshuffle'.tr()),
       findsOneWidget,

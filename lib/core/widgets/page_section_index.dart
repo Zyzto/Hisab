@@ -5,13 +5,16 @@ import 'package:flutter/material.dart';
 class PageSectionIndexEntry {
   const PageSectionIndexEntry({
     required this.id,
-    required this.label,
+    required this.labelKey,
     required this.key,
     this.icon,
   });
 
   final String id;
-  final String label;
+
+  /// easy_localization key — translated inside the index so locale changes
+  /// refresh labels without waiting for a parent [setState].
+  final String labelKey;
   final GlobalKey key;
   final IconData? icon;
 }
@@ -31,6 +34,9 @@ class PageSectionIndex extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Depend on EasyLocalization so this rail rebuilds on language change.
+    // `.tr()` alone does not register an InheritedWidget dependency.
+    context.locale;
     if (entries.isEmpty) return const SizedBox.shrink();
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
@@ -133,6 +139,8 @@ class _PageSectionIndexOverlayState extends State<PageSectionIndexOverlay>
 
   @override
   Widget build(BuildContext context) {
+    // Depend on EasyLocalization so the pill/panel rebuilds on language change.
+    context.locale;
     if (widget.entries.isEmpty) return const SizedBox.shrink();
 
     final theme = Theme.of(context);
@@ -244,7 +252,7 @@ class _PageSectionIndexOverlayState extends State<PageSectionIndexOverlay>
                                           ),
                                     ),
                                     Text(
-                                      active.label,
+                                      active.labelKey.tr(),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: theme.textTheme.bodySmall
@@ -284,6 +292,7 @@ class _PopoverPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.locale;
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final maxH = MediaQuery.sizeOf(context).height * 0.45;
@@ -390,7 +399,7 @@ class _IndexLink extends StatelessWidget {
                 ],
                 Expanded(
                   child: Text(
-                    entry.label,
+                    entry.labelKey.tr(),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodyMedium?.copyWith(

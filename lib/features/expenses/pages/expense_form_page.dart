@@ -6,7 +6,7 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:custom_sliding_segmented_control/custom_sliding_segmented_control.dart';
-import 'package:easy_localization/easy_localization.dart';
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -105,6 +105,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
   late TransactionType _transactionTypeSegmentInitial;
   late final CustomSegmentedController<TransactionType>
   _transactionTypeSegmentController;
+  late SplitType _splitTypeSegmentInitial;
+  late final CustomSegmentedController<SplitType> _splitTypeSegmentController;
   bool _saving = false;
 
   bool _groupCurrencyInitialized = false;
@@ -156,6 +158,10 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
     _transactionTypeSegmentInitial = _transactionType;
     _transactionTypeSegmentController =
         CustomSegmentedController<TransactionType>(value: _transactionType);
+    _splitTypeSegmentInitial = _splitType;
+    _splitTypeSegmentController = CustomSegmentedController<SplitType>(
+      value: _splitType,
+    );
     _initExchangeAmountListener();
     if (widget.expenseId != null) {
       _loadExpenseForEdit();
@@ -211,6 +217,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
       _transactionTypeSegmentInitial = _transactionType;
       _transactionTypeSegmentController.value = _transactionType;
       _splitType = expense.splitType;
+      _splitTypeSegmentInitial = _splitType;
+      _splitTypeSegmentController.value = _splitType;
       _toParticipantId = expense.toParticipantId;
       _includedInSplitIds.addAll(expense.splitShares.keys);
       _previousParticipantIds = participants.map((p) => p.id).toSet();
@@ -271,6 +279,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
     }
     _lineItemControllers.clear();
     _transactionTypeSegmentController.dispose();
+    _splitTypeSegmentController.dispose();
     super.dispose();
   }
 
@@ -1406,6 +1415,10 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
                                             amountCents: amountCentsInt,
                                             currencyCode: currencyCode,
                                             splitType: _splitType,
+                                            splitTypeSegmentInitial:
+                                                _splitTypeSegmentInitial,
+                                            splitTypeController:
+                                                _splitTypeSegmentController,
                                             includedInSplitIds:
                                                 _includedInSplitIds,
                                             customSplitValues:
@@ -1445,8 +1458,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
                                             },
                                             getOrCreateFocusNode: (p) =>
                                                 _splitFocusNodes[p.id],
-                                            onSplitTypeTap: () =>
-                                                _showSplitTypePicker(context),
+                                            onSplitTypeChanged:
+                                                _onSplitTypeChanged,
                                             onIncludeChanged: (p, included) {
                                               setState(() {
                                                 if (included) {
@@ -2306,13 +2319,21 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
             child: Row(
               children: [
                 Expanded(
-                  child: Text(
-                    compactLabel,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyLarge,
+                  child: Align(
+                    // Keep LTR date text, but pin the block to the leading edge in RTL.
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: Text(
+                        compactLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyLarge,
+                      ),
+                    ),
                   ),
                 ),
+                const SizedBox(width: 8),
                 Icon(
                   Icons.calendar_today_rounded,
                   size: 18,
@@ -2367,42 +2388,26 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
     if (chosen != null) setState(() => _payerParticipantId = chosen);
   }
 
-  Future<void> _showSplitTypePicker(BuildContext context) async {
+  void _onSplitTypeChanged(SplitType chosen) {
+    if (chosen == _splitType) return;
     _defocusFormInputs();
-    final chosen = await showOptionPickerSheet<SplitType>(
-      context,
-      title: 'split_type'.tr(),
-      selected: _splitType,
-      options: [
-        for (final e in SplitType.values)
-          SheetPickerOption(
-            value: e,
-            label: e == SplitType.equal
-                ? 'equal'.tr()
-                : e == SplitType.parts
-                ? 'parts'.tr()
-                : 'amounts'.tr(),
-          ),
-      ],
-    );
-    if (chosen != null) {
-      setState(() {
-        _splitType = chosen;
-        _amountsManuallySetIds.clear();
-        _lastAmountCentsForAmounts = null;
-        if (chosen == SplitType.parts || chosen == SplitType.amounts) {
-          _amountsFieldsTouched = false;
-          for (final c in _splitEditControllers.values) {
-            c.dispose();
-          }
-          _splitEditControllers.clear();
-          for (final f in _splitFocusNodes.values) {
-            f.dispose();
-          }
-          _splitFocusNodes.clear();
-          _customSplitValues.clear();
+    setState(() {
+      _splitType = chosen;
+      _splitTypeSegmentController.value = chosen;
+      _amountsManuallySetIds.clear();
+      _lastAmountCentsForAmounts = null;
+      if (chosen == SplitType.parts || chosen == SplitType.amounts) {
+        _amountsFieldsTouched = false;
+        for (final c in _splitEditControllers.values) {
+          c.dispose();
         }
-      });
-    }
+        _splitEditControllers.clear();
+        for (final f in _splitFocusNodes.values) {
+          f.dispose();
+        }
+        _splitFocusNodes.clear();
+        _customSplitValues.clear();
+      }
+    });
   }
 }

@@ -159,7 +159,10 @@ void main() {
     expect(find.text('Bob', skipOffstage: false), findsOneWidget);
     expect(find.text('60%', skipOffstage: false), findsOneWidget);
     expect(find.text('40%', skipOffstage: false), findsOneWidget);
-    expect(_hasText(tester, const ['Equal', 'equal']), isTrue);
+    expect(
+      _hasText(tester, const ['Equally', 'equally', 'بالتساوي', 'equal']),
+      isTrue,
+    );
   });
 
   testWidgets('income shows received-by label', (tester) async {

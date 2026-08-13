@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' as ui;
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -22,12 +21,14 @@ import 'core/auth/oauth_web_url.dart';
 import 'core/constants/firebase_config.dart';
 import 'core/constants/supabase_config.dart';
 import 'core/database/database_providers.dart';
+import 'core/debug/marionette_binding.dart';
 import 'core/log_web.dart';
 import 'core/navigation/decorative_route.dart';
 import 'core/database/delete_db_file.dart';
 import 'core/image_picker_init.dart';
 import 'core/database/powersync_schema.dart' as ps;
 import 'core/services/notification_service.dart';
+import 'core/settings/initial_language.dart';
 import 'core/settings/providers/settings_framework_providers.dart';
 import 'core/settings/settings_definitions.dart';
 import 'app.dart';
@@ -279,30 +280,23 @@ void main() {
         // Run app — EasyLocalization stays mounted (no key change) to avoid
         // setState-after-dispose from its async asset loading. We sync locale
         // by calling setLocale when languageProvider changes (_LocaleSync).
-        // First initial language (onboarding, default): system locale if supported, else English.
+        //
+        // Language: follow the device language on first launch (en/ar). Once the
+        // user picks a language (or we seed from the platform), that stored value
+        // wins until they change it or reset settings.
         // --------------------------------------------------------------------------
-        if (settingsProviders != null &&
-            easyLocalizationReady &&
-            !settingsProviders.controller.get(onboardingCompletedSettingDef) &&
-            settingsProviders.controller.get(languageSettingDef) == 'en') {
-          final resolved = ui.PlatformDispatcher.instance
-              .computePlatformResolvedLocale(const [
-                Locale('en'),
-                Locale('ar'),
-              ]);
-          if (resolved != null) {
-            settingsProviders.controller.set(
-              languageSettingDef,
-              resolved.languageCode,
-            );
-            Log.info(
-              'Setting changed: ${languageSettingDef.key}=${resolved.languageCode} (platform)',
-            );
-          }
+        if (settingsProviders != null && easyLocalizationReady) {
+          await seedLanguageFromPlatformIfUnset(
+            settingsProviders.controller,
+          );
         }
         final startLocale = easyLocalizationReady && settingsProviders != null
             ? Locale(settingsProviders.controller.get(languageSettingDef))
-            : const Locale('en');
+            : Locale(
+                resolveInitialLanguageCode(
+                  platformLanguageCode: readPlatformUiLanguageCode(),
+                ),
+              );
 
         Log.info('main: Starting app (runApp)');
         runApp(
@@ -349,7 +343,7 @@ void main() {
       if (kIsWeb) {
         await runZoned(
           () async {
-            WidgetsFlutterBinding.ensureInitialized();
+            ensureHisabWidgetsBinding();
             initWebLogCapture();
             setupErrorHandlers();
             await runRestOfMain();
@@ -362,7 +356,7 @@ void main() {
           ),
         );
       } else {
-        WidgetsFlutterBinding.ensureInitialized();
+        ensureHisabWidgetsBinding();
         setupErrorHandlers();
         await runRestOfMain();
       }

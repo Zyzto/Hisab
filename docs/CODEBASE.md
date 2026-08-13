@@ -148,11 +148,12 @@ Expense form **photos**: add up to 5 images (camera or gallery on all platforms,
 ## Localization and RTL
 
 - Source of truth for language is settings key `language`.
+- First launch (no stored `language`): seed from device locale (`en`/`ar`) via `seedLanguageFromPlatformIfUnset` — see [I18N.md](I18N.md).
 - `_LocaleSync` (in `main.dart`) updates Easy Localization locale when provider changes.
 - `App` (`lib/app.dart`) intentionally reads locale from `context.locale` only.
 - Router refreshes on locale changes via `localeRefreshNotifier`.
 - Supported locales: English (`en`), Arabic (`ar`).
-- Strings live in `assets/translations/en.json` and `ar.json` (same key set). Production UI uses `.tr()`; keep both locale files in lockstep when adding keys.
+- Strings live in `assets/translations/en.json` and `ar.json` (same key set). Production UI uses `.tr()`; keep both locale files in lockstep when adding keys. JSON asset edits need hot **restart** / reinstall (not hot reload).
 - Special cases (FCM background isolate English fallbacks, debug menu, bug-report English markdown, stored default participant names): see [I18N.md](I18N.md).
 - Directional Material icons (`Icons.arrow_back`, `Icons.chevron_right`, etc.) already set `IconData.matchTextDirection`; do **not** pass `matchTextDirection` on the `Icon` widget (that named arg is not on `Icon` in current Flutter). Layout helpers (`ConstrainedContent.aside`, `ContentAlignedFabLocation`) place trailing chrome on the **end** side so Arabic mirrors correctly.
 

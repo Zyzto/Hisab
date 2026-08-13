@@ -111,25 +111,25 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final entries = <PageSectionIndexEntry>[
       PageSectionIndexEntry(
         id: 'account',
-        label: 'profile_index_account'.tr(),
+        labelKey: 'profile_index_account',
         key: _accountKey,
         icon: Icons.person_outline_rounded,
       ),
       PageSectionIndexEntry(
         id: 'overview',
-        label: 'profile_index_overview'.tr(),
+        labelKey: 'profile_index_overview',
         key: _overviewKey,
         icon: Icons.dashboard_outlined,
       ),
       PageSectionIndexEntry(
         id: 'analytics',
-        label: 'profile_my_analytics'.tr(),
+        labelKey: 'profile_my_analytics',
         key: _analyticsKey,
         icon: Icons.pie_chart_outline_rounded,
       ),
       PageSectionIndexEntry(
         id: 'expenses',
-        label: 'profile_my_expenses'.tr(),
+        labelKey: 'profile_my_expenses',
         key: _expensesKey,
         icon: Icons.receipt_long_outlined,
       ),
@@ -138,7 +138,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       entries.add(
         PageSectionIndexEntry(
           id: 'balances',
-          label: 'profile_balances'.tr(),
+          labelKey: 'profile_balances',
           key: _balancesKey,
           icon: Icons.account_balance_wallet_outlined,
         ),
@@ -148,7 +148,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       entries.add(
         PageSectionIndexEntry(
           id: 'budgets',
-          label: 'profile_personal_budgets'.tr(),
+          labelKey: 'profile_personal_budgets',
           key: _budgetsKey,
           icon: Icons.savings_outlined,
         ),
@@ -157,7 +157,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     entries.add(
       PageSectionIndexEntry(
         id: 'activity',
-        label: 'profile_recent_activity'.tr(),
+        labelKey: 'profile_recent_activity',
         key: _activityKey,
         icon: Icons.notifications_none_rounded,
       ),
@@ -166,7 +166,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       entries.add(
         PageSectionIndexEntry(
           id: 'groups',
-          label: 'profile_your_groups'.tr(),
+          labelKey: 'profile_your_groups',
           key: _groupsKey,
           icon: Icons.groups_outlined,
         ),
@@ -230,6 +230,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    // Rebuild when language changes so section headings refresh with the locale.
+    context.locale;
     final dashboardAsync = ref.watch(profileDashboardProvider);
     final activityAsync = ref.watch(profileActivityProvider);
     final data = dashboardAsync.asData?.value;

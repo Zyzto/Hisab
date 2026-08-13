@@ -303,10 +303,10 @@ void main() {
           );
           await enterTextAndPump(tester, find.byType(TextField).at(1), '90');
 
-          await scrollUntilVisible(tester, find.text('Equal'));
-          await tapAndSettle(tester, find.text('Equal'));
-          await waitForWidget(tester, find.text('Parts'));
-          await tapAndSettle(tester, find.text('Parts'));
+          await scrollUntilVisible(tester, find.text('Equally'));
+          await tapAndSettle(tester, find.text('Equally'));
+          await waitForWidget(tester, find.text('Shares'));
+          await tapAndSettle(tester, find.text('Shares'));
 
           // Verify parts stepper controls are tappable in integration flow.
           await waitForWidget(tester, find.byTooltip('Increase part'));
@@ -335,10 +335,10 @@ void main() {
           );
           await enterTextAndPump(tester, find.byType(TextField).at(1), '50');
 
-          await scrollUntilVisible(tester, find.text('Equal'));
-          await tapAndSettle(tester, find.text('Equal'));
-          await waitForWidget(tester, find.text('Amounts'));
-          await tapAndSettle(tester, find.text('Amounts'));
+          await scrollUntilVisible(tester, find.text('Equally'));
+          await tapAndSettle(tester, find.text('Equally'));
+          await waitForWidget(tester, find.text('Exact amounts'));
+          await tapAndSettle(tester, find.text('Exact amounts'));
 
           await tapSubmitExpenseButton(tester);
           await ensureFormClosed(tester);

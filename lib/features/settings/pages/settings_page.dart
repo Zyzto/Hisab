@@ -30,6 +30,7 @@ import '../../../core/services/delete_my_data_service.dart';
 import '../../../core/services/github_user_client.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/utils/currency_helpers.dart';
+import 'package:hisab/core/settings/initial_language.dart';
 import 'package:hisab/core/settings/settings_definitions.dart';
 import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 import '../backup_ui.dart';
@@ -147,7 +148,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       for (final section in sections)
         PageSectionIndexEntry(
           id: section.key,
-          label: section.titleKey.tr(),
+          labelKey: section.titleKey,
           key: _sectionKeys[section.key]!,
           icon: section.icon,
         ),
@@ -347,6 +348,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Rebuild when language changes so section titles (and search copy) refresh.
+    // Index labels depend on locale inside [PageSectionIndex] itself.
+    context.locale;
     final settings = ref.watch(hisabSettingsProvidersProvider);
 
     if (settings == null) {
@@ -746,6 +750,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
     if (confirmed != true || !context.mounted) return;
     await settings.controller.resetAll();
+    // Language has no stored value after reset — follow the device again.
+    await seedLanguageFromPlatformIfUnset(settings.controller);
     Log.info('Setting changed: reset_all');
     if (!context.mounted) return;
     // _LocaleSync handles locale sync automatically via languageProvider

@@ -98,7 +98,7 @@ void main() {
         toName: 'Bob',
         translate: _translateFrom(ar),
       ),
-      'تصفية: Alice ← Bob',
+      'تصفية: من Alice إلى Bob',
     );
   });
 

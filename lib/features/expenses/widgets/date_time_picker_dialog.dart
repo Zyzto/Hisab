@@ -1,4 +1,4 @@
-import 'package:easy_localization/easy_localization.dart';
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -219,10 +219,13 @@ class _DateTimePickerSheetContentState
                 Icon(Icons.event_rounded, color: cs.primary, size: 20),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
-                    _summaryLabel(use24h),
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
+                  child: Directionality(
+                    textDirection: TextDirection.ltr,
+                    child: Text(
+                      _summaryLabel(use24h),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),
@@ -341,6 +344,23 @@ class _TimePickerPanel extends StatelessWidget {
       return use24h ? DateFormat.Hm().format(t) : DateFormat.jm().format(t);
     }();
 
+    final captionStyle = theme.textTheme.labelSmall?.copyWith(
+      color: cs.onSurfaceVariant,
+      fontWeight: FontWeight.w600,
+    );
+    const colonSlotWidth = 20.0;
+
+    Widget columnCaption(String label) => Expanded(
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: captionStyle,
+          ),
+        );
+
+    // Keep hour:minute order in RTL locales; captions stay aligned to columns.
     return Semantics(
       label: 'time'.tr(),
       value: timeValue,
@@ -365,97 +385,127 @@ class _TimePickerPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          Container(
-            height: _panelHeight,
-            decoration: BoxDecoration(
-              color: cs.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            clipBehavior: Clip.hardEdge,
-            child: Stack(
-              alignment: Alignment.center,
+          Directionality(
+            textDirection: TextDirection.ltr,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Shared selection band across all columns.
-                Positioned(
-                  left: 12,
-                  right: 12,
-                  top: (_panelHeight - _itemExtent) / 2,
-                  height: _itemExtent,
-                  child: IgnorePointer(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: cs.primaryContainer.withValues(alpha: 0.45),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                ),
                 Row(
                   children: [
-                    Expanded(
-                      child: _TimeColumn<int>(
-                        items: use24h
-                            ? List.generate(24, (i) => i)
-                            : List.generate(12, (i) => i == 0 ? 12 : i),
-                        value: use24h ? hour24 : hour12Value,
-                        onChanged: onHourChanged,
-                        format: (v) =>
-                            use24h ? v.toString().padLeft(2, '0') : '$v',
-                        itemExtent: _itemExtent,
-                        semanticLabel: 'hour'.tr(),
-                      ),
-                    ),
-                    IgnorePointer(
-                      child: Text(
-                        ':',
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          color: cs.primary,
-                          fontWeight: FontWeight.w700,
-                          height: 1,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: _TimeColumn<int>(
-                        items: List.generate(60, (i) => i),
-                        value: minute,
-                        onChanged: onMinuteChanged,
-                        format: (v) => v.toString().padLeft(2, '0'),
-                        itemExtent: _itemExtent,
-                        semanticLabel: 'minute'.tr(),
-                      ),
-                    ),
-                    if (!use24h)
-                      Expanded(
-                        child: _TimeColumn<DayPeriod>(
-                          items: const [DayPeriod.am, DayPeriod.pm],
-                          value: isAm ? DayPeriod.am : DayPeriod.pm,
-                          onChanged: (v) => onPeriodChanged(v == DayPeriod.am),
-                          format: (v) => v == DayPeriod.am ? 'AM' : 'PM',
-                          itemExtent: _itemExtent,
-                          semanticLabel: 'period'.tr(),
-                        ),
-                      ),
+                    columnCaption('hour'.tr()),
+                    const SizedBox(width: colonSlotWidth),
+                    columnCaption('minute'.tr()),
+                    if (!use24h) columnCaption('period'.tr()),
                   ],
                 ),
-                // Soft fade above wheels so edge numbers recede.
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            cs.surfaceContainerHighest,
-                            cs.surfaceContainerHighest.withValues(alpha: 0),
-                            cs.surfaceContainerHighest.withValues(alpha: 0),
-                            cs.surfaceContainerHighest,
-                          ],
-                          stops: const [0, 0.28, 0.72, 1],
+                const SizedBox(height: 6),
+                Container(
+                  height: _panelHeight,
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  clipBehavior: Clip.hardEdge,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Positioned(
+                        left: 12,
+                        right: 12,
+                        top: (_panelHeight - _itemExtent) / 2,
+                        height: _itemExtent,
+                        child: IgnorePointer(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: cs.primaryContainer.withValues(alpha: 0.45),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _TimeColumn<int>(
+                              items: use24h
+                                  ? List.generate(24, (i) => i)
+                                  : List.generate(12, (i) => i == 0 ? 12 : i),
+                              value: use24h ? hour24 : hour12Value,
+                              onChanged: onHourChanged,
+                              format: (v) => use24h
+                                  ? v.toString().padLeft(2, '0')
+                                  : '$v',
+                              itemExtent: _itemExtent,
+                              semanticLabel: 'hour'.tr(),
+                            ),
+                          ),
+                          IgnorePointer(
+                            child: SizedBox(
+                              width: colonSlotWidth,
+                              child: Text(
+                                ':',
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.headlineSmall?.copyWith(
+                                  color: cs.primary,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: _TimeColumn<int>(
+                              items: List.generate(60, (i) => i),
+                              value: minute,
+                              onChanged: onMinuteChanged,
+                              format: (v) => v.toString().padLeft(2, '0'),
+                              itemExtent: _itemExtent,
+                              semanticLabel: 'minute'.tr(),
+                            ),
+                          ),
+                          if (!use24h)
+                            Expanded(
+                              child: _TimeColumn<DayPeriod>(
+                                items: const [DayPeriod.am, DayPeriod.pm],
+                                value: isAm ? DayPeriod.am : DayPeriod.pm,
+                                onChanged: (v) =>
+                                    onPeriodChanged(v == DayPeriod.am),
+                                format: (v) {
+                                  final isAr =
+                                      context.locale.languageCode == 'ar';
+                                  if (isAr) {
+                                    return v == DayPeriod.am ? 'ص' : 'م';
+                                  }
+                                  return v == DayPeriod.am ? 'AM' : 'PM';
+                                },
+                                itemExtent: _itemExtent,
+                                semanticLabel: 'period'.tr(),
+                              ),
+                            ),
+                        ],
+                      ),
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  cs.surfaceContainerHighest,
+                                  cs.surfaceContainerHighest
+                                      .withValues(alpha: 0),
+                                  cs.surfaceContainerHighest
+                                      .withValues(alpha: 0),
+                                  cs.surfaceContainerHighest,
+                                ],
+                                stops: const [0, 0.28, 0.72, 1],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],

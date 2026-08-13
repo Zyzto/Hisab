@@ -1,7 +1,7 @@
 name: hisab
 description: "Group expense splitting and settle-up app."
 publish_to: 'none'
-version: 0.7.14+84
+version: 0.7.15+85
 
 environment:
   sdk: ^3.11.0
@@ -109,6 +109,9 @@ dependencies:
   # OS screenshot detection (iOS + Android 14+); detection only, never prevention
   ss_preventer: ^0.1.2
 
+  # AI-agent E2E (debug only via MarionetteBinding)
+  marionette_flutter: ^0.6.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -124,6 +127,7 @@ dev_dependencies:
   build_runner: ^2.13.1
   riverpod_generator: ^4.0.3
   flutter_launcher_icons: ^0.14.4
+  marionette_mcp: ^0.6.0
 
 # Tracked: langchain_google latest (0.7.1+2) still needs googleai_dart 3.0.0 — ApiException.code renamed in 3.6.
 dependency_overrides:

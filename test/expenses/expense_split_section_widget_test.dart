@@ -1,3 +1,4 @@
+import 'package:custom_sliding_segmented_control/custom_sliding_segmented_control.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -39,6 +40,8 @@ void main() {
     Map<String, String>? customSplitValues,
     Map<String, TextEditingController>? splitEditControllers,
     Map<String, FocusNode>? splitFocusNodes,
+    CustomSegmentedController<SplitType>? splitTypeController,
+    ValueChanged<SplitType>? onSplitTypeChanged,
   }) {
     final sharesCents = splitType == SplitType.equal
         ? [2500, 2500]
@@ -46,19 +49,24 @@ void main() {
     customSplitValues ??= {};
     splitEditControllers ??= {};
     splitFocusNodes ??= {};
+    final controller =
+        splitTypeController ??
+        CustomSegmentedController<SplitType>(value: splitType);
     return ExpenseSplitSection(
       participants: participants,
       sharesCents: sharesCents,
       amountCents: 5000,
       currencyCode: 'USD',
       splitType: splitType,
+      splitTypeSegmentInitial: splitType,
+      splitTypeController: controller,
       includedInSplitIds: includedInSplitIds,
       customSplitValues: customSplitValues,
       splitEditControllers: splitEditControllers,
       splitFocusNodes: splitFocusNodes,
       getOrCreateController: (_) => null,
       getOrCreateFocusNode: (_) => null,
-      onSplitTypeTap: () {},
+      onSplitTypeChanged: onSplitTypeChanged ?? (_) {},
       onIncludeChanged: (_, _) {},
       onAmountChanged: (_, _, _, _) {},
       onPartsChanged: (_, _) {},
@@ -67,6 +75,10 @@ void main() {
   }
 
   testWidgets('ExpenseSplitSection shows split label', (tester) async {
+    final controller = CustomSegmentedController<SplitType>(
+      value: SplitType.equal,
+    );
+    addTearDown(controller.dispose);
     await tester.pumpWidget(
       EasyLocalization(
         path: 'assets/translations',
@@ -79,6 +91,7 @@ void main() {
               child: buildSplitSection(
                 splitType: SplitType.equal,
                 includedInSplitIds: {'p1', 'p2'},
+                splitTypeController: controller,
               ),
             ),
           ),
@@ -92,6 +105,10 @@ void main() {
   testWidgets('ExpenseSplitSection shows participant names for equal split', (
     tester,
   ) async {
+    final controller = CustomSegmentedController<SplitType>(
+      value: SplitType.equal,
+    );
+    addTearDown(controller.dispose);
     await tester.pumpWidget(
       EasyLocalization(
         path: 'assets/translations',
@@ -104,6 +121,7 @@ void main() {
               child: buildSplitSection(
                 splitType: SplitType.equal,
                 includedInSplitIds: {'p1', 'p2'},
+                splitTypeController: controller,
               ),
             ),
           ),
@@ -113,6 +131,70 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Alice'), findsOneWidget);
     expect(find.text('Bob'), findsOneWidget);
+  });
+
+  testWidgets('split type short segment labels render', (tester) async {
+    final controller = CustomSegmentedController<SplitType>(
+      value: SplitType.equal,
+    );
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      EasyLocalization(
+        path: 'assets/translations',
+        supportedLocales: const [Locale('en')],
+        fallbackLocale: const Locale('en'),
+        startLocale: const Locale('en'),
+        child: MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: buildSplitSection(
+                splitType: SplitType.equal,
+                includedInSplitIds: {'p1', 'p2'},
+                splitTypeController: controller,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    // Widget tests often leave .tr() as the key (no asset load).
+    expect(find.text('equal_short'), findsOneWidget);
+    expect(find.text('parts_short'), findsOneWidget);
+    expect(find.text('amounts_short'), findsOneWidget);
+  });
+
+  testWidgets('split type segment change invokes callback', (tester) async {
+    final controller = CustomSegmentedController<SplitType>(
+      value: SplitType.equal,
+    );
+    addTearDown(controller.dispose);
+    SplitType? changed;
+    await tester.pumpWidget(
+      EasyLocalization(
+        path: 'assets/translations',
+        supportedLocales: const [Locale('en')],
+        fallbackLocale: const Locale('en'),
+        startLocale: const Locale('en'),
+        child: MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: buildSplitSection(
+                splitType: SplitType.equal,
+                includedInSplitIds: {'p1', 'p2'},
+                splitTypeController: controller,
+                onSplitTypeChanged: (type) => changed = type,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('parts_short'));
+    await tester.pumpAndSettle();
+    expect(changed, SplitType.parts);
   });
 
   testWidgets('parts split +/- buttons update parts value', (tester) async {
@@ -126,6 +208,19 @@ void main() {
       'p2': FocusNode(),
     };
     final updates = <String>[];
+    final splitTypeController = CustomSegmentedController<SplitType>(
+      value: SplitType.parts,
+    );
+
+    addTearDown(() {
+      for (final c in controllers.values) {
+        c.dispose();
+      }
+      for (final f in focusNodes.values) {
+        f.dispose();
+      }
+      splitTypeController.dispose();
+    });
 
     await tester.pumpWidget(
       EasyLocalization(
@@ -142,13 +237,15 @@ void main() {
                 amountCents: 5000,
                 currencyCode: 'USD',
                 splitType: SplitType.parts,
+                splitTypeSegmentInitial: SplitType.parts,
+                splitTypeController: splitTypeController,
                 includedInSplitIds: const {'p1', 'p2'},
                 customSplitValues: customSplitValues,
                 splitEditControllers: controllers,
                 splitFocusNodes: focusNodes,
                 getOrCreateController: (p) => controllers[p.id],
                 getOrCreateFocusNode: (p) => focusNodes[p.id],
-                onSplitTypeTap: () {},
+                onSplitTypeChanged: (_) {},
                 onIncludeChanged: (_, _) {},
                 onAmountChanged: (_, _, _, _) {},
                 onPartsChanged: (p, v) {
@@ -173,12 +270,5 @@ void main() {
     await tester.pumpAndSettle();
     expect(updates.last, 'p1:1');
     expect(customSplitValues['p1'], '1');
-
-    for (final c in controllers.values) {
-      c.dispose();
-    }
-    for (final f in focusNodes.values) {
-      f.dispose();
-    }
   });
 }
