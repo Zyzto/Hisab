@@ -289,6 +289,8 @@
   "import_data_subtitle": "Restore from a previously exported backup",
   "version": "Version",
   "licenses": "Licenses",
+  "source_code": "Source Code",
+  "source_code_description": "Browse the app source on GitHub",
   "about_me": "About Me",
   "about_me_description": "Developer info from GitHub",
   "about_me_summary": "I am a researcher and developer skilled in Dart, Rust, and AI. I build diverse projects, from mobile apps to server tools, while exploring 3D printing, virtual cycling, and mastering multiple languages.",

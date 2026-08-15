@@ -81,7 +81,7 @@ final class GroupBalanceProvider
   }
 }
 
-String _$groupBalanceHash() => r'66828f609c2591d125635fe39e5730a36c9b4434';
+String _$groupBalanceHash() => r'79d6f245f26389b76a4b06454fae73b6398b46e5';
 
 /// Computed provider for group balances and settlements. Caches computation
 /// and recomputes when group, participants, or expenses change.

@@ -1347,8 +1347,8 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
   String _ownerTreasurerLabel() {
     final user = ref.read(authServiceProvider).currentUser;
     final raw =
-        user?.userMetadata?['display_name'] as String? ??
-        user?.userMetadata?['full_name'] as String? ??
+        user?.metadata['display_name'] as String? ??
+        user?.fullName ??
         user?.email;
     final trimmed = raw?.trim();
     if (trimmed != null && trimmed.isNotEmpty) return trimmed;

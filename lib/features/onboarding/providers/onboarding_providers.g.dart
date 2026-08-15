@@ -8,32 +8,30 @@ part of 'onboarding_providers.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Whether online mode is available (Supabase configured via --dart-define).
+/// Whether this build has a cloud backend, and so can offer online mode.
 
-@ProviderFor(supabaseConfigAvailableOnboarding)
-final supabaseConfigAvailableOnboardingProvider =
-    SupabaseConfigAvailableOnboardingProvider._();
+@ProviderFor(cloudAvailableOnboarding)
+final cloudAvailableOnboardingProvider = CloudAvailableOnboardingProvider._();
 
-/// Whether online mode is available (Supabase configured via --dart-define).
+/// Whether this build has a cloud backend, and so can offer online mode.
 
-final class SupabaseConfigAvailableOnboardingProvider
+final class CloudAvailableOnboardingProvider
     extends $FunctionalProvider<bool, bool, bool>
     with $Provider<bool> {
-  /// Whether online mode is available (Supabase configured via --dart-define).
-  SupabaseConfigAvailableOnboardingProvider._()
+  /// Whether this build has a cloud backend, and so can offer online mode.
+  CloudAvailableOnboardingProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'supabaseConfigAvailableOnboardingProvider',
+        name: r'cloudAvailableOnboardingProvider',
         isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() =>
-      _$supabaseConfigAvailableOnboardingHash();
+  String debugGetCreateSourceHash() => _$cloudAvailableOnboardingHash();
 
   @$internal
   @override
@@ -42,7 +40,7 @@ final class SupabaseConfigAvailableOnboardingProvider
 
   @override
   bool create(Ref ref) {
-    return supabaseConfigAvailableOnboarding(ref);
+    return cloudAvailableOnboarding(ref);
   }
 
   /// {@macro riverpod.override_with_value}
@@ -54,5 +52,5 @@ final class SupabaseConfigAvailableOnboardingProvider
   }
 }
 
-String _$supabaseConfigAvailableOnboardingHash() =>
-    r'a30394b5fc0d0cae3a84849c30aff802400fa94d';
+String _$cloudAvailableOnboardingHash() =>
+    r'a6f104c98f78094888c8e9f6bdd6ccce3fa519c5';

@@ -2,22 +2,53 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hisab/core/database/sync_errors.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 
 void main() {
   group('sync error classification', () {
-    test('AuthException is auth error', () {
+    test('auth CloudException is an auth error', () {
       expect(
-        isSyncAuthError(const AuthException('x', statusCode: '401')),
+        isSyncAuthError(
+          const CloudException(
+            'x',
+            kind: CloudErrorKind.auth,
+            statusCode: 401,
+          ),
+        ),
         true,
       );
       expect(
-        isSyncAuthError(const AuthException('x', statusCode: '403')),
+        isSyncAuthError(
+          const CloudException(
+            'x',
+            kind: CloudErrorKind.auth,
+            statusCode: 403,
+          ),
+        ),
         true,
       );
       expect(
-        isSyncTransientError(const AuthException('x', statusCode: '401')),
+        isSyncTransientError(
+          const CloudException(
+            'x',
+            kind: CloudErrorKind.auth,
+            statusCode: 401,
+          ),
+        ),
         false,
+      );
+    });
+
+    test('kind alone classifies when no status code is carried', () {
+      expect(
+        isSyncAuthError(const CloudException('x', kind: CloudErrorKind.auth)),
+        true,
+      );
+      expect(
+        isSyncTransientError(
+          const CloudException('x', kind: CloudErrorKind.network),
+        ),
+        true,
       );
     });
 
@@ -26,13 +57,25 @@ void main() {
       expect(isSyncAuthError(TimeoutException('x')), false);
     });
 
-    test('syncErrorStatusCode extracts from AuthException', () {
+    test('syncErrorStatusCode extracts from CloudException', () {
       expect(
-        syncErrorStatusCode(const AuthException('x', statusCode: '401')),
+        syncErrorStatusCode(
+          const CloudException(
+            'x',
+            kind: CloudErrorKind.auth,
+            statusCode: 401,
+          ),
+        ),
         401,
       );
       expect(
-        syncErrorStatusCode(const AuthException('x', statusCode: '403')),
+        syncErrorStatusCode(
+          const CloudException(
+            'x',
+            kind: CloudErrorKind.auth,
+            statusCode: 403,
+          ),
+        ),
         403,
       );
     });

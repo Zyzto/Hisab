@@ -4,11 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Redirecting...</title>
+<!--
+  Server-rendered invite preview hand-off.
+
+  A cloud build injects the backend's invite-redirect endpoint into
+  __CLOUD_INVITE_RESOLVER_URL__ before uploading this file as
+  /invite-redirect.html; see docs/BACKEND_BEHAVIOUR.md for the endpoint
+  contract. The offline build never deploys it, because there is no backend
+  to resolve the token against.
+-->
 <script>
 (function() {
-  var base = "__SUPABASE_URL__".replace(/\/$/, "");
-  var target = base + "/functions/v1/invite-redirect" + (window.location.search || "");
-  window.location.replace(target);
+  var resolver = "__CLOUD_INVITE_RESOLVER_URL__".replace(/\/$/, "");
+  if (resolver.indexOf("__") === 0) return;
+  window.location.replace(resolver + (window.location.search || ""));
 })();
 </script>
 </head>

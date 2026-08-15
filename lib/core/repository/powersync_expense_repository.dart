@@ -6,16 +6,16 @@ part of 'powersync_repository.dart';
 
 class PowerSyncExpenseRepository implements IExpenseRepository {
   final PowerSyncDatabase _db;
-  final SupabaseClient? _client;
+  final CloudBackend? _cloud;
   final bool _isOnline;
   final bool _isLocalOnly;
 
   PowerSyncExpenseRepository(
     this._db, {
-    SupabaseClient? client,
+    CloudBackend? cloud,
     bool isOnline = false,
     bool isLocalOnly = true,
-  }) : _client = client,
+  }) : _cloud = cloud,
        _isOnline = isOnline,
        _isLocalOnly = isLocalOnly;
 
@@ -128,9 +128,9 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
       'updated_at': now,
     };
 
-    if (!_isLocalOnly && _isOnline && _client != null) {
+    if (!_isLocalOnly && _isOnline && _cloud != null) {
       // Online: write to Supabase first
-      await _client.from('expenses').insert(data);
+      await _cloud.sync.upsert('expenses', data);
     } else if (!_isLocalOnly && !_isOnline) {
       // Online mode but temporarily offline: queue for later push
       await _enqueue(
@@ -204,10 +204,8 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
     final imagePathsJson = imagePaths != null ? jsonEncode(imagePaths) : null;
     final currencyCode = expense.currencyCode.trim().toUpperCase();
 
-    if (!_isLocalOnly && _isOnline && _client != null) {
-      await _client
-          .from('expenses')
-          .update({
+    if (!_isLocalOnly && _isOnline && _cloud != null) {
+      await _cloud.sync.update('expenses', {
             'title': title,
             'amount_cents': expense.amountCents,
             'currency_code': currencyCode,
@@ -225,8 +223,7 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
             'image_path': imagePath,
             'image_paths': imagePathsJson,
             'updated_at': now,
-          })
-          .eq('id', expense.id);
+          }, expense.id);
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,
       isOnline: _isOnline,
@@ -292,8 +289,8 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
 
   @override
   Future<void> delete(String id) async {
-    if (!_isLocalOnly && _isOnline && _client != null) {
-      await _client.from('expenses').delete().eq('id', id);
+    if (!_isLocalOnly && _isOnline && _cloud != null) {
+      await _cloud.sync.delete('expenses', id);
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,
       isOnline: _isOnline,

@@ -20,7 +20,7 @@ import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
-import '../../../core/constants/supabase_config.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/platform/network_image_decode.dart';
@@ -603,7 +603,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           onResetAllSettings: () => _resetAllSettings(context, ref, settings),
           onDeleteLocalData: () => _showDeleteLocalData(context, ref),
           onDeleteCloudData: () => _showDeleteCloudData(context, ref),
-          supabaseAvailable: supabaseConfigAvailable,
+          supabaseAvailable: cloudAvailable,
           isSignedIn: ref.watch(currentUserProvider) != null,
           anchors: _anchors,
         ),
@@ -918,7 +918,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     WidgetRef ref,
     SettingsProviders settings,
   ) {
-    final onlineAvailable = supabaseConfigAvailable;
+    final onlineAvailable = cloudAvailable;
     final value = ref.watch(settings.provider(localOnlySettingDef));
     String subtitle = 'local_only_description'.tr();
     if (!onlineAvailable) {
@@ -1425,6 +1425,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
           ),
           _anchors.wrap(
+            actionSourceCodeSettingDef.key,
+            NavigationSettingsTile(
+              leading: const Icon(Icons.code_outlined),
+              title: Text('source_code'.tr()),
+              subtitle: Text('source_code_description'.tr()),
+              onTap: () => _openSourceCodeLink(context),
+            ),
+          ),
+          _anchors.wrap(
             actionAboutMeSettingDef.key,
             NavigationSettingsTile(
               leading: const Icon(Icons.person_outline),
@@ -1646,6 +1655,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       Log.warning('Open donate link failed', error: e, stackTrace: st);
       if (context.mounted) {
         context.showToast('donate'.tr());
+      }
+    }
+  }
+
+  static Future<void> _openSourceCodeLink(BuildContext context) async {
+    final uri = Uri.parse(sourceCodeUrl);
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e, st) {
+      Log.warning('Open source link failed', error: e, stackTrace: st);
+      if (context.mounted) {
+        context.showToast(sourceCodeUrl);
       }
     }
   }

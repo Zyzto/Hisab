@@ -1,0 +1,10 @@
+name: hisab_backend
+description: "Backend contract for Hisab: the interfaces a cloud provider must implement."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.11.0
+
+dev_dependencies:
+  lints: ^6.0.0

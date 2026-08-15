@@ -2,16 +2,16 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../layout/layout_breakpoints.dart';
 import '../layout/responsive_sheet.dart';
 import '../settings/providers/settings_framework_providers.dart';
-import '../constants/supabase_config.dart';
 import '../services/connectivity_service.dart';
 import '../services/firebase_status_client.dart';
 import '../services/status_page_client.dart';
-import '../services/supabase_project_health_client.dart';
+import '../services/cloud_health_client.dart';
 
 const _supabaseStatusUrl = 'https://status.supabase.com';
 const _firebaseStatusUrl = 'https://status.firebase.google.com';
@@ -21,8 +21,11 @@ const _geminiStatusUrl = 'https://status.cloud.google.com';
 /// Hours window for "recent" incidents in the modal.
 const _recentIncidentsHours = 6;
 
-/// Shows a bottom sheet with Supabase and Firebase status, links to status
-/// pages, and recent incidents (Supabase only). Call from [SyncStatusChip] onTap.
+/// Shows a bottom sheet with backend and Firebase status, links to status
+/// pages, and recent incidents. Call from [SyncStatusChip] onTap.
+///
+/// The hosted-backend rows are hidden entirely in an offline build, which has
+/// no backend whose status could be relevant.
 void showServicesStatusSheet(BuildContext context, WidgetRef ref) {
   showResponsiveSheet<void>(
     context: context,
@@ -46,14 +49,16 @@ class _ServicesStatusSheet extends ConsumerStatefulWidget {
 class _ServicesStatusSheetState extends ConsumerState<_ServicesStatusSheet> {
   Future<StatusPageResult>? _supabaseFuture;
   Future<FirebaseStatusResult>? _firebaseFuture;
-  Future<SupabaseProjectHealthResult>? _projectHealthFuture;
+  Future<CloudHealthResult>? _projectHealthFuture;
 
   @override
   void initState() {
     super.initState();
-    _supabaseFuture = fetchSupabaseStatus();
+    if (cloudAvailable) {
+      _supabaseFuture = fetchSupabaseStatus();
+      _projectHealthFuture = fetchCloudHealth();
+    }
     _firebaseFuture = fetchFirebaseStatus();
-    _projectHealthFuture = fetchSupabaseProjectHealth();
   }
 
   @override
@@ -98,26 +103,26 @@ class _ServicesStatusSheetState extends ConsumerState<_ServicesStatusSheet> {
                 ),
               ),
               const SizedBox(height: 8),
-              FutureBuilder<StatusPageResult>(
-                future: _supabaseFuture,
-                builder: (context, snapshot) {
-                  return _ServiceRow(
-                    name: 'service_supabase'.tr(),
-                    result: snapshot.data,
-                    statusPageUrl: _supabaseStatusUrl,
-                  );
-                },
-              ),
-              if (supabaseConfigAvailable) ...[
+              if (cloudAvailable) ...[
+                FutureBuilder<StatusPageResult>(
+                  future: _supabaseFuture,
+                  builder: (context, snapshot) {
+                    return _ServiceRow(
+                      name: 'service_supabase'.tr(),
+                      result: snapshot.data,
+                      statusPageUrl: _supabaseStatusUrl,
+                    );
+                  },
+                ),
                 const SizedBox(height: 12),
-                FutureBuilder<SupabaseProjectHealthResult>(
+                FutureBuilder<CloudHealthResult>(
                   future: _projectHealthFuture,
                   builder: (context, snapshot) {
                     return _ProjectHealthRow(result: snapshot.data);
                   },
                 ),
+                const SizedBox(height: 12),
               ],
-              const SizedBox(height: 12),
               FutureBuilder<FirebaseStatusResult>(
                 future: _firebaseFuture,
                 builder: (context, snapshot) {
@@ -513,7 +518,7 @@ class _FirebaseServiceRow extends StatelessWidget {
 class _ProjectHealthRow extends StatelessWidget {
   const _ProjectHealthRow({required this.result});
 
-  final SupabaseProjectHealthResult? result;
+  final CloudHealthResult? result;
 
   @override
   Widget build(BuildContext context) {
@@ -527,11 +532,11 @@ class _ProjectHealthRow extends StatelessWidget {
     if (result == null) {
       statusText = 'services_status_loading'.tr();
       statusColor = cs.onSurfaceVariant;
-    } else if (result is SupabaseProjectHealthPaused) {
+    } else if (result!.status == CloudHealthStatus.paused) {
       statusText = 'services_status_project_paused'.tr();
       statusColor = cs.error;
       hint = 'services_status_project_paused_hint'.tr();
-    } else if (result is SupabaseProjectHealthActive) {
+    } else if (result!.status == CloudHealthStatus.active) {
       statusText = 'services_status_project_active'.tr();
       statusColor = cs.primary;
     } else {

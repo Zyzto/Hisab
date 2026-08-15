@@ -29,6 +29,18 @@ const _messagingSenderId = String.fromEnvironment(
 );
 const _appId = String.fromEnvironment('FIREBASE_APP_ID', defaultValue: '');
 
+/// VAPID key for Firebase Cloud Messaging on web.
+/// Firebase Console → Project Settings → Cloud Messaging → Web Push certificates.
+/// Required for `FirebaseMessaging.instance.getToken(vapidKey: ...)` on web.
+const fcmVapidKey = String.fromEnvironment('FCM_VAPID_KEY', defaultValue: '');
+
+/// Set to true after `Firebase.initializeApp()` succeeds in `main()`.
+///
+/// Push *display* is client-side and independent of the backend, but there is
+/// nothing to display without Firebase, so notification code checks this as
+/// well as `cloudAvailable`.
+bool firebaseInitialized = false;
+
 /// Returns [FirebaseOptions] for web when all required values are set.
 /// On non-web, or when config is missing (e.g. no dart-define), returns null.
 FirebaseOptions? get firebaseOptionsForWeb {

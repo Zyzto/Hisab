@@ -73,9 +73,10 @@ Keys `privacy_policy_*` use **legal-formal MSA** only—no Spacetoon flair, no m
 
 When product labels change in UI (e.g. إشعارات فورية, إيصالات), update the same terms inside privacy bodies so Settings paths stay accurate. Do **not** change legal meaning. Keep [PLAY_CONSOLE_DECLARATIONS.md](PLAY_CONSOLE_DECLARATIONS.md) sync in mind (`en` / `ar` / `web/privacy`).
 
-## Push notifications (Edge)
+## Push notifications (server side)
 
-Arabic strings in `supabase/functions/send-notification` (`NOTIFICATION_STRINGS.ar`) must stay aligned with app keys:
+Push copy is composed on the server, not in the app, so a backend keeps its own
+Arabic strings. They must stay aligned with these app keys:
 
 - `notification_expense_updated`
 - `notification_expense_deleted`
@@ -90,4 +91,4 @@ Keep push prefixes short.
 - [ ] No dialect / no English calques
 - [ ] Errors encouraging where space allows
 - [ ] Privacy keys legal-formal; product terms synced
-- [ ] Edge AR updated if notification copy changed
+- [ ] Backend Arabic push copy updated if notification wording changed

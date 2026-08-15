@@ -4,11 +4,10 @@ import 'dart:convert';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter_logging_service/flutter_logging_service.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 import 'package:powersync/powersync.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
-import '../constants/supabase_config.dart';
 import '../utils/user_text.dart';
 import '../../domain/domain.dart';
 import 'group_repository.dart';

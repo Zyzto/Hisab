@@ -26,12 +26,11 @@ The same domain entity (`Group`) and the same pages (detail, settings, expense f
 - **`lib/core/database/powersync_schema.dart`**
   - `groups` table: `Column.integer('is_personal')`, `Column.integer('budget_amount_cents')` (nullable).
 
-### Cloud DB (Supabase)
+### Cloud DB
 
-- **Migration 16** (`supabase/migrations/20250225000000_groups_is_personal_and_budget.sql`):
+- Server-side, a backend's `groups` table needs:
   - `is_personal BOOLEAN DEFAULT false NOT NULL`
   - `budget_amount_cents INT` (nullable)
-- Documented in [SUPABASE_SETUP.md](SUPABASE_SETUP.md) under “Migration 16”.
 
 ### Repository and sync
 
@@ -39,8 +38,8 @@ The same domain entity (`Group`) and the same pages (detail, settings, expense f
   - `create(..., { bool isPersonal = false, int? budgetAmountCents })`
 - **`lib/core/repository/powersync_repository.dart`**
   - `_groupFromRow`: reads `is_personal` (0/1 → bool), `budget_amount_cents` (nullable int).
-  - `create()`: writes both to Supabase and local INSERT.
-  - `update()`: includes both in Supabase PATCH and local UPDATE.
+  - `create()`: writes both to the backend and a local INSERT.
+  - `update()`: includes both in the backend PATCH and the local UPDATE.
 - **`lib/core/database/sync_engine.dart`**  
   - Full fetch: INSERT into local `groups` includes `is_personal` and `budget_amount_cents`; uses `(g['is_personal'] ?? false) == true` and `(g['budget_amount_cents'] as num?)?.toInt()` for backward compatibility.
 
@@ -129,7 +128,7 @@ Summary: Personal↔Group only toggles `is_personal` and (when going to personal
 **No.** Only you can see it. They do **not** have that group under their account at all (not as group, not as personal).
 
 - You can only **Use as personal** when there is **one participant** (you). So at conversion time you are the only member left.
-- The app (and Supabase) decide which groups you see by **group membership**: you only sync and see groups where you have a row in `group_members`. After converting to personal, only you have a row for that group.
+- The app and the backend decide which groups you see by **group membership**: you only sync and see groups where you have a row in `group_members`. After converting to personal, only you have a row for that group.
 - Anyone who was in the group and then **left** is removed from `group_members`. When their app next syncs, the sync engine only fetches groups they are still a member of; that group is no longer in the set, so it is removed from their local data. So they don’t see it as “personal” under them—they don’t see the group at all.
 - Converting to personal does not add or remove members; it only sets `is_personal = true` and revokes invite links. So no one else gains or keeps access.
 
@@ -138,10 +137,10 @@ Summary: Personal↔Group only toggles `is_personal` and (when going to personal
 - **Convert to personal:** Only allowed when participant count is 1; all active invites for the group are revoked before setting `isPersonal: true`.
 - **Budget:** Null or zero is shown as “—”; user can set or clear in settings (clear uses `copyWith(clearBudgetAmountCents: true)`).
 - **Existing groups:** Unchanged; `isPersonal` defaults to `false` everywhere (schema, sync, backup parse).
-- **Local-only:** Create personal, add expense, set budget, delete, and Share as group all work without Supabase.
+- **Local-only:** Create personal, add expense, set budget, delete, and Share as group all work with no backend.
 
 ## Related docs
 
-- [SUPABASE_SETUP.md](SUPABASE_SETUP.md) — Migration 16 (groups personal and budget)
+- [SELF_HOSTING.md](SELF_HOSTING.md) — `groups.is_personal` / `budget_amount_cents` in the synced schema
 - [CODEBASE.md](CODEBASE.md) — Data layer, sync, feature modules
 - [TRANSACTION_SCANNER.md](TRANSACTION_SCANNER.md) — Android notification drafts → personal expenses

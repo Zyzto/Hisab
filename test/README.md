@@ -2,17 +2,17 @@
 
 <!-- markdownlint-disable MD031 MD032 MD036 MD040 MD060 -->
 
-How to run unit, widget, integration, and online tests for Hisab. Product overview: [../README.md](../README.md). Doc index: [../docs/README.md](../docs/README.md).
+How to run unit, widget and integration tests for Hisab. Product overview:
+[../README.md](../README.md). Doc index: [../docs/README.md](../docs/README.md).
 
-## Local stack (Supabase + Edge)
+Every test here runs **with no backend and no network**. That is deliberate:
+this repository builds an offline app, so its suite must pass on a machine with
+nothing installed but Flutter. Tests that need a live server belong with that
+server, not here — see [../docs/SELF_HOSTING.md](../docs/SELF_HOSTING.md).
 
-```bash
-./scripts/local_test_env.sh up          # start, db reset, write dart_defines_local.json
-./scripts/local_test_env.sh test-edge   # HTTP smoke: telemetry, invite-redirect, og, send-notification dry-run
-./scripts/local_test_env.sh down
-```
-
-Details: [docs/LOCAL_TEST_ENV.md](../docs/LOCAL_TEST_ENV.md). VS Code: **Hisab (Local Online)** / **Hisab (Chrome Local Online)**.
+Cloud-facing code is covered through fakes. `test/support/fake_cloud.dart`
+implements every `CloudBackend` facet in memory, so repository and provider
+tests exercise the online paths without a service.
 
 ## Running tests
 
@@ -77,15 +77,15 @@ dart run tool/score_ocr_dirs.dart fixtures=test/fixtures/receipts/ocr_raw
 
 ## PowerSync
 
-Tests in `local_database_test.dart`, `sync_test.dart`, and `supabase_repository_test.dart` depend on the PowerSync native binary. On first run they probe for availability (e.g. by initializing a temporary database). If the binary cannot be loaded (e.g. in some CI environments or when the platform is unsupported), those tests are skipped; the rest of the suite still runs.
+Tests in `local_database_test.dart`, `sync_test.dart`, and `cloud_repository_test.dart` depend on the PowerSync native binary. On first run they probe for availability (e.g. by initializing a temporary database). If the binary cannot be loaded (e.g. in some CI environments or when the platform is unsupported), those tests are skipped; the rest of the suite still runs.
 
 ## Integration tests
 
-Full-app integration tests live in `integration_test/`. They run the real UI (App + GoRouter + providers) with a temp PowerSync DB and no live Supabase/Firebase (local-only).
+Full-app integration tests live in `integration_test/`. They run the real UI (App + GoRouter + providers) with a temp PowerSync DB and no backend or Firebase.
 
 **Platforms:** Integration tests target the **web app** (Chrome). CI runs them with `flutter drive` and `-d chrome`. You can also run on Android or iOS when a device/emulator is available.
 
-**Dart Debug Chrome extension:** For interactive web debugging (e.g. `flutter run -d web-server` or `flutter run -d chrome`), install the [Dart Debug Extension](https://chromewebstore.google.com/detail/dart-debug-extension/eljbmlghnomdjgdjmbdekegdkbabckhm) in Chrome to get meaningful console messages, Dart stack traces, and DevTools. See [docs/WEB_DEBUGGING.md](docs/WEB_DEBUGGING.md). Integration test runs (`flutter drive --release`) do not use the extension.
+**Dart Debug Chrome extension:** For interactive web debugging (e.g. `flutter run -d web-server` or `flutter run -d chrome`), install the [Dart Debug Extension](https://chromewebstore.google.com/detail/dart-debug-extension/eljbmlghnomdjgdjmbdekegdkbabckhm) in Chrome to get meaningful console messages, Dart stack traces, and DevTools. See [docs/WEB_DEBUGGING.md](../docs/WEB_DEBUGGING.md). Integration test runs (`flutter drive --release`) do not use the extension.
 
 Run on web — primary target (requires ChromeDriver on port **4444**; Flutter does not expose a flag to use another port):
 
@@ -179,7 +179,6 @@ flutter test integration_test/ -d <ios_device_id>
 integration_test/
   helpers/
     test_bootstrap.dart          -- local-only bootstrap (temp DB, settings, runApp)
-    online_test_bootstrap.dart   -- online bootstrap (Supabase init, sign-in, runApp)
     test_helpers.dart            -- reusable finders, tap helpers, wait helpers
     fake_image_picker.dart       -- mock ImagePickerPlatform for photo tests
     test_db_path.dart            -- platform-conditional DB path (io/stub)
@@ -192,26 +191,18 @@ integration_test/
   balance_test.dart              -- verify balances, record settlement
   settings_test.dart             -- theme, language, font size, telemetry toggle
   app_test.dart                  -- barrel that imports all local-only web-safe test files
-  online/
-    auth_online_test.dart        -- sign-in, sign-out, session verification
-    sync_online_test.dart        -- create group/expense via UI, verify in Supabase DB
-    invite_online_test.dart      -- 2-user invite flow (create, accept, verify membership)
-  online_app_test.dart           -- barrel that imports all online test files
 test_driver/
   integration_test.dart          -- web driver entry point (custom diagnostics)
 tool/
   run_all_tests.dart            -- cross-platform runner: unit/widget, then Android + web integration, summary
-  run_online_tests.dart         -- cross-platform online test runner (Supabase, ChromeDriver, cleanup)
   score_ocr_dirs.dart           -- score OCR text dirs against shared receipt expects
 scripts/
   run_all_tests.sh, run_all_tests.bat  -- wrappers for dart run tool/run_all_tests.dart
-  run_online_tests.sh           -- thin wrapper: exec dart run tool/run_online_tests.dart
 ```
 
-- **Bootstrap (local):** `integration_test/helpers/test_bootstrap.dart` initializes EasyLocalization, a temp PowerSync DB, and settings (onboarding completed, local-only), then calls `runApp(...)` with the same overrides as production. No Supabase/Firebase or LoggingService. Set `skipOnboarding: false` to exercise the onboarding flow.
-- **Bootstrap (online):** `integration_test/helpers/online_test_bootstrap.dart` initializes Supabase with local credentials (via `--dart-define`), sets `localOnlySettingDef` to `false`, optionally signs in a test user, and runs the app in online mode. Provides `signInAs()`, `signOutCurrentUser()`, and the test user constants (`testUserAEmail`, `testUserBEmail`, `testPassword`).
+- **Bootstrap:** `integration_test/helpers/test_bootstrap.dart` initializes EasyLocalization, a temp PowerSync DB, and settings (onboarding completed, local-only), then calls `runApp(...)` with the same overrides as production. No backend, Firebase or LoggingService. Set `skipOnboarding: false` to exercise the onboarding flow.
 - **Helpers:** `integration_test/helpers/test_helpers.dart` provides `pumpAndSettleWithTimeout`, `tapAndSettle`, `enterTextAndPump` (with web fallback), `waitForWidget`, `scrollUntilVisible`, `tapSubmitExpenseButton`, `ensureFormClosed`, `stage` (stage-based progress recording), and `ensureBootstrapReady`.
-- **Test flows — local-only mode** (`app_test.dart`):
+- **Test flows** (`app_test.dart`):
   - **Smoke:** App opens to home (Groups/Personal/FAB visible); navigate to Settings and back.
   - **Onboarding:** Complete all 4 pages (Welcome → Preferences → Permissions → Connect) and land on home.
   - **Group flows:** Create group with participants (Alice, Bob) → verify detail tabs (Expenses/Balance/People) → open group settings → change icon/color/currency/settlement → archive group.
@@ -219,158 +210,18 @@ scripts/
   - **Expense flows:** Create group with 2 participants → add expenses with tags, description, bill breakdown, long titles, currency change, exchange rates → all split types → view detail → edit expense → add Income and Transfer. Photo attach is `expense_photos_test.dart` (mobile only; `MockPlatformInterfaceMixin` must not ship in the web `--release` suite).
   - **Balance:** Create group, add expense → switch to Balance tab → verify balances and settlement suggestions → record and freeze settlements. The test user is the group owner, so they can record any settlement (by default only the owner or the debtor can record; see group setting "Members can record settlements for others").
   - **Settings:** Change theme, language (Arabic and back), font size, toggle telemetry; verify settings persist across navigation.
-- **Test flows — online mode** (`online_app_test.dart`, requires local Supabase):
-  - **Auth:** Sign in as User A → verify session → Settings → Profile → sign out → programmatic re-sign-in → sign in as User B.
-  - **Sync:** Sign in → create group via UI → verify group exists in Supabase DB → add expense → verify expense synced → delete group via UI → verify deletion propagated.
-  - **Invite:** User A creates group → creates invite token (RPC) → signs out → User B accepts invite (RPC) → verify membership → User A verifies member list → cleanup.
 - **Requirements:** For web, Chrome/Chromium must be installed (set `CHROME_EXECUTABLE` if needed). PowerSync is used; on web it uses the web-backed storage. If the bootstrap fails (e.g. PowerSync unavailable), tests fail with a clear message.
-- **CI:** Runs local integration tests on **web** (`flutter drive` with `-d chrome`). Online tests run separately with a Docker-based Supabase instance. For Android/iOS, use an emulator or Firebase Test Lab.
+- **CI:** Runs the integration tests on **web** (`flutter drive` with `-d chrome`). For Android/iOS, use an emulator or Firebase Test Lab.
 
-## Online integration tests (local Supabase)
+## Testing against a real backend
 
-Online integration tests run the app against a **local Supabase instance** via the Docker API (Docker Engine or Podman with `DOCKER_HOST`). They cover authentication, data sync, and multi-user invite flows — all without touching production.
-
-### Prerequisites
-
-| Requirement | Check |
-|---|---|
-| Docker or Podman | `docker info` **or** `podman info`; on NixOS prefer **rootful** Podman (`DOCKER_HOST=unix:///run/podman/podman.sock`, see [LOCAL_TEST_ENV.md](../docs/LOCAL_TEST_ENV.md)) |
-| Supabase CLI | `supabase --version` (install: `npm i -g supabase` or [docs](https://supabase.com/docs/guides/cli/getting-started)) |
-| Chrome + ChromeDriver (web) | Same as local integration tests (version-matched); only needed for web |
-
-### Quick start (one command)
-
-**Recommended — cross-platform Dart runner (all platforms):**
-
-```bash
-dart run tool/run_online_tests.dart
-```
-
-Optional: `dart run tool/run_online_tests.dart android` to run on a connected Android device. On Linux/macOS you can use the shell wrapper: `./scripts/run_online_tests.sh` or `./scripts/run_online_tests.sh android`.
-
-The runner:
-1. Checks prerequisites (Docker or Podman + `DOCKER_HOST` when needed, Supabase CLI, ChromeDriver for web)
-2. Starts local Supabase (`supabase start`) and resets the database (migrations + seed)
-3. Parses credentials from `supabase status --output json` (no `jq` required)
-4. For web: starts ChromeDriver on port 4444 if needed, then runs `flutter drive` with the online test barrel
-5. Stops Supabase and ChromeDriver (if started) on exit, including on interrupt (e.g. Ctrl+C)
-6. Writes all output to `logs/online_tests_<timestamp>.log` and prints "Online tests: PASS" or "Online tests: FAILED (see log: ...)"
-
-### Manual steps (step by step)
-
-```bash
-# 1. Start local Supabase (first run pulls Docker images — takes a few minutes)
-supabase start
-
-# 2. Reset DB to apply all migrations + seed test users
-supabase db reset
-
-# 3. Extract credentials
-SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')
-SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')
-
-# 4. Run online integration tests on web
-flutter drive \
-  --driver=test_driver/integration_test.dart \
-  --target=integration_test/online_app_test.dart \
-  -d web-server --release \
-  --dart-define=SUPABASE_URL=$SUPABASE_URL \
-  --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY \
-  --web-browser-flag=--no-sandbox
-
-# 5. Stop Supabase when done
-supabase stop
-```
-
-### Local Supabase configuration
-
-All configuration lives under `supabase/`:
-
-| File | Purpose |
-|---|---|
-| `supabase/config.toml` | Supabase project config: ports, auth settings, storage buckets, rate limits |
-| `supabase/migrations/*.sql` | Ordered migrations covering schema, RLS, RPCs, indexes, and features |
-| `supabase/seed.sql` | Seeds two test users into `auth.users` + `auth.identities` |
-
-Before running online tests (or in CI), verify config-as-code invariants:
-
-```bash
-bash ./scripts/verify_supabase_config_as_code.sh
-```
-
-This check fails if required files are missing/untracked or if migration filenames do not follow the expected timestamp naming convention.
-
-**Test users** (seeded automatically by `supabase db reset`):
-
-| User | Email | Password | UUID |
-|---|---|---|---|
-| User A | `test-a@hisab.test` | `TestPass123!` | `aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa` |
-| User B | `test-b@hisab.test` | `TestPass123!` | `bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb` |
-
-**Key `config.toml` settings for testing:**
-- `auth.email.enable_confirmations = false` — emails auto-confirmed (no verification needed)
-- `auth.email.double_confirm_changes = false` — no dual confirmation for email changes
-- `auth.email.max_frequency = "0s"` — no cooldown between email sends
-- `auth.rate_limit.*` = `1000` — high limits to prevent throttling during test runs
-- `storage.buckets.expense-images` — pre-created bucket for expense image uploads
-
-**Migrations:** The migration files consolidate the complete Supabase schema from `docs/SUPABASE_SETUP.md`:
-
-1. `core_schema` — tables (groups, participants, expenses, etc.)
-2. `rls_policies` — row-level security
-3. `rpc_functions` — invite, ownership, member management RPCs
-4. `security_hardening` — column permissions, function security
-5. `device_tokens` — FCM token storage
-6. `device_tokens_locale` — locale column for localized push
-7. `schema_additions` — additional indexes, columns
-8. `rpc_invites_extended` — extended invite RPCs
-9. `revoke_toggle_rpcs` — revoke/toggle functions
-10. `rls_performance` — RLS policy optimization
-11. `indexes` — performance indexes
-12. `groups_archive` — archive support
-13. `merge_participant` — participant merge RPC
-14. `participants_left` — left_at tracking
-15. `expense_images_bucket` — storage bucket + policies
-16. `groups_personal_budget` — personal budget columns
-17. `anonymize_on_delete` — name anonymization on account delete
-18. `expense_image_paths` — expense image path columns
-19. `groups_allow_member_settle_for_others` — settlement permission (owner or debtor only by default)
-20. `fix_accept_invite_null_expiry_validation` — invite acceptance supports never-expiring links (`expires_at IS NULL`) and aligns token validation with `get_invite_by_token` (corresponds to Migration 21 in `docs/SUPABASE_SETUP.md`; local numbering differs because notification-trigger migration is intentionally skipped in local Docker setup)
-
-> **Note:** Migration 6 from the original setup (pg_net notification triggers) is intentionally skipped — `pg_net` is not available in the local Supabase environment.
-
-### Online test suites
-
-| Suite | File | What it tests |
-|---|---|---|
-| **Auth** | `integration_test/online/auth_online_test.dart` | Sign in User A → verify session → navigate to Settings → sign out → re-sign-in → sign in User B |
-| **Sync** | `integration_test/online/sync_online_test.dart` | Create group via UI → verify in Supabase DB → add expense → verify synced → delete group → verify removed |
-| **Invite** | `integration_test/online/invite_online_test.dart` | User A creates group + invite token → User B accepts (group_id assertion) → verify membership + `invite_usages` row → User A verifies member list |
-| **Edge smoke** | `test/edge/edge_functions_smoke_test.dart` | HTTP against local Edge Functions (telemetry, invite-redirect, og-invite-image, send-notification dry-run). Run via `./scripts/local_test_env.sh test-edge` |
-
-### CI (GitHub Actions)
-
-The `test-online` job in `.github/workflows/release.yml` runs online tests automatically:
-1. Sets up Flutter and Supabase CLI
-2. Verifies config-as-code files (`bash ./scripts/verify_supabase_config_as_code.sh`)
-3. Starts local Supabase (Docker is available on `ubuntu-latest`)
-4. Resets the database
-5. Extracts credentials
-6. Runs `flutter drive` with the online test barrel
-7. Stops Supabase in an `always()` cleanup step
-
-No additional GitHub secrets are needed — the local Supabase instance generates its own URL and anon key.
-
-### Troubleshooting
-
-| Issue | Fix |
-|---|---|
-| `supabase start` hangs / Kong permission denied | Prefer rootful: `sudo systemctl enable --now podman.socket` and `DOCKER_HOST=unix:///run/podman/podman.sock`. See [LOCAL_TEST_ENV.md](../docs/LOCAL_TEST_ENV.md). First run pulls ~2 GB of images. |
-| `ERROR: Could not get SUPABASE_URL` | Supabase didn't start. Check `docker ps` / `podman ps` and `supabase status`. |
-| Auth sign-in fails in test | Run `supabase db reset` to re-seed test users. |
-| `pg_net` extension error | Expected — migration 6 (notification triggers) is skipped locally. |
-| Rate limit hit during tests | Check `config.toml` rate limits are set to 1000. |
-| Test passes locally but fails in CI | CI uses `--no-sandbox` and `--disable-dev-shm-usage` flags for headless Chrome. |
+End-to-end auth, sync and invite tests need a live server, so they live with
+whatever backend you run rather than in this repository. If you implement the
+`CloudBackend` contract yourself, the shape that works is: bring up your stack,
+compose your package over this checkout with a `pubspec_overrides.yaml`, and
+point `flutter drive` at a barrel of online tests with your defines passed
+through. [../docs/SELF_HOSTING.md](../docs/SELF_HOSTING.md) covers the
+composition step.
 
 ## Coverage
 

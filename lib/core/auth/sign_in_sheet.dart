@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 
 import 'auth_flow_policy.dart';
 import 'auth_providers.dart';
@@ -147,7 +147,7 @@ class _SignInSheetState extends State<_SignInSheet> {
 
     final authService = widget.ref.read(authServiceProvider);
     Completer<bool>? completer;
-    StreamSubscription<AuthState>? sub;
+    StreamSubscription<CloudAuthState>? sub;
     try {
       // Subscribe before send on native so a fast callback cannot be missed.
       if (!kIsWeb) {
@@ -158,7 +158,7 @@ class _SignInSheetState extends State<_SignInSheet> {
         }
         completer = Completer<bool>();
         sub = authService.onAuthStateChange.listen((state) {
-          if (state.event == AuthChangeEvent.signedIn &&
+          if (state.event == CloudAuthEvent.signedIn &&
               completer != null &&
               !completer.isCompleted) {
             completer.complete(true);
@@ -208,22 +208,24 @@ class _SignInSheetState extends State<_SignInSheet> {
     }
   }
 
-  Future<void> _signInWithOAuth(OAuthProvider provider) async {
+  Future<void> _signInWithOAuth(CloudOAuthProvider provider) async {
     setState(() {
       _loading = true;
       _error = null;
     });
 
     final authService = widget.ref.read(authServiceProvider);
-    final providerName = provider == OAuthProvider.google ? 'Google' : 'GitHub';
+    final providerName = provider == CloudOAuthProvider.google
+        ? 'Google'
+        : 'GitHub';
     Completer<bool>? completer;
-    StreamSubscription<AuthState>? sub;
+    StreamSubscription<CloudAuthState>? sub;
     try {
       // Subscribe before launch on native so a fast callback cannot be missed.
       if (!kIsWeb) {
         completer = Completer<bool>();
         sub = authService.onAuthStateChange.listen((state) {
-          if (state.event == AuthChangeEvent.signedIn &&
+          if (state.event == CloudAuthEvent.signedIn &&
               completer != null &&
               !completer.isCompleted) {
             completer.complete(true);
@@ -231,7 +233,7 @@ class _SignInSheetState extends State<_SignInSheet> {
         });
       }
 
-      final launched = provider == OAuthProvider.google
+      final launched = provider == CloudOAuthProvider.google
           ? await authService.signInWithGoogle()
           : await authService.signInWithGithub();
 
@@ -285,7 +287,7 @@ class _SignInSheetState extends State<_SignInSheet> {
   }
 
   bool _isEmailNotConfirmedError(Object e) {
-    if (e is AuthException) {
+    if (e is CloudException) {
       return e.message.toLowerCase().contains('email not confirmed') ||
           (e.code == 'email_not_confirmed');
     }
@@ -316,7 +318,7 @@ class _SignInSheetState extends State<_SignInSheet> {
       Log.warning('Resend confirmation failed', error: e);
       if (mounted) {
         final isRateLimit =
-            e is AuthException &&
+            e is CloudException &&
             (e.code == 'over_email_send_rate_limit' ||
                 e.message.toLowerCase().contains('rate limit'));
         setState(() {
@@ -335,7 +337,7 @@ class _SignInSheetState extends State<_SignInSheet> {
   }
 
   String _parseAuthError(Object e) {
-    if (e is AuthException) {
+    if (e is CloudException) {
       if (e.message.toLowerCase().contains('email not confirmed')) {
         return 'auth_email_not_confirmed'.tr();
       }
@@ -614,7 +616,7 @@ class _SignInSheetState extends State<_SignInSheet> {
                       OutlinedButton.icon(
                         onPressed: _loading
                             ? null
-                            : () => _signInWithOAuth(OAuthProvider.google),
+                            : () => _signInWithOAuth(CloudOAuthProvider.google),
                         icon: const Icon(Icons.g_mobiledata, size: 22),
                         label: Text('auth_provider_google'.tr()),
                         style: OutlinedButton.styleFrom(
@@ -629,7 +631,7 @@ class _SignInSheetState extends State<_SignInSheet> {
                       OutlinedButton.icon(
                         onPressed: _loading
                             ? null
-                            : () => _signInWithOAuth(OAuthProvider.github),
+                            : () => _signInWithOAuth(CloudOAuthProvider.github),
                         icon: const Icon(Icons.code, size: 20),
                         label: Text('auth_provider_github'.tr()),
                         style: OutlinedButton.styleFrom(

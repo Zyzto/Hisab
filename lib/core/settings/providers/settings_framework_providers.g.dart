@@ -191,7 +191,7 @@ final class EffectiveLocalOnlyProvider
 }
 
 String _$effectiveLocalOnlyHash() =>
-    r'094d91f85897f4bcffe7e2dd68d0a1d3eacb390d';
+    r'1375fdc2ef0989d42ff842cb9bbdf3be9438ac50';
 
 @ProviderFor(receiptScanMode)
 final receiptScanModeProvider = ReceiptScanModeProvider._();
@@ -232,7 +232,7 @@ final class ReceiptScanModeProvider
   }
 }
 
-String _$receiptScanModeHash() => r'receipt_scan_mode_manual_gen_001';
+String _$receiptScanModeHash() => r'6a3c82d9b558dee8e59728e627f4c2866b2a8eb6';
 
 @ProviderFor(receiptAiProvider)
 final receiptAiProviderProvider = ReceiptAiProviderProvider._();
@@ -273,7 +273,7 @@ final class ReceiptAiProviderProvider
   }
 }
 
-String _$receiptAiProviderHash() => r'receipt_ai_provider_manual_gen_001';
+String _$receiptAiProviderHash() => r'54195a02ab399487e23ee11d3d520a1c34a85568';
 
 @ProviderFor(geminiApiKey)
 final geminiApiKeyProvider = GeminiApiKeyProvider._();
@@ -722,7 +722,7 @@ final class SubtleAccentsProvider extends $FunctionalProvider<bool, bool, bool>
   }
 }
 
-String _$subtleAccentsHash() => r'9c4f2e1a0b7d6c5e8f3a2b1c0d9e8f7a6b5c4d3e';
+String _$subtleAccentsHash() => r'3c74b83318a46d155f10c0e12272ba35c33bfce1';
 
 @ProviderFor(extraAnimationsEnabled)
 final extraAnimationsEnabledProvider = ExtraAnimationsEnabledProvider._();
@@ -764,7 +764,7 @@ final class ExtraAnimationsEnabledProvider
 }
 
 String _$extraAnimationsEnabledHash() =>
-    r'a1b2c3d4e5f60718293a4b5c6d7e8f901234abcd';
+    r'880fb9034d62694426b915aa785b932e66f1ae89';
 
 @ProviderFor(authUserProfile)
 final authUserProfileProvider = AuthUserProfileProvider._();

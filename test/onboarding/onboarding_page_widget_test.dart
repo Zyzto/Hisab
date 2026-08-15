@@ -5,7 +5,7 @@ import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:hisab/core/constants/supabase_config.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 import 'package:hisab/features/onboarding/pages/onboarding_page.dart';
 import 'package:hisab/features/onboarding/widgets/onboarding_welcome_page.dart';
 import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
@@ -195,7 +195,7 @@ void main() {
       // Privacy CTA is Text.rich — match the linked label in the plain text.
       expect(find.textContaining('privacy_policy'.tr()), findsOneWidget);
 
-      if (supabaseConfigAvailable) {
+      if (cloudAvailable) {
         expect(find.text('onboarding_offline'.tr()), findsOneWidget);
         expect(find.text('onboarding_online'.tr()), findsOneWidget);
         expect(find.text('onboarding_offline_desc'.tr()), findsWidgets);
@@ -229,7 +229,7 @@ void main() {
           isFalse,
         );
       },
-      skip: !supabaseConfigAvailable,
+      skip: !cloudAvailable,
     );
 
     testWidgets(
@@ -242,7 +242,7 @@ void main() {
         );
         expect(find.text('onboarding_online_unavailable'.tr()), findsOneWidget);
       },
-      skip: supabaseConfigAvailable,
+      skip: cloudAvailable,
     );
   });
 

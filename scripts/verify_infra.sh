@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-# Infra / release-readiness checks (repo layout + config-as-code).
+# Release-readiness checks over the client tree (layout, web shell, pins).
 # Safe to run locally and in CI — no network required.
+#
+# Backend-side checks (edge functions, config-as-code, the notification
+# pipeline) live in the private cloud repo's copy of this script.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -13,30 +16,17 @@ fail() {
 
 echo "==> Infra check"
 
-# ── Supabase config-as-code ───────────────────────────────────────────────────
-bash ./scripts/verify_supabase_config_as_code.sh
-
-# ── Required Edge Functions ───────────────────────────────────────────────────
-echo "==> Checking Edge Function sources"
-required_fns=(
-  invite-redirect
-  og-invite-image
-  send-notification
-  telemetry
-)
-for fn in "${required_fns[@]}"; do
-  [[ -f "supabase/functions/$fn/index.ts" ]] \
-    || fail "Missing Edge Function source: supabase/functions/$fn/index.ts"
-done
-
 # ── Firebase Hosting layout ───────────────────────────────────────────────────
 echo "==> Checking Firebase Hosting config"
 [[ -f firebase.json ]] || fail "Missing firebase.json"
 grep -q '"hosting"' firebase.json || fail "firebase.json missing hosting block"
 grep -q '"public"[[:space:]]*:[[:space:]]*"build/web"' firebase.json \
   || fail 'firebase.json hosting.public must be "build/web"'
-grep -q 'invite-redirect' firebase.json \
-  || fail "firebase.json missing invite-redirect rewrite"
+# Every invite link ever shared points at /functions/v1/invite-redirect, so
+# that rewrite has to keep serving no matter what the newer /invite-redirect
+# route does.
+grep -q '/functions/v1/invite-redirect' firebase.json \
+  || fail "firebase.json dropped the legacy invite-redirect rewrite"
 
 # ── Web PWA shell ─────────────────────────────────────────────────────────────
 echo "==> Checking web shell assets"
@@ -57,38 +47,36 @@ grep -q 'isInAppBrowser' web/in_app_browser.js \
 grep -q '_flutter.loader.load' web/flutter_bootstrap.js \
   || fail "web/flutter_bootstrap.js missing _flutter.loader.load()"
 
-# ── App version + CI Flutter pin ──────────────────────────────────────────────
-echo "==> Checking version / CI pins"
+# ── App version + Flutter pin ─────────────────────────────────────────────────
+echo "==> Checking version / toolchain pins"
 version_line=$(grep -E '^version:' pubspec.yaml | head -1 || true)
 [[ -n "$version_line" ]] || fail "pubspec.yaml missing version:"
 if ! echo "$version_line" | grep -Eq '^version:[[:space:]]*[0-9]+\.[0-9]+\.[0-9]+\+[0-9]+$'; then
   fail "pubspec.yaml version must be MARKETING+BUILD (e.g. 0.6.16+65); got: $version_line"
 fi
 
-[[ -f .github/workflows/release.yml ]] || fail "Missing .github/workflows/release.yml"
-grep -q 'FLUTTER_VERSION:' .github/workflows/release.yml \
-  || fail "release.yml missing FLUTTER_VERSION env"
-[[ -f .github/workflows/ci.yml ]] || fail "Missing .github/workflows/ci.yml"
-grep -q 'FLUTTER_VERSION:' .github/workflows/ci.yml \
-  || fail "ci.yml missing FLUTTER_VERSION env"
-release_flutter=$(grep -E 'FLUTTER_VERSION:' .github/workflows/release.yml | head -1)
-ci_flutter=$(grep -E 'FLUTTER_VERSION:' .github/workflows/ci.yml | head -1)
-# Compare version string only (ignore surrounding YAML/comments).
-release_ver=$(echo "$release_flutter" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-ci_ver=$(echo "$ci_flutter" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-[[ -n "$release_ver" && "$release_ver" == "$ci_ver" ]] \
-  || fail "FLUTTER_VERSION mismatch: release.yml=$release_ver ci.yml=$ci_ver"
+# One file, read by every workflow in both repos and by the local pipeline.
+# The previous "keep in sync" comments across four copies did not survive the
+# split.
+[[ -f .flutter-version ]] || fail "Missing .flutter-version"
+grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' .flutter-version \
+  || fail ".flutter-version must contain a bare version like 3.41.5"
+if grep -rn 'FLUTTER_VERSION:' .github/workflows/ >/dev/null 2>&1; then
+  fail "A workflow still pins FLUTTER_VERSION; read .flutter-version instead"
+fi
+
+# ── Android variants ──────────────────────────────────────────────────────────
+echo "==> Checking Android flavors"
+grep -q 'create("foss")' android/app/build.gradle.kts \
+  || fail "android/app/build.gradle.kts missing the foss flavor"
+grep -q 'create("cloud")' android/app/build.gradle.kts \
+  || fail "android/app/build.gradle.kts missing the cloud flavor"
+[[ -f android/app/src/cloud/AndroidManifest.xml ]] \
+  || fail "Missing android/app/src/cloud/AndroidManifest.xml (deep link filters)"
 
 # ── Privacy / Play disclosure pages (Hosting copies these) ────────────────────
 echo "==> Checking static legal pages"
 [[ -d web/privacy ]] || fail "Missing web/privacy/"
 [[ -d web/delete-account ]] || fail "Missing web/delete-account/"
-
-# ── Notification pipeline coupling (migration + edge source both present) ─────
-echo "==> Checking notification pipeline files"
-ls supabase/migrations/*notify_group_activity* >/dev/null 2>&1 \
-  || fail "Missing notify_group_activity migration(s)"
-grep -q 'expense_deleted' supabase/functions/send-notification/index.ts \
-  || fail "send-notification missing expense_deleted action support"
 
 echo "✅ Infra check passed"

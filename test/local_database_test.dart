@@ -56,7 +56,7 @@ void main() {
 
   IGroupRepository repo() => PowerSyncGroupRepository(
     db!,
-    client: null,
+    cloud: null,
     isOnline: false,
     isLocalOnly: true,
   );
@@ -99,7 +99,7 @@ void main() {
 
         final participants = await PowerSyncParticipantRepository(
           db!,
-          client: null,
+          cloud: null,
           isOnline: false,
           isLocalOnly: true,
         ).getByGroupId(id);
@@ -164,7 +164,7 @@ void main() {
       final groupId = await groupRepo.create('Group', 'USD');
       final participantRepo = PowerSyncParticipantRepository(
         db!,
-        client: null,
+        cloud: null,
         isOnline: false,
         isLocalOnly: true,
       );
@@ -185,7 +185,7 @@ void main() {
       final groupId = await groupRepo.create('Group', 'USD');
       final participantRepo = PowerSyncParticipantRepository(
         db!,
-        client: null,
+        cloud: null,
         isOnline: false,
         isLocalOnly: true,
       );
@@ -207,7 +207,7 @@ void main() {
       final groupId = await groupRepo.create('Group', 'USD');
       final participantRepo = PowerSyncParticipantRepository(
         db!,
-        client: null,
+        cloud: null,
         isOnline: false,
         isLocalOnly: true,
       );
@@ -233,7 +233,7 @@ void main() {
       final groupId = await groupRepo.create('Expense Group', 'USD');
       final participantRepo = PowerSyncParticipantRepository(
         db!,
-        client: null,
+        cloud: null,
         isOnline: false,
         isLocalOnly: true,
       );
@@ -255,7 +255,7 @@ void main() {
       );
       final expenseRepo = PowerSyncExpenseRepository(
         db!,
-        client: null,
+        cloud: null,
         isOnline: false,
         isLocalOnly: true,
       );
@@ -275,7 +275,7 @@ void main() {
       final groupId = await groupRepo.create('Expense Group', 'USD');
       final participantRepo = PowerSyncParticipantRepository(
         db!,
-        client: null,
+        cloud: null,
         isOnline: false,
         isLocalOnly: true,
       );
@@ -283,7 +283,7 @@ void main() {
       final now = DateTime.now();
       final expenseRepo = PowerSyncExpenseRepository(
         db!,
-        client: null,
+        cloud: null,
         isOnline: false,
         isLocalOnly: true,
       );
@@ -318,7 +318,7 @@ void main() {
       final groupId = await groupRepo.create('Expense Group', 'USD');
       final participantRepo = PowerSyncParticipantRepository(
         db!,
-        client: null,
+        cloud: null,
         isOnline: false,
         isLocalOnly: true,
       );
@@ -326,7 +326,7 @@ void main() {
       final now = DateTime.now();
       final expenseRepo = PowerSyncExpenseRepository(
         db!,
-        client: null,
+        cloud: null,
         isOnline: false,
         isLocalOnly: true,
       );

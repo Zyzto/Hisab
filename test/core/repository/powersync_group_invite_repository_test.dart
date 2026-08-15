@@ -1,38 +1,21 @@
-import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
 import 'package:path/path.dart' as p;
 import 'package:powersync/powersync.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:hisab/core/database/powersync_schema.dart' as ps;
 import 'package:hisab/core/repository/powersync_repository.dart';
 import 'package:hisab/domain/domain.dart';
 
-class MockSupabaseClient extends Mock implements SupabaseClient {}
-
-class MockGoTrueClient extends Mock implements GoTrueClient {}
-
-/// Awaitable stub for [SupabaseClient.rpc], which returns a filter builder.
-class _FakeRpcBuilder extends Fake implements PostgrestFilterBuilder<dynamic> {
-  _FakeRpcBuilder(this.value);
-
-  final dynamic value;
-
-  @override
-  Future<R> then<R>(
-    FutureOr<R> Function(dynamic value) onValue, {
-    Function? onError,
-  }) => Future<R>.sync(() => onValue(value));
-}
+import '../../support/fake_cloud.dart';
 
 void main() {
   bool powerSyncAvailable = false;
   PowerSyncDatabase? db;
   late String dbPath;
-  late MockSupabaseClient client;
+  late FakeCloudInvites invites;
+  late FakeCloudBackend cloud;
 
   setUpAll(() async {
     try {
@@ -66,40 +49,33 @@ void main() {
   });
 
   setUp(() {
-    client = MockSupabaseClient();
+    invites = FakeCloudInvites();
+    cloud = FakeCloudBackend(invites: invites);
   });
 
   group('PowerSyncGroupInviteRepository', () {
-    test('getByToken throws UnsupportedError when client is null', () async {
+    test('getByToken throws UnsupportedError in an offline build', () async {
       if (!powerSyncAvailable || db == null) return;
-      final repo = PowerSyncGroupInviteRepository(db!, supabaseClient: null);
+      final repo = PowerSyncGroupInviteRepository(db!, cloud: null);
       expect(() => repo.getByToken('abc'), throwsA(isA<UnsupportedError>()));
     });
 
-    test('getByToken returns null for empty rpc payload', () async {
+    test('getByToken returns null for an unknown token', () async {
       if (!powerSyncAvailable || db == null) return;
-      final repo = PowerSyncGroupInviteRepository(db!, supabaseClient: client);
-      when(
-        () => client.rpc('get_invite_by_token', params: any(named: 'params')),
-      ).thenAnswer((_) => _FakeRpcBuilder(<dynamic>[]));
+      final repo = PowerSyncGroupInviteRepository(
+        db!,
+        cloud: FakeCloudBackend(
+          invites: FakeCloudInvites(onGetByToken: (_) async => null),
+        ),
+      );
 
-      final result = await repo.getByToken('abc');
-      expect(result, isNull);
+      expect(await repo.getByToken('abc'), isNull);
     });
 
-    test('createInvite sends expected params and interval string', () async {
+    test('createInvite forwards the invite settings unchanged', () async {
       if (!powerSyncAvailable || db == null) return;
-      final repo = PowerSyncGroupInviteRepository(db!, supabaseClient: client);
-      final auth = MockGoTrueClient();
-      when(() => client.auth).thenReturn(auth);
-      when(() => auth.currentUser).thenReturn(null);
-      when(
-        () => client.rpc('create_invite', params: any(named: 'params')),
-      ).thenAnswer(
-        (_) => _FakeRpcBuilder([
-          {'id': 'invite-id', 'token': 'invite-token'},
-        ]),
-      );
+      invites.createResult = const {'id': 'invite-id', 'token': 'invite-token'};
+      final repo = PowerSyncGroupInviteRepository(db!, cloud: cloud);
 
       final result = await repo.createInvite(
         'group-1',
@@ -111,73 +87,54 @@ void main() {
 
       expect(result.id, 'invite-id');
       expect(result.token, 'invite-token');
-      final verification = verify(
-        () => client.rpc('create_invite', params: captureAny(named: 'params')),
-      );
-      verification.called(1);
-      final captured = verification.captured.single as Map<String, dynamic>;
-      expect(captured['p_group_id'], 'group-1');
-      expect(captured['p_role'], 'member');
-      expect(captured['p_label'], 'Family');
-      expect(captured['p_max_uses'], 5);
-      expect(captured['p_expires_in'], '3600 seconds');
-      expect(captured['p_access_mode'], 'standard');
+      expect(invites.createCalls, hasLength(1));
+      final call = invites.createCalls.single;
+      expect(call.groupId, 'group-1');
+      expect(call.role, 'member');
+      expect(call.label, 'Family');
+      expect(call.maxUses, 5);
+      expect(call.expiresIn, const Duration(hours: 1));
+      expect(call.accessMode, 'standard');
     });
 
-    test(
-      'createInvite sends null interval for never-expiring invite',
-      () async {
-        if (!powerSyncAvailable || db == null) return;
-        final repo = PowerSyncGroupInviteRepository(
-          db!,
-          supabaseClient: client,
-        );
-        final auth = MockGoTrueClient();
-        when(() => client.auth).thenReturn(auth);
-        when(() => auth.currentUser).thenReturn(null);
-        when(
-          () => client.rpc('create_invite', params: any(named: 'params')),
-        ).thenAnswer(
-          (_) => _FakeRpcBuilder([
-            {'id': 'invite-id-2', 'token': 'invite-token-2'},
-          ]),
-        );
+    test('createInvite passes a null duration for a never-expiring invite', () async {
+      if (!powerSyncAvailable || db == null) return;
+      invites.createResult = const {
+        'id': 'invite-id-2',
+        'token': 'invite-token-2',
+      };
+      final repo = PowerSyncGroupInviteRepository(db!, cloud: cloud);
 
-        await repo.createInvite('group-2', expiresIn: null);
-        final verification = verify(
-          () =>
-              client.rpc('create_invite', params: captureAny(named: 'params')),
-        );
-        verification.called(1);
-        final captured = verification.captured.single as Map<String, dynamic>;
-        expect(captured['p_group_id'], 'group-2');
-        expect(captured['p_expires_in'], isNull);
-        expect(captured['p_access_mode'], 'standard');
-      },
-    );
+      await repo.createInvite('group-2', expiresIn: null);
+
+      final call = invites.createCalls.single;
+      expect(call.groupId, 'group-2');
+      expect(call.expiresIn, isNull);
+      expect(call.accessMode, 'standard');
+    });
 
     test('getByToken maps access_mode and group timestamps', () async {
       if (!powerSyncAvailable || db == null) return;
-      final repo = PowerSyncGroupInviteRepository(db!, supabaseClient: client);
-      when(
-        () => client.rpc('get_invite_by_token', params: any(named: 'params')),
-      ).thenAnswer(
-        (_) => _FakeRpcBuilder([
-          {
-            'invite_id': 'invite-1',
-            'group_id': 'group-1',
-            'token': 'tok-1',
-            'invitee_email': null,
-            'role': 'member',
-            'created_at': '2026-01-01T00:00:00Z',
-            'expires_at': '2026-12-31T00:00:00Z',
-            'access_mode': 'readonly_only',
-            'group_name': 'Test Group',
-            'group_currency_code': 'USD',
-            'group_created_at': '2026-01-01T00:00:00Z',
-            'group_updated_at': '2026-01-02T00:00:00Z',
-          },
-        ]),
+      final repo = PowerSyncGroupInviteRepository(
+        db!,
+        cloud: FakeCloudBackend(
+          invites: FakeCloudInvites(
+            onGetByToken: (_) async => {
+              'invite_id': 'invite-1',
+              'group_id': 'group-1',
+              'token': 'tok-1',
+              'invitee_email': null,
+              'role': 'member',
+              'created_at': '2026-01-01T00:00:00Z',
+              'expires_at': '2026-12-31T00:00:00Z',
+              'access_mode': 'readonly_only',
+              'group_name': 'Test Group',
+              'group_currency_code': 'USD',
+              'group_created_at': '2026-01-01T00:00:00Z',
+              'group_updated_at': '2026-01-02T00:00:00Z',
+            },
+          ),
+        ),
       );
 
       final result = await repo.getByToken('tok-1');
@@ -190,27 +147,27 @@ void main() {
       );
     });
 
-    test('getByToken defaults missing access_mode to standard', () async {
+    test('getByToken defaults a missing access_mode to standard', () async {
       if (!powerSyncAvailable || db == null) return;
-      final repo = PowerSyncGroupInviteRepository(db!, supabaseClient: client);
-      when(
-        () => client.rpc('get_invite_by_token', params: any(named: 'params')),
-      ).thenAnswer(
-        (_) => _FakeRpcBuilder([
-          {
-            'invite_id': 'invite-2',
-            'group_id': 'group-1',
-            'token': 'tok-2',
-            'invitee_email': null,
-            'role': 'member',
-            'created_at': '2026-01-01T00:00:00Z',
-            'expires_at': null,
-            'group_name': 'Test Group',
-            'group_currency_code': 'USD',
-            'group_created_at': '2026-01-01T00:00:00Z',
-            'group_updated_at': '2026-01-01T00:00:00Z',
-          },
-        ]),
+      final repo = PowerSyncGroupInviteRepository(
+        db!,
+        cloud: FakeCloudBackend(
+          invites: FakeCloudInvites(
+            onGetByToken: (_) async => {
+              'invite_id': 'invite-2',
+              'group_id': 'group-1',
+              'token': 'tok-2',
+              'invitee_email': null,
+              'role': 'member',
+              'created_at': '2026-01-01T00:00:00Z',
+              'expires_at': null,
+              'group_name': 'Test Group',
+              'group_currency_code': 'USD',
+              'group_created_at': '2026-01-01T00:00:00Z',
+              'group_updated_at': '2026-01-01T00:00:00Z',
+            },
+          ),
+        ),
       );
 
       final result = await repo.getByToken('tok-2');
@@ -218,32 +175,24 @@ void main() {
       expect(result!.invite.accessMode, InviteAccessMode.standard);
     });
 
-    test('accept sends expected params and returns group id', () async {
+    test('accept forwards the token and returns the group id', () async {
       if (!powerSyncAvailable || db == null) return;
-      final repo = PowerSyncGroupInviteRepository(db!, supabaseClient: client);
-      when(
-        () => client.rpc('accept_invite', params: any(named: 'params')),
-      ).thenAnswer((_) => _FakeRpcBuilder('group-xyz'));
+      invites.acceptResult = 'group-xyz';
+      final repo = PowerSyncGroupInviteRepository(db!, cloud: cloud);
 
       final result = await repo.accept('tok-123', newParticipantName: 'User B');
 
       expect(result, 'group-xyz');
-      final verification = verify(
-        () => client.rpc('accept_invite', params: captureAny(named: 'params')),
-      );
-      verification.called(1);
-      final captured = verification.captured.single as Map<String, dynamic>;
-      expect(captured['p_token'], 'tok-123');
-      expect(captured['p_participant_id'], isNull);
-      expect(captured['p_new_participant_name'], 'User B');
+      final call = invites.acceptCalls.single;
+      expect(call.token, 'tok-123');
+      expect(call.participantId, isNull);
+      expect(call.newParticipantName, 'User B');
     });
 
-    test('accept forwards optional participantId for claim', () async {
+    test('accept forwards an optional participantId for a claim', () async {
       if (!powerSyncAvailable || db == null) return;
-      final repo = PowerSyncGroupInviteRepository(db!, supabaseClient: client);
-      when(
-        () => client.rpc('accept_invite', params: any(named: 'params')),
-      ).thenAnswer((_) => _FakeRpcBuilder('group-claim'));
+      invites.acceptResult = 'group-claim';
+      final repo = PowerSyncGroupInviteRepository(db!, cloud: cloud);
 
       final result = await repo.accept(
         'tok-claim',
@@ -252,14 +201,10 @@ void main() {
       );
 
       expect(result, 'group-claim');
-      final verification = verify(
-        () => client.rpc('accept_invite', params: captureAny(named: 'params')),
-      );
-      verification.called(1);
-      final captured = verification.captured.single as Map<String, dynamic>;
-      expect(captured['p_token'], 'tok-claim');
-      expect(captured['p_participant_id'], 'participant-1');
-      expect(captured['p_new_participant_name'], 'Alice');
+      final call = invites.acceptCalls.single;
+      expect(call.token, 'tok-claim');
+      expect(call.participantId, 'participant-1');
+      expect(call.newParticipantName, 'Alice');
     });
   });
 }

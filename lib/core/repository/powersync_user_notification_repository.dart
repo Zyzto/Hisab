@@ -27,13 +27,13 @@ class PowerSyncUserNotificationRepository
     implements IUserNotificationRepository {
   PowerSyncUserNotificationRepository(
     this._db, {
-    this.client,
+    this.cloud,
     this.isOnline = true,
     this.isLocalOnly = false,
   });
 
   final PowerSyncDatabase _db;
-  final SupabaseClient? client;
+  final CloudBackend? cloud;
   final bool isOnline;
   final bool isLocalOnly;
 
@@ -87,12 +87,11 @@ class PowerSyncUserNotificationRepository
       'UPDATE user_notifications SET read_at = ? WHERE id = ?',
       [readAt, id],
     );
-    if (client != null && isOnline) {
+    if (cloud != null && isOnline) {
       try {
-        await client!
-            .from('user_notifications')
-            .update({'read_at': readAt})
-            .eq('id', id);
+        await cloud!.sync.update('user_notifications', {
+          'read_at': readAt,
+        }, id);
         return;
       } catch (e, st) {
         Log.warning(
@@ -123,12 +122,14 @@ class PowerSyncUserNotificationRepository
       'UPDATE user_notifications SET read_at = ? WHERE read_at IS NULL',
       [readAt],
     );
-    if (client != null && isOnline) {
+    if (cloud != null && isOnline) {
       try {
-        await client!
-            .from('user_notifications')
-            .update({'read_at': readAt})
-            .isFilter('read_at', null);
+        await cloud!.sync.updateWhere(
+          'user_notifications',
+          {'read_at': readAt},
+          column: 'read_at',
+          value: null,
+        );
         return;
       } catch (e, st) {
         Log.warning(

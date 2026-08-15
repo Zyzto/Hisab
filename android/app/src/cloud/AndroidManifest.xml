@@ -1,0 +1,39 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Invite and auth entry points only exist when a backend is attached, so
+         they are registered by the cloud flavor alone. Registering them in the
+         offline build would put a chooser dialog in front of every invite link
+         on devices that have both apps installed. -->
+    <application>
+        <activity android:name=".MainActivity">
+            <!-- Invite deep links: com.shenepoy.hisab://invite?token=...
+                 The io.supabase.hisab scheme stays registered so links shared
+                 before the rename keep opening the app. Drop it after two or
+                 three releases. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="com.shenepoy.hisab" android:host="invite"/>
+                <data android:scheme="io.supabase.hisab" android:host="invite"/>
+            </intent-filter>
+            <!-- OAuth / magic-link callback: com.shenepoy.hisab://callback -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="com.shenepoy.hisab" android:host="callback"/>
+                <data android:scheme="io.supabase.hisab" android:host="callback"/>
+            </intent-filter>
+            <!-- HTTPS App Links: https://hisab.shenepoy.com/invite/... -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="https"
+                    android:host="hisab.shenepoy.com"
+                    android:pathPrefix="/invite"/>
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

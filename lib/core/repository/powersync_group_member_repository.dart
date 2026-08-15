@@ -9,11 +9,11 @@ class PowerSyncGroupMemberRepository implements IGroupMemberRepository {
   final bool isLocalOnly;
   PowerSyncGroupMemberRepository(this._db, {this.isLocalOnly = false});
 
-  String? get _currentUserId =>
-      supabaseClientIfConfigured?.auth.currentUser?.id;
+  String? get _currentUserId => cloudBackend?.auth.currentUser?.id;
 
-  SupabaseClient? get _supabase =>
-      isLocalOnly ? null : supabaseClientIfConfigured;
+  /// Membership changes are always server-authorized, so they need the backend
+  /// even when the caller is otherwise offline-capable.
+  CloudGroups? get _groups => isLocalOnly ? null : cloudBackend?.groups;
 
   @override
   Future<GroupRole?> getMyRole(String groupId) async {
@@ -111,27 +111,22 @@ class PowerSyncGroupMemberRepository implements IGroupMemberRepository {
 
   @override
   Future<void> kickMember(String groupId, String memberId) async {
-    final client = _supabase;
-    if (client != null) {
-      await client.rpc(
-        'kick_member',
-        params: {'p_group_id': groupId, 'p_member_id': memberId},
-      );
-      Log.info('Member kicked via RPC');
-    } else {
+    final groups = _groups;
+    if (groups == null) {
       throw UnsupportedError('kickMember requires online mode');
     }
+    await groups.kickMember(groupId, memberId);
+    Log.info('Member kicked');
   }
 
   @override
   Future<void> leave(String groupId) async {
-    final client = _supabase;
-    if (client != null) {
-      await client.rpc('leave_group', params: {'p_group_id': groupId});
-      Log.info('Left group via RPC');
-    } else {
+    final groups = _groups;
+    if (groups == null) {
       throw UnsupportedError('leave requires online mode');
     }
+    await groups.leaveGroup(groupId);
+    Log.info('Left group');
   }
 
   @override
@@ -140,20 +135,12 @@ class PowerSyncGroupMemberRepository implements IGroupMemberRepository {
     String memberId,
     GroupRole role,
   ) async {
-    final client = _supabase;
-    if (client != null) {
-      await client.rpc(
-        'update_member_role',
-        params: {
-          'p_group_id': groupId,
-          'p_member_id': memberId,
-          'p_role': role.name,
-        },
-      );
-      Log.info('Member role updated via RPC');
-    } else {
+    final groups = _groups;
+    if (groups == null) {
       throw UnsupportedError('updateRole requires online mode');
     }
+    await groups.updateMemberRole(groupId, memberId, role.name);
+    Log.info('Member role updated');
   }
 
   @override
@@ -161,19 +148,12 @@ class PowerSyncGroupMemberRepository implements IGroupMemberRepository {
     String groupId,
     String newOwnerMemberId,
   ) async {
-    final client = _supabase;
-    if (client != null) {
-      await client.rpc(
-        'transfer_ownership',
-        params: {
-          'p_group_id': groupId,
-          'p_new_owner_member_id': newOwnerMemberId,
-        },
-      );
-      Log.info('Ownership transferred via RPC');
-    } else {
+    final groups = _groups;
+    if (groups == null) {
       throw UnsupportedError('transferOwnership requires online mode');
     }
+    await groups.transferOwnership(groupId, newOwnerMemberId);
+    Log.info('Ownership transferred');
   }
 
   @override
@@ -182,19 +162,11 @@ class PowerSyncGroupMemberRepository implements IGroupMemberRepository {
     String participantId,
     String memberId,
   ) async {
-    final client = _supabase;
-    if (client != null) {
-      await client.rpc(
-        'merge_participant_with_member',
-        params: {
-          'p_group_id': groupId,
-          'p_participant_id': participantId,
-          'p_member_id': memberId,
-        },
-      );
-      Log.info('Participant merged with member via RPC');
-    } else {
+    final groups = _groups;
+    if (groups == null) {
       throw UnsupportedError('mergeParticipantWithMember requires online mode');
     }
+    await groups.mergeParticipantWithMember(groupId, participantId, memberId);
+    Log.info('Participant merged with member');
   }
 }

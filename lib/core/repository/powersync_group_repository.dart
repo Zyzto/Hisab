@@ -6,16 +6,16 @@ part of 'powersync_repository.dart';
 
 class PowerSyncGroupRepository implements IGroupRepository {
   final PowerSyncDatabase _db;
-  final SupabaseClient? _client;
+  final CloudBackend? _cloud;
   final bool _isOnline;
   final bool _isLocalOnly;
 
   PowerSyncGroupRepository(
     this._db, {
-    SupabaseClient? client,
+    CloudBackend? cloud,
     bool isOnline = false,
     bool isLocalOnly = true,
-  }) : _client = client,
+  }) : _cloud = cloud,
        _isOnline = isOnline,
        _isLocalOnly = isLocalOnly;
 
@@ -112,15 +112,15 @@ class PowerSyncGroupRepository implements IGroupRepository {
     String? ownerId;
     String? ownerDisplayName;
     String? ownerAvatarId;
-    final user = supabaseClientIfConfigured?.auth.currentUser;
+    final user = cloudBackend?.auth.currentUser;
     if (user != null) {
       ownerId = user.id;
       ownerDisplayName =
-          user.userMetadata?['display_name'] as String? ??
-          user.userMetadata?['full_name'] as String? ??
+          user.metadata['display_name'] as String? ??
+          user.fullName ??
           user.email ??
           'default_owner_name'.tr();
-      ownerAvatarId = user.userMetadata?['avatar_id'] as String?;
+      ownerAvatarId = user.avatarId;
     }
 
     final groupData = <String, dynamic>{
@@ -187,13 +187,13 @@ class PowerSyncGroupRepository implements IGroupRepository {
         ? fallbackOwnerName
         : clampCodePoints(rawOwnerName, maxCodePoints: 100);
 
-    if (!_isLocalOnly && _isOnline && _client != null) {
+    if (!_isLocalOnly && _isOnline && _cloud != null) {
       // Online: write to Supabase first
-      await _client.from('groups').insert(groupData);
+      await _cloud.sync.upsert('groups', groupData);
       // Create owner membership first (without participant_id) so that
       // get_user_role() returns 'owner' for subsequent RLS checks.
       if (ownerId != null && ownerMemberId != null) {
-        await _client.from('group_members').insert({
+        await _cloud.sync.upsert('group_members', {
           'id': ownerMemberId,
           'group_id': id,
           'user_id': ownerId,
@@ -202,7 +202,7 @@ class PowerSyncGroupRepository implements IGroupRepository {
         });
       }
       // Create participant for owner (RLS now passes via get_user_role)
-      await _client.from('participants').insert({
+      await _cloud.sync.upsert('participants', {
         'id': participantId,
         'group_id': id,
         'name': participantName,
@@ -214,15 +214,12 @@ class PowerSyncGroupRepository implements IGroupRepository {
       });
       // Link participant to the membership record
       if (ownerMemberId != null) {
-        await _client
-            .from('group_members')
-            .update({'participant_id': participantId})
-            .eq('id', ownerMemberId);
+        await _cloud.sync.update('group_members', {'participant_id': participantId}, ownerMemberId);
       }
       // Create additional participants from the wizard (use same IDs as local loop below)
       for (int i = 0; i < additionalParticipantIds.length; i++) {
         final entry = additionalParticipantIds[i];
-        await _client.from('participants').insert({
+        await _cloud.sync.upsert('participants', {
           'id': entry.id,
           'group_id': id,
           'name': entry.name,
@@ -381,14 +378,14 @@ class PowerSyncGroupRepository implements IGroupRepository {
       'updated_at': now,
     };
 
-    if (!_isLocalOnly && _isOnline && _client != null) {
+    if (!_isLocalOnly && _isOnline && _cloud != null) {
       // Omit id (PK) and archived_at (archive/unarchive use dedicated methods).
       // Personal/budget/settle/permission columns are part of the groups schema
       // (migrations 12/16/19/20260728120000) and must sync or local edits revert on fetch.
       final supabaseData = Map<String, dynamic>.from(data)
         ..remove('archived_at')
         ..remove('id');
-      await _client.from('groups').update(supabaseData).eq('id', group.id);
+      await _cloud.sync.update('groups', supabaseData, group.id);
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,
       isOnline: _isOnline,
@@ -450,8 +447,8 @@ class PowerSyncGroupRepository implements IGroupRepository {
       updateData['settlement_snapshot_json'] = _archiveAutoFreezeMarker;
     }
 
-    if (!_isLocalOnly && _isOnline && _client != null) {
-      await _client.from('groups').update(updateData).eq('id', groupId);
+    if (!_isLocalOnly && _isOnline && _cloud != null) {
+      await _cloud.sync.update('groups', updateData, groupId);
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,
       isOnline: _isOnline,
@@ -498,8 +495,8 @@ class PowerSyncGroupRepository implements IGroupRepository {
       updateData['settlement_snapshot_json'] = null;
     }
 
-    if (!_isLocalOnly && _isOnline && _client != null) {
-      await _client.from('groups').update(updateData).eq('id', groupId);
+    if (!_isLocalOnly && _isOnline && _cloud != null) {
+      await _cloud.sync.update('groups', updateData, groupId);
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,
       isOnline: _isOnline,
@@ -598,8 +595,8 @@ class PowerSyncGroupRepository implements IGroupRepository {
 
   @override
   Future<void> delete(String id) async {
-    if (!_isLocalOnly && _isOnline && _client != null) {
-      await _client.from('groups').delete().eq('id', id);
+    if (!_isLocalOnly && _isOnline && _cloud != null) {
+      await _cloud.sync.delete('groups', id);
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,
       isOnline: _isOnline,
@@ -617,15 +614,12 @@ class PowerSyncGroupRepository implements IGroupRepository {
     final now = _nowIso();
     final snapshotJson = snapshot.toJsonString();
 
-    if (!_isLocalOnly && _isOnline && _client != null) {
-      await _client
-          .from('groups')
-          .update({
+    if (!_isLocalOnly && _isOnline && _cloud != null) {
+      await _cloud.sync.update('groups', {
             'settlement_freeze_at': now,
             'settlement_snapshot_json': snapshotJson,
             'updated_at': now,
-          })
-          .eq('id', groupId);
+          }, groupId);
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,
       isOnline: _isOnline,
@@ -653,15 +647,12 @@ class PowerSyncGroupRepository implements IGroupRepository {
   Future<void> unfreezeSettlement(String groupId) async {
     final now = _nowIso();
 
-    if (!_isLocalOnly && _isOnline && _client != null) {
-      await _client
-          .from('groups')
-          .update({
+    if (!_isLocalOnly && _isOnline && _cloud != null) {
+      await _cloud.sync.update('groups', {
             'settlement_freeze_at': null,
             'settlement_snapshot_json': null,
             'updated_at': now,
-          })
-          .eq('id', groupId);
+          }, groupId);
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,
       isOnline: _isOnline,

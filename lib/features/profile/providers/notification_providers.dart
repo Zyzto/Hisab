@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/constants/supabase_config.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/repository/powersync_repository.dart';
 import '../../../core/repository/user_notification_repository.dart';
@@ -14,9 +14,7 @@ final userNotificationRepositoryProvider =
       final isOnline = ref.watch(connectivityProvider);
       return PowerSyncUserNotificationRepository(
         ref.watch(powerSyncDatabaseProvider),
-        client: (localOnly || !supabaseConfigAvailable)
-            ? null
-            : supabaseClientIfConfigured,
+        cloud: localOnly ? null : cloudBackend,
         isOnline: isOnline,
         isLocalOnly: localOnly,
       );

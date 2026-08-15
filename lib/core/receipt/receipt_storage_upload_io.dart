@@ -2,30 +2,24 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_logging_service/flutter_logging_service.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 import 'package:path/path.dart' as path;
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:uuid/uuid.dart';
 
-import '../constants/supabase_config.dart';
-
-const String _bucket = 'expense-images';
-
-/// Uploads an expense image at [localPath] to Supabase Storage under
-/// [groupId]/[expenseId]/{uuid}.{ext}. Returns the public URL, or null on failure.
-/// Call only when Supabase is configured and user is authenticated.
+/// Uploads the expense image at [localPath]. Returns its URL, or null on
+/// failure — a receipt photo that fails to upload must not fail the expense.
 Future<String?> uploadExpenseImageToStorage(
   String localPath,
   String groupId,
   String expenseId,
 ) async {
-  if (!supabaseConfigAvailable) return null;
+  if (!cloudAvailable) return null;
   final file = File(localPath);
   if (!await file.exists()) {
     Log.warning('Expense image upload: file not found: $localPath');
     return null;
   }
   final bytes = await file.readAsBytes();
-  final ext = _normalizeImageExt(
+  final ext = normalizeImageExt(
     path.extension(localPath).isEmpty
         ? 'jpg'
         : path.extension(localPath).replaceFirst('.', ''),
@@ -38,39 +32,25 @@ Future<String?> uploadExpenseImageToStorage(
   );
 }
 
-/// Uploads expense image [bytes] to Supabase Storage under
-/// [groupId]/[expenseId]/{uuid}.{ext}. Returns the public URL, or null on failure.
+/// Uploads expense image [bytes]. Returns its URL, or null on failure.
 Future<String?> uploadExpenseImageBytesToStorage(
   Uint8List bytes,
   String groupId,
   String expenseId, {
   String? fileExt,
 }) async {
-  final client = supabaseClientIfConfigured;
-  if (client == null) return null;
-  final ext = _normalizeImageExt(fileExt ?? 'jpg');
-  final bucketKey = '$groupId/$expenseId/${const Uuid().v4()}.$ext';
-  try {
-    await client.storage
-        .from(_bucket)
-        .uploadBinary(
-          bucketKey,
-          bytes,
-          fileOptions: FileOptions(
-            upsert: false,
-            contentType: _contentTypeForExt(ext),
-          ),
-        );
-    final url = client.storage.from(_bucket).getPublicUrl(bucketKey);
-    Log.debug('Expense image uploaded: $bucketKey');
-    return url;
-  } catch (e, st) {
-    Log.error('Expense image upload failed', error: e, stackTrace: st);
-    return null;
-  }
+  final files = cloudBackend?.files;
+  if (files == null) return null;
+  return files.uploadExpenseImage(
+    bytes,
+    groupId: groupId,
+    expenseId: expenseId,
+    fileExt: normalizeImageExt(fileExt ?? 'jpg'),
+  );
 }
 
-String _normalizeImageExt(String ext) {
+/// Narrows an arbitrary extension to one the backend is required to accept.
+String normalizeImageExt(String ext) {
   switch (ext.toLowerCase()) {
     case 'jpg':
     case 'jpeg':
@@ -81,17 +61,5 @@ String _normalizeImageExt(String ext) {
       return 'webp';
     default:
       return 'jpg';
-  }
-}
-
-String _contentTypeForExt(String ext) {
-  switch (_normalizeImageExt(ext)) {
-    case 'png':
-      return 'image/png';
-    case 'webp':
-      return 'image/webp';
-    case 'jpg':
-    default:
-      return 'image/jpeg';
   }
 }

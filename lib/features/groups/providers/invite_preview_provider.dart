@@ -1,24 +1,16 @@
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 
 import '../../../core/services/settle_up_service.dart';
 import '../../../domain/domain.dart';
 
-final supabaseClientProvider = Provider<SupabaseClient>(
-  (ref) => Supabase.instance.client,
+/// Where invite previews are read from. Null in an offline build, which has no
+/// invites to preview. Overridden in tests with a fake.
+final invitePreviewSourceProvider = Provider<CloudInvites?>(
+  (ref) => cloudBackend?.invites,
 );
-
-typedef InvitePreviewRpc =
-    Future<dynamic> Function(String rpcName, Map<String, dynamic> params);
-
-final invitePreviewRpcProvider = Provider<InvitePreviewRpc>((ref) {
-  final client = ref.read(supabaseClientProvider);
-  return (rpcName, params) async {
-    return await client.rpc(rpcName, params: params);
-  };
-});
 
 class InvitePreviewData {
   const InvitePreviewData({
@@ -78,20 +70,18 @@ bool _isReadonlyPreviewMode(String? accessMode) =>
     accessMode == InviteAccessMode.readonlyOnly.value;
 
 Future<Map<String, dynamic>?> _loadInvitePreviewGroupRow({
-  required InvitePreviewRpc rpc,
+  required CloudInvites invites,
   required String token,
 }) async {
   try {
-    final result = await rpc('get_invite_preview_group', {'p_token': token});
-    return _extractFirstRow(result);
+    return _extractFirstRow(await invites.previewGroup(token));
   } catch (error) {
     if (!_isMissingSettleColumnError(error)) rethrow;
   }
 
-  // Legacy backend fallback: older projects may not have
+  // Legacy backend fallback: older deployments may not have
   // groups.allow_member_settle_for_others yet.
-  final legacyResult = await rpc('get_invite_by_token', {'p_token': token});
-  final legacyRow = _extractFirstRow(legacyResult);
+  final legacyRow = _extractFirstRow(await invites.getByToken(token));
   if (legacyRow == null) return null;
 
   final accessMode = legacyRow['access_mode'] as String?;
@@ -197,25 +187,17 @@ List<String>? _parseImagePaths(Object? value) {
 
 final invitePreviewDataProvider =
     FutureProvider.family<InvitePreviewData?, String>((ref, token) async {
-      final rpc = ref.read(invitePreviewRpcProvider);
+      final invites = ref.read(invitePreviewSourceProvider);
+      if (invites == null) return null;
 
-      final groupRow = await _loadInvitePreviewGroupRow(rpc: rpc, token: token);
+      final groupRow = await _loadInvitePreviewGroupRow(
+        invites: invites,
+        token: token,
+      );
       if (groupRow == null) return null;
 
-      final participantsResult = await rpc('get_invite_preview_participants', {
-        'p_token': token,
-      });
-      final participantsRows = (participantsResult is List)
-          ? participantsResult.cast<Map<String, dynamic>>()
-          : <Map<String, dynamic>>[];
-
-      final expensesResult = await rpc('get_invite_preview_expenses', {
-        'p_token': token,
-        'p_limit': 200,
-      });
-      final expensesRows = (expensesResult is List)
-          ? expensesResult.cast<Map<String, dynamic>>()
-          : <Map<String, dynamic>>[];
+      final participantsRows = await invites.previewParticipants(token);
+      final expensesRows = await invites.previewExpenses(token);
 
       final group = Group(
         id: groupRow['group_id'] as String,

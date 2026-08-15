@@ -604,7 +604,11 @@ class _FakeSyncBackend implements SyncBackend {
   }
 
   @override
-  Future<void> upsert(String table, Map<String, dynamic> data) async {
+  Future<void> upsert(
+    String table,
+    Map<String, dynamic> data, {
+    List<String>? conflictColumns,
+  }) async {
     _captured?.add({'table': table, 'operation': 'insert', 'data': data});
   }
 
@@ -619,6 +623,22 @@ class _FakeSyncBackend implements SyncBackend {
       'operation': 'update',
       'data': data,
       'id': id,
+    });
+  }
+
+  @override
+  Future<void> updateWhere(
+    String table,
+    Map<String, dynamic> data, {
+    required String column,
+    required Object? value,
+  }) async {
+    _captured?.add({
+      'table': table,
+      'operation': 'updateWhere',
+      'data': data,
+      'column': column,
+      'value': value,
     });
   }
 

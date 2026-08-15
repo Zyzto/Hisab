@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import '../constants/supabase_config.dart';
+import '../constants/firebase_config.dart';
 import '../layout/layout_breakpoints.dart';
 import '../layout/responsive_sheet.dart';
 import '../pwa/pwa_capabilities.dart';

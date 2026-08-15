@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:powersync/powersync.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'sync_backend.dart';
 
@@ -15,18 +14,10 @@ const Set<String> kPendingWritesAllowedTables = {
   'expense_tags',
 };
 
-/// Testable sync operations: full fetch from Supabase into local DB,
-/// and push of pending_writes to Supabase. Used by [DataSyncService].
+/// Testable sync operations: full fetch from the backend into the local DB,
+/// and push of pending_writes back out. Used by [DataSyncService].
 class SyncEngine {
-  /// Push queued offline writes to Supabase.
-  Future<void> pushPendingWrites(
-    PowerSyncDatabase db,
-    SupabaseClient client,
-  ) async {
-    await pushPendingWritesWithBackend(db, SupabaseSyncBackend(client));
-  }
-
-  /// Push queued offline writes using [SyncBackend]. Used for testing.
+  /// Push queued offline writes using [SyncBackend].
   Future<void> pushPendingWritesWithBackend(
     PowerSyncDatabase db,
     SyncBackend backend, {
@@ -100,13 +91,8 @@ class SyncEngine {
     return value.toString() == '1' || value.toString() == 'true';
   }
 
-  /// Full fetch from Supabase into local DB. Replaces local cache for
-  /// groups the current user is a member of.
-  Future<void> fetchAll(PowerSyncDatabase db, SupabaseClient client) async {
-    await fetchAllWithBackend(db, SupabaseSyncBackend(client));
-  }
-
-  /// Full fetch using [SyncBackend]. Used for testing.
+  /// Full fetch into the local DB, replacing the cached rows for every group
+  /// the current user is a member of.
   Future<void> fetchAllWithBackend(
     PowerSyncDatabase db,
     SyncBackend backend,
@@ -350,7 +336,3 @@ class SyncEngine {
   }
 }
 
-/// Calls Supabase RPC [set_notify_suppress].
-Future<void> setNotifySuppressRpc(SupabaseClient client, bool active) async {
-  await client.rpc('set_notify_suppress', params: {'p_active': active});
-}

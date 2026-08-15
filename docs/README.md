@@ -8,10 +8,10 @@ Guides for running, shipping, and extending **Hisab**. Start with the root [READ
 
 | Doc | Use when you need to… |
 |-----|------------------------|
-| [CONFIGURATION.md](CONFIGURATION.md) | Pass `--dart-define` / define files; online vs local-only |
-| [LOCAL_TEST_ENV.md](LOCAL_TEST_ENV.md) | Run Supabase + Edge Functions on LAN (Podman) for device tests |
-| [SUPABASE_SETUP.md](SUPABASE_SETUP.md) | Create a hosted project, migrations, Auth, Edge deploy |
+| [CONFIGURATION.md](CONFIGURATION.md) | Build-time flags; online vs local-only |
 | [CODEBASE.md](CODEBASE.md) | Map features (incl. Profile), sync, shell nav, notifications, and where code lives |
+| [SELF_HOSTING.md](SELF_HOSTING.md) | Attach your own backend to this client |
+| [../CONTRIBUTING.md](../CONTRIBUTING.md) | Workflow, checks, and the CLA |
 | [../SECURITY.md](../SECURITY.md) | Know what never lands in a public commit |
 
 ---
@@ -21,17 +21,22 @@ Guides for running, shipping, and extending **Hisab**. Start with the root [READ
 | Doc | Topic |
 |-----|--------|
 | [RELEASE_SETUP.md](RELEASE_SETUP.md) | Keystore, Play, Firebase Hosting, one-time release checklist |
-| [../.cursor/skills/hisab-release-checks/SKILL.md](../.cursor/skills/hisab-release-checks/SKILL.md) | Agent skill: security + infra checks, advisors, release gate |
-| [GITHUB_ACTIONS_SECRETS.md](GITHUB_ACTIONS_SECRETS.md) | CI secret names and where each value comes from |
-| [SUPABASE_BACKUP.md](SUPABASE_BACKUP.md) | Database backup and restore |
+| [../.cursor/skills/hisab-release-checks/SKILL.md](../.cursor/skills/hisab-release-checks/SKILL.md) | Agent skill: security + infra checks, release gate |
 
 ---
 
 ## Backend
 
+This repository ships **no backend**. It ships the contract one must satisfy.
+
 | Doc | Topic |
 |-----|--------|
-| [EDGE_FUNCTIONS.md](EDGE_FUNCTIONS.md) | Functions list, local smoke, deploy commands |
+| [SELF_HOSTING.md](SELF_HOSTING.md) | Implement `CloudBackend` against your own server, step by step |
+| [BACKEND_BEHAVIOUR.md](BACKEND_BEHAVIOUR.md) | Server-side rules the client assumes (invites, membership, deletion) |
+| [../packages/hisab_backend/README.md](../packages/hisab_backend/README.md) | Facet-by-facet API reference |
+
+The hosted Hisab backend is a separate proprietary project and is not part of
+this repository.
 
 ---
 
@@ -62,13 +67,12 @@ Guides for running, shipping, and extending **Hisab**. Start with the root [READ
 
 | Doc | Topic |
 |-----|--------|
-| [../test/README.md](../test/README.md) | Unit, widget, integration, online, and Edge smoke |
+| [../test/README.md](../test/README.md) | Unit, widget, and integration tests |
 
 ---
 
 ## Suggested reading order
 
-1. **Contributor, no cloud** — [CONFIGURATION.md](CONFIGURATION.md) (local-only), then [CODEBASE.md](CODEBASE.md).
-2. **Device + local backend** — [LOCAL_TEST_ENV.md](LOCAL_TEST_ENV.md), then [EDGE_FUNCTIONS.md](EDGE_FUNCTIONS.md).
-3. **Hosted online** — [SUPABASE_SETUP.md](SUPABASE_SETUP.md), then [CONFIGURATION.md](CONFIGURATION.md) for defines.
-4. **Ship a release** — [RELEASE_SETUP.md](RELEASE_SETUP.md) + [GITHUB_ACTIONS_SECRETS.md](GITHUB_ACTIONS_SECRETS.md); keep [SECURITY.md](../SECURITY.md) open while adding secrets.
+1. **Contributor, no cloud** — [CONFIGURATION.md](CONFIGURATION.md) (local-only), then [CODEBASE.md](CODEBASE.md), then [../CONTRIBUTING.md](../CONTRIBUTING.md).
+2. **Running your own backend** — [SELF_HOSTING.md](SELF_HOSTING.md), then [BACKEND_BEHAVIOUR.md](BACKEND_BEHAVIOUR.md), then [../packages/hisab_backend/README.md](../packages/hisab_backend/README.md) as reference.
+3. **Ship a FOSS release** — [RELEASE_SETUP.md](RELEASE_SETUP.md); keep [SECURITY.md](../SECURITY.md) open while adding secrets.

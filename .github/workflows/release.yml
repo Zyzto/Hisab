@@ -1,80 +1,49 @@
-name: Release
+name: Release (offline build)
+
+# Ships the FOSS variant: no backend, no Firebase, its own signing key and its
+# own application id (com.shenepoy.hisab.foss), so it installs alongside the
+# cloud build rather than replacing it.
+#
+# The cloud build is produced by the private repo and uploaded to the same
+# GitHub Release. Nothing here has access to production credentials.
 
 on:
   push:
     tags:
       - "v*"
   workflow_dispatch:
-    inputs:
-      deploy_play_store:
-        description: "Deploy AAB to Google Play internal track"
-        type: boolean
-        default: true
-      deploy_web:
-        description: "Deploy web build to Firebase Hosting"
-        type: boolean
-        default: true
-      web_build_mode:
-        description: "Web build mode: default (CanvasKit) or wasm (Skwasm with fallback)"
-        type: choice
-        options:
-          - default
-          - wasm
-        default: default
 
-# Cancel previous runs on the same ref so we don't waste minutes.
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: true
 
 env:
-  FLUTTER_VERSION: "3.41.5" # keep in sync with your local SDK
-  JAVA_VERSION: "17"
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
-  # ──────────────────────────────────────────────
-  # 0a. Static security check (secrets / tracked files)
-  # ──────────────────────────────────────────────
-  security-check:
-    name: Security Check
+  checks:
+    name: Checks
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Run security check
-        run: bash ./scripts/verify_security.sh
-
-  # ──────────────────────────────────────────────
-  # 0b. Static infra / release-readiness check
-  # ──────────────────────────────────────────────
-  infra-check:
-    name: Infra Check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Run infra check
-        run: bash ./scripts/verify_infra.sh
-
-  # ──────────────────────────────────────────────
-  # 0c. Unit, widget, and integration tests (web Chrome)
-  # ──────────────────────────────────────────────
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - name: Read Flutter version
+        id: flutter
+        run: echo "version=$(cat .flutter-version)" >> "$GITHUB_OUTPUT"
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
+          flutter-version: ${{ steps.flutter.outputs.version }}
           channel: stable
           cache: true
+
+      - name: Static release checks
+        run: bash ./scripts/run_release_checks.sh
+
+      - name: Assert the tree carries no backend dependency
+        run: bash ./scripts/ci/assert_offline_only.sh
 
       - name: Flutter pub get
         run: flutter pub get
@@ -82,413 +51,78 @@ jobs:
       - name: Run unit and widget tests
         run: flutter test
 
-      - name: Install Chrome + ChromeDriver
-        id: chrome
-        uses: browser-actions/setup-chrome@v2
-        with:
-          chrome-version: 'stable'
-          install-chromedriver: true
-
-      - name: Link action Chrome over system Chrome
-        run: |
-          sudo ln -sf "${{ steps.chrome.outputs.chrome-path }}" /opt/google/chrome/chrome
-          sudo ln -sf "${{ steps.chrome.outputs.chrome-path }}" /usr/bin/google-chrome
-          sudo ln -sf "${{ steps.chrome.outputs.chrome-path }}" /usr/bin/google-chrome-stable
-
-      - name: Start ChromeDriver
-        run: |
-          "${{ steps.chrome.outputs.chromedriver-path }}" --port=4444 &
-          sleep 3
-
-      - name: Run integration tests (web)
-        env:
-          CHROME_EXECUTABLE: ${{ steps.chrome.outputs.chrome-path }}
-        run: |
-          flutter drive \
-            --driver=test_driver/integration_test.dart \
-            --target=integration_test/app_test.dart \
-            -d web-server \
-            --release \
-            --web-browser-flag=--no-sandbox \
-            --web-browser-flag=--disable-dev-shm-usage
-
-  # ──────────────────────────────────────────────
-  # 0d. Online integration tests (local Supabase + web Chrome)
-  # ──────────────────────────────────────────────
-  test-online:
-    name: Online Tests
-    runs-on: ubuntu-latest
-    env:
-      # Isolate compose project naming from checkout path mismatches — reduces Kong/storage
-      # routing flakes during `supabase db reset` (see supabase/cli#4535).
-      COMPOSE_PROJECT_NAME: hisab
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      # cache: false avoids "Failed to FinalizeCacheEntryUpload (404) cache entry not found"
-      # when this job is cancelled or runs under concurrency; save step is skipped.
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          cache: false
-
-      - name: Flutter pub get
-        run: flutter pub get
-
-      - name: Verify Supabase config as code files
-        run: bash ./scripts/verify_supabase_config_as_code.sh
-
-      - name: Set up Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          # Pin for reproducible CI (avoid transient regressions when `latest` moves).
-          version: 2.95.4
-
-      - name: Write local Edge secrets for CI
-        run: |
-          # invite-redirect reads SITE_URL from [edge_runtime.secrets]; without this
-          # it falls back to the production host and smoke tests fail.
-          printf 'SITE_URL=http://localhost:8080\n' > supabase/.env
-
-      - name: Start local Supabase
-        run: supabase start
-
-      - name: Reset database (migrations + seed)
-        run: |
-          set -euo pipefail
-          for attempt in 1 2 3 4 5; do
-            echo "supabase db reset (attempt ${attempt}/5)"
-            if supabase db reset; then
-              exit 0
-            fi
-            echo "Reset failed — cooling down before retry..."
-            sleep 25
-          done
-          echo "supabase db reset failed after retries"
-          exit 1
-
-      - name: Wait for Supabase API
-        run: |
-          API_URL=$(supabase status --output json | jq -r '.API_URL')
-          ready=0
-          for i in $(seq 1 30); do
-            code=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/rest/v1/" || true)
-            if [ "$code" = "200" ] || [ "$code" = "401" ] || [ "$code" = "404" ]; then
-              echo "Supabase API ready (HTTP $code)"
-              ready=1
-              break
-            fi
-            echo "Waiting for Supabase API... ($i/30)"
-            sleep 2
-          done
-          if [ "$ready" -ne 1 ]; then
-            echo "ERROR: Supabase API did not become ready in time"
-            exit 1
-          fi
-
-      - name: Extract Supabase credentials
-        id: supabase
-        run: |
-          STATUS_JSON=$(supabase status --output json)
-          echo "url=$(echo "$STATUS_JSON" | jq -r '.API_URL')" >> "$GITHUB_OUTPUT"
-          echo "anon_key=$(echo "$STATUS_JSON" | jq -r '.ANON_KEY')" >> "$GITHUB_OUTPUT"
-          echo "service_role_key=$(echo "$STATUS_JSON" | jq -r '.SERVICE_ROLE_KEY')" >> "$GITHUB_OUTPUT"
-
-      - name: Install Chrome + ChromeDriver
-        id: chrome
-        uses: browser-actions/setup-chrome@v2
-        with:
-          chrome-version: 'stable'
-          install-chromedriver: true
-
-      - name: Link action Chrome over system Chrome
-        run: |
-          sudo ln -sf "${{ steps.chrome.outputs.chrome-path }}" /opt/google/chrome/chrome
-          sudo ln -sf "${{ steps.chrome.outputs.chrome-path }}" /usr/bin/google-chrome
-          sudo ln -sf "${{ steps.chrome.outputs.chrome-path }}" /usr/bin/google-chrome-stable
-
-      - name: Start ChromeDriver
-        run: |
-          "${{ steps.chrome.outputs.chromedriver-path }}" --port=4444 &
-          sleep 3
-
-      - name: Run online integration tests (web)
-        env:
-          CHROME_EXECUTABLE: ${{ steps.chrome.outputs.chrome-path }}
-        run: |
-          flutter drive \
-            --driver=test_driver/integration_test.dart \
-            --target=integration_test/online_app_test.dart \
-            -d web-server \
-            --release \
-            --dart-define=SUPABASE_URL=${{ steps.supabase.outputs.url }} \
-            --dart-define=SUPABASE_ANON_KEY=${{ steps.supabase.outputs.anon_key }} \
-            --dart-define=HISAB_SKIP_INVITE_ONLINE=false \
-            --web-browser-flag=--no-sandbox \
-            --web-browser-flag=--disable-dev-shm-usage
-
-      - name: Run edge function HTTP smoke tests
-        run: |
-          flutter test test/edge/edge_functions_smoke_test.dart \
-            --dart-define=SUPABASE_URL=${{ steps.supabase.outputs.url }} \
-            --dart-define=SUPABASE_ANON_KEY=${{ steps.supabase.outputs.anon_key }} \
-            --dart-define=SUPABASE_SERVICE_ROLE_KEY=${{ steps.supabase.outputs.service_role_key }} \
-            --dart-define=SITE_URL=http://localhost:8080
-
-      - name: Stop local Supabase
-        if: always()
-        run: supabase stop
-
-  # ──────────────────────────────────────────────
-  # 1. Build Android APK + AAB
-  # ──────────────────────────────────────────────
-  build-android:
-    name: Build Android
-    needs: [security-check, infra-check, test, test-online]
+  build-foss:
+    name: Build FOSS APKs
+    needs: checks
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Set up Java ${{ env.JAVA_VERSION }}
+      - name: Read Flutter version
+        id: flutter
+        run: echo "version=$(cat .flutter-version)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Java
         uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version: "17"
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
+          flutter-version: ${{ steps.flutter.outputs.version }}
           channel: stable
           cache: true
-
-      # Decode the release keystore from a base64 secret.
-      - name: Decode keystore
-        run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release-keystore.jks
-
-      # Write key.properties so build.gradle.kts picks it up.
-      - name: Create key.properties
-        env:
-          STORE_FILE: ${{ github.workspace }}/android/app/release-keystore.jks
-          STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS_VAL: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD_VAL: ${{ secrets.KEY_PASSWORD }}
-        run: |
-          printf 'storeFile=%s\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
-            "$STORE_FILE" "$STORE_PASSWORD" "$KEY_ALIAS_VAL" "$KEY_PASSWORD_VAL" \
-            > android/key.properties
-
-      # Restore google-services.json from a base64 secret (gitignored for security).
-      - name: Decode google-services.json
-        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 --decode > android/app/google-services.json
 
       - name: Flutter pub get
         run: flutter pub get
 
-      - name: Build APK
-        run: |
-          flutter build apk --release --split-per-abi \
-            --obfuscate \
-            --split-debug-info=build/app/outputs/symbols \
-            --tree-shake-icons \
-            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
-            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
-            --dart-define=INVITE_BASE_URL=${{ secrets.INVITE_BASE_URL }} \
-            --dart-define=FCM_VAPID_KEY=${{ secrets.FCM_VAPID_KEY }}
-
-      - name: Build App Bundle
-        run: |
-          flutter build appbundle --release \
-            --obfuscate \
-            --split-debug-info=build/app/outputs/symbols \
-            --tree-shake-icons \
-            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
-            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
-            --dart-define=INVITE_BASE_URL=${{ secrets.INVITE_BASE_URL }} \
-            --dart-define=FCM_VAPID_KEY=${{ secrets.FCM_VAPID_KEY }}
+      - name: Build APKs
+        env:
+          KEYSTORE_BASE64: ${{ secrets.FOSS_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.FOSS_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.FOSS_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.FOSS_KEY_PASSWORD }}
+        run: bash ./scripts/ci/build_android.sh foss
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v7
         with:
-          name: release-apk
+          name: foss-apk
           path: |
-            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
-            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-            build/app/outputs/flutter-apk/app-x86_64-release.apk
-
-      - name: Upload AAB artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: release-aab
-          path: build/app/outputs/bundle/release/app-release.aab
+            build/app/outputs/flutter-apk/app-armeabi-v7a-foss-release.apk
+            build/app/outputs/flutter-apk/app-arm64-v8a-foss-release.apk
+            build/app/outputs/flutter-apk/app-x86_64-foss-release.apk
 
       - name: Upload Dart symbol maps
         uses: actions/upload-artifact@v7
         with:
-          name: release-symbols
+          name: foss-symbols
           path: build/app/outputs/symbols/
 
-  # ──────────────────────────────────────────────
-  # 2. Create GitHub Release (tag pushes only)
-  # ──────────────────────────────────────────────
   github-release:
     name: GitHub Release
-    needs: build-android
+    needs: build-foss
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Download APK
+      - name: Download APKs
         uses: actions/download-artifact@v8
         with:
-          name: release-apk
+          name: foss-apk
 
-      - name: Create Release
+      # Created as a draft so the private pipeline can attach the cloud build
+      # before anyone sees a release that offers only one of the two.
+      - name: Create draft release
         uses: softprops/action-gh-release@v2
         with:
+          draft: true
           generate_release_notes: true
           files: |
-            app-armeabi-v7a-release.apk
-            app-arm64-v8a-release.apk
-            app-x86_64-release.apk
-
-  # ──────────────────────────────────────────────
-  # 3. Deploy AAB to Google Play (internal track)
-  # ──────────────────────────────────────────────
-  deploy-play-store:
-    name: Deploy to Google Play
-    needs: build-android
-    if: >-
-      (startsWith(github.ref, 'refs/tags/v')) ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_play_store == 'true')
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download AAB
-        uses: actions/download-artifact@v8
-        with:
-          name: release-aab
-
-      - name: Upload to Play Store (internal)
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON }}
-          packageName: com.shenepoy.hisab
-          releaseFiles: app-release.aab
-          track: internal
-          status: completed
-
-  # ──────────────────────────────────────────────
-  # 4. Build & deploy web to Firebase Hosting
-  # ──────────────────────────────────────────────
-  deploy-web:
-    name: Deploy Web
-    needs: [security-check, infra-check, test, test-online]
-    if: >-
-      (startsWith(github.ref, 'refs/tags/v')) ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_web == 'true')
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          cache: true
-
-      - name: Flutter pub get
-        run: flutter pub get
-
-      # PowerSync web needs sqlite3.wasm and powersync_db.worker.js (required for live site; missing = "Unexpected token '<'" / wrong WASM MIME).
-      - name: Set up PowerSync web (sqlite3.wasm + worker)
-        run: flutter pub run powersync:setup_web
-
-      - name: Ensure PowerSync web assets exist
-        run: |
-          test -f web/sqlite3.wasm || (echo "Missing web/sqlite3.wasm after setup_web" && exit 1)
-          test -f web/powersync_db.worker.js || (echo "Missing web/powersync_db.worker.js after setup_web" && exit 1)
-
-      - name: Build web
-        run: |
-          WEB_WASM_FLAG=""
-          if [ "${{ github.event.inputs.web_build_mode }}" = "wasm" ]; then
-            WEB_WASM_FLAG="--wasm"
-          fi
-          flutter build web \
-            $WEB_WASM_FLAG \
-            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
-            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
-            --dart-define=INVITE_BASE_URL=${{ secrets.INVITE_BASE_URL }} \
-            --dart-define=SITE_URL=${{ secrets.SITE_URL }} \
-            --dart-define=ENABLE_WEB_SEMANTICS=false \
-            --dart-define=FCM_VAPID_KEY=${{ secrets.FCM_VAPID_KEY }} \
-            --dart-define=FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }} \
-            --dart-define=FIREBASE_AUTH_DOMAIN=${{ secrets.FIREBASE_AUTH_DOMAIN }} \
-            --dart-define=FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }} \
-            --dart-define=FIREBASE_STORAGE_BUCKET=${{ secrets.FIREBASE_STORAGE_BUCKET }} \
-            --dart-define=FIREBASE_MESSAGING_SENDER_ID=${{ secrets.FIREBASE_MESSAGING_SENDER_ID }} \
-            --dart-define=FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }}
-
-      - name: Inject Firebase config into web assets
-        run: |
-          for f in build/web/index.html build/web/firebase-messaging-sw.js; do
-            sed -i "s|__FIREBASE_API_KEY__|${{ secrets.FIREBASE_API_KEY }}|g" "$f"
-            sed -i "s|__FIREBASE_AUTH_DOMAIN__|${{ secrets.FIREBASE_AUTH_DOMAIN }}|g" "$f"
-            sed -i "s|__FIREBASE_PROJECT_ID__|${{ secrets.FIREBASE_PROJECT_ID }}|g" "$f"
-            sed -i "s|__FIREBASE_STORAGE_BUCKET__|${{ secrets.FIREBASE_STORAGE_BUCKET }}|g" "$f"
-            sed -i "s|__FIREBASE_MESSAGING_SENDER_ID__|${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}|g" "$f"
-            sed -i "s|__FIREBASE_APP_ID__|${{ secrets.FIREBASE_APP_ID }}|g" "$f"
-          done
-
-      - name: Copy static pages and PowerSync web assets for Firebase Hosting
-        run: |
-          cp -r web/privacy build/web/
-          cp -r web/delete-account build/web/
-          cp -r web/.well-known build/web/
-          cp web/redirect.html build/web/
-          cp web/in_app_browser.js build/web/
-          cp web/og-invite.png build/web/
-          sed "s|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g" web/invite-redirect-template.html > build/web/invite-redirect.html
-          cp web/sqlite3.wasm build/web/ 2>/dev/null || true
-          for f in web/*.worker.js; do [ -f "$f" ] && cp "$f" build/web/; done
-
-      # Fill assetlinks / AASA from Actions secrets (values are not readable via gh CLI).
-      - name: Inject App/Universal Link signing into .well-known
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          PLAY_STORE_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON }}
-          PLAY_APP_SIGNING_SHA256: ${{ secrets.PLAY_APP_SIGNING_SHA256 }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          python3 -m pip install --quiet google-api-python-client google-auth
-          # Prefer SDK apksigner when present on the runner image.
-          if [ -z "${APKSIGNER:-}" ]; then
-            for ver in 35.0.0 34.0.0 33.0.2; do
-              if [ -x "$ANDROID_HOME/build-tools/$ver/apksigner" ]; then
-                export APKSIGNER="$ANDROID_HOME/build-tools/$ver/apksigner"
-                break
-              fi
-            done
-          fi
-          python3 scripts/inject_well_known_signing.py
-          echo "assetlinks.json:" && cat build/web/.well-known/assetlinks.json
-          echo "apple-app-site-association:" && cat build/web/.well-known/apple-app-site-association
-
-      - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          channelId: live
-          projectId: ${{ secrets.FIREBASE_PROJECT_ID }}
+            app-armeabi-v7a-foss-release.apk
+            app-arm64-v8a-foss-release.apk
+            app-x86_64-foss-release.apk

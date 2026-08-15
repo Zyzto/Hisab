@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD060 -->
 
-Hisab is a Flutter app for group expense splitting and settlement. Local SQLite (PowerSync package) always starts; Supabase is optional for auth, sync, invites, and push.
+Hisab is a Flutter app for group expense splitting and settlement. Local SQLite (PowerSync package) always starts; a cloud backend is optional and, in this repository, absent — auth, sync, invites and push come from a `CloudBackend` implementation supplied by a separate package.
 
 Product and install overview: [../README.md](../README.md). Doc index: [README.md](README.md).
 
@@ -13,7 +13,8 @@ Product and install overview: [../README.md](../README.md). Doc index: [README.m
 - GoRouter for navigation
 - Easy Localization (`en`, `ar`, RTL support)
 - PowerSync package as local SQLite engine
-- Supabase (optional): Auth, Postgres, RPCs, Edge Functions
+- `packages/hisab_backend`: the backend contract (nine facets, neutral models)
+- `packages/hisab_cloud`: the backend implementation — a no-op stub here
 - Firebase Cloud Messaging for push notifications (Android/iOS/Web)
 
 **Platform support:** Run/build/release targets are Android, iOS, and web. Linux is **not** supported as an app target (no launch option, no `flutter build linux`, no Linux release). On a Linux host you can still use test tooling: `flutter test`, integration tests (e.g. `flutter drive -d web-server` or with another device), and CI runs unit/widget/integration tests on `ubuntu-latest`.
@@ -29,20 +30,18 @@ Product and install overview: [../README.md](../README.md). Doc index: [README.m
 | `assets/translations/` | Localization JSON files |
 | `web/` | PWA shell, Firebase web messaging config, redirect pages, static privacy page |
 | `ios/Runner/Info.plist` | iOS permissions/deep-link/background notification config |
-| `supabase/functions/invite-redirect/` | Edge Function: invite token validation and redirect |
-| `supabase/functions/og-invite-image/` | Edge Function: GET `?token=...` → 1200×630 PNG (QR, branding) for invite previews |
-| `supabase/functions/send-notification/` | Edge Function: `user_notifications` + FCM push (expense create/update/delete, member_joined; excludes actor) |
-| `supabase/functions/telemetry/` | Edge Function: anonymous telemetry ingest |
+| `packages/hisab_backend/` | Backend contract: facet interfaces, neutral models, registry |
+| `packages/hisab_cloud/` | Backend implementation. In this repository a stub that registers nothing |
 | `docs/` | Setup and architecture documentation; see [docs/README.md](README.md) for an index |
 | `test/` | Tests mirroring `lib/` layout; see [test/README.md](../test/README.md) |
-| `integration_test/` | Full-app integration tests (local-only + online); see [test/README.md](../test/README.md) |
-| `supabase/` | Local Supabase config, migrations, seed data for online integration tests |
-| `scripts/` | Helper scripts (`run_online_tests.sh`, `run_all_tests.sh`, `local_test_env.sh`, `verify_*`, etc.) |
-| `tool/` | Dart runners (`run_online_tests.dart`, `run_all_tests.dart`, `score_ocr_dirs.dart`) and debug-icon generator |
+| `integration_test/` | Full-app integration tests, backend-free; see [test/README.md](../test/README.md) |
+| `scripts/` | Helper scripts (`run_all_tests.sh`, `verify_*`) |
+| `scripts/ci/` | One-line build and check steps shared by CI and local runs |
+| `tool/` | Dart runners (`run_all_tests.dart`, `score_ocr_dirs.dart`) and debug-icon generator |
 | `assets/tessdata/` | Bundled Tesseract traineddata (`eng`+`ara`) for Android on-device OCR |
 | `assets/images/parallax/` | Onboarding meadow layers (hybrid WebP: lossy sky, lossless alpha) |
 | `tmp/` | Local scratch (gitignored): OCR photos/outputs, tool previews |
-| `.github/workflows/release.yml` | CI/CD for Android builds/releases + web deploy + online integration tests |
+| `.github/workflows/` | `ci.yml` (checks, tests, offline build guard) and `release.yml` (signed FOSS APKs on `v*` tags) |
 
 ## App Startup Flow
 
@@ -51,9 +50,9 @@ Product and install overview: [../README.md](../README.md). Doc index: [README.m
 1. Flutter bindings, global error handlers, logging service, Easy Localization, image picker setup. On web, `web/index.html` exposes `window.hisabPwa` (install + capability detection) and shows a boot splash until Flutter mounts.
 2. Settings framework (`flutter_settings_framework`) and reads persisted settings.
 3. Initializes local SQLite (`PowerSyncDatabase`) unconditionally.
-4. Initializes Supabase only when `SUPABASE_URL` and `SUPABASE_ANON_KEY` are provided. On web, `_finalizeWebOAuthReturn` cleans auth callback URL params and retries session recovery once if the stock path left no session.
+4. Calls `registerHisabCloud()`, then initializes the backend if one registered itself. With the stub, nothing happens and the app is local-only. On web, `_finalizeWebOAuthReturn` cleans auth callback URL params and retries session recovery once if the stock path left no session.
 5. Resolves pending OAuth flags from settings (onboarding/settings web redirect flows).
-6. Initializes Firebase (for FCM) when Supabase is configured.
+6. Initializes Firebase (for FCM) when a backend is available.
 7. Mounts `EasyLocalization` + `ProviderScope` and injects initialized singletons. `App` surfaces any pending web OAuth error toast after the navigator is ready.
 8. Uses `_LocaleSync` as the only bridge from settings language provider to `context.setLocale`.
 
@@ -68,11 +67,11 @@ Product and install overview: [../README.md](../README.md). Doc index: [README.m
   - `pending_writes` queue for offline-online deferred writes
 - **PowerSync `id` column:** PowerSync adds an `id` column automatically to each table. Do not add `Column.text('id')` (or any custom `id` column) in the schema — it will trigger: *"id column is automatically added, custom id columns are not supported"*. Hisab uses PowerSync 2.x as the **local SQLite engine** with a custom `SyncEngine` (not PowerSync Cloud Sync Streams).
 - **Repositories** (`lib/core/repository/`): `group_repository`, `participant_repository`, `expense_repository`, `group_member_repository`, `group_invite_repository`, `tag_repository`, `user_notification_repository`, `powersync_repository`. Wired in `repository_providers.dart` / profile providers with `effectiveLocalOnlyProvider` and connectivity; implementations in `powersync_repository.dart` and per-entity repositories.
-- Reads come from local DB; online mode writes target Supabase then local cache.
+- Reads come from local DB; online mode writes target the backend then the local cache.
 - In online mode while temporarily offline, some writes (notably expense writes) are queued to `pending_writes`.
 - **Expense exchange rate:** Each expense stores `exchange_rate` and `base_amount_cents` (group-currency amount). Display and settle-up **always** use these stored values so amounts stay consistent over time and when editing; do not recalculate from a live API for existing expenses.
 
-**Schema alignment:** The source of truth for synced table columns is the INSERT column list in `lib/core/database/sync_engine.dart`. When adding or changing columns in Supabase (or in the local schema), keep all three in sync: (1) Supabase table definition (migrations), (2) `lib/core/database/powersync_schema.dart`, and (3) the corresponding INSERT in `sync_engine.dart`. PowerSync adds an `id` column automatically to each table — do not add a custom `Column.text('id')` in the schema (it will trigger an assertion). The test in `test/schema_alignment_test.dart` covers all eight synced tables (including user-scoped `user_notifications`).
+**Schema alignment:** The source of truth for synced table columns is the INSERT column list in `lib/core/database/sync_engine.dart`. When adding or changing a column, keep all three in sync: (1) the server-side table definition, (2) `lib/core/database/powersync_schema.dart`, and (3) the corresponding INSERT in `sync_engine.dart`. PowerSync adds an `id` column automatically to each table — do not add a custom `Column.text('id')` in the schema (it will trigger an assertion). The test in `test/schema_alignment_test.dart` covers all eight synced tables (including user-scoped `user_notifications`).
 
 ### Domain
 
@@ -80,9 +79,9 @@ Product and install overview: [../README.md](../README.md). Doc index: [README.m
 
 ### Sync Layer
 
-- **SyncEngine** (`lib/core/database/sync_engine.dart`): testable full fetch from Supabase into local DB and push of `pending_writes`; **SyncBackend** (`lib/core/database/sync_backend.dart`) abstracts the backend for tests.
+- **SyncEngine** (`lib/core/database/sync_engine.dart`): testable full fetch from the backend into the local DB and push of `pending_writes`; `SyncBackend` (`lib/core/database/sync_backend.dart`) is a typedef for the contract's `CloudSync` facet.
 - **DataSyncService** (`lib/core/database/database_providers.dart`) uses SyncEngine and is active only when:
-  - Supabase is configured
+  - a backend is registered
   - app is not in effective local-only mode
   - user is authenticated
 - Sync actions: pushes `pending_writes`, performs full fetch for member groups, refreshes every 5 minutes while online.
@@ -91,7 +90,7 @@ Product and install overview: [../README.md](../README.md). Doc index: [README.m
 
 - `local_only = true`: full local operation, no network dependency
 - `local_only = false`: online mode (subject to auth/connectivity)
-- `effectiveLocalOnly` also becomes true when Supabase config is missing
+- `effectiveLocalOnly` also becomes true when no backend is registered
 
 Switching local to online goes through sign-in and optional migration (`MigrationService`) before flipping mode.
 
@@ -170,27 +169,35 @@ Expense form **photos**: add up to 5 images (camera or gallery on all platforms,
 Redirect behavior:
 
 - Web uses `SITE_URL` if provided (`authRedirectUrl`). If `SITE_URL` is mistakenly `http://` while the page origin is `https://` on the same host, the app upgrades the redirect to the current origin so OAuth does not bounce through an http→https 301.
-- Native uses deep link callback `io.supabase.hisab://callback`.
+- Native uses deep link callback `com.shenepoy.hisab://callback` (legacy `io.supabase.hisab://callback` still accepted).
 
 **Web OAuth return path** (`lib/main.dart` + `lib/core/auth/oauth_*.dart`):
 
-- Stock `Supabase.initialize` still runs with default `detectSessionInUri: true` (Safari/production happy path).
+- The backend's own initialization still handles the URI session by default (Safari/production happy path); the retry above only covers the case where it left no session.
 - `_finalizeWebOAuthReturn` then: if auth params remain and there is still no session, retries `getSessionFromUrl` once (20s timeout); sets `pendingWebOAuthCallbackError` for toast keys `auth_oauth_callback_failed` / `auth_oauth_timeout`; always clears auth query/hash params via `clearWebAuthCallbackParams` so a refresh cannot reuse a spent code.
 - `App` shows the pending toast from the navigator context after first frame.
 
 ## Notifications (FCM + in-app history)
 
-Push notifications are sent when expenses are added/content-edited/deleted or members join a group. The pipeline is: **Supabase (trigger) → pg_net → send-notification Edge Function → (1) insert `user_notifications` rows → (2) Firebase Cloud Messaging → Flutter**. Full setup and verification are in [SUPABASE_SETUP.md](SUPABASE_SETUP.md) (Section 5: send-notification, “Push notifications: end-to-end flow and verification”, and Section 9: “Push notifications not received”).
+Push notifications are sent when expenses are added/content-edited/deleted or members join a group. The client's half of the pipeline is token registration plus the in-app history table; the fan-out itself happens server side and is therefore backend-specific. The full chain is: **write lands on the server → server detects the change → (1) insert `user_notifications` rows → (2) Firebase Cloud Messaging → Flutter**. What a backend has to guarantee here is in [BACKEND_BEHAVIOUR.md](BACKEND_BEHAVIOUR.md) § Notifications.
 
 **Flutter** (`lib/core/services/notification_service.dart`):
 
-- Requests notification permission; registers/unregisters FCM token in Supabase `device_tokens` (upsert on `user_id,token`), including the current app `locale` for language-aware notifications.
+- Requests notification permission; registers/unregisters the FCM token through `cloudBackend.notifications`, including the current app `locale` for language-aware notifications.
 - Handles token refresh, foreground display (mobile: local notifications), and tap → navigate to group detail using `message.data['group_id']`.
 - Expects incoming messages to have `notification` (title, body) and `data.group_id` (string).
 
-**In-app activity feed:** The same Edge Function persists one `user_notifications` row per recipient (including when FCM is dry-run or the user has no device token). SyncEngine fetches the signed-in user’s rows into local SQLite; Profile (`features/profile`) shows a grouped feed and mark-as-read. Migration: `20260729010000_user_notifications.sql`.
+**In-app activity feed:** The server persists one `user_notifications` row per recipient, including when push is dry-run or the user has no device token, so the feed is not a side effect of push succeeding. SyncEngine fetches the signed-in user's rows into local SQLite; Profile (`features/profile`) shows a grouped feed and mark-as-read.
 
-**Backend:** Database trigger `notify_on_expense_change` (`AFTER INSERT OR UPDATE OR DELETE ON expenses`) and `notify_on_member_join` call `notify_group_activity()`, which POSTs to the `send-notification` Edge Function with `group_id`, `actor_user_id`, `action`, `group_name`, and optional expense fields (including `expense_id`). **Image-only / `updated_at`-only expense updates are skipped** (avoids a second Profile row when creating an expense with photos). **Personal groups** and **missing groups** (CASCADE delete) skip the HTTP call. Actions: `expense_created`, `expense_updated`, `expense_deleted`, `member_joined`. Copy: notification title is the group name; body is `{expense title} - {cost}` with localized `Edit` / `Deleted` prefixes. The Edge Function excludes the actor so only **other** group members receive push/history. Title/body are localized per recipient `locale` (en/ar; fallback en).
+**Server side:** the fan-out is the backend's responsibility. What the client
+assumes is: actions are `expense_created`, `expense_updated`, `expense_deleted`
+and `member_joined`; the actor is excluded, so only *other* members are
+notified; image-only and `updated_at`-only expense updates produce nothing,
+which is what stops a second feed row appearing when an expense is created with
+photos; personal groups and deleted groups produce nothing. Copy is the group
+name as title and `{expense title} - {cost}` as body, with localized `Edit` /
+`Deleted` prefixes, localized per recipient locale (en/ar, fallback en). Full
+contract in [BACKEND_BEHAVIOUR.md](BACKEND_BEHAVIOUR.md).
 
 **Web:** `web/index.html` loads Firebase compat SDKs **asynchronously** and sets `window.__hisabFirebaseReady`; `web/flutter_bootstrap.js` waits on that promise before booting Flutter (faster first paint). `web/firebase-messaging-sw.js` handles background push and clicks. Web token registration requires `FCM_VAPID_KEY` at build time. On iPhone/iPad (all browsers use WebKit), push is gated until the user installs the Home Screen PWA and opens it from there (`pwaNotificationSupport`).
 
@@ -240,32 +247,37 @@ Major persisted keys include:
   - `PwaInstallBanner` + `PwaInstallGuideSheet` — native Chromium prompt on Android when available; otherwise platform-specific Add-to-Home-Screen steps (iOS Share menu / Android browser menu)
   - Web push on iPhone/iPad is gated until the Home Screen PWA is opened (`pwaNotificationSupport == needsInstall`); `PermissionService` then shows an install sheet instead of a no-op browser prompt
   - Unit coverage: `test/core/pwa_capabilities_test.dart`, `test/core/pwa_install_banner_widget_test.dart`
-- Invite links use the web app domain (e.g. hisab.shenepoy.com) when `INVITE_BASE_URL` is set. On deploy, the route `/functions/v1/invite-redirect` is served by **Firebase Hosting** via a rewrite to static `invite-redirect.html` (built from `web/invite-redirect-template.html`); that page redirects to the Supabase Edge Function, which validates the token and redirects the user to `redirect.html`. This works on the Firebase free (Spark) plan with no Cloud Function. When the user is already inside the web app, the same path is handled by the Flutter app (GoRouter), which redirects to the Supabase Edge Function.
+- Invite links use the web app domain when the backend supplies one. On deploy, `/invite-redirect` (and the legacy `/functions/v1/invite-redirect`) is served by **Firebase Hosting** via a rewrite to static `invite-redirect.html`, built from `web/invite-redirect-template.html` with `__CLOUD_INVITE_RESOLVER_URL__` substituted at build time. That page redirects to the backend's invite resolver, which validates the token and redirects the user to `redirect.html`. This needs only static hosting. When the user is already inside the web app, the same path is handled by GoRouter, which redirects to `cloudBackend.invites.resolverUrlFor(token)`.
 - Invite redirect static page: `web/redirect.html`
   - desktop -> web invite route
   - mobile -> attempts app deep link with timed web fallback
-- Invite/OG assets: `web/invite-redirect-template.html`, `web/og-invite.png` (used in invite link and OG image flow; see [EDGE_FUNCTIONS.md](EDGE_FUNCTIONS.md)).
+- Invite/OG assets: `web/invite-redirect-template.html`, `web/og-invite.png`. The template carries a `__CLOUD_INVITE_RESOLVER_URL__` placeholder that the build substitutes with the backend's invite resolver endpoint.
 - Public privacy page: `web/privacy/index.html`
 - Account deletion is described in `docs/DELETE_ACCOUNT.md`; the in-app options are Delete local data and Delete cloud data under Settings > Advanced (and a public page at `web/delete-account/index.html` when deployed).
 - Deployment cache control is configured in `firebase.json`: entry scripts/manifest/SW/invite HTML + catch-all `**` use `max-age=0, must-revalidate` (Firebase matches header `source` on the **request path before rewrites**; default HTML cache is one hour). Hosting deploys via GitHub Actions tag releases.
 
-## Supabase Backend Contract
+## Backend contract
 
-This repo is the **source of truth** for all Supabase Edge Functions. See [EDGE_FUNCTIONS.md](EDGE_FUNCTIONS.md) for the list and deploy commands.
+No backend lives in this repository. What lives here is the interface one must
+satisfy: `packages/hisab_backend` declares nine facets (`auth`, `sync`,
+`groups`, `invites`, `notifications`, `files`, `account`, `telemetry`,
+`health`), and `packages/hisab_cloud` is a stub that registers nothing, which is
+why a default build is local-only.
 
-- `supabase/functions/invite-redirect/index.ts` — validates invite token and redirects to `redirect.html`
-- `supabase/functions/og-invite-image/` — GET `?token=...` returns 1200×630 PNG (QR code, branding) for invite link previews; deploy with `--no-verify-jwt`
-- `supabase/functions/send-notification/index.ts` — persists `user_notifications` and sends FCM push (expense create/update/delete, member_joined; excludes actor)
-- `supabase/functions/telemetry/index.ts` — accepts anonymous usage telemetry events
+Everything in `lib/` reaches the network through `cloudBackend`, and gates on
+`cloudAvailable`. Adding a direct HTTP or vendor SDK call to `lib/` breaks the
+offline build and CI will catch it.
 
-On the free plan, invite redirect uses only static Hosting files (`invite-redirect.html` + `redirect.html`). A **Firebase Cloud Function** can optionally serve the same path with dynamic OG meta for crawlers (see [EDGE_FUNCTIONS.md](EDGE_FUNCTIONS.md) for `functions/` and hosting rewrites).
+The app expects the server to own these tables — `groups`, `group_members`,
+`participants`, `expenses`, `expense_tags`, `group_invites`, `invite_usages`,
+`telemetry`, `device_tokens`, `user_notifications` — and to enforce
+authorization there rather than trusting the client. Membership changes, invite
+acceptance and account deletion are server-authorized operations behind the
+`groups`, `invites` and `account` facets, not table writes.
 
-The app also depends on Supabase-side schema, RLS, and RPCs documented in `docs/SUPABASE_SETUP.md`, including:
-
-- tables such as `groups`, `group_members`, `participants`, `expenses`, `expense_tags`, `group_invites`, `invite_usages`, `telemetry`, `device_tokens`, `user_notifications`
-- RPCs such as `accept_invite`, `transfer_ownership`, `leave_group`, `kick_member`, `update_member_role`, `create_invite`, etc.
-
-Schema and security/performance can be re-verified via [Supabase MCP](https://supabase.com/docs/guides/getting-started/mcp) (`list_tables`, `get_advisors`).
+- Contract reference: [`packages/hisab_backend/README.md`](../packages/hisab_backend/README.md)
+- Behaviour the client assumes: [BACKEND_BEHAVIOUR.md](BACKEND_BEHAVIOUR.md)
+- Building your own: [SELF_HOSTING.md](SELF_HOSTING.md)
 
 ## MCP available in the IDE
 
@@ -273,51 +285,12 @@ MCP servers enabled in Cursor vary by machine/workspace. Common ones for this pr
 
 | Area | Typical server ids | Purpose |
 |------|-------------------|--------|
-| **Supabase** | `plugin-supabase-supabase` | Schema, advisors, SQL, migrations, Edge Functions, logs |
 | **Firebase** | `plugin-firebase-firebase` / `user-firebase` | FCM, Hosting, Auth, docs |
 | **Browser** | `cursor-ide-browser` | Web automation / screenshots |
 | **Mobile debug** | `user-polyscreen`, `user-Mobile MCP` | Device install, UI snapshot, crashes (Hisab Debug) |
 | **App control** | `cursor-app-control` | Workspace / project helpers |
 
 Discover live tools with MCP catalog/`GetMcpTools` rather than hard-coding server names — ids drift between Cursor versions.
-
-### Example: cross-MCP workflow (Supabase → Firebase)
-
-A typical flow using both Supabase and Firebase MCP:
-
-1. **Find a user in Supabase**  
-   Use Supabase MCP `execute_sql` with `project_id` from `list_projects`. Example: look up by name in `auth.users` (`raw_user_meta_data->>'full_name'`) or in `public.participants` (`name`, `user_id`). Use the returned `user_id` (UUID) for the next step.
-
-2. **Get the user’s FCM token**  
-   Query `public.device_tokens` with that `user_id` to get `token` and `platform` (e.g. `android`, `ios`, `web`). The `token` is the FCM registration token needed for sending a push.
-
-3. **Send a push via Firebase MCP**  
-   Call Firebase MCP tool `messaging_send_message` with:
-   - `registration_token`: the token from step 2  
-   - `title`: notification title (e.g. app name)  
-   - `body`: notification body text  
-
-   The Firebase server may appear as `project-0-hisab-firebase` in Cursor (not `firebase`). If a tool call fails with “MCP server does not exist: firebase”, use the server name listed in the error under “Available servers”.
-
-### How to use Supabase MCP
-
-The Supabase MCP server (`plugin-supabase-supabase`) talks to your linked Supabase project. Use it from the IDE (e.g. Cursor) so the AI or you can run schema checks, apply migrations, and run SQL without leaving the editor.
-
-1. **Get the project ID**  
-   Call `list_projects` (no arguments). Use the `id` of the project you care about (e.g. **Hisab_01**) as `project_id` for all other Supabase MCP tools.
-
-2. **Common operations**
-   - **Schema:** `list_tables` — `project_id`, `schemas` (default `["public"]`). Returns tables, columns, RLS, row counts, and FKs.
-   - **Migrations:** `list_migrations` — `project_id`. Shows applied migrations.  
-   - **Apply a migration:** `apply_migration` — `project_id`, `name` (snake_case, e.g. `participants_left_at_and_rejoin_reuse`), `query` (full SQL string). Use the contents of a file under `supabase/migrations/*.sql` for `query`; do not hardcode generated IDs in data migrations.
-   - **Run SQL:** `execute_sql` — `project_id`, `query`. For one-off or read-only checks.
-   - **Advisors:** `get_advisors` — `project_id`. Security and performance suggestions for the project.
-
-3. **Tool schemas**  
-   Before calling a tool, read its descriptor under `.cursor/projects/<workspace>/mcps/plugin-supabase-supabase/tools/<tool_name>.json` to see required and optional arguments and types.
-
-4. **Docs**  
-   [Supabase MCP guide](https://supabase.com/docs/guides/getting-started/mcp) — setup and overview.
 
 ### How to use Firebase MCP
 
@@ -328,7 +301,7 @@ The Firebase MCP server is configured in `.cursor/mcp.json` as `firebase` (comma
 
 2. **Sending a push notification**  
    Use the `messaging_send_message` tool with:
-   - `registration_token`: FCM device token (from app registration, or from Supabase `device_tokens.token` for a user)
+   - `registration_token`: FCM device token (from app registration, or from your backend's device token table)
    - `title` (optional): notification title  
    - `body` (optional): notification body  
    Supply either `registration_token` or `topic`, not both. See the tool descriptor under `mcps/<firebase-server>/tools/` for the full schema.
@@ -370,15 +343,15 @@ The **jj** (Jujutsu) MCP server (`user-jj`) exposes Jujutsu VCS operations so th
 
 ## Configuration
 
-Build-time config is via `--dart-define` in `lib/core/constants/supabase_config.dart`:
+Build-time config the client itself reads (`lib/core/constants/firebase_config.dart` and `lib/main.dart`):
 
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `INVITE_BASE_URL` (optional)
-- `SITE_URL` (optional auth email redirect)
+- `FIREBASE_*` (web SDK options, FCM only)
 - `FCM_VAPID_KEY` (web push)
+- `ENABLE_WEB_SEMANTICS` (web accessibility semantics, off by default)
 
-Non-secret app constants (e.g. `reportIssueUrl`) live in `lib/core/constants/app_config.dart`. Secrets and project URLs come from `--dart-define` / gitignored define files — see `docs/CONFIGURATION.md`. If Supabase defines are missing, app runs local-only by design. In local mode, no environment variables are required and the app must not crash or throw.
+A backend package defines its own flags on top of these; the client neither reads nor validates them.
+
+Non-secret app constants (e.g. `reportIssueUrl`) live in `lib/core/constants/app_config.dart`. Anything else comes from `--dart-define` or gitignored define files — see `docs/CONFIGURATION.md`. With no backend registered the app runs local-only by design: no environment variable is required, and it must not crash or throw.
 
 ## Platform Permissions
 
@@ -394,24 +367,29 @@ iOS declarations are present in `ios/Runner/Info.plist`, including:
 - `NSPhotoLibraryUsageDescription`
 - `NSUserNotificationsUsageDescription`
 - `UIBackgroundModes: remote-notification`
-- custom URL scheme `io.supabase.hisab`
+- custom URL scheme `com.shenepoy.hisab` (legacy `io.supabase.hisab` still registered)
 
 ## CI/CD
 
-`.github/workflows/release.yml`:
+`.github/workflows/ci.yml` — every push and pull request:
 
-- triggers on tags `v*` or manual dispatch
-- **security-check** / **infra-check**: static gates (`scripts/verify_security.sh`, `scripts/verify_infra.sh`); required before Android/web deploy
-- **test** job: unit + widget tests, local-only integration tests on web (Chrome)
-- **test-online** job: online integration tests against a local Supabase Docker instance (auth, sync, invite flows)
-- builds Android APK + AAB
-- creates GitHub release (tag flow)
-- optional Play Store internal deploy
-- builds/deploys Flutter web to Firebase Hosting (copies privacy page to build output)
+- static gates (`scripts/verify_security.sh`, `scripts/verify_infra.sh`)
+- unit and widget tests, plus integration tests on web (Chrome)
+- **offline build guard**: `scripts/ci/assert_offline_only.sh` and a `foss` build, which fail if a backend dependency or a tracked credential enters the tree
 
-Agent pre-release gate (scripts + Supabase advisors + security-review): [`.cursor/skills/hisab-release-checks/SKILL.md`](../.cursor/skills/hisab-release-checks/SKILL.md). Local: `bash ./scripts/run_release_checks.sh`.
+`.github/workflows/release.yml` — on `v*` tags:
 
-The `test-online` job requires no additional secrets — it uses the local Supabase instance's auto-generated credentials. It sets up the Supabase CLI, starts Docker containers, resets the database (migrations + seed), and runs `flutter drive` with the online test barrel.
+- the same checks, then `scripts/ci/build_android.sh foss`
+- per-ABI signed APKs attached to a **draft** GitHub Release
+
+The release is left as a draft because the private cloud pipeline attaches its
+own artifacts to the same release afterwards. Neither workflow has access to
+production credentials; the only secrets involved are the FOSS signing key.
+
+Every CI step is a one-line call into `scripts/ci/`, so the same command that
+runs in Actions runs locally. Agent pre-release gate:
+[`.cursor/skills/hisab-release-checks/SKILL.md`](../.cursor/skills/hisab-release-checks/SKILL.md).
+Local: `bash ./scripts/run_release_checks.sh`.
 
 ## Key Dependencies (Selected)
 
@@ -419,7 +397,7 @@ The `test-online` job requires no additional secrets — it uses the local Supab
 - navigation: `go_router`
 - **Git deps:** `flutter_logging_service` (siglat), `flutter_settings_framework` (edadat) — pinned to `ref: main` in pubspec for CI; local path override (lock not committed) is used for fast iteration on those packages. Optional: publish to pub.dev or vendor into this repo for long-term reproducibility.
 - local db/sync engine: `powersync`
-- backend/auth: `supabase_flutter`
+- backend contract: `hisab_backend` (interfaces only); implementation supplied by `hisab_cloud`
 - notifications: `firebase_core`, `firebase_messaging`, `flutter_local_notifications`
 - localization: `easy_localization`
 - settings framework: `flutter_settings_framework`
@@ -437,7 +415,7 @@ The `test-online` job requires no additional secrets — it uses the local Supab
   - **Locale:** Key widgets are tested in both English and Arabic via `test/widget_test_helpers.dart`: `pumpApp(tester, child: ..., locale: Locale('ar'))` and `testSupportedLocales`. Edge cases (empty/zero/long content, optional params) are covered where relevant. Translation file parity: `test/translations_test.dart` (see [I18N.md](I18N.md)).
   - **Integration-style:** Local PowerSync DB, sync engine with fake backend. See [test/README.md](../test/README.md) for PowerSync native binary requirements and coverage (`flutter test --coverage`).
   - **Integration (local-only):** Full-app flows in `integration_test/` — smoke, onboarding, group, personal, expense (tags, photos, currencies, bill breakdown), balance (settlements, freeze), settings. Run with `flutter drive` on web or `flutter test integration_test/ -d <device>`. See [test/README.md](../test/README.md).
-  - **Integration (online):** Full end-to-end tests against a **local Supabase instance** (Docker) — auth (sign-in/out), data sync (create group/expense → verify in Supabase DB), and multi-user invite flow. Run with `./scripts/run_online_tests.sh` or manually via `supabase start` + `flutter drive`. See [test/README.md](../test/README.md) for full setup.
+  - **Cloud paths:** covered with `test/support/fake_cloud.dart`, an in-memory implementation of every `CloudBackend` facet, so repository and provider tests exercise online behaviour without a server. End-to-end tests against a live backend live with that backend — see [test/README.md](../test/README.md).
 - **Widget test helper:** `test/widget_test_helpers.dart` provides `pumpApp(tester, child, locale?, pumpAndSettle?)` to wrap the widget in EasyLocalization + MaterialApp; use for presentational widgets. For widgets that depend on Riverpod, build ProviderScope + EasyLocalization + MaterialApp inline with overrides (see e.g. `test/balance/balance_list_widget_test.dart`).
 - **Generated code:** Run `flutter pub run build_runner build --delete-conflicting-outputs` (or `watch`) to regenerate `.g.dart` files before running tests or when changing providers/settings.
 
@@ -466,24 +444,24 @@ The following improvements are reflected in the codebase and docs:
 - **Back button dismisses keyboard:** When the keyboard is visible, the first back press (Android) only closes the keyboard and does not navigate. Implemented app-wide via `BackButtonKeyboardDismiss` in `lib/core/widgets/back_button_keyboard_dismiss.dart`, registered in the router builder so it runs before route-specific back handling.
 - **Anonymize participant name on account deletion only:** When a user's auth account is deleted (e.g. after an account deletion request), a database trigger runs and replaces their participant display name in all groups with a random placeholder (e.g. "Former member a3f2b1") and clears avatar, so expense history shows a neutral label. Leave/kick/archive do not change names. See migration `20250101000017_anonymize_on_delete.sql` (trigger on `auth.users` DELETE).
 - **Upgrader logging:** Debug logging from the upgrader package is disabled. The app logs one aggregated line per update check (manual from Settings > About and automatic via UpgradeAlert) via the logging service. See `lib/app.dart` (`debugLogging: false`, `willDisplayUpgrade`, and the manual-check callback).
-- **CODEBASE doc:** This overview was updated to reflect current lib layout (core subdirs, domain barrel, repositories), SyncEngine/SyncBackend, core services/widgets/receipt, feature details, Edge Functions (including og-invite-image), web assets, and test layout.
+- **CODEBASE doc:** This overview was updated to reflect current lib layout (core subdirs, domain barrel, repositories), SyncEngine/SyncBackend, core services/widgets/receipt, feature details, the backend contract, web assets, and test layout.
 - **Modal centering (web tablet/desktop):** Modals are centered in the full viewport by default (`centerInFullViewport` defaults to true). `showResponsiveSheet` and `showAppDialog` support `centerInFullViewport`; pass `false` for modals opened from home/settings that should stay in the content area next to the rail. The app builder uses `Positioned.fill` so the root navigator gets full viewport size. See `docs/MODAL_CENTERING_AND_RESPONSIVE_SHEET.md`.
 - **App bar title aligned with content:** All pages with a constrained body use **ContentAlignedAppBar** so the app bar title sits in the same horizontal band as the body (same `contentBandMetrics` as `ConstrainedContent`). The title is absolutely positioned in the app bar so it is not affected by leading/actions; titles are not shrunk with `FittedBox` (use ellipsis / elision in the title widget). Wrap the scaffold in `LayoutBuilder` and pass `layoutConstraints.maxWidth` as `contentAreaWidth`. See `lib/core/layout/content_aligned_app_bar.dart` and the “Layout (core/layout)” section above.
 
-- **Settlement permission:** By default only the group owner or the debtor (participant who owes) can record a settlement. Group setting **Members can record settlements for others** (`Group.allowMemberSettleForOthers`, default false) allows any member to record. Schema: `groups.allow_member_settle_for_others`; sync, repository, backup, and Migration 19 in `docs/SUPABASE_SETUP.md`; local Supabase migration `20250101000019_groups_allow_member_settle_for_others.sql`. **Client + server:** Balance list / record sheet enforce the rule offline; Migration 23 (`20260803140000_expenses_settle_freeze_rls.sql`) enforces transfer settle rules, freeze-blocks-insert, and archive-blocks-mutations on Supabase. See `lib/features/balance/widgets/balance_list.dart`, `lib/features/groups/pages/group_settings_page.dart`, `lib/domain/group.dart`.
+- **Settlement permission:** By default only the group owner or the debtor (participant who owes) can record a settlement. Group setting **Members can record settlements for others** (`Group.allowMemberSettleForOthers`, default false) allows any member to record. Schema: `groups.allow_member_settle_for_others`. **Client + server:** Balance list / record sheet enforce the rule offline, and a backend is expected to enforce the same rule plus freeze-blocks-insert and archive-blocks-mutations server side (see [BACKEND_BEHAVIOUR.md](BACKEND_BEHAVIOUR.md)). See `lib/features/balance/widgets/balance_list.dart`, `lib/features/groups/pages/group_settings_page.dart`, `lib/domain/group.dart`.
 - **Settlement titles (i18n):** Transfer rows keep a human `Expense.title` for push/activity feeds, but list/detail/share rebuild the title at display time via `expenseDisplayTitle` / `expenseDisplayTitleFromMap` (`lib/core/utils/expense_display_title.dart`) so EN/AR follow the current locale.
 - **Frozen snapshot corrupt:** If `settlement_snapshot_json` fails to parse while frozen (and is not the archive auto-freeze marker), Balance shows a corrupt banner and empty balances instead of silently recomputing live numbers (`GroupBalanceResult.snapshotCorrupt`).
-- **Online integration tests:** Full end-to-end tests against a local Supabase Docker instance — auth, sync, and invite flows. Local Supabase setup (config, migrations, seed) lives in `supabase/`. Run with `./scripts/run_online_tests.sh`. CI runs them in the `test-online` GitHub Actions job. See [test/README.md](../test/README.md) for full setup, prerequisites, and troubleshooting.
-- **Invite RPC null-expiry fix:** `accept_invite` treats `expires_at IS NULL` as valid (never-expiring invites) and pre-filters inactive/maxed invites. Apply migration `20260306120000_fix_accept_invite_null_expiry_validation.sql` in local/dev environments so invite acceptance matches production behavior.
-- **Duplicate participant guard:** Memberships stay unique via `group_members(group_id, user_id)`. Active linked participants are also unique via partial index `idx_participants_active_user_per_group` (`user_id IS NOT NULL AND left_at IS NULL`). `accept_invite` reuses by `user_id`, race-safely claims a unique unlinked placeholder (name/profile/first-token/email/local-part, min length 2), and maps membership races to “Already a member”; `merge_participant_with_member` unlinks the old row before claiming. Migration: `20260728130000_prevent_duplicate_active_participants.sql`.
+- **Online integration tests:** End-to-end auth, sync and invite tests need a real backend, so they live with the backend rather than here. This repository's suite is unit, widget and offline integration only, and runs with no services present. See [test/README.md](../test/README.md).
+- **Never-expiring invites:** a null expiry is valid, not expired. Both the client and any backend must treat `expires_at IS NULL` as "no expiry" rather than comparing against it.
+- **Duplicate participant guard:** memberships are unique per (group, user), and at most one active linked participant may exist per user per group. Invite acceptance is expected to reuse an existing participant, or claim an unlinked placeholder, rather than create a second row. Details in [BACKEND_BEHAVIOUR.md](BACKEND_BEHAVIOUR.md).
 - **i18n hardcode pass:** User-facing strings (scanner, notifications channel/fallbacks, language/theme labels, exchange-rate label, receipt/status defaults, relative times, feedback issue title, etc.) go through translation keys in both `en.json` and `ar.json`. Built-in scanner pattern names are stored as keys and shown via `scannerPatternDisplayName`. Conventions and intentional exceptions: [I18N.md](I18N.md).
 
 ## Related Docs
 
 - `docs/MODAL_CENTERING_AND_RESPONSIVE_SHEET.md` - modal/dialog centering on web, `centerInFullViewport`, and responsive sheet API
-- `docs/SUPABASE_SETUP.md` - complete backend bootstrap and SQL/RPC policy setup
-- `docs/SUPABASE_BACKUP.md` - how to backup Supabase database (dashboard, pg_dump, script)
-- `docs/EDGE_FUNCTIONS.md` - Supabase Edge Functions list and deploy commands (invite-redirect, og-invite-image, send-notification, telemetry)
+- `docs/SELF_HOSTING.md` - implement the backend contract against your own server
+- `docs/BACKEND_BEHAVIOUR.md` - server-side rules the client relies on
+- `packages/hisab_backend/README.md` - facet-by-facet contract reference
 - `docs/PERSONAL_FEATURE.md` - personal (my-expenses-only) mode: data model, flows, code locations, backup, i18n
 - `docs/TRANSACTION_SCANNER.md` - Android notification → draft → personal expense scanner
 - `docs/I18N.md` - localization conventions, key groups, en/ar parity, notification/scanner special cases

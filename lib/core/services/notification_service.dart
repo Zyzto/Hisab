@@ -10,7 +10,7 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../constants/firebase_config.dart';
-import '../constants/supabase_config.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 import '../navigation/app_router.dart';
 import '../navigation/route_paths.dart';
 import '../pwa/pwa_capabilities.dart';
@@ -159,8 +159,9 @@ class NotificationService extends _$NotificationService {
 
   @override
   Future<void> build() async {
-    // Only initialise when Supabase + Firebase are both available
-    if (!supabaseConfigAvailable || !firebaseInitialized) return;
+    // Needs both a backend to register the token with and Firebase to
+    // deliver through.
+    if (!cloudAvailable || !firebaseInitialized) return;
 
     ref.onDispose(() {
       _foregroundSub?.cancel();
@@ -192,7 +193,7 @@ class NotificationService extends _$NotificationService {
   /// it from system settings.
   Future<bool> initialize([BuildContext? context]) async {
     if (_initialized) return true;
-    if (!supabaseConfigAvailable || !firebaseInitialized || _initializing) {
+    if (!cloudAvailable || !firebaseInitialized || _initializing) {
       if (!firebaseInitialized) {
         Log.warning(
           'NotificationService: Firebase not initialized, cannot enable notifications',
@@ -203,8 +204,7 @@ class NotificationService extends _$NotificationService {
     _initializing = true;
 
     try {
-      final client = supabaseClientIfConfigured;
-      if (client == null || client.auth.currentUser == null) {
+      if (cloudBackend?.auth.currentUser == null) {
         Log.warning(
           'NotificationService: initialize called without authenticated user',
         );
@@ -291,9 +291,9 @@ class NotificationService extends _$NotificationService {
     }
   }
 
-  /// Remove the device token from Supabase.
+  /// Remove the device token from the backend.
   /// Prefer calling this **before** [AuthService.signOut] while the session
-  /// is still valid (RLS requires auth.uid()).
+  /// is still valid — the backend authorizes the delete against the caller.
   Future<void> unregisterToken() async {
     _initialized = false;
     _initializing = false;
@@ -307,8 +307,8 @@ class NotificationService extends _$NotificationService {
     final token = _currentToken;
     if (token == null) return;
 
-    final client = supabaseClientIfConfigured;
-    if (client == null || client.auth.currentSession == null) {
+    final backend = cloudBackend;
+    if (backend == null || !backend.auth.isAuthenticated) {
       Log.warning(
         'NotificationService: skip unregister, no authenticated session',
       );
@@ -316,7 +316,7 @@ class NotificationService extends _$NotificationService {
       return;
     }
     try {
-      await client.from('device_tokens').delete().eq('token', token);
+      await backend.notifications.removeDeviceToken(token);
       Log.info('NotificationService: token unregistered');
       _currentToken = null;
     } catch (e) {
@@ -387,22 +387,22 @@ class NotificationService extends _$NotificationService {
           ? 'web'
           : (defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android');
 
-      // Upsert into device_tokens (include locale for language-aware notifications)
-      final client = supabaseClientIfConfigured;
-      final userId = client?.auth.currentUser?.id;
-      if (client == null || userId == null) {
+      final backend = cloudBackend;
+      if (backend == null || backend.auth.currentUser == null) {
         Log.warning(
-          'NotificationService: skip token upsert, no client or no authenticated user',
+          'NotificationService: skip token upsert, no backend or no authenticated user',
         );
         return;
       }
 
       final locale = ref.read(languageProvider);
 
-      // Claim exclusive ownership of this FCM token (drops other users' rows).
-      await client.rpc(
-        'claim_device_token',
-        params: {'p_token': token, 'p_platform': platform, 'p_locale': locale},
+      // Claim exclusive ownership of this token so a shared device stops
+      // delivering to whoever signed in first.
+      await backend.notifications.claimDeviceToken(
+        token: token,
+        platform: platform,
+        locale: locale,
       );
 
       Log.info('NotificationService: token registered ($platform)');
@@ -419,7 +419,7 @@ class NotificationService extends _$NotificationService {
     Log.debug('FCM foreground: ${message.notification?.title}');
 
     final actorId = message.data['actor_user_id'] as String?;
-    final currentId = supabaseClientIfConfigured?.auth.currentUser?.id;
+    final currentId = cloudBackend?.auth.currentUser?.id;
     if (actorId != null &&
         currentId != null &&
         actorId.trim().toLowerCase() == currentId.trim().toLowerCase()) {

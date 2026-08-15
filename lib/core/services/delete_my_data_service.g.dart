@@ -8,12 +8,12 @@ part of 'delete_my_data_service.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Service for Delete cloud data: preview and execute deletion on Supabase.
+/// Preview and execute erasure of the user's cloud footprint.
 
 @ProviderFor(deleteMyDataService)
 final deleteMyDataServiceProvider = DeleteMyDataServiceProvider._();
 
-/// Service for Delete cloud data: preview and execute deletion on Supabase.
+/// Preview and execute erasure of the user's cloud footprint.
 
 final class DeleteMyDataServiceProvider
     extends
@@ -23,7 +23,7 @@ final class DeleteMyDataServiceProvider
           DeleteMyDataService
         >
     with $Provider<DeleteMyDataService> {
-  /// Service for Delete cloud data: preview and execute deletion on Supabase.
+  /// Preview and execute erasure of the user's cloud footprint.
   DeleteMyDataServiceProvider._()
     : super(
         from: null,

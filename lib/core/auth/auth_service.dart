@@ -1,46 +1,30 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 
-import '../constants/supabase_config.dart';
-import 'auth_flow_policy.dart';
 import 'auth_user_profile.dart';
 
-/// Unified Supabase auth service. Works on all platforms — `supabase_flutter`
-/// handles web/native differences internally.
-/// When Supabase is not configured (local-only), [currentUser] and related getters
-/// return null/false and must not throw.
+/// Thin delegate over the registered backend's [CloudAuth].
+///
+/// In an offline build no backend is registered, so the getters return
+/// null/false and every action throws [StateError] rather than being called at
+/// all — the UI hides these affordances behind `cloudAvailable`.
 class AuthService {
-  /// Supabase client when configured and initialized; null in local-only mode.
-  SupabaseClient? get _client => supabaseClientIfConfigured;
+  CloudAuth? get _auth => cloudBackend?.auth;
 
-  SupabaseClient get _clientOrThrow =>
-      supabaseClientIfConfigured ??
-      (throw StateError('Supabase not configured'));
-
-  /// Redirect URL for OAuth and email auth callbacks.
-  ///
-  /// Web: [authRedirectUrl] (SITE_URL), with http→https upgrade when the app is
-  /// already on https for the same host (avoids Firebase Hosting 301). When
-  /// unset, returns `null` so Supabase falls back to its Site URL.
-  /// Native: [authOAuthCallbackDeepLink] so the app reopens with the PKCE verifier.
-  String? get _authRedirectUrl => resolveAuthRedirectUrl(
-    isWeb: kIsWeb,
-    configuredSiteUrl: authRedirectUrl,
-    webOrigin: kIsWeb ? Uri.base.origin : null,
-  );
+  CloudAuth get _authOrThrow =>
+      cloudBackend?.auth ?? (throw StateError('No cloud backend configured'));
 
   // ---------------------------------------------------------------------------
   // Sign-in methods
   // ---------------------------------------------------------------------------
 
-  Future<AuthResponse> signInWithEmail(String email, String password) async {
+  Future<CloudAuthResponse> signInWithEmail(
+    String email,
+    String password,
+  ) async {
     Log.debug('Signing in with email');
     try {
-      final response = await _clientOrThrow.auth.signInWithPassword(
-        email: email,
-        password: password,
-      );
+      final response = await _authOrThrow.signInWithEmail(email, password);
       Log.info('User signed in with email');
       return response;
     } catch (e, st) {
@@ -49,7 +33,7 @@ class AuthService {
     }
   }
 
-  Future<AuthResponse> signUpWithEmail(
+  Future<CloudAuthResponse> signUpWithEmail(
     String email,
     String password, {
     String? name,
@@ -57,18 +41,11 @@ class AuthService {
   }) async {
     Log.debug('Signing up with email');
     try {
-      final data = <String, dynamic>{};
-      if (name != null && name.trim().isNotEmpty) {
-        data['full_name'] = name.trim();
-      }
-      if (avatarId != null && avatarId.isNotEmpty) {
-        data['avatar_id'] = avatarId;
-      }
-      final response = await _clientOrThrow.auth.signUp(
-        email: email,
-        password: password,
-        emailRedirectTo: _authRedirectUrl,
-        data: data.isNotEmpty ? data : null,
+      final response = await _authOrThrow.signUpWithEmail(
+        email,
+        password,
+        name: name,
+        avatarId: avatarId,
       );
       Log.info('User signed up with email');
       return response;
@@ -78,29 +55,19 @@ class AuthService {
     }
   }
 
-  /// Update the current user's profile (name and/or avatar). Persists to Supabase user_metadata.
+  /// Update the current user's name and/or avatar.
   Future<void> updateProfile({String? name, String? avatarId}) async {
-    final user = currentUser;
-    if (user == null) return;
-    final existing = Map<String, dynamic>.from(user.userMetadata ?? {});
-    if (name != null) {
-      existing['full_name'] = name.trim().isEmpty ? null : name.trim();
-    }
-    if (avatarId != null) {
-      existing['avatar_id'] = avatarId.isEmpty ? null : avatarId;
-    }
-    await _clientOrThrow.auth.updateUser(UserAttributes(data: existing));
+    if (currentUser == null) return;
+    await _authOrThrow.updateProfile(name: name, avatarId: avatarId);
     Log.info('Profile updated');
   }
 
   /// Update the current user's password. Caller must verify identity (e.g. via
-  /// signInWithEmail with current password) before calling.
+  /// [signInWithEmail] with the current password) before calling.
   Future<void> updatePassword(String newPassword) async {
     Log.debug('Updating password');
     try {
-      await _clientOrThrow.auth.updateUser(
-        UserAttributes(password: newPassword),
-      );
+      await _authOrThrow.updatePassword(newPassword);
       Log.info('Password updated');
     } catch (e, st) {
       Log.error('Password update failed', error: e, stackTrace: st);
@@ -112,11 +79,7 @@ class AuthService {
   Future<void> resendConfirmation(String email) async {
     Log.debug('Resending confirmation email');
     try {
-      await _clientOrThrow.auth.resend(
-        type: OtpType.signup,
-        email: email,
-        emailRedirectTo: _authRedirectUrl,
-      );
+      await _authOrThrow.resendConfirmation(email);
       Log.info('Confirmation email resent');
     } catch (e, st) {
       Log.error('Resend confirmation failed', error: e, stackTrace: st);
@@ -127,10 +90,7 @@ class AuthService {
   Future<void> signInWithMagicLink(String email) async {
     Log.debug('Sending magic link');
     try {
-      await _clientOrThrow.auth.signInWithOtp(
-        email: email,
-        emailRedirectTo: _authRedirectUrl,
-      );
+      await _authOrThrow.signInWithMagicLink(email);
       Log.info('Magic link sent');
     } catch (e, st) {
       Log.error('Magic link failed', error: e, stackTrace: st);
@@ -138,32 +98,16 @@ class AuthService {
     }
   }
 
-  Future<bool> signInWithGoogle() async {
-    Log.debug('Signing in with Google OAuth');
-    try {
-      final redirectTo = _authRedirectUrl;
-      final ok = await _clientOrThrow.auth.signInWithOAuth(
-        OAuthProvider.google,
-        redirectTo: redirectTo,
-      );
-      return ok;
-    } catch (e, st) {
-      Log.error('Google sign-in failed', error: e, stackTrace: st);
-      rethrow;
-    }
-  }
+  Future<bool> signInWithGoogle() => _signInWithOAuth(CloudOAuthProvider.google);
 
-  Future<bool> signInWithGithub() async {
-    Log.debug('Signing in with GitHub OAuth');
+  Future<bool> signInWithGithub() => _signInWithOAuth(CloudOAuthProvider.github);
+
+  Future<bool> _signInWithOAuth(CloudOAuthProvider provider) async {
+    Log.debug('Signing in with ${provider.name} OAuth');
     try {
-      final redirectTo = _authRedirectUrl;
-      final ok = await _clientOrThrow.auth.signInWithOAuth(
-        OAuthProvider.github,
-        redirectTo: redirectTo,
-      );
-      return ok;
+      return await _authOrThrow.signInWithOAuth(provider);
     } catch (e, st) {
-      Log.error('GitHub sign-in failed', error: e, stackTrace: st);
+      Log.error('${provider.name} sign-in failed', error: e, stackTrace: st);
       rethrow;
     }
   }
@@ -175,7 +119,7 @@ class AuthService {
   Future<void> signOut() async {
     Log.info('User signing out');
     try {
-      await _clientOrThrow.auth.signOut();
+      await _authOrThrow.signOut();
       Log.info('User signed out');
     } catch (e, st) {
       Log.error('Sign-out failed', error: e, stackTrace: st);
@@ -184,35 +128,30 @@ class AuthService {
   }
 
   // ---------------------------------------------------------------------------
-  // Session & user getters (safe when Supabase not configured — return null/false/empty)
+  // Session & user getters (safe offline — return null/false/empty)
   // ---------------------------------------------------------------------------
 
-  Session? get currentSession => _client?.auth.currentSession;
+  CloudSession? get currentSession => _auth?.currentSession;
 
-  User? get currentUser => _client?.auth.currentUser;
+  CloudUser? get currentUser => _auth?.currentUser;
 
-  bool get isAuthenticated => _client?.auth.currentSession != null;
+  bool get isAuthenticated => _auth?.isAuthenticated ?? false;
 
-  Stream<AuthState> get onAuthStateChange =>
-      _client?.auth.onAuthStateChange ?? const Stream.empty();
+  Stream<CloudAuthState> get onAuthStateChange =>
+      _auth?.authStateChanges ?? const Stream.empty();
 
   // ---------------------------------------------------------------------------
-  // Profile helper (mirrors old AuthUserProfile)
+  // Profile helper
   // ---------------------------------------------------------------------------
 
   AuthUserProfile? getUserProfile() {
     final user = currentUser;
     if (user == null) return null;
     return AuthUserProfile(
-      name:
-          user.userMetadata?['full_name'] as String? ??
-          user.userMetadata?['name'] as String?,
+      name: user.fullName,
       email: user.email,
       sub: user.id,
-      avatarId: user.userMetadata?['avatar_id'] as String?,
+      avatarId: user.avatarId,
     );
   }
 }
-
-/// Whether Supabase is configured and online mode can be used.
-bool get supabaseOnlineAvailable => supabaseConfigAvailable;

@@ -12,14 +12,14 @@ import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 import 'package:go_router/go_router.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:hisab_backend/hisab_backend.dart';
+import 'package:hisab_cloud/hisab_cloud.dart';
 import 'package:powersync/powersync.dart' show PowerSyncDatabase, Schema;
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/auth/auth_pending_finalize.dart';
 import 'core/auth/oauth_callback_state.dart';
 import 'core/auth/oauth_web_url.dart';
 import 'core/constants/firebase_config.dart';
-import 'core/constants/supabase_config.dart';
 import 'core/database/database_providers.dart';
 import 'core/debug/marionette_binding.dart';
 import 'core/log_web.dart';
@@ -189,30 +189,26 @@ void main() {
         Log.info('main: PowerSync database initialized (local SQLite)');
 
         // --------------------------------------------------------------------------
-        // Supabase (ONLY if configured via --dart-define)
+        // Cloud backend (present only in a build that bundles one)
         // --------------------------------------------------------------------------
-        if (supabaseConfigAvailable) {
-          Log.info('main: Initializing Supabase...');
-          // Keep default detectSessionInUri: true — same path Safari already
-          // uses successfully in production. Web-only post-step below is a
-          // no-op when that path already established a session.
-          await Supabase.initialize(
-            url: effectiveSupabaseUrl,
-            publishableKey: supabaseAnonKey,
-          );
-          Log.info('main: Supabase client initialized');
+        Log.info('main: Registering cloud backend...');
+        await registerHisabCloud();
+        final backend = cloudBackend;
+        if (backend != null) {
+          await backend.initialize();
+          Log.info('main: Cloud backend initialized');
 
           if (kIsWeb) {
             await _finalizeWebOAuthReturn();
           }
 
           if (settingsProviders != null) {
-            final session = supabaseClientIfConfigured?.auth.currentSession;
+            final hasSession = backend.auth.isAuthenticated;
 
             // Pending OAuth / magic-link redirects (web reload or cold start).
             finalizePendingOnlineAuth(
               controller: settingsProviders.controller,
-              hasSession: session != null,
+              hasSession: hasSession,
               clearWhenNoSession: true,
             );
 
@@ -226,7 +222,7 @@ void main() {
             final localOnly = settingsProviders.controller.get(
               localOnlySettingDef,
             );
-            if (!localOnly && session == null) {
+            if (!localOnly && !hasSession) {
               Log.info(
                 'Online mode active but no session yet — '
                 'user can re-authenticate from settings',
@@ -234,15 +230,13 @@ void main() {
             }
           }
         } else {
-          Log.info(
-            'main: Supabase not configured — running in local-only mode',
-          );
+          Log.info('main: No cloud backend — running in local-only mode');
         }
 
         // --------------------------------------------------------------------------
-        // Firebase (for push notifications — only if Supabase is configured)
+        // Firebase (for push notifications — only when a backend is present)
         // --------------------------------------------------------------------------
-        if (supabaseConfigAvailable) {
+        if (cloudAvailable) {
           try {
             Log.info('main: Initializing Firebase...');
             if (kIsWeb) {
@@ -383,14 +377,14 @@ void main() {
   );
 }
 
-/// Web-only follow-up after stock [Supabase.initialize] auth-url recovery.
+/// Web-only follow-up after the backend's own auth-url recovery.
 ///
-/// Safari/production happy path: initialize already exchanged `?code=` and set
-/// a session — this only cleans the URL (idempotent) and returns.
+/// Happy path: the backend already exchanged `?code=` during `initialize()` and
+/// set a session — this only cleans the URL (idempotent) and returns.
 ///
 /// Failure path (e.g. flaky iOS Firefox): if auth params remain and there is
-/// still no session, retry once with a timeout, surface a toast, then clear
-/// the URL so a refresh does not reuse a spent code.
+/// still no session, ask the backend to retry once with a timeout, surface a
+/// toast, then clear the URL so a refresh does not reuse a spent code.
 Future<void> _finalizeWebOAuthReturn() async {
   final uri = currentWebLocationUri();
   if (uri == null) return;
@@ -408,20 +402,18 @@ Future<void> _finalizeWebOAuthReturn() async {
       hasParam('error_description');
   if (!isAuthCallback) return;
 
-  final client = supabaseClientIfConfigured;
-  if (client == null) return;
+  final auth = cloudBackend?.auth;
+  if (auth == null) return;
 
-  if (client.auth.currentSession != null) {
+  if (auth.isAuthenticated) {
     clearWebAuthCallbackParams();
     return;
   }
 
   Log.info('main: Stock auth recovery left no session; retrying once (web)');
   try {
-    await client.auth
-        .getSessionFromUrl(uri)
-        .timeout(const Duration(seconds: 20));
-    if (client.auth.currentSession != null) {
+    await auth.completeWebRedirect().timeout(const Duration(seconds: 20));
+    if (auth.isAuthenticated) {
       Log.info('main: Auth callback session recovered on retry');
     } else {
       Log.warning('main: Auth callback retry finished without a session');
@@ -429,7 +421,7 @@ Future<void> _finalizeWebOAuthReturn() async {
     }
   } on TimeoutException catch (e, st) {
     // .timeout does not cancel the request; only toast if still signed out.
-    if (client.auth.currentSession != null) {
+    if (auth.isAuthenticated) {
       Log.info('main: Auth callback session arrived after retry timeout');
     } else {
       Log.warning(
@@ -439,16 +431,8 @@ Future<void> _finalizeWebOAuthReturn() async {
       );
       pendingWebOAuthCallbackError = 'auth_oauth_timeout';
     }
-  } on AuthException catch (e, st) {
-    if (client.auth.currentSession != null) return;
-    Log.warning(
-      'main: Auth callback session retry auth error: ${e.message}',
-      error: e,
-      stackTrace: st,
-    );
-    pendingWebOAuthCallbackError = 'auth_oauth_callback_failed';
   } catch (e, st) {
-    if (client.auth.currentSession != null) return;
+    if (auth.isAuthenticated) return;
     Log.warning(
       'main: Auth callback session retry failed',
       error: e,

@@ -11,9 +11,14 @@ import 'route_paths.dart';
 import '../settings/providers/settings_framework_providers.dart';
 import '../settings/settings_definitions.dart';
 
-/// Scheme and host used by the invite-redirect edge function for app deep links.
-const String _inviteScheme = 'io.supabase.hisab';
+/// Scheme used for app deep links. [inviteScheme] is current; [legacyInviteScheme]
+/// stays accepted so links shared before the rename keep opening the app.
+const String inviteScheme = 'com.shenepoy.hisab';
+const String legacyInviteScheme = 'io.supabase.hisab';
 const String _inviteHost = 'invite';
+
+bool _isInviteScheme(String scheme) =>
+    scheme == inviteScheme || scheme == legacyInviteScheme;
 
 /// Extracts invite token from a URI (deep link or web /invite?token=...).
 String? extractInviteTokenFromUri(Uri? uri) {
@@ -27,8 +32,8 @@ String? extractInviteTokenFromUri(Uri? uri) {
     return trimmed.isEmpty ? null : trimmed;
   }
 
-  // Deep link: io.supabase.hisab://invite?token=...
-  if (uri.scheme == _inviteScheme) {
+  // Deep link: com.shenepoy.hisab://invite?token=... (or the legacy scheme).
+  if (_isInviteScheme(uri.scheme)) {
     if (uri.host != _inviteHost) return null;
     return nonEmpty(queryToken) ??
         (pathSegments.isNotEmpty ? nonEmpty(pathSegments.first) : null);

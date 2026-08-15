@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
-import '../../../core/constants/supabase_config.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/repository/repository_providers.dart';
@@ -340,12 +340,7 @@ class _InviteResultViewState extends State<_InviteResultView> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final base = inviteLinkBaseUrl.endsWith('/')
-        ? inviteLinkBaseUrl.substring(0, inviteLinkBaseUrl.length - 1)
-        : inviteLinkBaseUrl;
-    final url = supabaseConfigAvailable
-        ? '$base/functions/v1/invite-redirect?token=${Uri.encodeQueryComponent(widget.token)}'
-        : '';
+    final url = cloudBackend?.invites.linkFor(widget.token) ?? '';
 
     if (url.isEmpty) {
       return Padding(

@@ -54,6 +54,7 @@
 			<string>invite</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
+				<string>com.shenepoy.hisab</string>
 				<string>io.supabase.hisab</string>
 			</array>
 		</dict>

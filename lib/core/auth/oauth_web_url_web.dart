@@ -18,7 +18,7 @@ const _authParameters = {
   'type',
 };
 
-/// Current browser URL — same source supabase_flutter/app_links uses on web.
+/// Current browser URL — the source auth callbacks land in on web.
 Uri? currentWebLocationUri() => Uri.parse(web.window.location.href);
 
 /// Removes OAuth callback query/hash params from the URL without reloading.

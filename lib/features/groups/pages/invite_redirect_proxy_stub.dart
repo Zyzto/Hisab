@@ -1,4 +1,3 @@
-/// Non-web: no-op. This route is only used when the app is loaded from the
-/// custom domain (hisab.shenepoy.com) on web; native apps open the Supabase
-/// invite-redirect URL directly when INVITE_BASE_URL is set.
-void redirectToSupabaseInviteUrl(String target) {}
+/// Non-web: no-op. This route is only reachable when the app is loaded from
+/// the custom domain on web; native apps open the invite resolver URL directly.
+void redirectToInviteResolver(String target) {}

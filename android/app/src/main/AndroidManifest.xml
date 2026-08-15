@@ -37,30 +37,9 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <!-- Invite deep links: io.supabase.hisab://invite?token=... -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW"/>
-                <category android:name="android.intent.category.DEFAULT"/>
-                <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="io.supabase.hisab" android:host="invite"/>
-            </intent-filter>
-            <!-- OAuth / magic-link callback: io.supabase.hisab://callback -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW"/>
-                <category android:name="android.intent.category.DEFAULT"/>
-                <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="io.supabase.hisab" android:host="callback"/>
-            </intent-filter>
-            <!-- HTTPS App Links: https://hisab.shenepoy.com/invite/... -->
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW"/>
-                <category android:name="android.intent.category.DEFAULT"/>
-                <category android:name="android.intent.category.BROWSABLE"/>
-                <data
-                    android:scheme="https"
-                    android:host="hisab.shenepoy.com"
-                    android:pathPrefix="/invite"/>
-            </intent-filter>
+            <!-- Invite, OAuth callback and App Link filters live in the cloud
+                 flavor's manifest; the offline build has no backend to resolve
+                 them against. See android/app/src/cloud/AndroidManifest.xml. -->
         </activity>
         <!-- Transaction notification scanner (opt-in, disabled by default).
              User must grant access in Android notification listener settings. -->

@@ -1,8 +1,7 @@
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 
-import '../constants/supabase_config.dart';
 import '../database/database_providers.dart';
 import '../services/connectivity_service.dart';
 import '../settings/providers/settings_framework_providers.dart';
@@ -16,11 +15,10 @@ import 'powersync_repository.dart';
 
 part 'repository_providers.g.dart';
 
-/// Helper: get SupabaseClient if available and not local-only.
-SupabaseClient? _clientIfOnline(bool localOnly) {
-  if (localOnly || !supabaseConfigAvailable) return null;
-  return supabaseClientIfConfigured;
-}
+/// The backend when this build has one and the user has not opted into
+/// local-only mode. Null makes every repository take its offline path.
+CloudBackend? _backendIfOnline(bool localOnly) =>
+    localOnly ? null : cloudBackend;
 
 @riverpod
 IGroupRepository groupRepository(Ref ref) {
@@ -31,7 +29,7 @@ IGroupRepository groupRepository(Ref ref) {
   );
   return PowerSyncGroupRepository(
     ref.watch(powerSyncDatabaseProvider),
-    client: _clientIfOnline(localOnly),
+    cloud: _backendIfOnline(localOnly),
     isOnline: isOnline,
     isLocalOnly: localOnly,
   );
@@ -43,7 +41,7 @@ IParticipantRepository participantRepository(Ref ref) {
   final isOnline = ref.watch(connectivityProvider);
   return PowerSyncParticipantRepository(
     ref.watch(powerSyncDatabaseProvider),
-    client: _clientIfOnline(localOnly),
+    cloud: _backendIfOnline(localOnly),
     isOnline: isOnline,
     isLocalOnly: localOnly,
   );
@@ -55,7 +53,7 @@ IExpenseRepository expenseRepository(Ref ref) {
   final isOnline = ref.watch(connectivityProvider);
   return PowerSyncExpenseRepository(
     ref.watch(powerSyncDatabaseProvider),
-    client: _clientIfOnline(localOnly),
+    cloud: _backendIfOnline(localOnly),
     isOnline: isOnline,
     isLocalOnly: localOnly,
   );
@@ -67,7 +65,7 @@ ITagRepository tagRepository(Ref ref) {
   final isOnline = ref.watch(connectivityProvider);
   return PowerSyncTagRepository(
     ref.watch(powerSyncDatabaseProvider),
-    client: _clientIfOnline(localOnly),
+    cloud: _backendIfOnline(localOnly),
     isOnline: isOnline,
     isLocalOnly: localOnly,
   );
@@ -89,6 +87,6 @@ IGroupInviteRepository groupInviteRepository(Ref ref) {
     // Invite token lookup is needed to route readonly invite previews even
     // when account mode is currently local-only. Mutating invite actions still
     // enforce authentication/online at repository method level.
-    supabaseClient: supabaseClientIfConfigured,
+    cloud: cloudBackend,
   );
 }

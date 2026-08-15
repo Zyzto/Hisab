@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/layout/layout_breakpoints.dart';
@@ -145,7 +145,7 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
   }
 
   String _parseChangePasswordError(Object e) {
-    if (e is AuthException) {
+    if (e is CloudException) {
       if (e.message.toLowerCase().contains('reauthenticate') ||
           e.message.toLowerCase().contains('reauthentication')) {
         return 'change_password_reauth_required'.tr();

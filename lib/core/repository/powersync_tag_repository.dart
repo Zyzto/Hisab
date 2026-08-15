@@ -6,16 +6,16 @@ part of 'powersync_repository.dart';
 
 class PowerSyncTagRepository implements ITagRepository {
   final PowerSyncDatabase _db;
-  final SupabaseClient? _client;
+  final CloudBackend? _cloud;
   final bool _isOnline;
   final bool _isLocalOnly;
 
   PowerSyncTagRepository(
     this._db, {
-    SupabaseClient? client,
+    CloudBackend? cloud,
     bool isOnline = false,
     bool isLocalOnly = true,
-  }) : _client = client,
+  }) : _cloud = cloud,
        _isOnline = isOnline,
        _isLocalOnly = isLocalOnly;
 
@@ -95,8 +95,8 @@ class PowerSyncTagRepository implements ITagRepository {
       'updated_at': now,
     };
 
-    if (!_isLocalOnly && _isOnline && _client != null) {
-      await _client.from('expense_tags').insert(data);
+    if (!_isLocalOnly && _isOnline && _cloud != null) {
+      await _cloud.sync.upsert('expense_tags', data);
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,
       isOnline: _isOnline,
@@ -134,16 +134,13 @@ class PowerSyncTagRepository implements ITagRepository {
     }
     final now = _nowIso();
 
-    if (!_isLocalOnly && _isOnline && _client != null) {
-      await _client
-          .from('expense_tags')
-          .update({
+    if (!_isLocalOnly && _isOnline && _cloud != null) {
+      await _cloud.sync.update('expense_tags', {
             'label': trimmedLabel,
             'icon_name': trimmedIcon,
             'color': normalizedColor,
             'updated_at': now,
-          })
-          .eq('id', tag.id);
+          }, tag.id);
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,
       isOnline: _isOnline,
@@ -170,8 +167,8 @@ class PowerSyncTagRepository implements ITagRepository {
 
   @override
   Future<void> delete(String id) async {
-    if (!_isLocalOnly && _isOnline && _client != null) {
-      await _client.from('expense_tags').delete().eq('id', id);
+    if (!_isLocalOnly && _isOnline && _cloud != null) {
+      await _cloud.sync.delete('expense_tags', id);
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,
       isOnline: _isOnline,

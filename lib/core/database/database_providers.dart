@@ -1,14 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter_logging_service/flutter_logging_service.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 import 'package:powersync/powersync.dart' hide SyncStatus;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../auth/auth_providers.dart';
-import '../constants/supabase_config.dart';
 import '../services/connectivity_service.dart';
 import '../settings/providers/settings_framework_providers.dart';
-import 'sync_backend.dart';
 import 'sync_engine.dart';
 import 'sync_errors.dart';
 
@@ -65,7 +64,7 @@ class DataSyncService extends _$DataSyncService {
   @override
   void build() {
     final localOnly = ref.watch(effectiveLocalOnlyProvider);
-    if (localOnly || !supabaseConfigAvailable) {
+    if (localOnly || !cloudAvailable) {
       _refreshTimer?.cancel();
       _debounceTimer?.cancel();
       Log.debug('DataSyncService: inactive (localOnly=$localOnly)');
@@ -131,8 +130,8 @@ class DataSyncService extends _$DataSyncService {
 
     try {
       final db = ref.read(powerSyncDatabaseProvider);
-      final client = supabaseClientIfConfigured;
-      if (client == null) {
+      final backend = cloudBackend;
+      if (backend == null) {
         syncStatusNotifier.setSynced();
         return;
       }
@@ -152,10 +151,10 @@ class DataSyncService extends _$DataSyncService {
           }
           await engine.pushPendingWritesWithBackend(
             db,
-            SupabaseSyncBackend(client),
-            setNotifySuppress: (active) => setNotifySuppressRpc(client, active),
+            backend.sync,
+            setNotifySuppress: backend.notifications.setNotifySuppress,
           );
-          await engine.fetchAll(db, client);
+          await engine.fetchAllWithBackend(db, backend.sync);
           Log.info('DataSyncService: sync complete');
           syncStatusNotifier.setSynced();
           return;

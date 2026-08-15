@@ -6,21 +6,17 @@ part of 'powersync_repository.dart';
 
 class PowerSyncGroupInviteRepository implements IGroupInviteRepository {
   final PowerSyncDatabase _db;
-  final SupabaseClient? supabaseClient;
-  PowerSyncGroupInviteRepository(this._db, {this.supabaseClient});
+  final CloudBackend? cloud;
+  PowerSyncGroupInviteRepository(this._db, {this.cloud});
 
   @override
   Future<({GroupInvite invite, Group group})?> getByToken(String token) async {
-    final client = supabaseClient;
-    if (client == null) {
+    final invites = cloud?.invites;
+    if (invites == null) {
       throw UnsupportedError('getByToken requires online mode');
     }
-    final result = await client.rpc(
-      'get_invite_by_token',
-      params: {'p_token': token},
-    );
-    if (result == null || (result is List && result.isEmpty)) return null;
-    final row = result is List ? result.first : result;
+    final row = await invites.getByToken(token);
+    if (row == null) return null;
 
     // RPC returns invite + group columns; createdBy, label, maxUses, useCount, isActive may be absent (defaults used)
     final invite = GroupInvite(
@@ -53,28 +49,20 @@ class PowerSyncGroupInviteRepository implements IGroupInviteRepository {
     Duration? expiresIn,
     InviteAccessMode accessMode = InviteAccessMode.standard,
   }) async {
-    final client = supabaseClient;
-    if (client == null) {
+    final invites = cloud?.invites;
+    if (invites == null) {
       throw UnsupportedError('createInvite requires online mode');
     }
     final effectiveRole = role ?? 'member';
-    final params = <String, dynamic>{
-      'p_group_id': groupId,
-      'p_invitee_email': inviteeEmail,
-      'p_role': effectiveRole,
-      'p_label': label,
-      'p_max_uses': maxUses,
-      'p_access_mode': accessMode.value,
-    };
-    // Convert Duration to PostgreSQL interval string, or null for never
-    if (expiresIn == null) {
-      params['p_expires_in'] = null;
-    } else {
-      final totalSeconds = expiresIn.inSeconds;
-      params['p_expires_in'] = '$totalSeconds seconds';
-    }
-    final result = await client.rpc('create_invite', params: params);
-    final row = result is List ? result.first : result;
+    final row = await invites.create(
+      groupId,
+      inviteeEmail: inviteeEmail,
+      role: effectiveRole,
+      label: label,
+      maxUses: maxUses,
+      expiresIn: expiresIn,
+      accessMode: accessMode.value,
+    );
     final id = row['id'] as String;
     final token = row['token'] as String;
 
@@ -83,7 +71,7 @@ class PowerSyncGroupInviteRepository implements IGroupInviteRepository {
     final expiresAtIso = expiresIn != null
         ? DateTime.now().toUtc().add(expiresIn).toIso8601String()
         : null;
-    final createdBy = client.auth.currentUser?.id;
+    final createdBy = cloud?.auth.currentUser?.id;
     await _db.execute(
       '''INSERT OR REPLACE INTO group_invites
         (id, group_id, token, invitee_email, role, created_at, expires_at,
@@ -113,20 +101,17 @@ class PowerSyncGroupInviteRepository implements IGroupInviteRepository {
     String? newParticipantName,
     String? participantId,
   }) async {
-    final client = supabaseClient;
-    if (client == null) {
+    final invites = cloud?.invites;
+    if (invites == null) {
       throw UnsupportedError('accept requires online mode');
     }
-    final result = await client.rpc(
-      'accept_invite',
-      params: {
-        'p_token': token,
-        'p_participant_id': participantId,
-        'p_new_participant_name': newParticipantName,
-      },
+    final groupId = await invites.accept(
+      token,
+      participantId: participantId,
+      newParticipantName: newParticipantName,
     );
     Log.info('Invite accepted');
-    return result as String;
+    return groupId;
   }
 
   @override
@@ -153,10 +138,7 @@ class PowerSyncGroupInviteRepository implements IGroupInviteRepository {
 
   @override
   Future<void> revoke(String inviteId) async {
-    final client = supabaseClient;
-    if (client != null) {
-      await client.rpc('revoke_invite', params: {'p_invite_id': inviteId});
-    }
+    await cloud?.invites.revoke(inviteId);
     // Always update local DB so watchers fire immediately
     await _db.execute('UPDATE group_invites SET is_active = 0 WHERE id = ?', [
       inviteId,
@@ -165,13 +147,7 @@ class PowerSyncGroupInviteRepository implements IGroupInviteRepository {
 
   @override
   Future<void> toggleActive(String inviteId, bool active) async {
-    final client = supabaseClient;
-    if (client != null) {
-      await client.rpc(
-        'toggle_invite_active',
-        params: {'p_invite_id': inviteId, 'p_active': active},
-      );
-    }
+    await cloud?.invites.toggleActive(inviteId, active);
     // Always update local DB so watchers fire immediately
     await _db.execute('UPDATE group_invites SET is_active = ? WHERE id = ?', [
       active ? 1 : 0,

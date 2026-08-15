@@ -12,7 +12,7 @@ import '../../../core/auth/sign_in_sheet.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/debug/integration_test_mode.dart';
 import '../../../core/widgets/toast.dart';
-import '../../../core/constants/supabase_config.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/motion/app_motion.dart';
@@ -303,7 +303,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(hisabSettingsProvidersProvider);
-    final onlineAvailable = supabaseConfigAvailable;
+    final onlineAvailable = cloudAvailable;
 
     if (settings == null) {
       return Scaffold(body: Center(child: Text('settings_unavailable'.tr())));
@@ -864,7 +864,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
     _stopChromeDemos();
     setState(() => _isCompleting = true);
 
-    final onlineAvailable = supabaseConfigAvailable;
+    final onlineAvailable = cloudAvailable;
     var isLocalOnly = ref.read(settings.provider(localOnlySettingDef));
     // Online unavailable: never leave the user in a "online" local_only=false state.
     if (!onlineAvailable && !isLocalOnly) {

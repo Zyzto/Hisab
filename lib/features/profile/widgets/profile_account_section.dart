@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/auth/auth_user_profile.dart';
 import '../../../core/auth/predefined_avatars.dart';
-import '../../../core/constants/supabase_config.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 import '../../../core/services/connectivity_service.dart';
 import '../../../core/widgets/participant_avatar.dart';
 import '../../../core/widgets/user_text.dart';
@@ -25,7 +25,7 @@ class ProfileAccountSection extends ConsumerWidget {
     final settings = ref.watch(hisabSettingsProvidersProvider);
     if (settings == null) return const SizedBox.shrink();
 
-    final onlineAvailable = supabaseConfigAvailable;
+    final onlineAvailable = cloudAvailable;
     final localOnly = ref.watch(effectiveLocalOnlyProvider);
 
     // Warm avatar emoji glyphs while the profile is visible so the edit
@@ -118,9 +118,7 @@ class ProfileAccountSection extends ConsumerWidget {
         }
 
         final provider = AccountModeActions.providerLabel(user);
-        final canChangePassword =
-            user != null &&
-            (user.appMetadata['provider'] as String?) == 'email';
+        final canChangePassword = user?.provider == 'email';
 
         return Column(
           children: [

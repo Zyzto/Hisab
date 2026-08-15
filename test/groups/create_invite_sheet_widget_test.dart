@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:hisab/core/constants/supabase_config.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 import 'package:hisab/core/repository/group_invite_repository.dart';
 import 'package:hisab/core/repository/repository_providers.dart';
 import 'package:hisab/domain/domain.dart';
@@ -100,7 +100,7 @@ void main() {
 
       expect(fakeInviteRepo.lastAccessMode, InviteAccessMode.readonlyOnly);
     },
-    skip: !supabaseConfigAvailable,
+    skip: !cloudAvailable,
   );
 
   testWidgets('CreateInviteSheet in Arabic shows key content', (tester) async {
@@ -114,7 +114,7 @@ void main() {
   });
 
   testWidgets(
-    'Create action closes form sheet and shows offline notice when Supabase is not configured',
+    'Create action closes form sheet and shows offline notice in an offline build',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(400, 1200));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -137,11 +137,11 @@ void main() {
       expect(hasOnlineNotice, isTrue);
       expect(find.byIcon(Icons.add_link), findsNothing);
     },
-    skip: supabaseConfigAvailable,
+    skip: cloudAvailable,
   );
 
   testWidgets(
-    'Create action opens QR share actions when Supabase is configured',
+    'Create action opens QR share actions when a cloud backend is present',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(400, 1200));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -161,7 +161,7 @@ void main() {
       expect(find.byIcon(Icons.copy), findsOneWidget);
       expect(find.byIcon(Icons.add_link), findsNothing);
     },
-    skip: !supabaseConfigAvailable,
+    skip: !cloudAvailable,
   );
 }
 

@@ -1,6 +1,6 @@
 import 'package:flutter_logging_service/flutter_logging_service.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 import 'package:powersync/powersync.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 /// Result of a Local -> Online migration attempt.
@@ -9,13 +9,13 @@ enum MigrationResult { success, noData, failed }
 /// Handles two-way data migration when switching between Local-Only and Online modes.
 class MigrationService {
   final PowerSyncDatabase _db;
-  final SupabaseClient _client;
+  final CloudBackend _cloud;
 
   static const _uuid = Uuid();
 
-  MigrationService(this._db, this._client);
+  MigrationService(this._db, this._cloud);
 
-  /// Migrate all local data to Supabase when switching Local -> Online.
+  /// Migrate all local data to the cloud when switching Local -> Online.
   ///
   /// Pushes groups (with owner_id = current user), group_members,
   /// participants, expenses, and expense_tags.
@@ -24,14 +24,15 @@ class MigrationService {
   Future<MigrationResult> migrateLocalToOnline({
     void Function(int completed, int total)? onProgress,
   }) async {
-    // Ensure the session is fresh so RLS sees auth.uid() (avoids 42501 after sign-in)
+    // Ensure the session is fresh so the backend authorizes every row of a
+    // long migration, not just the first few.
     try {
-      await _client.auth.refreshSession();
+      await _cloud.auth.refreshSession();
     } catch (e) {
       Log.debug('MigrationService: session refresh note: $e');
     }
 
-    final userId = _client.auth.currentUser?.id;
+    final userId = _cloud.auth.currentUser?.id;
     if (userId == null) {
       Log.error('MigrationService: no authenticated user');
       return MigrationResult.failed;
@@ -53,12 +54,12 @@ class MigrationService {
           groups.length + participants.length + expenses.length + tags.length;
       var completed = 0;
 
-      Log.info('MigrationService: migrating $total items to Supabase');
+      Log.info('MigrationService: migrating $total items to the cloud');
 
       // Push groups with owner_id = current user
       for (final g in groups) {
         final groupId = g['id'] as String;
-        await _client.from('groups').upsert({
+        await _cloud.sync.upsert('groups', {
           'id': groupId,
           'name': g['name'],
           'currency_code': g['currency_code'],
@@ -99,14 +100,14 @@ class MigrationService {
           }
         }
 
-        await _client.from('group_members').upsert({
+        await _cloud.sync.upsert('group_members', {
           'id': memberId,
           'group_id': groupId,
           'user_id': userId,
           'role': 'owner',
           'participant_id': ownerParticipantId,
           'joined_at': g['created_at'],
-        }, onConflict: 'group_id,user_id');
+        }, conflictColumns: const ['group_id', 'user_id']);
 
         completed++;
         onProgress?.call(completed, total);
@@ -120,7 +121,7 @@ class MigrationService {
 
       // Push participants
       for (final p in participants) {
-        await _client.from('participants').upsert({
+        await _cloud.sync.upsert('participants', {
           'id': p['id'],
           'group_id': p['group_id'],
           'name': p['name'],
@@ -137,7 +138,7 @@ class MigrationService {
 
       // Push expenses
       for (final e in expenses) {
-        await _client.from('expenses').upsert({
+        await _cloud.sync.upsert('expenses', {
           'id': e['id'],
           'group_id': e['group_id'],
           'payer_participant_id': e['payer_participant_id'],
@@ -165,7 +166,7 @@ class MigrationService {
 
       // Push tags
       for (final t in tags) {
-        await _client.from('expense_tags').upsert({
+        await _cloud.sync.upsert('expense_tags', {
           'id': t['id'],
           'group_id': t['group_id'],
           'label': t['label'],

@@ -1,0 +1,14 @@
+name: hisab_cloud
+description: "Offline stub backend for Hisab. Registers nothing, so the app runs fully local."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  hisab_backend:
+    path: ../hisab_backend
+
+dev_dependencies:
+  lints: ^6.0.0

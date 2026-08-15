@@ -1,9 +1,9 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import '../../../core/constants/supabase_config.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 part 'onboarding_providers.g.dart';
 
-/// Whether online mode is available (Supabase configured via --dart-define).
+/// Whether this build has a cloud backend, and so can offer online mode.
 @riverpod
-bool supabaseConfigAvailableOnboarding(Ref ref) {
-  return supabaseConfigAvailable;
+bool cloudAvailableOnboarding(Ref ref) {
+  return cloudAvailable;
 }

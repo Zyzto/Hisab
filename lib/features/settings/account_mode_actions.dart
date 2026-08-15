@@ -6,7 +6,7 @@ import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 
 import '../../core/auth/auth_providers.dart';
 import '../../core/auth/sign_in_sheet.dart';
-import '../../core/constants/supabase_config.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 import '../../core/database/database_providers.dart';
 import '../../core/layout/responsive_sheet.dart';
 import '../../core/services/migration_service.dart';
@@ -34,9 +34,8 @@ class AccountModeActions {
     return '?';
   }
 
-  static String providerLabel(dynamic user) {
-    if (user == null) return '';
-    final provider = user.appMetadata['provider'] as String?;
+  static String providerLabel(CloudUser? user) {
+    final provider = user?.provider;
     return switch (provider) {
       'google' => 'Google',
       'github' => 'GitHub',
@@ -118,7 +117,7 @@ class AccountModeActions {
       return;
     }
 
-    if (!supabaseConfigAvailable) return;
+    if (!cloudAvailable) return;
 
     final authService = ref.read(authServiceProvider);
     if (authService.isAuthenticated) {
@@ -185,10 +184,10 @@ class AccountModeActions {
     WidgetRef ref,
     SettingsProviders settings,
   ) async {
-    final client = supabaseClientIfConfigured;
-    if (client == null) return;
+    final backend = cloudBackend;
+    if (backend == null) return;
     final db = ref.read(powerSyncDatabaseProvider);
-    final migrationService = MigrationService(db, client);
+    final migrationService = MigrationService(db, backend);
 
     final hasData = await migrationService.hasLocalData();
     if (!hasData) {

@@ -9,6 +9,7 @@ import 'package:hisab/features/groups/pages/group_detail_page.dart';
 import 'package:hisab/features/groups/pages/invite_group_preview_page.dart';
 import 'package:hisab/features/groups/providers/invite_preview_provider.dart';
 
+import '../support/fake_cloud.dart';
 import '../widget_test_helpers.dart';
 
 void main() {
@@ -17,22 +18,20 @@ void main() {
   });
 
   testWidgets('shows three tabs and no mutating actions', (tester) async {
-    final dataByRpc = <String, dynamic>{
-      'get_invite_preview_group': [
-        {
-          'invite_id': 'invite-1',
-          'invite_access_mode': 'readonly_only',
-          'group_id': 'group-1',
-          'group_name': 'Preview Group',
-          'group_currency_code': 'USD',
-          'group_settlement_method': 'greedy',
-          'group_treasurer_participant_id': null,
-          'group_allow_member_settle_for_others': false,
-          'group_created_at': '2026-01-01T00:00:00Z',
-          'group_updated_at': '2026-01-01T00:00:00Z',
-        },
-      ],
-      'get_invite_preview_participants': [
+    final invites = FakeCloudInvites(
+      onPreviewGroup: (_) async => {
+        'invite_id': 'invite-1',
+        'invite_access_mode': 'readonly_only',
+        'group_id': 'group-1',
+        'group_name': 'Preview Group',
+        'group_currency_code': 'USD',
+        'group_settlement_method': 'greedy',
+        'group_treasurer_participant_id': null,
+        'group_allow_member_settle_for_others': false,
+        'group_created_at': '2026-01-01T00:00:00Z',
+        'group_updated_at': '2026-01-01T00:00:00Z',
+      },
+      onPreviewParticipants: (_) async => [
         {
           'id': 'p1',
           'group_id': 'group-1',
@@ -46,8 +45,7 @@ void main() {
           'member_role': 'member',
         },
       ],
-      'get_invite_preview_expenses': <Map<String, dynamic>>[],
-    };
+    );
 
     final router = GoRouter(
       initialLocation: '/invite/token-1/preview/expenses',
@@ -91,9 +89,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          invitePreviewRpcProvider.overrideWithValue((rpcName, params) async {
-            return dataByRpc[rpcName];
-          }),
+          invitePreviewSourceProvider.overrideWithValue(invites),
         ],
         child: EasyLocalization(
           path: 'assets/translations',
@@ -152,22 +148,20 @@ void main() {
   testWidgets('opens read-only expense detail and shows image section', (
     tester,
   ) async {
-    final dataByRpc = <String, dynamic>{
-      'get_invite_preview_group': [
-        {
-          'invite_id': 'invite-1',
-          'invite_access_mode': 'readonly_join',
-          'group_id': 'group-1',
-          'group_name': 'Preview Group',
-          'group_currency_code': 'USD',
-          'group_settlement_method': 'greedy',
-          'group_treasurer_participant_id': null,
-          'group_allow_member_settle_for_others': false,
-          'group_created_at': '2026-01-01T00:00:00Z',
-          'group_updated_at': '2026-01-01T00:00:00Z',
-        },
-      ],
-      'get_invite_preview_participants': [
+    final invites = FakeCloudInvites(
+      onPreviewGroup: (_) async => {
+        'invite_id': 'invite-1',
+        'invite_access_mode': 'readonly_join',
+        'group_id': 'group-1',
+        'group_name': 'Preview Group',
+        'group_currency_code': 'USD',
+        'group_settlement_method': 'greedy',
+        'group_treasurer_participant_id': null,
+        'group_allow_member_settle_for_others': false,
+        'group_created_at': '2026-01-01T00:00:00Z',
+        'group_updated_at': '2026-01-01T00:00:00Z',
+      },
+      onPreviewParticipants: (_) async => [
         {
           'id': 'p1',
           'group_id': 'group-1',
@@ -193,7 +187,7 @@ void main() {
           'member_role': 'member',
         },
       ],
-      'get_invite_preview_expenses': [
+      onPreviewExpenses: (_) async => [
         {
           'id': 'e1',
           'group_id': 'group-1',
@@ -214,7 +208,7 @@ void main() {
           'updated_at': '2026-01-02T00:00:00Z',
         },
       ],
-    };
+    );
 
     final router = GoRouter(
       initialLocation: '/invite/token-1/preview/expenses',
@@ -244,9 +238,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          invitePreviewRpcProvider.overrideWithValue((rpcName, params) async {
-            return dataByRpc[rpcName];
-          }),
+          invitePreviewSourceProvider.overrideWithValue(invites),
         ],
         child: EasyLocalization(
           path: 'assets/translations',

@@ -774,13 +774,28 @@ final actionLicensesSettingDef = const ActionSetting(
   },
 );
 
+// The AGPL obliges the hosted web app to offer its source to the people using
+// it, so this tile is a licence requirement rather than a nicety.
+final actionSourceCodeSettingDef = const ActionSetting(
+  'action_source_code',
+  titleKey: 'source_code',
+  subtitleKey: 'source_code_description',
+  icon: Icons.code_outlined,
+  section: 'about',
+  order: 3,
+  searchTerms: {
+    'en': ['source', 'github', 'agpl', 'open source', 'repository'],
+    'ar': ['المصدر', 'الشيفرة', 'مفتوح'],
+  },
+);
+
 final actionAboutMeSettingDef = const ActionSetting(
   'action_about_me',
   titleKey: 'about_me',
   subtitleKey: 'about_me_description',
   icon: Icons.person_search_outlined,
   section: 'about',
-  order: 3,
+  order: 4,
   searchTerms: {
     'en': ['developer', 'author', 'github'],
     'ar': ['مطور'],
@@ -793,7 +808,7 @@ final actionDonateSettingDef = const ActionSetting(
   subtitleKey: 'donate_description',
   icon: Icons.favorite_outline,
   section: 'about',
-  order: 4,
+  order: 5,
   searchTerms: {
     'en': ['sponsor', 'support', 'github'],
     'ar': ['تبرع', 'دعم'],
@@ -873,6 +888,7 @@ final allSettings = <SettingDefinition>[
   actionDeleteCloudDataSettingDef,
   actionSendFeedbackSettingDef,
   actionLicensesSettingDef,
+  actionSourceCodeSettingDef,
   actionAboutMeSettingDef,
   actionDonateSettingDef,
   actionVersionSettingDef,

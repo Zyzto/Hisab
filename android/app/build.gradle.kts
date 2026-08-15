@@ -7,8 +7,25 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
-    // Google services — processes google-services.json for Firebase SDKs
-    id("com.google.gms.google-services")
+}
+
+// Firebase config only ships with the cloud flavor. A clean clone of the public
+// repo has no google-services.json at all, so applying the plugin unconditionally
+// would fail the build for anyone without the cloud credentials.
+val cloudGoogleServices = file("src/cloud/google-services.json")
+if (cloudGoogleServices.exists()) {
+    apply(plugin = "com.google.gms.google-services")
+
+    // The plugin, once applied, wires itself into every variant — including
+    // foss, which has no config and does not want Firebase. Without this the
+    // foss build fails for anyone who also happens to have the cloud
+    // credentials on disk, which is every maintainer.
+    tasks.matching {
+        it.name.startsWith("process") && it.name.endsWith("GoogleServices") &&
+            !it.name.contains("Cloud")
+    }.configureEach {
+        enabled = false
+    }
 }
 
 // Load key.properties if it exists (CI writes it from secrets; local dev may not have it).
@@ -48,6 +65,21 @@ android {
                 keyAlias = keyProperties["keyAlias"] as String
                 keyPassword = keyProperties["keyPassword"] as String
             }
+        }
+    }
+
+    // cloud: the published app — Firebase, deep links, production signing key.
+    //        Built only from the private repo, which supplies the credentials.
+    // foss:  the offline build from the public repo. Installs side by side with
+    //        cloud and is signed with a separate key held in the public repo.
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("cloud") {
+            dimension = "distribution"
+        }
+        create("foss") {
+            dimension = "distribution"
+            applicationIdSuffix = ".foss"
         }
     }
 

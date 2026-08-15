@@ -6,16 +6,16 @@ part of 'powersync_repository.dart';
 
 class PowerSyncParticipantRepository implements IParticipantRepository {
   final PowerSyncDatabase _db;
-  final SupabaseClient? _client;
+  final CloudBackend? _cloud;
   final bool _isOnline;
   final bool _isLocalOnly;
 
   PowerSyncParticipantRepository(
     this._db, {
-    SupabaseClient? client,
+    CloudBackend? cloud,
     bool isOnline = false,
     bool isLocalOnly = true,
-  }) : _client = client,
+  }) : _cloud = cloud,
        _isOnline = isOnline,
        _isLocalOnly = isLocalOnly;
 
@@ -98,8 +98,8 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
       'updated_at': now,
     };
 
-    if (!_isLocalOnly && _isOnline && _client != null) {
-      await _client.from('participants').insert(data);
+    if (!_isLocalOnly && _isOnline && _cloud != null) {
+      await _cloud.sync.upsert('participants', data);
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,
       isOnline: _isOnline,
@@ -131,17 +131,14 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
     final now = _nowIso();
 
     final leftAtIso = participant.leftAt?.toUtc().toIso8601String();
-    if (!_isLocalOnly && _isOnline && _client != null) {
-      await _client
-          .from('participants')
-          .update({
+    if (!_isLocalOnly && _isOnline && _cloud != null) {
+      await _cloud.sync.update('participants', {
             'name': trimmedName,
             'sort_order': participant.order,
             'avatar_id': participant.avatarId,
             'left_at': leftAtIso,
             'updated_at': now,
-          })
-          .eq('id', participant.id);
+          }, participant.id);
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,
       isOnline: _isOnline,
@@ -177,12 +174,9 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
   @override
   Future<void> archive(String groupId, String participantId) async {
     final now = _nowIso();
-    if (!_isLocalOnly && _isOnline && _client != null) {
-      await _client.rpc(
-        'archive_participant',
-        params: {'p_group_id': groupId, 'p_participant_id': participantId},
-      );
-      Log.info('Participant archived via RPC');
+    if (!_isLocalOnly && _isOnline && _cloud != null) {
+      await _cloud.groups.archiveParticipant(groupId, participantId);
+      Log.info('Participant archived via backend');
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,
       isOnline: _isOnline,
@@ -217,8 +211,8 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
     final updates = <String, dynamic>{'name': trimmedName, 'updated_at': now};
     if (avatarId != null) updates['avatar_id'] = avatarId;
 
-    if (!_isLocalOnly && _isOnline && _client != null) {
-      await _client.from('participants').update(updates).eq('user_id', userId);
+    if (!_isLocalOnly && _isOnline && _cloud != null) {
+      await _cloud.sync.updateWhere('participants', updates, column: 'user_id', value: userId);
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,
       isOnline: _isOnline,
@@ -258,8 +252,8 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
     Log.info(
       'ParticipantRepository.delete: participantId=$id localOnly=$_isLocalOnly online=$_isOnline',
     );
-    if (!_isLocalOnly && _isOnline && _client != null) {
-      await _client.from('participants').delete().eq('id', id);
+    if (!_isLocalOnly && _isOnline && _cloud != null) {
+      await _cloud.sync.delete('participants', id);
       Log.info('ParticipantRepository.delete: deleted on server');
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,

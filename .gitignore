@@ -55,6 +55,7 @@ app.*.map.json
 android/build/
 android/secrets.properties
 android/app/google-services.json
+android/app/src/cloud/google-services.json
 /android/app/debug
 /android/app/profile
 /android/app/release

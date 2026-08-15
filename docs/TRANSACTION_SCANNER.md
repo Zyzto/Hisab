@@ -33,7 +33,7 @@ Gate: `lib/features/transaction_scanner/providers/scanner_providers.dart`. `App`
 | Area | Path |
 |------|------|
 | Feature | `lib/features/transaction_scanner/` — `pages/`, `providers/scanner_providers.dart` (`ScannerController`), `repository/scanner_repository.dart`, `services/` (parser, duplicate detector, bridge), `domain/` |
-| Schema | `lib/core/database/powersync_schema.dart` — local-only tables below (no Supabase) |
+| Schema | `lib/core/database/powersync_schema.dart` — local-only tables below (never synced) |
 | Settings UI | `settings_definitions.dart` (`scannerSection`, `scanner_enabled`); `settings_page.dart` (Android section → hub) |
 
 **Navigation:** No GoRouter routes; Settings/hub use `Navigator.push` + `MaterialPageRoute`.

@@ -1,54 +1,68 @@
 # Security and secrets
 
-This repository is **public**. Treat every commit as visible to the world.
+This repository is **public**, and it has no production credentials in it by
+design. There is no backend here, so there is nothing here to hold a
+service-role key, a database password, or an admin token. Treat every commit as
+visible to the world, because it is.
+
+## Reporting a vulnerability
+
+Please do not open a public issue for a security problem. Email the maintainer
+at the address on the [GitHub profile](https://github.com/Zyzto), or use
+GitHub's private vulnerability reporting on this repository. Include the
+version or commit, the platform, and the smallest reproduction you have.
+
+If the issue is in the hosted service rather than the client, say so — it is a
+separate system and gets fixed separately.
 
 ## Safe to commit
 
-- `supabase/config.toml` with `env(...)` placeholders only
-- `supabase/migrations/*.sql`
-- `supabase/seed.sql` with **fake** local test users only
-- `supabase/functions/**` source (no embedded keys)
-- Docs and scripts that name secrets — never their values
-- `*_example.json` / `*.env.example` templates
+- Source, docs and scripts that *name* secrets — never their values
+- `*_example.json` / `*.env.example` templates with placeholders
+- Anything already public in a shipped build
 
 ## Never commit
 
-- Supabase `service_role` key or JWT signing material (`signing_keys.json`)
-- Filled `anon` keys / project URLs in tracked files (use local define files)
-- Firebase service-account JSON (private keys)
-- OAuth client secrets, SMTP/API tokens, real `.env*` values
+- Firebase service-account JSON or any private key material
+- Filled define files with real keys or project URLs
+- OAuth client secrets, SMTP or API tokens, real `.env*` values
+- Signing keystores or their passwords
 - Production dumps or real user exports
 
 **Gitignored paths — do not `git add -f`:**
 
 | Path | Why |
 |------|-----|
-| `dart_defines_local.json` / `dart_defines_online.json` | Project URLs + keys |
-| `secrets/**` (except `README.md` / `.gitkeep`) | FCM SA JSON, etc. |
-| `supabase/.env` / `functions/.env` | Local Edge / redirect env |
-| `android/app/google-services.json` | Firebase Android |
+| `dart_defines*.json` | Backend URLs and keys |
+| `secrets/**` (except `README.md` / `.gitkeep`) | Service-account JSON, etc. |
+| `android/app/src/cloud/google-services.json` | Firebase Android config for the cloud build |
 | `ios/Runner/GoogleService-Info.plist` | Firebase iOS |
 | `**/fcm-service-account*.json` | Firebase Admin private key |
+| `*.jks` / `*.keystore` / `key.properties` | Android signing material |
 
-Copy from `*_example` templates and [secrets/README.md](secrets/README.md).
+## A note on client-side "secrets"
+
+Everything passed to a Flutter build with `--dart-define` ends up inside the
+compiled binary or JavaScript bundle. It is not secret; it is merely
+inconvenient to read. A public API key that is safe to expose — because the
+server enforces authorization regardless — is fine. A key that grants
+privileges on its own is not, and no amount of build-time injection changes
+that. If your backend has an admin credential, it belongs on your server.
 
 ## Where secrets live
 
 | Context | Store in |
 |---------|----------|
 | Local dev | Env vars or untracked files (table above) |
-| CI/CD | [GitHub Actions secrets](docs/GITHUB_ACTIONS_SECRETS.md) |
-| Edge (hosted) | `supabase secrets set ...` |
-| Local config.toml | `env(NAME)` placeholders only |
-| Local FCM for Edge | `secrets/fcm-service-account.test.json` → `./scripts/local_test_env.sh reload-secrets` |
+| Public CI | GitHub Actions secrets on this repository — only the FOSS signing keystore |
+| Backend / cloud build | The private backend repository's own Actions environments |
 
-## If something leaks
+The public release pipeline signs the FOSS APK and does nothing else. It has no
+access to production Firebase, to the backend, or to the Play upload key.
 
-Rotate the credential immediately and remove it from git history. Seeded test users in `supabase/seed.sql` must never be reused in production.
+## Release checks
 
-## Config-as-code / release checks
-
-Before opening a PR that touches Supabase config, or before a release:
+Before opening a PR, or before a release:
 
 ```bash
 bash ./scripts/run_release_checks.sh
@@ -58,16 +72,11 @@ Runs:
 
 | Script | What it gates |
 |--------|----------------|
-| [`scripts/verify_security.sh`](scripts/verify_security.sh) | No tracked secret paths; no PEM/JWT/API keys/tokens/service_role literals; Firebase web placeholders |
-| [`scripts/verify_infra.sh`](scripts/verify_infra.sh) | Config-as-code, Edge Function sources, Firebase Hosting, web shell, version/CI pins |
+| [`scripts/verify_security.sh`](scripts/verify_security.sh) | No tracked secret paths; no PEM/JWT/API-key/token literals; Firebase web placeholders left as placeholders |
+| [`scripts/verify_infra.sh`](scripts/verify_infra.sh) | Firebase Hosting config, web shell assets, version and toolchain pins, Android variants, legal pages |
 
-CI runs the same two checks as **Security Check** and **Infra Check** jobs on tag releases (`.github/workflows/release.yml`). Agent workflow: [`.cursor/skills/hisab-release-checks/SKILL.md`](.cursor/skills/hisab-release-checks/SKILL.md) (also runs Supabase advisors + security-review when asked).
-
-Config-as-code only:
-
-```bash
-bash ./scripts/verify_supabase_config_as_code.sh
-```
+CI runs the same checks on every push and on tag releases. Agent workflow:
+[`.cursor/skills/hisab-release-checks/SKILL.md`](.cursor/skills/hisab-release-checks/SKILL.md).
 
 ## Before push (secret scan)
 
@@ -83,8 +92,14 @@ bash ./scripts/install_git_hooks.sh
 
 3. **Cursor agent pushes** are also gated by [`.cursor/hooks.json`](.cursor/hooks.json) (`beforeShellExecution` → `block-push-if-secrets.sh`).
 
-Bypass only when you intentionally must (not for real secrets):
+Bypass only when you intentionally must, and never for real secrets:
 
 ```bash
 git push --no-verify
 ```
+
+## If something leaks
+
+Rotate the credential immediately, then remove it from git history. Rotation
+first — history rewriting is slow and a leaked key is exploitable the whole
+time you are doing it.

@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hisab/core/auth/auth_flow_policy.dart';
 import 'package:hisab/core/auth/sign_in_result.dart';
-import 'package:hisab/core/constants/supabase_config.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 
 void main() {
   group('SignInResult caller contracts', () {
@@ -86,11 +86,11 @@ void main() {
           isWeb: false,
           configuredSiteUrl: 'https://hisab.shenepoy.com',
         ),
-        authOAuthCallbackDeepLink,
+        hisabAuthCallbackDeepLink,
       );
       expect(
         resolveAuthRedirectUrl(isWeb: false, configuredSiteUrl: ''),
-        'io.supabase.hisab://callback',
+        'com.shenepoy.hisab://callback',
       );
     });
 
@@ -181,7 +181,7 @@ void main() {
       // Magic link / signup / resend / OAuth all share this on native.
       expect(
         resolveAuthRedirectUrl(isWeb: false, configuredSiteUrl: ''),
-        authOAuthCallbackDeepLink,
+        hisabAuthCallbackDeepLink,
       );
     });
   });

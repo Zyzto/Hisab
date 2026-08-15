@@ -5,9 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 import '../../../core/auth/auth_providers.dart';
-import '../../../core/constants/supabase_config.dart';
 import '../../../core/auth/sign_in_sheet.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
@@ -121,7 +120,9 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
   }
 
   _InviteAcceptErrorKind _classifyInviteAcceptError(Object error) {
-    if (error is AuthException) return _InviteAcceptErrorKind.unauthenticated;
+    if (error is CloudException && error.isAuthError) {
+      return _InviteAcceptErrorKind.unauthenticated;
+    }
     final dynamic d = error;
     int? statusCode;
     String? code;
@@ -191,7 +192,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
     // Not onboarded and not authenticated: resolve via anon preview, then sign-in.
     if (!onboardingCompleted &&
         !isAuthenticated &&
-        supabaseConfigAvailable &&
+        cloudAvailable &&
         !localOnly) {
       if (widget.token.isEmpty) {
         return LayoutBuilder(
@@ -367,7 +368,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
     // Local-only: invite openers with Supabase available are being flipped online
     // in initState — show a short loading state instead of the offline dead-end.
     if (localOnly) {
-      if (supabaseConfigAvailable && widget.token.isNotEmpty) {
+      if (cloudAvailable && widget.token.isNotEmpty) {
         return LayoutBuilder(
           builder: (context, layoutConstraints) {
             return Scaffold(
@@ -395,7 +396,7 @@ class _InviteAcceptPageState extends ConsumerState<InviteAcceptPage> {
                 onPressed: () => _dismissInvite(context),
               ),
             ),
-            body: (!supabaseConfigAvailable || !hasNetwork)
+            body: (!cloudAvailable || !hasNetwork)
                 ? Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24),

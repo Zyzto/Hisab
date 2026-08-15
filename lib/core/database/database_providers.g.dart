@@ -95,7 +95,7 @@ final class DataSyncServiceProvider
   }
 }
 
-String _$dataSyncServiceHash() => r'b535bd798dfb18b49057f5a458ef05db9edf1399';
+String _$dataSyncServiceHash() => r'003fef82d7a145319f010d552110c3ab4f6755fe';
 
 abstract class _$DataSyncService extends $Notifier<void> {
   void build();

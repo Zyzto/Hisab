@@ -10,7 +10,7 @@ import '../secure_settings_storage.dart';
 import '../settings_definitions.dart';
 import '../../auth/auth_providers.dart';
 import '../../auth/auth_user_profile.dart';
-import '../../constants/supabase_config.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 import '../../theme/flex_theme_builder.dart' show defaultThemeSchemeId;
 
 part 'settings_framework_providers.g.dart';
@@ -223,7 +223,7 @@ bool localOnly(Ref ref) {
 @riverpod
 bool effectiveLocalOnly(Ref ref) {
   final local = ref.watch(localOnlyProvider);
-  return local || !supabaseConfigAvailable;
+  return local || !cloudAvailable;
 }
 
 @riverpod

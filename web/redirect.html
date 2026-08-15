@@ -155,10 +155,10 @@ p{color:var(--muted);margin-bottom:20px;font-size:.95rem}
     var appUrl = isAndroid
       ? ("intent://invite?token=" + encodedToken
         + "#Intent"
-        + ";scheme=io.supabase.hisab"
+        + ";scheme=com.shenepoy.hisab"
         + ";S.browser_fallback_url=" + encodeURIComponent(webUrl)
         + ";end")
-      : ("io.supabase.hisab://invite?token=" + encodedToken);
+      : ("com.shenepoy.hisab://invite?token=" + encodedToken);
 
     openApp.href = appUrl;
     heading.textContent = i18n[locale].heading;

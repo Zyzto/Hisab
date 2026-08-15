@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 
-import '../../../core/constants/supabase_config.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/content_aligned_fab_location.dart';
 import '../../../core/layout/constrained_content.dart';
@@ -309,12 +309,7 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
   bool _expanded = false;
   bool _actionLoading = false;
 
-  String _inviteUrl(String token) {
-    final base = inviteLinkBaseUrl.endsWith('/')
-        ? inviteLinkBaseUrl.substring(0, inviteLinkBaseUrl.length - 1)
-        : inviteLinkBaseUrl;
-    return '$base/functions/v1/invite-redirect?token=${Uri.encodeQueryComponent(token)}';
-  }
+  String _inviteUrl(String token) => cloudBackend?.invites.linkFor(token) ?? '';
 
   Widget _statusChip(BuildContext context) {
     final theme = Theme.of(context);

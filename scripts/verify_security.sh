@@ -59,6 +59,7 @@ must_not_track=(
   "dart_defines_online.json"
   "dart_defines_local.json"
   "android/app/google-services.json"
+  "android/app/src/cloud/google-services.json"
   "ios/Runner/GoogleService-Info.plist"
   "android/key.properties"
   "supabase/.env"
@@ -156,29 +157,8 @@ if matches=$(grep_tracked '(postgres|postgresql|mysql|mongodb(\+srv)?)://[^[:spa
   fi
 fi
 
-# ── config.toml must use env(...) for secret-bearing keys ─────────────────────
-config_src="supabase/config.toml"
-if [[ -n "$SCAN_TREE" ]]; then
-  if git cat-file -e "${SCAN_TREE}:${config_src}" 2>/dev/null; then
-    config_tmp=$(mktemp)
-    git show "${SCAN_TREE}:${config_src}" >"$config_tmp"
-    config_src="$config_tmp"
-    trap 'rm -f "$config_tmp"' EXIT
-  else
-    config_src=""
-  fi
-fi
-
-if [[ -n "$config_src" && -f "$config_src" ]]; then
-  # Fail closed: secret-bearing keys must use env(...) or be empty.
-  bad_config=$(grep -nE '^\s*(secret|password|auth_token|openai_api_key|s3_access_key|s3_secret_key)\s*=\s*"' \
-    "$config_src" \
-    | grep -vE 'env\(|=\s*""\s*$|#|YOUR_|example|placeholder' || true)
-  if [[ -n "$bad_config" ]]; then
-    echo "$bad_config" >&2
-    fail "supabase/config.toml has non-env secret-looking values (use env(...) placeholders)"
-  fi
-fi
+# Backend config lives in the private repo, which runs its own config-as-code
+# checks over supabase/config.toml. This script only guards the client.
 
 # ── Web Firebase placeholders (working tree only when not scanning a SHA) ─────
 if [[ -z "$SCAN_TREE" ]]; then

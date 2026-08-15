@@ -1,7 +1,7 @@
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../constants/supabase_config.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 import '../settings/providers/settings_framework_providers.dart';
 import '../settings/settings_definitions.dart';
 import 'invite_nav_redirect.dart';
@@ -10,7 +10,7 @@ import 'last_route_restore.dart';
 /// Force online mode for invite flows when Supabase is configured.
 /// Call from post-frame callbacks or button handlers — never during build.
 void prepareInviteOnlineMode(WidgetRef ref) {
-  if (!supabaseConfigAvailable) return;
+  if (!cloudAvailable) return;
   final settings = ref.read(hisabSettingsProvidersProvider);
   if (settings == null) return;
   final localOnly = ref.read(settings.provider(localOnlySettingDef));

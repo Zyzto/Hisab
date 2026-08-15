@@ -9,7 +9,7 @@
 <p align="center">
   <strong>Split expenses. Settle cleanly. Work offline.</strong><br/>
   Shared trips, household costs, and personal budgets — with balances that stay clear<br/>
-  when everyone chips in. Flutter · offline-first · optional Supabase sync.
+  when everyone chips in. Flutter · offline-first · optional cloud sync.
 </p>
 
 <p align="center">
@@ -18,7 +18,7 @@
   <a href="https://hisab.shenepoy.com"><img alt="web" src="https://img.shields.io/badge/web-hisab.shenepoy.com-2E7D32?style=flat-square" /></a>
   <a href="https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/Zyzto/Hisab/releases"><img alt="Obtainium" src="https://img.shields.io/badge/Obtainium-add-2E7D32?style=flat-square&logo=android&logoColor=white" /></a>
   <img alt="flutter" src="https://img.shields.io/badge/Flutter-%3E%3D3.11-C0C0C0?style=flat-square&logo=flutter&logoColor=white" />
-  <img alt="license" src="https://img.shields.io/badge/license-CC%20BY--NC--SA%204.0-2E7D32?style=flat-square" />
+  <a href="LICENSE"><img alt="license" src="https://img.shields.io/badge/license-AGPL--3.0-2E7D32?style=flat-square" /></a>
 </p>
 
 <p align="center">
@@ -56,7 +56,7 @@
 | **Balance & settle-up** | Who owes whom, minimal settlement suggestions, record payments in one tap. |
 | **Profile** | Cross-group dashboard: net balances, KPIs, personal budgets, and an in-app activity feed (online). |
 | **Personal lists** | Solo budgets and spending (no split UI); optional Android notification scanner drafts. |
-| **Offline-first** | Full local SQLite. Sync, invites, and members when you connect Supabase. |
+| **Offline-first** | Full local SQLite. Sync, invites, and members when a backend is attached. |
 | **Locales** | English and Arabic (RTL), themes, and subtle accent controls. |
 
 **Modes**
@@ -64,7 +64,7 @@
 | Mode | Data | Extra |
 |------|------|--------|
 | **Local-only** (default) | Device SQLite | Everything except sign-in & cross-device sync |
-| **Online** | Supabase + local cache | Invites, members, push, multi-device |
+| **Online** | Cloud backend + local cache | Invites, members, push, multi-device |
 
 Temporarily offline in online mode: expense writes queue and sync later. Invites and member admin need a connection.
 
@@ -125,11 +125,39 @@ Temporarily offline in online mode: expense writes queue and sync later. Invites
 
 ---
 
+## Two builds
+
+Hisab is open core. This repository is the whole client, and it builds a
+complete offline app with no backend at all. The hosted sync service that
+powers invites, shared groups and multi-device is a separate proprietary
+project, and it plugs in behind an interface that lives here in
+[`packages/hisab_backend`](packages/hisab_backend).
+
+| | **FOSS** | **Cloud** |
+|---|---|---|
+| Built from | this repository, alone | this repository + a private backend package |
+| Backend | none | hosted Supabase |
+| Application id | `com.shenepoy.hisab.foss` | `com.shenepoy.hisab` |
+| Groups, expenses, balances, settle-up, budgets, receipts | yes | yes |
+| Sign-in, invites, shared groups, push, multi-device | no | yes |
+| Licence | AGPL-3.0 | AGPL-3.0 client, proprietary backend |
+
+Both are published on the same [releases page](https://github.com/Zyzto/Hisab/releases/latest),
+and they install side by side, so trying one does not overwrite the other.
+
+You are not limited to those two. The backend is an interface, not a vendor:
+implement it against your own server and you get a third build that is yours
+end to end. [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md) is the specification,
+and [docs/BACKEND_BEHAVIOUR.md](docs/BACKEND_BEHAVIOUR.md) documents the
+server-side behaviour the client expects.
+
+---
+
 ## Install
 
 ### Web / PWA
 
-Live at **[hisab.shenepoy.com](https://hisab.shenepoy.com)** (Firebase Hosting).  
+Live at **[hisab.shenepoy.com](https://hisab.shenepoy.com)** (Firebase Hosting) — this is the cloud build.  
 Install from the in-app banner when offered (Chromium Android uses the native install prompt; iPhone/iPad and other mobile browsers get Add-to-Home-Screen steps). On iOS, open the Home Screen app for web push. Works offline after install.
 
 ### Android
@@ -137,8 +165,11 @@ Install from the in-app banner when offered (Chromium Android uses the native in
 | Option | |
 |--------|--|
 | **Obtainium** (recommended) | [![Obtainium](https://img.shields.io/badge/Obtainium-add-2E7D32?style=flat-square&logo=android&logoColor=white)](https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/Zyzto/Hisab/releases) — tracks [GitHub Releases](https://github.com/Zyzto/Hisab/releases) |
-| **APK** | Download `app-release.apk` from [latest release](https://github.com/Zyzto/Hisab/releases/latest) |
+| **APK, cloud build** | `cloud-<abi>-release.apk` from the [latest release](https://github.com/Zyzto/Hisab/releases/latest) |
+| **APK, FOSS build** | `app-<abi>-foss-release.apk` from the same release — offline only, built entirely from this repository |
 | **Play Store** | [Listing](https://play.google.com/store/apps/details?id=com.shenepoy.hisab) (WIP / when published) |
+
+Pick `arm64-v8a` unless you know your device is older.
 
 ---
 
@@ -152,17 +183,10 @@ dart run build_runner build --delete-conflicting-outputs
 flutter run
 ```
 
-No `--dart-define` → **local-only** mode.
-
-**Online (hosted Supabase):**
-
-```bash
-flutter run \
-  --dart-define=SUPABASE_URL=https://YOUR_PROJECT.supabase.co \
-  --dart-define=SUPABASE_ANON_KEY=YOUR_ANON_KEY
-```
-
-Or use define files (gitignored): copy `dart_defines_online.example.json` / `dart_defines_local.example.json`, then launch with `--dart-define-from-file=...` (see `.vscode/launch.json`).
+That is the whole setup. There is no backend to configure, no keys to obtain,
+and no `--dart-define` to pass — the checked-in `packages/hisab_cloud` is a
+no-op stub, so the app runs **local-only** and every feature that does not
+inherently need a server works.
 
 **Web:** generate WASM once if needed:
 
@@ -170,22 +194,40 @@ Or use define files (gitignored): copy `dart_defines_online.example.json` / `dar
 flutter pub run powersync:setup_web
 ```
 
-**Fuller local stack** (Supabase + Edge Functions on LAN):
+**Android:** the `foss` flavor is the offline one and the default for
+development:
 
 ```bash
-./scripts/local_test_env.sh up
+flutter run --flavor foss
 ```
 
-Details: [docs/LOCAL_TEST_ENV.md](docs/LOCAL_TEST_ENV.md) · [docs/CONFIGURATION.md](docs/CONFIGURATION.md) · [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md)
+### Attaching a backend
+
+Implement the `CloudBackend` contract in a package of your own and point
+`pubspec_overrides.yaml` at it:
+
+```yaml
+dependency_overrides:
+  hisab_cloud:
+    path: ../my_hisab_cloud
+```
+
+The app calls `registerHisabCloud()` at startup; if your implementation
+registers a backend, sign-in, sync, invites and push light up, and if it does
+not, the app stays local-only. Nothing else in `lib/` changes.
+
+Full walkthrough: [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md) ·
+contract reference: [packages/hisab_backend/README.md](packages/hisab_backend/README.md) ·
+server-side expectations: [docs/BACKEND_BEHAVIOUR.md](docs/BACKEND_BEHAVIOUR.md)
 
 ### Quick fixes
 
 | Issue | Fix |
 |-------|-----|
-| Stays local-only | Pass both `SUPABASE_URL` and `SUPABASE_ANON_KEY` |
+| Stays local-only | Expected without a backend package — see *Attaching a backend* |
 | SQLite crash on web | `flutter pub run powersync:setup_web` |
-| OAuth redirect fails | Align Supabase Auth redirect URLs with your app / `SITE_URL` |
-| Migration errors | Stable network; migrations are idempotent — see Supabase setup docs |
+| Android build cannot find a flavor | Pass `--flavor foss` (or `cloud` if you supply a backend) |
+| Riverpod / codegen errors after a pull | `dart run build_runner build --delete-conflicting-outputs` |
 
 ---
 
@@ -193,8 +235,8 @@ Details: [docs/LOCAL_TEST_ENV.md](docs/LOCAL_TEST_ENV.md) · [docs/CONFIGURATION
 
 - **UI / state** — Flutter, Riverpod 3 (codegen), GoRouter  
 - **Local DB** — SQLite via PowerSync package (always on)  
-- **Cloud** — Optional Supabase (Auth, Postgres, RPCs, Edge Functions)  
-- **Sync** — Online writes to Supabase then cache; reads from SQLite; pending queue when offline  
+- **Cloud** — Optional, behind the `CloudBackend` contract; absent by default  
+- **Sync** — Online writes go to the backend then the cache; reads always come from SQLite; a pending queue drains when connectivity returns  
 - **Domain** — Groups, participants, expenses (cents), balances, settlements, invites  
 
 Deeper map: [docs/CODEBASE.md](docs/CODEBASE.md)
@@ -206,12 +248,13 @@ Deeper map: [docs/CODEBASE.md](docs/CODEBASE.md)
 | Guide | |
 |-------|--|
 | [Documentation index](docs/README.md) | All topics |
-| [Configuration](docs/CONFIGURATION.md) | `--dart-define`, online vs local |
-| [Supabase setup](docs/SUPABASE_SETUP.md) | Project, migrations, auth, Edge Functions |
-| [Local test env](docs/LOCAL_TEST_ENV.md) | Podman / CLI stack for device + Edge tests |
+| [Self-hosting](docs/SELF_HOSTING.md) | Implement the contract against your own server |
+| [Backend behaviour](docs/BACKEND_BEHAVIOUR.md) | Server-side rules the client relies on |
+| [Backend contract](packages/hisab_backend/README.md) | Facet-by-facet API reference |
+| [Configuration](docs/CONFIGURATION.md) | Build-time flags, online vs local |
 | [Security](SECURITY.md) | Public-repo secret policy (what never to commit) |
-| [GitHub Actions secrets](docs/GITHUB_ACTIONS_SECRETS.md) | CI/CD secret names and sources |
-| [Tests](test/README.md) | Unit, widget, integration, online |
+| [Contributing](CONTRIBUTING.md) | Workflow and the CLA |
+| [Tests](test/README.md) | Unit, widget, integration |
 
 ---
 
@@ -219,26 +262,35 @@ Deeper map: [docs/CODEBASE.md](docs/CODEBASE.md)
 
 ```bash
 flutter test
-
-# Local stack + Edge smoke
-./scripts/local_test_env.sh up
-./scripts/local_test_env.sh test-edge
-
-# Online integration (Docker/Podman + Supabase CLI)
-./scripts/run_online_tests.sh
+bash scripts/run_release_checks.sh
 ```
 
-CI builds Android, deploys web, and runs tests on tags `v*` / manual dispatch (`.github/workflows/release.yml`). Secrets live in GitHub Actions — see [docs/GITHUB_ACTIONS_SECRETS.md](docs/GITHUB_ACTIONS_SECRETS.md), not in this repo.
+CI runs the checks, the test suite and an **offline build guard** that asserts
+this tree still builds with no backend attached
+(`.github/workflows/ci.yml`). Tagging `v*` builds and publishes the signed FOSS
+APKs (`.github/workflows/release.yml`). No production credentials exist in this
+repository or in its Actions secrets.
 
 ---
 
-## Contributing & secrets
+## Contributing
 
-This repository is **public**. Never commit real keys, service-account JSON, or filled define/env files. Use `*_example` templates and [SECURITY.md](SECURITY.md).
+Pull requests are welcome, and **all of them need a CLA** — the project can only
+ship an AGPL client alongside a proprietary backend while one party holds the
+copyright. [CONTRIBUTING.md](CONTRIBUTING.md) explains it in one paragraph.
+
+This repository is **public**. Never commit real keys, service-account JSON, or
+filled define/env files. See [SECURITY.md](SECURITY.md).
 
 ---
 
 ## License
 
-[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) — share and adapt with attribution, **non-commercial** only, same license for derivatives.  
-Full text: [LICENSE](LICENSE).
+[AGPL-3.0](LICENSE) — use, study, modify and redistribute freely; if you run a
+modified version as a network service, its users are entitled to your source.
+
+The name **Hisab**, the Arabic wordmark <span dir="rtl">**حساب**</span> and the
+logo are not covered by that licence. Fork away, but please ship your fork under
+a different name and icon. The hosted backend is a separate proprietary work
+and is not in this repository — [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md) is
+the published specification for building your own.

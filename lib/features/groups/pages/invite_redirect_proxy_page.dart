@@ -2,16 +2,18 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/constants/supabase_config.dart';
+import 'package:hisab_backend/hisab_backend.dart';
+
+import '../../../core/navigation/invite_link_handler.dart';
 import '../../../core/navigation/route_paths.dart';
 import 'invite_redirect_proxy.dart';
 
-/// Page shown when the user opens the invite link on the custom domain (e.g.
-/// hisab.shenepoy.com/functions/v1/invite-redirect?token=...). On web, it
-/// immediately redirects to the Supabase Edge Function URL so the token can
-/// be validated and the user sent to redirect.html. On non-web, this route
-/// is not normally hit; shows a brief "Redirecting..." state.
-/// When Supabase is not configured (local-only), shows a message and a way to go home.
+/// Shown when an invite link on the custom domain reaches the SPA instead of
+/// the static redirect page. On web it bounces straight to the backend's
+/// resolver so the token can be validated and the visitor sent onward. On
+/// native this route is not normally hit and only shows "Redirecting...".
+///
+/// An offline build has no resolver, so it explains that and offers a way home.
 class InviteRedirectProxyPage extends StatefulWidget {
   const InviteRedirectProxyPage({super.key, required this.uri});
 
@@ -30,19 +32,15 @@ class _InviteRedirectProxyPageState extends State<InviteRedirectProxyPage> {
   }
 
   void _redirect() {
-    if (!supabaseConfigAvailable) return;
-    final base = supabaseUrl.endsWith('/')
-        ? supabaseUrl.substring(0, supabaseUrl.length - 1)
-        : supabaseUrl;
-    final path = widget.uri.path;
-    final query = widget.uri.hasQuery ? '?${widget.uri.query}' : '';
-    final target = '$base$path$query';
-    redirectToSupabaseInviteUrl(target);
+    final invites = cloudBackend?.invites;
+    final token = extractInviteTokenFromUri(widget.uri);
+    if (invites == null || token == null) return;
+    redirectToInviteResolver(invites.resolverUrlFor(token).toString());
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!supabaseConfigAvailable) {
+    if (!cloudAvailable) {
       return Scaffold(
         body: SafeArea(
           child: Center(

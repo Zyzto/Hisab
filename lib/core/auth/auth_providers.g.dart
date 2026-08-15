@@ -50,23 +50,35 @@ final class AuthServiceProvider
 
 String _$authServiceHash() => r'21d842d4dceafa3d239c0196a0f2b890d37c0b71';
 
-/// Emits a new value whenever auth state changes. We use [int] (not [AuthState])
-/// so Riverpod never stores Supabase's JS-backed types, avoiding web-only
-/// dart_rti / NoSuchMethodError when the stream updates.
+/// Emits a new value whenever auth state changes. We use [int] (not
+/// [CloudAuthState]) so Riverpod never stores a backend's platform-backed
+/// types, avoiding web-only dart_rti / NoSuchMethodError when the stream
+/// updates.
+///
+/// Values must be unique per event: Riverpod skips rebuilds when
+/// `AsyncData(n) == AsyncData(n)`, so a constant `0` would hide profile updates.
 
 @ProviderFor(authStateChanges)
 final authStateChangesProvider = AuthStateChangesProvider._();
 
-/// Emits a new value whenever auth state changes. We use [int] (not [AuthState])
-/// so Riverpod never stores Supabase's JS-backed types, avoiding web-only
-/// dart_rti / NoSuchMethodError when the stream updates.
+/// Emits a new value whenever auth state changes. We use [int] (not
+/// [CloudAuthState]) so Riverpod never stores a backend's platform-backed
+/// types, avoiding web-only dart_rti / NoSuchMethodError when the stream
+/// updates.
+///
+/// Values must be unique per event: Riverpod skips rebuilds when
+/// `AsyncData(n) == AsyncData(n)`, so a constant `0` would hide profile updates.
 
 final class AuthStateChangesProvider
     extends $FunctionalProvider<AsyncValue<int>, int, Stream<int>>
     with $FutureModifier<int>, $StreamProvider<int> {
-  /// Emits a new value whenever auth state changes. We use [int] (not [AuthState])
-  /// so Riverpod never stores Supabase's JS-backed types, avoiding web-only
-  /// dart_rti / NoSuchMethodError when the stream updates.
+  /// Emits a new value whenever auth state changes. We use [int] (not
+  /// [CloudAuthState]) so Riverpod never stores a backend's platform-backed
+  /// types, avoiding web-only dart_rti / NoSuchMethodError when the stream
+  /// updates.
+  ///
+  /// Values must be unique per event: Riverpod skips rebuilds when
+  /// `AsyncData(n) == AsyncData(n)`, so a constant `0` would hide profile updates.
   AuthStateChangesProvider._()
     : super(
         from: null,
@@ -92,7 +104,7 @@ final class AuthStateChangesProvider
   }
 }
 
-String _$authStateChangesHash() => r'c3ca227f2322b95b2ae35b2edf79e4d04bb6afd1';
+String _$authStateChangesHash() => r'727361f7e0ebb4194e2ae30f48202ccb02e53ec9';
 
 @ProviderFor(isAuthenticated)
 final isAuthenticatedProvider = IsAuthenticatedProvider._();
@@ -133,13 +145,14 @@ final class IsAuthenticatedProvider
   }
 }
 
-String _$isAuthenticatedHash() => r'bb78fb83d37351ca71ccb52731cad7be00388ccf';
+String _$isAuthenticatedHash() => r'80b4be833bd4eb80266dc39ba5469c2184c989c7';
 
 @ProviderFor(currentUser)
 final currentUserProvider = CurrentUserProvider._();
 
-final class CurrentUserProvider extends $FunctionalProvider<User?, User?, User?>
-    with $Provider<User?> {
+final class CurrentUserProvider
+    extends $FunctionalProvider<CloudUser?, CloudUser?, CloudUser?>
+    with $Provider<CloudUser?> {
   CurrentUserProvider._()
     : super(
         from: null,
@@ -156,21 +169,21 @@ final class CurrentUserProvider extends $FunctionalProvider<User?, User?, User?>
 
   @$internal
   @override
-  $ProviderElement<User?> $createElement($ProviderPointer pointer) =>
+  $ProviderElement<CloudUser?> $createElement($ProviderPointer pointer) =>
       $ProviderElement(pointer);
 
   @override
-  User? create(Ref ref) {
+  CloudUser? create(Ref ref) {
     return currentUser(ref);
   }
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(User? value) {
+  Override overrideWithValue(CloudUser? value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<User?>(value),
+      providerOverride: $SyncValueProvider<CloudUser?>(value),
     );
   }
 }
 
-String _$currentUserHash() => r'6e4c9694a6ba25ab30a32661504c64681560f37f';
+String _$currentUserHash() => r'35e5c0e22d7922bff63de45caa56a46abd4c3231';

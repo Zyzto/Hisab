@@ -1,347 +1,213 @@
-# Release Setup Guide
+# Release setup (FOSS build)
 
 <!-- markdownlint-disable MD031 MD040 MD060 -->
 
-This document covers every manual step needed **outside the codebase** to make the CI/CD pipeline work. The pipeline lives in `.github/workflows/release.yml` and does three things:
+This is the manual setup behind `.github/workflows/release.yml`, the pipeline
+that ships the **FOSS** variant of Hisab from this repository. It does exactly
+two things: build signed per-ABI APKs from a tree with no backend, and attach
+them to a draft GitHub Release.
 
-1. Builds a signed Android APK and AAB, attaches the APK to a GitHub Release.
-2. Uploads the AAB to Google Play (internal testing track).
-3. Builds the Flutter web app and deploys it to Firebase Hosting.
+It has no Play Store upload, no Firebase deploy, and no production credentials.
+The cloud build is produced by a separate private pipeline that attaches its
+artifacts to the same release; nothing here can reach it.
 
----
-
-## Table of Contents
-
-1. [Prerequisites](#1-prerequisites)
-2. [Generate an Android Release Keystore](#2-generate-an-android-release-keystore)
-3. [Base64-Encode the Keystore](#3-base64-encode-the-keystore)
-4. [Set Up Google Play](#4-set-up-google-play)
-5. [Create a Google Play Service Account](#5-create-a-google-play-service-account)
-6. [Set Up Firebase Hosting](#6-set-up-firebase-hosting)
-7. [Add All Secrets to GitHub](#7-add-all-secrets-to-github)
-8. [First Release Checklist](#8-first-release-checklist)
-9. [Local Development Notes](#9-local-development-notes)
-10. [App size and update load](#10-app-size-and-update-load)
+If you forked Hisab and run your own backend, this is also the pipeline to copy
+— you would add your own defines and signing to it.
 
 ---
 
 ## 1. Prerequisites
 
-- A GitHub repository with this codebase pushed.
-- A [Google Play Developer account](https://play.google.com/console/) ($25 one-time fee).
-- A [Firebase project](https://console.firebase.google.com/) (the free Spark plan is enough for Hosting).
-- `keytool` (ships with Java / JDK).
+- A fork or clone of this repository on GitHub.
+- `keytool` (ships with the JDK).
+
+That is all. There is no account to create, because there is no service to
+deploy to.
 
 ---
 
-## 2. Generate an Android Release Keystore
+## 2. Generate an Android release keystore
 
-Run this once on your local machine. **Keep the generated `.jks` file safe** — you will need it for every future release and to push updates to Google Play.
+Run once, locally. **Keep the `.jks` safe** — Android identifies an app by its
+signature, so losing it means users cannot upgrade in place and must uninstall
+first.
 
 ```bash
 keytool -genkeypair \
   -v \
-  -keystore release-keystore.jks \
+  -keystore foss-keystore.jks \
   -keyalg RSA \
   -keysize 2048 \
   -validity 10000 \
-  -alias hisab-release \
+  -alias hisab-foss \
   -storepass YOUR_STORE_PASSWORD \
   -keypass YOUR_KEY_PASSWORD
 ```
 
-When prompted, fill in your name / organisation details (they are baked into the certificate but are not shown publicly on Google Play).
+Fill in the name and organisation prompts; they end up in the certificate but
+are not shown to users.
 
 | Value | What to remember |
 |-------|-----------------|
-| File  | `release-keystore.jks` |
-| Alias | `hisab-release` (or whatever you chose with `-alias`) |
+| File  | `foss-keystore.jks` |
+| Alias | `hisab-foss` |
 | Store password | The `-storepass` value |
 | Key password   | The `-keypass` value |
 
-> **Never commit the keystore or passwords to git.** The `android/.gitignore` already excludes `*.jks` and `key.properties`.
+> Never commit the keystore or its passwords. `android/.gitignore` already
+> excludes `*.jks` and `key.properties`, and `scripts/verify_security.sh`
+> fails the build if one is tracked.
 
 ---
 
-## 3. Base64-Encode the Keystore
+## 3. Base64-encode the keystore
 
-GitHub Secrets can only hold text, so we encode the binary keystore as base64.
+GitHub secrets hold text only.
 
 ```bash
-base64 -i release-keystore.jks | tr -d '\n'
+base64 -w 0 foss-keystore.jks     # Linux
+base64 -i foss-keystore.jks | tr -d '\n'   # macOS
 ```
 
-Copy the entire output — that is the value for the `KEYSTORE_BASE64` secret.
-
-On Linux the flag is `-w 0` instead of `-i`:
-
-```bash
-base64 -w 0 release-keystore.jks
-```
+The output is the value for `FOSS_KEYSTORE_BASE64`. In CI,
+`scripts/ci/decode_keystore.sh` turns it back into a keystore and writes
+`android/key.properties`.
 
 ---
 
-## 4. Set Up Google Play
+## 4. Add the secrets
 
-Before the workflow can upload builds, you need to create the app listing manually (Google Play requires the first APK/AAB to be uploaded by hand).
-
-### 4a. Create the app on Google Play Console
-
-1. Go to [Google Play Console](https://play.google.com/console/).
-2. **Create app** -> fill in the app name ("Hisab"), default language, app type (App), free/paid.
-3. Complete the **Store listing** (description, screenshots, icon, etc.) — only the required fields need to be filled.
-4. Complete the **Content rating** questionnaire.
-5. Complete the **Target audience and content** section.
-
-### 4b. Upload the first build manually
-
-1. Build a signed AAB locally:
-   ```bash
-   # First create android/key.properties pointing to your keystore:
-   cat > android/key.properties <<EOF
-   storeFile=/absolute/path/to/release-keystore.jks
-   storePassword=YOUR_STORE_PASSWORD
-   keyAlias=hisab-release
-   keyPassword=YOUR_KEY_PASSWORD
-   EOF
-
-   flutter build appbundle --release \
-     --obfuscate \
-     --split-debug-info=build/app/outputs/symbols \
-     --tree-shake-icons \
-     --dart-define=SUPABASE_URL=https://xxxxx.supabase.co \
-     --dart-define=SUPABASE_ANON_KEY=eyJhbGci...
-   ```
-   Keep `build/app/outputs/symbols/` for crash de-obfuscation (CI uploads it as `release-symbols`).
-2. In Google Play Console, go to **Release > Testing > Internal testing**.
-3. Click **Create new release**, upload `build/app/outputs/bundle/release/app-release.aab`.
-4. Fill in release notes and **Save & review** -> **Start rollout to Internal testing**.
-
-After this first manual upload, the CI workflow can push subsequent builds automatically via the API.
-
-For sideload / GitHub Release APKs (per-ABI, not a fat APK):
-
-```bash
-flutter build apk --release --split-per-abi \
-  --obfuscate \
-  --split-debug-info=build/app/outputs/symbols \
-  --tree-shake-icons \
-  --dart-define=SUPABASE_URL=... \
-  --dart-define=SUPABASE_ANON_KEY=...
-```
-
----
-
-## 5. Create a Google Play Service Account
-
-The workflow uses a GCP service account to authenticate with the Google Play Developer API.
-
-### 5a. Create the service account in Google Cloud
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/).
-2. Select (or create) a GCP project linked to your Play Console.
-3. Navigate to **IAM & Admin > Service Accounts**.
-4. Click **Create Service Account**.
-   - Name: `github-play-deploy` (or anything descriptive).
-   - Role: no role needed here (permissions are granted in Play Console).
-5. Click **Done**, then click the new service account row.
-6. Go to the **Keys** tab -> **Add Key** -> **Create new key** -> **JSON**.
-7. Download the JSON file. Its contents are the value for the `PLAY_STORE_SERVICE_ACCOUNT_JSON` secret.
-
-### 5b. Grant access in Google Play Console
-
-1. In [Google Play Console](https://play.google.com/console/), go to **Users and permissions**.
-2. Click **Invite new users**.
-3. Enter the service account email (from step 5a, looks like `github-play-deploy@project.iam.gserviceaccount.com`).
-4. Under **App permissions**, select **Hisab** and grant:
-   - **Release to production, exclude devices, and use Play App Signing** (or at minimum **Manage testing tracks and edit tester lists**).
-5. Click **Invite user** -> **Send invitation**.
-6. Accept the invitation (it may auto-accept for service accounts).
-
-> It can take up to 24 hours for the permissions to propagate. If the first workflow run fails with a 403, wait and retry.
-
----
-
-## 6. Set Up Firebase Hosting
-
-### 6a. Create / confirm your Firebase project
-
-1. Go to [Firebase Console](https://console.firebase.google.com/).
-2. Create a Firebase project or use an existing one. The repo’s `.firebaserc` uses a placeholder (`your-firebase-project-id`); run `firebase use your-project-id` locally, or rely on CI which uses the `FIREBASE_PROJECT_ID` secret.
-3. Navigate to **Build > Hosting** and click **Get started** if Hosting is not yet enabled.
-
-### 6b. Generate a Firebase service account for CI
-
-The workflow uses a GCP service account JSON to deploy. The simplest way:
-
-1. Go to **Firebase Console > Project settings > Service accounts**.
-2. Click **Generate new private key**. Download the JSON file.
-3. The entire contents of that JSON file is the value for the `FIREBASE_SERVICE_ACCOUNT` secret.
-
-Alternatively, if you prefer a scoped service account:
-
-1. Go to [Google Cloud Console > IAM & Admin > Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts).
-2. Select the Firebase project.
-3. Create a service account with the roles:
-   - **Firebase Hosting Admin** (`roles/firebasehosting.admin`)
-   - **Service Account User** (`roles/iam.serviceAccountUser`)
-4. Create a JSON key and use its contents as the secret.
-
-### 6c. Note your Hosting URL
-
-After the first deploy, your site will be live at:
-
-```
-https://your-project-id.web.app
-```
-
-(or a custom domain if you configure one). Use this URL as the `SITE_URL` secret so auth redirects land on the live site. Also add it to **Supabase Dashboard > Authentication > URL Configuration > Redirect URLs**.
-
-### 6d. CI deploys only Hosting (Spark plan)
-
-The release workflow deploys **only Firebase Hosting** (no Cloud Functions). That keeps the project on the **Spark (free)** plan. The Firebase Cloud Function `inviteRedirectPage` (invite redirect with OG meta for crawlers) is **not** deployed by CI; invite links still work via the Flutter web app. To deploy that function you would need to upgrade to Blaze and run `firebase deploy --only functions` manually.
-
----
-
-## 7. Add All Secrets to GitHub
-
-Go to your GitHub repository -> **Settings** -> **Secrets and variables** -> **Actions** -> **New repository secret**.
-
-Add each secret listed below:
+**Settings → Secrets and variables → Actions → New repository secret.**
 
 | Secret name | Value |
 |-------------|-------|
-| `SUPABASE_URL` | Your Supabase project URL, e.g. `https://xxxxx.supabase.co` |
-| `SUPABASE_ANON_KEY` | Your Supabase anon/public key (starts with `eyJ...`) |
-| `INVITE_BASE_URL` | Firebase Hosting HTTPS URL for invite links, e.g. `https://hisab.shenepoy.com` |
-| `SITE_URL` | Firebase Hosting HTTPS URL, e.g. `https://hisab.shenepoy.com` |
-| `FCM_VAPID_KEY` | Web Push certificate VAPID key from Firebase Console → Project Settings → Cloud Messaging → Web Push certificates (needed for web and optionally for Android FCM) |
-| `FIREBASE_API_KEY` | Firebase web API key (Project Settings → Your apps → Web app) |
-| `FIREBASE_AUTH_DOMAIN` | e.g. `your-project-id.firebaseapp.com` |
-| `FIREBASE_PROJECT_ID` | Firebase project ID |
-| `FIREBASE_STORAGE_BUCKET` | e.g. `your-project-id.firebasestorage.app` |
-| `FIREBASE_MESSAGING_SENDER_ID` | From your Firebase web app config |
-| `FIREBASE_APP_ID` | From your Firebase web app config (e.g. `1:123456789:web:abcdef`) |
-| `FIREBASE_SERVICE_ACCOUNT` | The full JSON contents from [step 6b](#6b-generate-a-firebase-service-account-for-ci) |
-| `KEYSTORE_BASE64` | The base64-encoded keystore from [step 3](#3-base64-encode-the-keystore) |
-| `KEYSTORE_PASSWORD` | The store password you chose in [step 2](#2-generate-an-android-release-keystore) |
-| `KEY_ALIAS` | The key alias, e.g. `hisab-release` |
-| `KEY_PASSWORD` | The key password from [step 2](#2-generate-an-android-release-keystore) |
-| `PLAY_STORE_SERVICE_ACCOUNT_JSON` | The full JSON contents from [step 5a](#5a-create-the-service-account-in-google-cloud) |
-| `GOOGLE_SERVICES_JSON` | Base64-encoded contents of `android/app/google-services.json` (Firebase Console → Project settings → your Android app → download `google-services.json`, then `base64 -w 0 android/app/google-services.json` or equivalent) |
+| `FOSS_KEYSTORE_BASE64` | Output from step 3 |
+| `FOSS_KEYSTORE_PASSWORD` | Store password from step 2 |
+| `FOSS_KEY_ALIAS` | Key alias, e.g. `hisab-foss` |
+| `FOSS_KEY_PASSWORD` | Key password from step 2 |
+
+Four secrets, all signing material, none of which grants access to anything but
+the ability to sign an APK with this identity. If the workflow runs without
+them, the build falls back to debug signing and produces an APK that is fine
+for testing and unsuitable for distribution.
 
 ---
 
-## 8. First Release Checklist
+## 5. Cut a release
 
-Once all secrets are in place:
+1. Bump the version in `pubspec.yaml`:
 
-### Option A: Tag push (recommended for real releases)
+```yaml
+version: 1.0.0+1
+```
 
-1. Update the version in `pubspec.yaml`:
-   ```yaml
-   version: 1.0.0+1
-   ```
-   The format is `MARKETING_VERSION+BUILD_NUMBER`. Increment the build number for every Play Store upload (Google rejects duplicate version codes).
+The format is `MARKETING_VERSION+BUILD_NUMBER`. Increment the build number on
+every release; Android refuses to install a build whose version code did not
+increase.
 
-2. Commit and push:
-   ```bash
-   git add pubspec.yaml
-   git commit -m "Bump version to 1.0.0+1"
-   git push
-   ```
+2. Commit, tag, push:
 
-3. Tag and push the tag:
-   ```bash
-   git tag v1.0.0
-   git push origin v1.0.0
-   ```
+```bash
+git add pubspec.yaml
+git commit -m "Bump version to 1.0.0+1"
+git push
+git tag v1.0.0
+git push origin v1.0.0
+```
 
-4. The workflow triggers automatically. Monitor progress in the repository **Actions** tab.
+3. Watch the **Actions** tab.
 
-### Option B: Manual dispatch (for testing the pipeline)
+### What the workflow does
 
-1. Go to your repository -> **Actions** -> **Release** workflow.
-2. Click **Run workflow**.
-3. Choose which deployments to enable (Play Store, Firebase).
-4. Click **Run workflow**.
+| Job | What it gates |
+|-----|----------------|
+| `checks` | `scripts/run_release_checks.sh` (secret scan, infra checks), `scripts/ci/assert_offline_only.sh` (no backend dependency crept in), then `flutter test` |
+| `build-foss` | `scripts/ci/build_android.sh foss` — per-ABI release APKs, obfuscated, with symbols uploaded as an artifact |
+| `github-release` | On `v*` tags only: creates a **draft** release with the three APKs attached |
 
-### What happens
+The release is a draft on purpose. The private cloud pipeline attaches its own
+artifacts to the same release afterwards, and publishing early would show users
+a release offering only one of the two builds.
 
-- **security-check**: Static secret / tracked-file scan (`scripts/verify_security.sh`).
-- **infra-check**: Config-as-code, Edge Functions, Hosting, web shell, version pins (`scripts/verify_infra.sh`).
-- **test** / **test-online**: Unit, widget, and web integration tests (local + local Supabase).
-- **build-android**: Builds a signed APK and AAB, uploads them as artifacts (needs security + infra + tests).
-- **github-release** (tag pushes only): Creates a GitHub Release with the APK attached.
-- **deploy-play-store**: Uploads the AAB to the Google Play internal testing track.
-- **deploy-web**: Builds the Flutter web app and deploys to Firebase Hosting (needs security + infra + tests).
-
-Local preflight (same as CI security/infra jobs):
+### Local preflight
 
 ```bash
 bash ./scripts/run_release_checks.sh
+bash ./scripts/ci/assert_offline_only.sh
+flutter test
 ```
 
-Install push secret-scan once per clone (blocks `git push` if secrets are in the commit tree):
+Install the push-time secret scan once per clone:
 
 ```bash
 bash ./scripts/install_git_hooks.sh
 ```
 
-Cursor agent skill for the full gate (scripts + Supabase advisors + security-review): [`.cursor/skills/hisab-release-checks/SKILL.md`](../.cursor/skills/hisab-release-checks/SKILL.md).
+The full agent-driven gate is in
+[`.cursor/skills/hisab-release-checks/SKILL.md`](../.cursor/skills/hisab-release-checks/SKILL.md).
 
 ---
 
-## 9. Local Development Notes
+## 6. Building locally
 
-### pubspec_overrides.yaml
-
-The main `pubspec.yaml` may use `git:` dependencies for some packages (so CI can resolve them). For local development, you can add a `pubspec_overrides.yaml` to redirect those dependencies to local paths (e.g. sibling packages you are developing).
-
-This file is automatically gitignored by `dart pub`. If you use it and delete it by accident, recreate it with your local paths:
-
-```yaml
-dependency_overrides:
-  some_package:
-    path: ../your-local-package
+```bash
+flutter build apk --release --flavor foss --split-per-abi \
+  --obfuscate \
+  --split-debug-info=build/app/outputs/symbols \
+  --tree-shake-icons
 ```
 
-Replace `some_package` and `../your-local-package` with the actual package name and path.
+Or just `bash scripts/ci/build_android.sh foss`, which is the same command CI
+runs, so a local failure is a real failure rather than an environment
+difference.
 
-### Local signing (optional)
-
-If you want to test release builds locally, create `android/key.properties`:
+To sign locally, create `android/key.properties` (gitignored):
 
 ```properties
-storeFile=/absolute/path/to/release-keystore.jks
+storeFile=/absolute/path/to/foss-keystore.jks
 storePassword=YOUR_STORE_PASSWORD
-keyAlias=hisab-release
+keyAlias=hisab-foss
 keyPassword=YOUR_KEY_PASSWORD
 ```
 
-This file is gitignored. Without it, release builds fall back to debug signing.
+Without it, release builds fall back to debug signing.
 
 ### Flutter version
 
-The workflow pins Flutter to a specific version via `FLUTTER_VERSION` in `.github/workflows/release.yml`. When you upgrade locally, update that env var to match so CI and local builds stay in sync.
+`.flutter-version` is the single source of truth. Every workflow reads it, so
+upgrading Flutter is a one-line change rather than a hunt through YAML.
+
+### `pubspec_overrides.yaml`
+
+Used to swap in a backend implementation locally; see
+[SELF_HOSTING.md](SELF_HOSTING.md). `dart pub` ignores it in git, so it never
+affects a release build made from a clean checkout.
 
 ---
 
-## 10. App size and update load
+## 7. App size and update load
 
-Release Android builds use R8 minify + resource shrinking, locale `resConfigs` for `en`/`ar`, Dart `--obfuscate` + `--split-debug-info`, and `--tree-shake-icons`. Play gets an AAB (device splits + patch updates). GitHub Release APKs are `--split-per-abi` (not a fat APK). Symbol maps are uploaded as the `release-symbols` CI artifact — keep them to decode crash stacks.
+Release Android builds use R8 minify plus resource shrinking, `resConfigs`
+limited to `en`/`ar`, Dart `--obfuscate` with `--split-debug-info`, and
+`--tree-shake-icons`. GitHub Release APKs are `--split-per-abi` rather than one
+fat APK. Symbol maps are uploaded as the `foss-symbols` artifact — keep them,
+because without them a crash stack from a release build is unreadable.
 
-**Biggest asset win:** onboarding parallax under `assets/images/parallax/` is hybrid WebP (lossy q85 for opaque `bg*`, lossless for alpha layers) — about **18.4 MB → ~8.2 MB** in the package (~9 MB saved). Tessdata stays bundled for offline OCR (~5.5 MB raw ≈ **~2.7 MB** gzipped in the APK).
+**Biggest asset win:** the onboarding parallax under `assets/images/parallax/`
+is hybrid WebP (lossy q85 for opaque `bg*`, lossless for alpha layers), about
+**18.4 MB → ~8.2 MB** in the package. Tessdata stays bundled for offline OCR
+(~5.5 MB raw ≈ **~2.7 MB** packaged), which is the price of the scanner working
+with no network.
 
-**Expected first-install win (arm64 Play download):** roughly **10–14 MB** vs the pre-optimization baseline (WebP + R8 + split-debug-info). Measure for real:
+Measure a change for real:
 
 ```bash
-flutter build appbundle --analyze-size \
+flutter build appbundle --analyze-size --flavor foss \
   --obfuscate \
   --split-debug-info=build/app/outputs/symbols \
-  --tree-shake-icons \
-  --dart-define=SUPABASE_URL=... \
-  --dart-define=SUPABASE_ANON_KEY=...
+  --tree-shake-icons
 ```
 
-Open the generated `*-code-size-analysis_*.json` in DevTools → App size, and compare Play Console **Android vitals → App size** after upload. Smoke after a size-focused change: onboarding meadow + one local receipt OCR scan.
+Open the generated `*-code-size-analysis_*.json` in DevTools → App size. Smoke
+test after any size-focused change: onboarding meadow plus one local receipt
+OCR scan.

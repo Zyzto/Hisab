@@ -8,12 +8,22 @@ void main() {
     });
 
     test(
-      'returns token for deep link io.supabase.hisab://invite?token=abc',
+      'returns token for deep link com.shenepoy.hisab://invite?token=abc',
       () {
-        final uri = Uri.parse('io.supabase.hisab://invite?token=abc');
+        final uri = Uri.parse('com.shenepoy.hisab://invite?token=abc');
         expect(extractInviteTokenFromUri(uri), 'abc');
       },
     );
+
+    test('still accepts the legacy io.supabase.hisab scheme', () {
+      final uri = Uri.parse('io.supabase.hisab://invite?token=abc');
+      expect(extractInviteTokenFromUri(uri), 'abc');
+    });
+
+    test('ignores an unrelated custom scheme', () {
+      final uri = Uri.parse('com.example.other://invite?token=abc');
+      expect(extractInviteTokenFromUri(uri), isNull);
+    });
 
     test('returns token for web-style path containing invite', () {
       final uri = Uri.parse('https://hisab.example.com/invite?token=xyz');
@@ -34,20 +44,20 @@ void main() {
     );
 
     test(
-      'returns token for deep link host path io.supabase.hisab://invite/abc',
+      'returns token for deep link host path com.shenepoy.hisab://invite/abc',
       () {
-        final uri = Uri.parse('io.supabase.hisab://invite/abc');
+        final uri = Uri.parse('com.shenepoy.hisab://invite/abc');
         expect(extractInviteTokenFromUri(uri), 'abc');
       },
     );
 
     test('returns null when token is missing', () {
-      final uri = Uri.parse('io.supabase.hisab://invite');
+      final uri = Uri.parse('com.shenepoy.hisab://invite');
       expect(extractInviteTokenFromUri(uri), isNull);
     });
 
     test('returns null when token is empty', () {
-      final uri = Uri.parse('io.supabase.hisab://invite?token=');
+      final uri = Uri.parse('com.shenepoy.hisab://invite?token=');
       expect(extractInviteTokenFromUri(uri), isNull);
     });
 
@@ -67,7 +77,7 @@ void main() {
     });
 
     test('returns null for deep link with wrong host', () {
-      final uri = Uri.parse('io.supabase.hisab://other/invite?token=abc');
+      final uri = Uri.parse('com.shenepoy.hisab://other/invite?token=abc');
       expect(extractInviteTokenFromUri(uri), isNull);
     });
 

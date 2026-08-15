@@ -1,32 +1,30 @@
 # Local secrets (gitignored)
 
-This folder is **gitignored** except this README and `.gitkeep`. Never `git add -f` anything here — the repo is public.
+This folder is **gitignored** except this README and `.gitkeep`. Never
+`git add -f` anything here — the repository is public.
 
-## Android app config (not this folder)
+Nothing in this repository requires a secret to build or run. A default
+`flutter run` is local-only and has no backend to authenticate against. This
+folder exists for the cases where you attach one.
 
-```text
-android/app/google-services.json
-```
-
-Firebase Android app config (`project_info` / `client`) — **not** a service account. Also gitignored.
-
-## Edge → FCM service account (this folder)
-
-Download a **service account key** (JSON with `type: service_account`, `private_key`, `client_email`, `project_id`) and save as:
+## Android Firebase config
 
 ```text
-secrets/fcm-service-account.test.json
+android/app/src/cloud/google-services.json
 ```
 
-Firebase Console → Project settings → Service accounts → Generate new private key  
-(or Google Cloud IAM → Service accounts → Keys).
+Lives in the `cloud` source set, so it only affects `--flavor cloud` builds and
+the `foss` build never looks for it. It is the Firebase app config
+(`project_info` / `client`), not a service account, but it is still gitignored.
 
-Then:
+## Signing material
 
-```bash
-./scripts/local_test_env.sh reload-secrets
-```
+Keystores (`*.jks`, `*.keystore`) and `android/key.properties` are gitignored
+wherever they sit. Keep them out of the tree entirely if you can; CI reads them
+from a base64 secret via `scripts/ci/decode_keystore.sh`.
 
-That writes `supabase/.env` (also gitignored). Prefer keeping the private key **only** in this JSON file.
+## Backend credentials
 
-See [docs/LOCAL_TEST_ENV.md](../docs/LOCAL_TEST_ENV.md#testing-firebase-fcm) and [SECURITY.md](../SECURITY.md).
+Anything your backend needs — service-account JSON, server keys, database
+passwords — belongs to that backend's own repository and deployment, not here.
+See [SECURITY.md](../SECURITY.md) and [docs/SELF_HOSTING.md](../docs/SELF_HOSTING.md).
