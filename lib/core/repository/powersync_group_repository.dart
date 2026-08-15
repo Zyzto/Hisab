@@ -214,7 +214,9 @@ class PowerSyncGroupRepository implements IGroupRepository {
       });
       // Link participant to the membership record
       if (ownerMemberId != null) {
-        await _cloud.sync.update('group_members', {'participant_id': participantId}, ownerMemberId);
+        await _cloud.sync.update('group_members', {
+          'participant_id': participantId,
+        }, ownerMemberId);
       }
       // Create additional participants from the wizard (use same IDs as local loop below)
       for (int i = 0; i < additionalParticipantIds.length; i++) {
@@ -616,10 +618,10 @@ class PowerSyncGroupRepository implements IGroupRepository {
 
     if (!_isLocalOnly && _isOnline && _cloud != null) {
       await _cloud.sync.update('groups', {
-            'settlement_freeze_at': now,
-            'settlement_snapshot_json': snapshotJson,
-            'updated_at': now,
-          }, groupId);
+        'settlement_freeze_at': now,
+        'settlement_snapshot_json': snapshotJson,
+        'updated_at': now,
+      }, groupId);
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,
       isOnline: _isOnline,
@@ -649,10 +651,10 @@ class PowerSyncGroupRepository implements IGroupRepository {
 
     if (!_isLocalOnly && _isOnline && _cloud != null) {
       await _cloud.sync.update('groups', {
-            'settlement_freeze_at': null,
-            'settlement_snapshot_json': null,
-            'updated_at': now,
-          }, groupId);
+        'settlement_freeze_at': null,
+        'settlement_snapshot_json': null,
+        'updated_at': now,
+      }, groupId);
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,
       isOnline: _isOnline,

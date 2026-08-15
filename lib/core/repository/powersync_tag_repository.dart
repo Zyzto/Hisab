@@ -136,11 +136,11 @@ class PowerSyncTagRepository implements ITagRepository {
 
     if (!_isLocalOnly && _isOnline && _cloud != null) {
       await _cloud.sync.update('expense_tags', {
-            'label': trimmedLabel,
-            'icon_name': trimmedIcon,
-            'color': normalizedColor,
-            'updated_at': now,
-          }, tag.id);
+        'label': trimmedLabel,
+        'icon_name': trimmedIcon,
+        'color': normalizedColor,
+        'updated_at': now,
+      }, tag.id);
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,
       isOnline: _isOnline,

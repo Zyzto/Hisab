@@ -100,14 +100,18 @@ class MigrationService {
           }
         }
 
-        await _cloud.sync.upsert('group_members', {
-          'id': memberId,
-          'group_id': groupId,
-          'user_id': userId,
-          'role': 'owner',
-          'participant_id': ownerParticipantId,
-          'joined_at': g['created_at'],
-        }, conflictColumns: const ['group_id', 'user_id']);
+        await _cloud.sync.upsert(
+          'group_members',
+          {
+            'id': memberId,
+            'group_id': groupId,
+            'user_id': userId,
+            'role': 'owner',
+            'participant_id': ownerParticipantId,
+            'joined_at': g['created_at'],
+          },
+          conflictColumns: const ['group_id', 'user_id'],
+        );
 
         completed++;
         onProgress?.call(completed, total);

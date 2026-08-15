@@ -280,9 +280,7 @@ void main() {
         // wins until they change it or reset settings.
         // --------------------------------------------------------------------------
         if (settingsProviders != null && easyLocalizationReady) {
-          await seedLanguageFromPlatformIfUnset(
-            settingsProviders.controller,
-          );
+          await seedLanguageFromPlatformIfUnset(settingsProviders.controller);
         }
         final startLocale = easyLocalizationReady && settingsProviders != null
             ? Locale(settingsProviders.controller.get(languageSettingDef))

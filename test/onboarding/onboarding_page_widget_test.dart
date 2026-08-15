@@ -232,18 +232,16 @@ void main() {
       skip: !cloudAvailable,
     );
 
-    testWidgets(
-      'offline remains default when cloud is unavailable',
-      (tester) async {
-        final settings = await pumpOnboardingPage(tester, initialPage: 3);
-        expect(
-          containerOf(tester).read(settings.provider(localOnlySettingDef)),
-          isTrue,
-        );
-        expect(find.text('onboarding_online_unavailable'.tr()), findsOneWidget);
-      },
-      skip: cloudAvailable,
-    );
+    testWidgets('offline remains default when cloud is unavailable', (
+      tester,
+    ) async {
+      final settings = await pumpOnboardingPage(tester, initialPage: 3);
+      expect(
+        containerOf(tester).read(settings.provider(localOnlySettingDef)),
+        isTrue,
+      );
+      expect(find.text('onboarding_online_unavailable'.tr()), findsOneWidget);
+    }, skip: cloudAvailable);
   });
 
   group('Completion lock', () {

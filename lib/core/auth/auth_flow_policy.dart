@@ -33,4 +33,3 @@ bool signInResultSetsOnlinePending(SignInResult result) =>
 /// null. After magic-link / confirm-email UI, dismiss must not look like cancel.
 SignInResult resolveSignInSheetDismiss({required bool emailLinkPending}) =>
     emailLinkPending ? SignInResult.pendingEmailLink : SignInResult.cancelled;
-

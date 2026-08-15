@@ -98,9 +98,11 @@ class AuthService {
     }
   }
 
-  Future<bool> signInWithGoogle() => _signInWithOAuth(CloudOAuthProvider.google);
+  Future<bool> signInWithGoogle() =>
+      _signInWithOAuth(CloudOAuthProvider.google);
 
-  Future<bool> signInWithGithub() => _signInWithOAuth(CloudOAuthProvider.github);
+  Future<bool> signInWithGithub() =>
+      _signInWithOAuth(CloudOAuthProvider.github);
 
   Future<bool> _signInWithOAuth(CloudOAuthProvider provider) async {
     Log.debug('Signing in with ${provider.name} OAuth');

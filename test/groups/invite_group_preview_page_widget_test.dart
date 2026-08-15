@@ -88,9 +88,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          invitePreviewSourceProvider.overrideWithValue(invites),
-        ],
+        overrides: [invitePreviewSourceProvider.overrideWithValue(invites)],
         child: EasyLocalization(
           path: 'assets/translations',
           supportedLocales: testSupportedLocales,
@@ -237,9 +235,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          invitePreviewSourceProvider.overrideWithValue(invites),
-        ],
+        overrides: [invitePreviewSourceProvider.overrideWithValue(invites)],
         child: EasyLocalization(
           path: 'assets/translations',
           supportedLocales: testSupportedLocales,

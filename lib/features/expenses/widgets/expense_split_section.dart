@@ -424,10 +424,7 @@ class _PartsStepper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = theme.colorScheme;
-    final numberStyle = _splitNumberStyle(
-      theme,
-      color: colorScheme.onSurface,
-    );
+    final numberStyle = _splitNumberStyle(theme, color: colorScheme.onSurface);
 
     // Keep − N + and money LTR so RTL UI does not flip to + N − / 0.00 $.
     // Explicit height — Material shrink-wraps otherwise and looks half-row tall.

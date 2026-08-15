@@ -89,9 +89,7 @@ class PowerSyncUserNotificationRepository
     );
     if (cloud != null && isOnline) {
       try {
-        await cloud!.sync.update('user_notifications', {
-          'read_at': readAt,
-        }, id);
+        await cloud!.sync.update('user_notifications', {'read_at': readAt}, id);
         return;
       } catch (e, st) {
         Log.warning(

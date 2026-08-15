@@ -351,14 +351,14 @@ class _TimePickerPanel extends StatelessWidget {
     const colonSlotWidth = 20.0;
 
     Widget columnCaption(String label) => Expanded(
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: captionStyle,
-          ),
-        );
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: captionStyle,
+      ),
+    );
 
     // Keep hour:minute order in RTL locales; captions stay aligned to columns.
     return Semantics(
@@ -417,7 +417,9 @@ class _TimePickerPanel extends StatelessWidget {
                         child: IgnorePointer(
                           child: DecoratedBox(
                             decoration: BoxDecoration(
-                              color: cs.primaryContainer.withValues(alpha: 0.45),
+                              color: cs.primaryContainer.withValues(
+                                alpha: 0.45,
+                              ),
                               borderRadius: BorderRadius.circular(10),
                             ),
                           ),
@@ -432,9 +434,8 @@ class _TimePickerPanel extends StatelessWidget {
                                   : List.generate(12, (i) => i == 0 ? 12 : i),
                               value: use24h ? hour24 : hour12Value,
                               onChanged: onHourChanged,
-                              format: (v) => use24h
-                                  ? v.toString().padLeft(2, '0')
-                                  : '$v',
+                              format: (v) =>
+                                  use24h ? v.toString().padLeft(2, '0') : '$v',
                               itemExtent: _itemExtent,
                               semanticLabel: 'hour'.tr(),
                             ),
@@ -493,10 +494,12 @@ class _TimePickerPanel extends StatelessWidget {
                                 end: Alignment.bottomCenter,
                                 colors: [
                                   cs.surfaceContainerHighest,
-                                  cs.surfaceContainerHighest
-                                      .withValues(alpha: 0),
-                                  cs.surfaceContainerHighest
-                                      .withValues(alpha: 0),
+                                  cs.surfaceContainerHighest.withValues(
+                                    alpha: 0,
+                                  ),
+                                  cs.surfaceContainerHighest.withValues(
+                                    alpha: 0,
+                                  ),
                                   cs.surfaceContainerHighest,
                                 ],
                                 stops: const [0, 0.28, 0.72, 1],

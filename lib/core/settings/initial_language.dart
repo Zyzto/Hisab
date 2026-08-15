@@ -51,7 +51,8 @@ Future<String> seedLanguageFromPlatformIfUnset(
     return controller.get(languageSettingDef);
   }
   final code = resolveInitialLanguageCode(
-    platformLanguageCode: (platformLanguageCodeReader ?? readPlatformUiLanguageCode)(),
+    platformLanguageCode:
+        (platformLanguageCodeReader ?? readPlatformUiLanguageCode)(),
   );
   await controller.set(languageSettingDef, code);
   Log.info('Setting changed: ${languageSettingDef.key}=$code (platform)');

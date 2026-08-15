@@ -9,31 +9,19 @@ void main() {
     test('auth CloudException is an auth error', () {
       expect(
         isSyncAuthError(
-          const CloudException(
-            'x',
-            kind: CloudErrorKind.auth,
-            statusCode: 401,
-          ),
+          const CloudException('x', kind: CloudErrorKind.auth, statusCode: 401),
         ),
         true,
       );
       expect(
         isSyncAuthError(
-          const CloudException(
-            'x',
-            kind: CloudErrorKind.auth,
-            statusCode: 403,
-          ),
+          const CloudException('x', kind: CloudErrorKind.auth, statusCode: 403),
         ),
         true,
       );
       expect(
         isSyncTransientError(
-          const CloudException(
-            'x',
-            kind: CloudErrorKind.auth,
-            statusCode: 401,
-          ),
+          const CloudException('x', kind: CloudErrorKind.auth, statusCode: 401),
         ),
         false,
       );
@@ -60,21 +48,13 @@ void main() {
     test('syncErrorStatusCode extracts from CloudException', () {
       expect(
         syncErrorStatusCode(
-          const CloudException(
-            'x',
-            kind: CloudErrorKind.auth,
-            statusCode: 401,
-          ),
+          const CloudException('x', kind: CloudErrorKind.auth, statusCode: 401),
         ),
         401,
       );
       expect(
         syncErrorStatusCode(
-          const CloudException(
-            'x',
-            kind: CloudErrorKind.auth,
-            statusCode: 403,
-          ),
+          const CloudException('x', kind: CloudErrorKind.auth, statusCode: 403),
         ),
         403,
       );

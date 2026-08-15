@@ -108,6 +108,9 @@ void main() {
     );
     addTearDown(container.dispose);
 
-    expect(await container.read(invitePreviewDataProvider('t3').future), isNull);
+    expect(
+      await container.read(invitePreviewDataProvider('t3').future),
+      isNull,
+    );
   });
 }

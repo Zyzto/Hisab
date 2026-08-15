@@ -198,13 +198,10 @@ class FakeCloudAuth implements CloudAuth {
 
 /// Assembles the facets a test needs. Facets left null throw when touched.
 class FakeCloudBackend implements CloudBackend {
-  FakeCloudBackend({
-    CloudAuth? auth,
-    CloudSync? sync,
-    CloudInvites? invites,
-  }) : _auth = auth ?? FakeCloudAuth(),
-       _sync = sync,
-       _invites = invites;
+  FakeCloudBackend({CloudAuth? auth, CloudSync? sync, CloudInvites? invites})
+    : _auth = auth ?? FakeCloudAuth(),
+      _sync = sync,
+      _invites = invites;
 
   final CloudAuth _auth;
   final CloudSync? _sync;

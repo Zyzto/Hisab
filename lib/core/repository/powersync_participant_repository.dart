@@ -133,12 +133,12 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
     final leftAtIso = participant.leftAt?.toUtc().toIso8601String();
     if (!_isLocalOnly && _isOnline && _cloud != null) {
       await _cloud.sync.update('participants', {
-            'name': trimmedName,
-            'sort_order': participant.order,
-            'avatar_id': participant.avatarId,
-            'left_at': leftAtIso,
-            'updated_at': now,
-          }, participant.id);
+        'name': trimmedName,
+        'sort_order': participant.order,
+        'avatar_id': participant.avatarId,
+        'left_at': leftAtIso,
+        'updated_at': now,
+      }, participant.id);
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,
       isOnline: _isOnline,
@@ -212,7 +212,12 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
     if (avatarId != null) updates['avatar_id'] = avatarId;
 
     if (!_isLocalOnly && _isOnline && _cloud != null) {
-      await _cloud.sync.updateWhere('participants', updates, column: 'user_id', value: userId);
+      await _cloud.sync.updateWhere(
+        'participants',
+        updates,
+        column: 'user_id',
+        value: userId,
+      );
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,
       isOnline: _isOnline,

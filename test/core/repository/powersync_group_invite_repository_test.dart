@@ -97,21 +97,24 @@ void main() {
       expect(call.accessMode, 'standard');
     });
 
-    test('createInvite passes a null duration for a never-expiring invite', () async {
-      if (!powerSyncAvailable || db == null) return;
-      invites.createResult = const {
-        'id': 'invite-id-2',
-        'token': 'invite-token-2',
-      };
-      final repo = PowerSyncGroupInviteRepository(db!, cloud: cloud);
+    test(
+      'createInvite passes a null duration for a never-expiring invite',
+      () async {
+        if (!powerSyncAvailable || db == null) return;
+        invites.createResult = const {
+          'id': 'invite-id-2',
+          'token': 'invite-token-2',
+        };
+        final repo = PowerSyncGroupInviteRepository(db!, cloud: cloud);
 
-      await repo.createInvite('group-2', expiresIn: null);
+        await repo.createInvite('group-2', expiresIn: null);
 
-      final call = invites.createCalls.single;
-      expect(call.groupId, 'group-2');
-      expect(call.expiresIn, isNull);
-      expect(call.accessMode, 'standard');
-    });
+        final call = invites.createCalls.single;
+        expect(call.groupId, 'group-2');
+        expect(call.expiresIn, isNull);
+        expect(call.accessMode, 'standard');
+      },
+    );
 
     test('getByToken maps access_mode and group timestamps', () async {
       if (!powerSyncAvailable || db == null) return;
