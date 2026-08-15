@@ -11,6 +11,10 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Nothing here writes to the repo. Jobs that need more say so themselves.
+permissions:
+  contents: read
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
@@ -18,6 +22,7 @@ jobs:
   analyze:
     name: Analyze & Format
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -54,6 +59,7 @@ jobs:
   test:
     name: Unit & Widget Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -78,6 +84,7 @@ jobs:
   security-check:
     name: Security Check
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -89,9 +96,13 @@ jobs:
   # builds on its own. No google-services.json, no dart-defines, only the
   # offline stub — the state a fresh clone is in. Without this the repo can
   # rot into something that only compiles inside the private overlay.
+  #
+  # Android and web are separate jobs because the APK takes several times as
+  # long, and a web regression should not wait behind it to be reported.
   offline-build:
-    name: Offline Build Guard
+    name: Offline Build Guard (Android)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -105,6 +116,15 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+
+      # Restores ~/.gradle: the dependency cache, the wrapper, and the build
+      # cache that gradle.properties enables. Writes a new entry only on main,
+      # so pull requests read it without evicting each other's.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          build-root-directory: android
+          add-job-summary: on-failure
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -122,5 +142,32 @@ jobs:
       - name: Build foss APK
         run: flutter build apk --debug --flavor foss
 
+  offline-build-web:
+    name: Offline Build Guard (Web)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Read Flutter version
+        id: flutter
+        run: echo "version=$(cat .flutter-version)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ steps.flutter.outputs.version }}
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Assert the tree carries no backend dependency
+        run: bash ./scripts/ci/assert_offline_only.sh
+
+      # --no-wasm-dry-run: the dry run only reports incompatibilities in
+      # packages we do not control, and is not free.
       - name: Build web
-        run: flutter build web
+        run: flutter build web --no-wasm-dry-run

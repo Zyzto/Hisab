@@ -17,6 +17,10 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: true
 
+# Only the job that publishes the release needs to write.
+permissions:
+  contents: read
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
@@ -24,6 +28,7 @@ jobs:
   checks:
     name: Checks
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -55,6 +60,7 @@ jobs:
     name: Build FOSS APKs
     needs: checks
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -63,11 +69,22 @@ jobs:
         id: flutter
         run: echo "version=$(cat .flutter-version)" >> "$GITHUB_OUTPUT"
 
+      - name: Reclaim runner disk
+        run: bash ./scripts/ci/free_disk_space.sh
+
       - name: Set up Java
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
+
+      # A release builds three obfuscated ABIs from cold; the restored Gradle
+      # cache is the difference between minutes and tens of minutes.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          build-root-directory: android
+          add-job-summary: on-failure
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -107,6 +124,7 @@ jobs:
     needs: build-foss
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:
