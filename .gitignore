@@ -33,6 +33,13 @@ migrate_working_dir/
 # Pub dependency overrides (local dev paths)
 pubspec_overrides.yaml
 
+# Tests a backend overlay copies in. They belong to that backend's repository
+# and must never be committed here.
+integration_test/online/
+integration_test/online_app_test.dart
+integration_test/helpers/online_test_bootstrap.dart
+test/edge/
+
 # Flutter / Dart
 **/doc/api/
 **/ios/Flutter/.last_build_id
