@@ -1,9 +1,11 @@
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'layout_breakpoints.dart';
+import 'sheet_handle_drag.dart';
 import '../motion/app_motion.dart';
 import '../navigation/route_paths.dart';
 import '../navigation/shell_nav_layout.dart';
@@ -67,6 +69,11 @@ Future<T?> showResponsiveSheet<T>({
   bool isScrollControlled = true,
   bool useSafeArea = true,
   bool showDragHandle = true,
+
+  /// When true (default), phone bottom sheets can be dragged down to dismiss.
+  /// Ignored on tablet+ (centered dialog). Nested scrollables still scroll;
+  /// pull-down wins when they cannot.
+  bool enableDrag = true,
   ShapeBorder? sheetShape,
 
   /// When true (default), tapping/clicking the barrier closes the modal.
@@ -103,6 +110,7 @@ Future<T?> showResponsiveSheet<T>({
         maxHeight: maxHeight,
         useSafeArea: useSafeArea,
         showDragHandle: showDragHandle,
+        enableDrag: enableDrag,
         sheetShape: sheetShape,
         barrierDismissible: barrierDismissible,
         centerInFullViewport: centerInFullViewport,
@@ -130,6 +138,7 @@ class _AdaptiveSheetHost extends StatelessWidget {
     required this.barrierDismissible,
     required this.useSafeArea,
     required this.showDragHandle,
+    required this.enableDrag,
     required this.openAnimation,
     this.title,
     this.tabletTopBarAction,
@@ -145,6 +154,7 @@ class _AdaptiveSheetHost extends StatelessWidget {
   final bool barrierDismissible;
   final bool useSafeArea;
   final bool showDragHandle;
+  final bool enableDrag;
   final Animation<double> openAnimation;
   final String? title;
   final Widget? tabletTopBarAction;
@@ -268,6 +278,7 @@ class _AdaptiveSheetHost extends StatelessWidget {
           )
         : showDragHandle
         ? Padding(
+            key: const ValueKey('responsive_sheet_drag_handle'),
             padding: const EdgeInsets.only(top: 12, bottom: 8),
             child: Center(
               child: Container(
@@ -349,6 +360,16 @@ class _AdaptiveSheetHost extends StatelessWidget {
             ),
           );
 
+    Widget sheet = sheetShape != null
+        ? ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: panelWidth),
+            child: panel,
+          )
+        : panel;
+    if (!isWide && enableDrag) {
+      sheet = _PhoneSheetDragDismiss(child: sheet);
+    }
+
     final alignedPanel = AnimatedPadding(
       duration: AppMotion.modal,
       curve: AppMotion.enterCurve,
@@ -359,12 +380,7 @@ class _AdaptiveSheetHost extends StatelessWidget {
         duration: AppMotion.modal,
         curve: AppMotion.enterCurve,
         alignment: isWide ? Alignment.center : Alignment.bottomCenter,
-        child: sheetShape != null
-            ? ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: panelWidth),
-                child: panel,
-              )
-            : panel,
+        child: sheet,
       ),
     );
 
@@ -422,6 +438,119 @@ class _AdaptiveSheetHost extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Phone-only drag-to-dismiss. Uses a thresholded vertical recognizer so nested
+/// scrollables still win, matching Material [BottomSheet.enableDrag].
+class _PhoneSheetDragDismiss extends StatefulWidget {
+  const _PhoneSheetDragDismiss({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_PhoneSheetDragDismiss> createState() => _PhoneSheetDragDismissState();
+}
+
+class _PhoneSheetDragDismissState extends State<_PhoneSheetDragDismiss>
+    with SingleTickerProviderStateMixin {
+  final ValueNotifier<double> _dy = ValueNotifier<double>(0);
+  late final AnimationController _snap;
+  Animation<double>? _snapAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _snap = AnimationController(vsync: this, duration: AppMotion.modal)
+      ..addListener(_onSnapTick);
+  }
+
+  void _onSnapTick() {
+    final anim = _snapAnim;
+    if (anim != null) _dy.value = anim.value;
+  }
+
+  @override
+  void dispose() {
+    _snap.removeListener(_onSnapTick);
+    _snap.dispose();
+    _dy.dispose();
+    super.dispose();
+  }
+
+  void _onDragUpdate(DragUpdateDetails details) {
+    _snap.stop();
+    _snapAnim = null;
+    final maxDy = MediaQuery.sizeOf(context).height;
+    final next = (_dy.value + (details.primaryDelta ?? details.delta.dy)).clamp(
+      0.0,
+      maxDy,
+    );
+    if (next != _dy.value) _dy.value = next;
+  }
+
+  void _onDragEnd(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+    if (_dy.value >= SheetHandleDrag.dismissDistance ||
+        velocity >= SheetHandleDrag.flingVelocity) {
+      _tryDismiss();
+      return;
+    }
+    _snapBack();
+  }
+
+  void _onDragCancel() {
+    if (_dy.value > 0) _snapBack();
+  }
+
+  Future<void> _tryDismiss() async {
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final popped = await navigator.maybePop();
+    if (!popped && mounted && _dy.value > 0) {
+      _snapBack();
+    }
+  }
+
+  void _snapBack() {
+    final begin = _dy.value;
+    if (begin == 0) return;
+    _snap.duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : AppMotion.modal;
+    _snapAnim = Tween<double>(
+      begin: begin,
+      end: 0,
+    ).animate(CurvedAnimation(parent: _snap, curve: AppMotion.enterCurve));
+    _snap
+      ..reset()
+      ..forward();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RawGestureDetector(
+      excludeFromSemantics: true,
+      gestures: <Type, GestureRecognizerFactory<GestureRecognizer>>{
+        VerticalDragGestureRecognizer:
+            GestureRecognizerFactoryWithHandlers<VerticalDragGestureRecognizer>(
+              () => VerticalDragGestureRecognizer(debugOwner: this),
+              (VerticalDragGestureRecognizer instance) {
+                instance
+                  ..onUpdate = _onDragUpdate
+                  ..onEnd = _onDragEnd
+                  ..onCancel = _onDragCancel
+                  ..onlyAcceptDragOnThreshold = true;
+              },
+            ),
+      },
+      child: ValueListenableBuilder<double>(
+        valueListenable: _dy,
+        builder: (context, dy, child) {
+          return Transform.translate(offset: Offset(0, dy), child: child);
+        },
+        child: widget.child,
+      ),
     );
   }
 }

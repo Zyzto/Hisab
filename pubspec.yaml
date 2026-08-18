@@ -46,6 +46,8 @@ dependencies:
   flex_color_scheme: ^8.4.0
   flex_color_picker: ^3.4.0
   google_fonts: ^8.0.2
+  # Brand marks (Google/GitHub) that must stay crisp at any density.
+  flutter_svg: ^2.3.0
   custom_sliding_segmented_control: ^1.8.5
   toastification: ^3.0.3
   fl_chart: ^1.1.1
@@ -152,6 +154,7 @@ flutter:
   assets:
     - assets/Hisab.png
     - assets/translations/
+    - assets/icons/
     - assets/images/parallax/
     - assets/tessdata/eng.traineddata
     - assets/tessdata/ara.traineddata

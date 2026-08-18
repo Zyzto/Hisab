@@ -12,6 +12,7 @@ import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/utils/form_validators.dart';
+import '../../../core/widgets/inline_banner.dart';
 import '../../groups/providers/groups_provider.dart';
 import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 
@@ -162,31 +163,7 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
               const SizedBox(height: 16),
             ],
             if (_error != null) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: colorScheme.errorContainer,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 20,
-                      color: colorScheme.error,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _error!,
-                        style: textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onErrorContainer,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              InlineBanner(message: _error!),
               const SizedBox(height: 16),
             ],
             DecoratedBox(

@@ -7,30 +7,51 @@ import 'package:hisab_backend/hisab_backend.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
+import '../../../core/utils/form_validators.dart';
+import '../../../core/widgets/inline_banner.dart';
+import '../../../core/widgets/obscure_text_toggle.dart';
 import '../../../core/widgets/toast.dart';
 
 /// Minimum length for a new password (Supabase default).
-const int _kMinPasswordLength = 6;
+const int _kMinPasswordLength = FormValidators.passwordMin;
 
-/// Bottom sheet to change password for email/password users. Verifies current
-/// password via sign-in then calls Supabase updateUser.
+/// Why the sheet is open, which decides whether identity still has to be proven.
+enum ChangePasswordMode {
+  /// A signed-in user changing a password they already know.
+  normal,
+
+  /// Arrived from a recovery link. Following that link is the proof of
+  /// identity, and the whole point is that the old password is unknown, so
+  /// there is nothing to re-authenticate against.
+  recovery,
+}
+
+/// Bottom sheet to change password for email/password users.
+///
+/// In [ChangePasswordMode.normal] the current password is verified by signing
+/// in with it before the update.
 Future<void> showChangePasswordSheet(
   BuildContext context,
-  WidgetRef ref,
-) async {
+  WidgetRef ref, {
+  ChangePasswordMode mode = ChangePasswordMode.normal,
+}) async {
+  final isRecovery = mode == ChangePasswordMode.recovery;
   await showResponsiveSheet<void>(
     context: context,
-    title: 'change_password_title'.tr(),
+    title: isRecovery
+        ? 'change_password_recovery_title'.tr()
+        : 'change_password_title'.tr(),
     isScrollControlled: true,
     useSafeArea: true,
     centerInFullViewport: false,
-    child: _ChangePasswordSheet(ref: ref),
+    child: _ChangePasswordSheet(ref: ref, mode: mode),
   );
 }
 
 class _ChangePasswordSheet extends ConsumerStatefulWidget {
-  const _ChangePasswordSheet({required this.ref});
+  const _ChangePasswordSheet({required this.ref, required this.mode});
   final WidgetRef ref;
+  final ChangePasswordMode mode;
 
   @override
   ConsumerState<_ChangePasswordSheet> createState() =>
@@ -92,12 +113,14 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
     super.dispose();
   }
 
+  bool get _isRecovery => widget.mode == ChangePasswordMode.recovery;
+
   Future<void> _submit() async {
     final current = _currentController.text;
     final newPassword = _newController.text;
     final confirm = _confirmController.text;
 
-    if (current.isEmpty) {
+    if (!_isRecovery && current.isEmpty) {
       setState(() => _error = 'change_password_enter_current'.tr());
       return;
     }
@@ -116,7 +139,7 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
 
     final user = ref.read(currentUserProvider);
     final email = user?.email;
-    if (email == null || email.isEmpty) {
+    if (!_isRecovery && (email == null || email.isEmpty)) {
       setState(() => _error = 'change_password_no_email'.tr());
       return;
     }
@@ -128,7 +151,11 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
 
     try {
       final authService = ref.read(authServiceProvider);
-      await authService.signInWithEmail(email, current);
+      // The recovery link already established the session, which is the proof
+      // of identity a re-auth would otherwise provide.
+      if (!_isRecovery) {
+        await authService.signInWithEmail(email!, current);
+      }
       await authService.updatePassword(newPassword);
       if (!mounted) return;
       context.showSuccess('password_changed_success'.tr());
@@ -182,11 +209,10 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
     return Padding(
-      padding: EdgeInsets.only(left: 24, right: 24, top: 16, bottom: 24),
+      padding: const EdgeInsets.only(left: 24, right: 24, top: 16, bottom: 24),
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -194,7 +220,9 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
           children: [
             if (!LayoutBreakpoints.isTabletOrWider(context)) ...[
               Text(
-                'change_password_title'.tr(),
+                _isRecovery
+                    ? 'change_password_recovery_title'.tr()
+                    : 'change_password_title'.tr(),
                 style: textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -202,52 +230,38 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
               ),
               const SizedBox(height: 24),
             ],
-            if (_error != null) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: colorScheme.errorContainer,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 20,
-                      color: colorScheme.error,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _error!,
-                        style: textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onErrorContainer,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+            if (_isRecovery) ...[
+              InlineBanner(
+                message: 'change_password_recovery_subtitle'.tr(),
+                tone: InlineBannerTone.info,
+                icon: Icons.lock_reset_outlined,
               ),
               const SizedBox(height: 16),
             ],
-            TextField(
-              controller: _currentController,
-              focusNode: _focusCurrent,
-              decoration: InputDecoration(
-                labelText: 'change_password_current'.tr(),
-                prefixIcon: const Icon(Icons.lock_outline),
-                border: const OutlineInputBorder(),
-                suffixIcon: _VisibilityToggle(
-                  obscure: _obscureCurrent,
-                  onTap: () =>
-                      setState(() => _obscureCurrent = !_obscureCurrent),
+            if (_error != null) ...[
+              InlineBanner(message: _error!),
+              const SizedBox(height: 16),
+            ],
+            if (!_isRecovery) ...[
+              TextField(
+                controller: _currentController,
+                focusNode: _focusCurrent,
+                decoration: InputDecoration(
+                  labelText: 'change_password_current'.tr(),
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  border: const OutlineInputBorder(),
+                  suffixIcon: ObscureTextToggle(
+                    obscure: _obscureCurrent,
+                    onTap: () =>
+                        setState(() => _obscureCurrent = !_obscureCurrent),
+                  ),
                 ),
+                obscureText: _obscureCurrent,
+                textInputAction: TextInputAction.next,
+                enabled: !_saving,
               ),
-              obscureText: _obscureCurrent,
-              textInputAction: TextInputAction.next,
-              enabled: !_saving,
-            ),
-            const SizedBox(height: 12),
+              const SizedBox(height: 12),
+            ],
             TextField(
               controller: _newController,
               focusNode: _focusNew,
@@ -255,7 +269,7 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
                 labelText: 'change_password_new'.tr(),
                 prefixIcon: const Icon(Icons.lock_outline),
                 border: const OutlineInputBorder(),
-                suffixIcon: _VisibilityToggle(
+                suffixIcon: ObscureTextToggle(
                   obscure: _obscureNew,
                   onTap: () => setState(() => _obscureNew = !_obscureNew),
                 ),
@@ -272,7 +286,7 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
                 labelText: 'change_password_confirm'.tr(),
                 prefixIcon: const Icon(Icons.lock_outline),
                 border: const OutlineInputBorder(),
-                suffixIcon: _VisibilityToggle(
+                suffixIcon: ObscureTextToggle(
                   obscure: _obscureConfirm,
                   onTap: () =>
                       setState(() => _obscureConfirm = !_obscureConfirm),
@@ -331,34 +345,6 @@ class _SubmitButton extends StatelessWidget {
                       fontSize: 16,
                     ),
                   ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Visibility toggle that does not participate in focus, so it never steals
-/// focus from the password TextField when tapped or when the keyboard opens.
-class _VisibilityToggle extends StatelessWidget {
-  const _VisibilityToggle({required this.obscure, required this.onTap});
-  final bool obscure;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      type: MaterialType.button,
-      color: Colors.transparent,
-      child: InkWell(
-        canRequestFocus: false,
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(48),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Icon(
-            obscure ? Icons.visibility_off : Icons.visibility,
-            size: 24,
           ),
         ),
       ),

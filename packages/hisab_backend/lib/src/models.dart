@@ -100,6 +100,20 @@ class CloudAuthResponse {
 /// OAuth providers Hisab offers.
 enum CloudOAuthProvider { google, github }
 
+/// Result of an in-app Google sign-in attempt.
+enum NativeGoogleOutcome {
+  /// A session now exists; nothing else to wait for.
+  signedIn,
+
+  /// The user dismissed the account picker. Not an error, so the UI should
+  /// return to the form rather than show a failure.
+  cancelled,
+
+  /// There is no native picker in this build or on this platform. The caller
+  /// falls back to the browser flow.
+  unsupported,
+}
+
 /// Broad category of a [CloudException], so the app can decide whether to
 /// retry, re-authenticate, or surface the error, without parsing messages.
 enum CloudErrorKind {

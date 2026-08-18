@@ -441,4 +441,94 @@ void main() {
     await tester.pump(const Duration(milliseconds: 320));
     expect(tester.getBottomLeft(panel).dy, closeTo(restingBottom, 1));
   });
+
+  testWidgets('phone sheet drags down to dismiss', (tester) async {
+    setPhoneViewport(tester);
+    await tester.pumpWidget(
+      buildApp(
+        onOpen: (ctx) => showConfirmSheet(
+          ctx,
+          title: 'Confirm',
+          content: 'Drag me',
+          confirmLabel: 'OK',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('responsive_sheet_panel')),
+      findsOneWidget,
+    );
+
+    await tester.drag(
+      find.byKey(const ValueKey('responsive_sheet_drag_handle')),
+      const Offset(0, 200),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('responsive_sheet_panel')), findsNothing);
+  });
+
+  testWidgets('phone sheet snaps back when the drag is short', (tester) async {
+    setPhoneViewport(tester);
+    await tester.pumpWidget(
+      buildApp(
+        onOpen: (ctx) => showConfirmSheet(
+          ctx,
+          title: 'Confirm',
+          content: 'Stay open',
+          confirmLabel: 'OK',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    final handle = find.byKey(const ValueKey('responsive_sheet_drag_handle'));
+    final panel = find.byKey(const ValueKey('responsive_sheet_panel'));
+    final before = tester.getTopLeft(panel).dy;
+
+    final gesture = await tester.startGesture(tester.getCenter(handle));
+    await tester.pump(const Duration(milliseconds: 16));
+    for (var i = 0; i < 10; i++) {
+      await gesture.moveBy(const Offset(0, 4));
+      await tester.pump(const Duration(milliseconds: 20));
+    }
+    expect(tester.getTopLeft(panel).dy, greaterThan(before + 8));
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(panel).dy, closeTo(before, 1));
+    expect(panel, findsOneWidget);
+  });
+
+  testWidgets('tablet dialog is not drag-dismissed', (tester) async {
+    setTabletViewport(tester);
+    await tester.pumpWidget(
+      buildApp(
+        onOpen: (ctx) => showConfirmSheet(
+          ctx,
+          title: 'Confirm',
+          content: 'Centered',
+          confirmLabel: 'OK',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('responsive_sheet_drag_handle')),
+      findsNothing,
+    );
+    final panel = find.byKey(const ValueKey('responsive_sheet_panel'));
+    await tester.drag(panel, const Offset(0, 200));
+    await tester.pumpAndSettle();
+    expect(panel, findsOneWidget);
+  });
 }

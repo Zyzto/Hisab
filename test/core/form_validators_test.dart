@@ -48,4 +48,47 @@ void main() {
     expect(FormValidators.positiveAmount('abc'), isNotNull);
     expect(FormValidators.positiveAmount(''), isNotNull);
   });
+
+  testWidgets('email accepts plausible addresses', (tester) async {
+    await pumpApp(tester, child: const SizedBox.shrink());
+    expect(FormValidators.email('a@b.co'), isNull);
+    expect(FormValidators.email('first.last+tag@sub.example.com'), isNull);
+    // Trimmed before matching, so a stray space from autofill is not an error.
+    expect(FormValidators.email('  a@b.co  '), isNull);
+  });
+
+  testWidgets('email rejects typos and blanks', (tester) async {
+    await pumpApp(tester, child: const SizedBox.shrink());
+    expect(FormValidators.email(null), isNotNull);
+    expect(FormValidators.email(''), isNotNull);
+    expect(FormValidators.email('   '), isNotNull);
+    expect(FormValidators.email('nope'), isNotNull);
+    expect(FormValidators.email('no@domain'), isNotNull);
+    expect(FormValidators.email('@example.com'), isNotNull);
+    expect(FormValidators.email('two@at@example.com'), isNotNull);
+    expect(FormValidators.email('spaced out@example.com'), isNotNull);
+  });
+
+  testWidgets('password enforces the Supabase minimum', (tester) async {
+    await pumpApp(tester, child: const SizedBox.shrink());
+    expect(FormValidators.passwordMin, 6);
+    expect(FormValidators.password(null), isNotNull);
+    expect(FormValidators.password(''), isNotNull);
+    expect(FormValidators.password('a' * 5), isNotNull);
+    expect(FormValidators.password('a' * 6), isNull);
+  });
+
+  testWidgets('password never trims, so spaces count', (tester) async {
+    await pumpApp(tester, child: const SizedBox.shrink());
+    expect(FormValidators.password('      '), isNull);
+  });
+
+  testWidgets('short and empty passwords fail differently', (tester) async {
+    await pumpApp(tester, child: const SizedBox.shrink());
+    expect(
+      FormValidators.password('abc'),
+      isNot(FormValidators.password('')),
+      reason: 'blank should say "required", not "too short"',
+    );
+  });
 }

@@ -23,6 +23,18 @@
       ]
     },
     {
+      "name": "Hisab Cloud (local stack)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "--flavor",
+        "cloud",
+        "--dart-define-from-file=dart_defines_local.json",
+        "--web-port=8080"
+      ]
+    },
+    {
       "name": "Integration: Current File (Android)",
       "request": "launch",
       "type": "dart",

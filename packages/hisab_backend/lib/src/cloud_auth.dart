@@ -36,6 +36,16 @@ abstract interface class CloudAuth {
   /// it succeeded — completion arrives on [authStateChanges].
   Future<bool> signInWithOAuth(CloudOAuthProvider provider);
 
+  /// Signs in with a natively obtained Google ID token, without a browser.
+  ///
+  /// Unlike [signInWithOAuth] this resolves the whole attempt: on
+  /// [NativeGoogleOutcome.signedIn] the session already exists, so the caller
+  /// does not have to wait on [authStateChanges].
+  ///
+  /// Returns [NativeGoogleOutcome.unsupported] on web, on desktop, and in
+  /// offline builds, so the caller can fall back to [signInWithOAuth].
+  Future<NativeGoogleOutcome> signInWithNativeGoogle();
+
   Future<void> signOut();
 
   /// Merges [name] and [avatarId] into the current user's metadata. A no-op
@@ -46,6 +56,16 @@ abstract interface class CloudAuth {
   Future<void> updatePassword(String newPassword);
 
   Future<void> resendConfirmation(String email);
+
+  /// Emails [email] a recovery link.
+  ///
+  /// Following that link must establish a real session and emit
+  /// [CloudAuthEvent.passwordRecovery], so the app can let the user set a new
+  /// password without knowing the old one.
+  ///
+  /// Backends should not reveal whether the address has an account: succeed
+  /// either way and let the inbox be the only signal.
+  Future<void> requestPasswordReset(String email);
 
   /// Forces a token refresh. Used before a bulk upload so a long migration
   /// does not fail halfway on an expired token.

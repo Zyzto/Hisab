@@ -87,6 +87,20 @@ class AuthService {
     }
   }
 
+  /// Emails a recovery link. Following it signs the user in and emits
+  /// [CloudAuthEvent.passwordRecovery], which the app turns into a
+  /// set-a-new-password sheet.
+  Future<void> requestPasswordReset(String email) async {
+    Log.debug('Requesting password reset');
+    try {
+      await _authOrThrow.requestPasswordReset(email);
+      Log.info('Password reset email sent');
+    } catch (e, st) {
+      Log.error('Password reset request failed', error: e, stackTrace: st);
+      rethrow;
+    }
+  }
+
   Future<void> signInWithMagicLink(String email) async {
     Log.debug('Sending magic link');
     try {
@@ -94,6 +108,22 @@ class AuthService {
       Log.info('Magic link sent');
     } catch (e, st) {
       Log.error('Magic link failed', error: e, stackTrace: st);
+      rethrow;
+    }
+  }
+
+  /// Tries the in-app Google account picker.
+  ///
+  /// Returns [NativeGoogleOutcome.unsupported] when this build cannot show it,
+  /// which is the caller's cue to fall back to [signInWithGoogle].
+  Future<NativeGoogleOutcome> signInWithNativeGoogle() async {
+    Log.debug('Signing in with native Google');
+    try {
+      final outcome = await _authOrThrow.signInWithNativeGoogle();
+      Log.info('Native Google sign-in: ${outcome.name}');
+      return outcome;
+    } catch (e, st) {
+      Log.error('Native Google sign-in failed', error: e, stackTrace: st);
       rethrow;
     }
   }

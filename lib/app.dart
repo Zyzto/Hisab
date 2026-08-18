@@ -10,9 +10,11 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:upgrader/upgrader.dart';
 import 'package:version/version.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 import 'core/auth/auth_pending_finalize.dart';
 import 'core/auth/auth_providers.dart';
 import 'core/auth/oauth_callback_state.dart';
+import 'features/settings/widgets/change_password_sheet.dart';
 import 'core/database/database_providers.dart';
 import 'core/services/notification_service.dart';
 import 'core/debug/debug_menu.dart';
@@ -55,6 +57,8 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
   bool _updateTriggerRegistered = false;
   bool _manualUpdateCheckInFlight = false;
   ProviderSubscription<bool>? _authSubscription;
+  StreamSubscription<CloudAuthState>? _authEventSubscription;
+  bool _passwordRecoverySheetOpen = false;
   void Function(BuildContext context)? _updateCheckCallback;
   VoidCallback? _clearOwnedUpdateCheckTrigger;
 
@@ -80,6 +84,7 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
           },
     );
     _registerAuthListener();
+    _registerPasswordRecoveryListener();
     // Keep long-lived services alive without rebuilding the whole App tree.
     ref.listenManual(dataSyncServiceProvider, (_, _) {});
     if (scannerAvailable) {
@@ -134,6 +139,7 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
     _clearOwnedUpdateCheckTrigger?.call();
     _clearOwnedUpdateCheckTrigger = null;
     _authSubscription?.close();
+    unawaited(_authEventSubscription?.cancel());
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -238,6 +244,52 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
         });
       }
     }, fireImmediately: true);
+  }
+
+  /// Opens the set-a-new-password sheet when the user arrives from a recovery
+  /// link.
+  ///
+  /// Subscribing here rather than in `main()` is safe even on web, where the
+  /// event fires during startup before this widget exists: the backend's auth
+  /// stream replays past events to new listeners, so the recovery that happened
+  /// during the page load still reaches us.
+  void _registerPasswordRecoveryListener() {
+    if (!cloudAvailable) return;
+    _authEventSubscription = ref
+        .read(authServiceProvider)
+        .onAuthStateChange
+        .listen((state) {
+          if (state.event != CloudAuthEvent.passwordRecovery) return;
+          Log.info('Password recovery link opened');
+          _openPasswordRecoverySheet();
+        });
+  }
+
+  void _openPasswordRecoverySheet([int attempt = 0]) {
+    if (_passwordRecoverySheetOpen || !mounted) return;
+    // App's own context sits above the router; use the navigator's.
+    final navContext = ref
+        .read(routerProvider)
+        .routerDelegate
+        .navigatorKey
+        .currentContext;
+    if (navContext == null || !navContext.mounted) {
+      // On a cold start from the link there is no navigator yet.
+      if (attempt < 10) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _openPasswordRecoverySheet(attempt + 1);
+        });
+      }
+      return;
+    }
+    _passwordRecoverySheetOpen = true;
+    unawaited(
+      showChangePasswordSheet(
+        navContext,
+        ref,
+        mode: ChangePasswordMode.recovery,
+      ).whenComplete(() => _passwordRecoverySheetOpen = false),
+    );
   }
 
   void _registerUpdateCheckTrigger() {
