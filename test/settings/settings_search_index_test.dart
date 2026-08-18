@@ -30,6 +30,17 @@ void main() {
     await index.build();
   });
 
+  test('Arabic usage-tracking synonyms find telemetry', () {
+    for (final query in ['تحليلات', 'إحصاءات']) {
+      final results = index.search(query);
+      expect(
+        results.map((r) => r.setting.key),
+        contains('telemetry_enabled'),
+        reason: query,
+      );
+    }
+  });
+
   test('Arabic query finds theme while UI terms are English-indexed too', () {
     final results = index.search('داكن');
     expect(results.map((r) => r.setting.key), contains('theme_mode'));

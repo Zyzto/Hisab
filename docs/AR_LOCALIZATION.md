@@ -86,7 +86,7 @@ Keep push prefixes short.
 
 ## Checklist (new or edited Arabic)
 
-- [ ] Same keys as `en.json`; placeholders identical
+- [ ] Same keys as `en.json`; placeholders identical (`test/translations_test.dart`)
 - [ ] Glossary terms respected (`balance` tab vs money; إيصال; مصاريف; إشعارات فورية)
 - [ ] No dialect / no English calques
 - [ ] Errors encouraging where space allows

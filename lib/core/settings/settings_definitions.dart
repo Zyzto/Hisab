@@ -67,7 +67,8 @@ final telemetryEnabledSettingDef = const BoolSetting(
   order: 0,
   searchTerms: {
     'en': ['analytics', 'usage', 'tracking'],
-    'ar': ['تحليلات', 'تتبع'],
+    // تحليلات = usage-tracking synonym; product Analytics tab is الإحصاءات.
+    'ar': ['تحليلات', 'تتبع', 'إحصاءات'],
   },
 );
 
