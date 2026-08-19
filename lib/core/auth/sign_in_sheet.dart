@@ -74,10 +74,7 @@ Future<SignInResult> showSignInSheet(
       );
   // The sheet is still on screen during its exit animation, so give the route
   // time to leave the tree before tearing the controller down.
-  Future<void>.delayed(
-    const Duration(milliseconds: 300),
-    controller.dispose,
-  );
+  Future<void>.delayed(const Duration(milliseconds: 300), controller.dispose);
   return resolved;
 }
 

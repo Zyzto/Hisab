@@ -183,7 +183,11 @@ class SignInController extends ChangeNotifier {
     try {
       await _auth.resendConfirmation(email.trim());
       _emit(
-        _state.copyWith(busy: false, confirmationResent: true, clearError: true),
+        _state.copyWith(
+          busy: false,
+          confirmationResent: true,
+          clearError: true,
+        ),
       );
     } catch (e) {
       Log.warning('Resend confirmation failed', error: e);

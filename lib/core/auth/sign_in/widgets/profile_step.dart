@@ -100,9 +100,7 @@ class _AvatarTile extends StatelessWidget {
         color: selected ? cs.primaryContainer : cs.surfaceContainerHighest,
         shape: CircleBorder(
           side: BorderSide(
-            color: selected
-                ? cs.primary
-                : cs.outline.withValues(alpha: 0.3),
+            color: selected ? cs.primary : cs.outline.withValues(alpha: 0.3),
             width: selected ? 2.5 : 1,
           ),
         ),

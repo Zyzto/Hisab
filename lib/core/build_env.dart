@@ -5,9 +5,6 @@
 /// corner banner.
 library;
 
-const String hisabEnv = String.fromEnvironment(
-  'HISAB_ENV',
-  defaultValue: '',
-);
+const String hisabEnv = String.fromEnvironment('HISAB_ENV', defaultValue: '');
 
 bool get isStagingBuild => hisabEnv.toLowerCase() == 'staging';

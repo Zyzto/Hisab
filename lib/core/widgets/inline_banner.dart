@@ -49,7 +49,11 @@ class InlineBanner extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    final (Color background, Color foreground, Color iconColor) = switch (tone) {
+    final (
+      Color background,
+      Color foreground,
+      Color iconColor,
+    ) = switch (tone) {
       InlineBannerTone.error => (
         cs.errorContainer,
         cs.onErrorContainer,
@@ -95,35 +99,32 @@ class InlineBanner extends StatelessWidget {
             children: [
               Icon(resolvedIcon, size: 20, color: iconColor),
               const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          message,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: foreground,
-                          ),
-                        ),
-                        if (detail != null) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            detail!,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: foreground.withValues(alpha: 0.75),
-                              height: 1.35,
-                            ),
-                          ),
-                        ],
-                      ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      message,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: foreground,
+                      ),
                     ),
-                  ),
+                    if (detail != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        detail!,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: foreground.withValues(alpha: 0.75),
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ],
           ),
-          for (final action in actions) ...[
-            const SizedBox(height: 12),
-            action,
-          ],
+          for (final action in actions) ...[const SizedBox(height: 12), action],
         ],
       ),
     );

@@ -366,16 +366,19 @@ void main() {
       expect(c.state.busy, isFalse);
     });
 
-    test('dismissing the picker returns to the form without an error', () async {
-      auth.nativeGoogleOutcome = NativeGoogleOutcome.cancelled;
-      final c = build();
-      await c.signInWithProvider(CloudOAuthProvider.google);
+    test(
+      'dismissing the picker returns to the form without an error',
+      () async {
+        auth.nativeGoogleOutcome = NativeGoogleOutcome.cancelled;
+        final c = build();
+        await c.signInWithProvider(CloudOAuthProvider.google);
 
-      expect(auth.calls, ['signInWithNativeGoogle']);
-      expect(c.state.errorKey, isNull);
-      expect(c.state.outcome, isNull);
-      expect(c.state.busy, isFalse);
-    });
+        expect(auth.calls, ['signInWithNativeGoogle']);
+        expect(c.state.errorKey, isNull);
+        expect(c.state.outcome, isNull);
+        expect(c.state.busy, isFalse);
+      },
+    );
 
     test('unsupported falls back to the browser', () async {
       auth.nativeGoogleOutcome = NativeGoogleOutcome.unsupported;

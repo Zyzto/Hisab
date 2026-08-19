@@ -7,10 +7,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         debugShowCheckedModeBanner: false,
-        home: wrapWithStagingBanner(
-          enabled: true,
-          child: const Text('body'),
-        ),
+        home: wrapWithStagingBanner(enabled: true, child: const Text('body')),
       ),
     );
     final banner = tester.widget<Banner>(find.byType(Banner));

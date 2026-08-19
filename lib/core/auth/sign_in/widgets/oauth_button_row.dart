@@ -77,11 +77,7 @@ class _ProviderButton extends StatelessWidget {
             Opacity(opacity: onPressed == null ? 0.4 : 1, child: logo),
             const SizedBox(width: 10),
             Flexible(
-              child: Text(
-                label,
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-              ),
+              child: Text(label, overflow: TextOverflow.ellipsis, maxLines: 1),
             ),
           ],
         ),

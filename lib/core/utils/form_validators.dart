@@ -26,9 +26,7 @@ class FormValidators {
   /// Deliberately permissive: one `@`, a dot-bearing domain, no spaces. The
   /// only authority on whether an address exists is the confirmation email, so
   /// this exists to catch typos, not to enforce RFC 5322.
-  static final RegExp _emailPattern = RegExp(
-    r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
-  );
+  static final RegExp _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
   /// Returns a localized "required" error if [value] is null or blank.
   static String? required(String? value) {
@@ -68,7 +66,8 @@ class FormValidators {
   static String? email(String? value) {
     final req = required(value);
     if (req != null) return req;
-    if (!_emailPattern.hasMatch(value!.trim())) return 'auth_invalid_email'.tr();
+    if (!_emailPattern.hasMatch(value!.trim()))
+      return 'auth_invalid_email'.tr();
     return null;
   }
 
@@ -77,9 +76,7 @@ class FormValidators {
   static String? password(String? value) {
     if (value == null || value.isEmpty) return 'required'.tr();
     if (value.length < passwordMin) {
-      return 'auth_password_too_short'.tr(
-        namedArgs: {'min': '$passwordMin'},
-      );
+      return 'auth_password_too_short'.tr(namedArgs: {'min': '$passwordMin'});
     }
     return null;
   }

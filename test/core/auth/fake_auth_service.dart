@@ -54,7 +54,9 @@ class FakeAuthService extends AuthService {
   Stream<CloudAuthState> get onAuthStateChange => _authStates.stream;
 
   void emitSignedIn() {
-    _authStates.add(const CloudAuthState(CloudAuthEvent.signedIn, kTestSession));
+    _authStates.add(
+      const CloudAuthState(CloudAuthEvent.signedIn, kTestSession),
+    );
   }
 
   Future<void> close() => _authStates.close();
@@ -65,7 +67,10 @@ class FakeAuthService extends AuthService {
   }
 
   @override
-  Future<CloudAuthResponse> signInWithEmail(String email, String password) async {
+  Future<CloudAuthResponse> signInWithEmail(
+    String email,
+    String password,
+  ) async {
     calls.add('signInWithEmail');
     if (signInError != null) throw signInError!;
     return const CloudAuthResponse(user: kTestUser, session: kTestSession);
