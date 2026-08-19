@@ -16,6 +16,7 @@ import 'package:hisab_backend/hisab_backend.dart';
 import 'package:hisab_cloud/hisab_cloud.dart';
 import 'package:powersync/powersync.dart' show PowerSyncDatabase, Schema;
 
+import 'core/auth/auth_flow_policy.dart';
 import 'core/auth/auth_pending_finalize.dart';
 import 'core/auth/oauth_callback_state.dart';
 import 'core/auth/oauth_web_url.dart';
@@ -195,6 +196,8 @@ void main() {
         await registerHisabCloud();
         final backend = cloudBackend;
         if (backend != null) {
+          // Capture before initialize(): detectSessionInUri consumes `?code=`.
+          final fromAuthCallback = kIsWeb && _currentUriIsAuthCallback();
           await backend.initialize();
           Log.info('main: Cloud backend initialized');
 
@@ -209,6 +212,7 @@ void main() {
             finalizePendingOnlineAuth(
               controller: settingsProviders.controller,
               hasSession: hasSession,
+              fromAuthCallback: fromAuthCallback,
               clearWhenNoSession: true,
             );
 
@@ -375,8 +379,11 @@ void main() {
   );
 }
 
-/// Web-only follow-up after the backend's own auth-url recovery.
-///
+bool _currentUriIsAuthCallback() {
+  final uri = currentWebLocationUri();
+  return uri != null && uriLooksLikeAuthCallback(uri);
+}
+
 /// Happy path: the backend already exchanged `?code=` during `initialize()` and
 /// set a session — this only cleans the URL (idempotent) and returns.
 ///
@@ -387,18 +394,7 @@ Future<void> _finalizeWebOAuthReturn() async {
   final uri = currentWebLocationUri();
   if (uri == null) return;
 
-  final fragmentParams = uri.fragment.isNotEmpty
-      ? Uri.splitQueryString(uri.fragment)
-      : const <String, String>{};
-  bool hasParam(String key) =>
-      uri.queryParameters.containsKey(key) || fragmentParams.containsKey(key);
-  final isAuthCallback =
-      hasParam('code') ||
-      hasParam('access_token') ||
-      hasParam('error') ||
-      hasParam('error_code') ||
-      hasParam('error_description');
-  if (!isAuthCallback) return;
+  if (!uriLooksLikeAuthCallback(uri)) return;
 
   final auth = cloudBackend?.auth;
   if (auth == null) return;

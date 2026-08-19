@@ -79,6 +79,33 @@ void main() {
     });
   });
 
+  group('uriLooksLikeAuthCallback', () {
+    test('query code is a callback', () {
+      expect(
+        uriLooksLikeAuthCallback(
+          Uri.parse('https://test.hisab.shenepoy.com/?code=abc'),
+        ),
+        isTrue,
+      );
+    });
+
+    test('hash access_token is a callback', () {
+      expect(
+        uriLooksLikeAuthCallback(
+          Uri.parse('https://test.hisab.shenepoy.com/#access_token=abc'),
+        ),
+        isTrue,
+      );
+    });
+
+    test('plain origin is not a callback', () {
+      expect(
+        uriLooksLikeAuthCallback(Uri.parse('https://test.hisab.shenepoy.com/')),
+        isFalse,
+      );
+    });
+  });
+
   group('resolveAuthRedirectUrl', () {
     test('native always uses OAuth/magic deep link', () {
       expect(

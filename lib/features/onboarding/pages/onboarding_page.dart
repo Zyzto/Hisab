@@ -878,6 +878,17 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
         final authService = ref.read(authServiceProvider);
         if (!authService.isAuthenticated) {
           if (!mounted) return;
+          // Web OAuth unloads the page before showSignInSheet returns, so this
+          // must be flushed before the provider redirect starts.
+          await settings.controller.set(
+            onboardingOnlinePendingSettingDef,
+            true,
+          );
+          Log.info(
+            'Setting changed: ${onboardingOnlinePendingSettingDef.key}=true '
+            '(before sign-in)',
+          );
+          if (!mounted) return;
           final result = await showSignInSheet(context, ref);
           switch (result) {
             case SignInResult.success:
@@ -885,19 +896,12 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
               break;
             case SignInResult.pendingRedirect:
             case SignInResult.pendingEmailLink:
-              ref
-                  .read(
-                    settings
-                        .provider(onboardingOnlinePendingSettingDef)
-                        .notifier,
-                  )
-                  .set(true);
-              Log.info(
-                'Setting changed: ${onboardingOnlinePendingSettingDef.key}=true '
-                '(${result.name})',
-              );
               return;
             case SignInResult.cancelled:
+              await settings.controller.set(
+                onboardingOnlinePendingSettingDef,
+                false,
+              );
               if (mounted) {
                 context.showToast('onboarding_online_requires_sign_in'.tr());
               }

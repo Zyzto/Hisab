@@ -33,3 +33,22 @@ bool signInResultSetsOnlinePending(SignInResult result) =>
 /// null. After magic-link / confirm-email UI, dismiss must not look like cancel.
 SignInResult resolveSignInSheetDismiss({required bool emailLinkPending}) =>
     emailLinkPending ? SignInResult.pendingEmailLink : SignInResult.cancelled;
+
+/// Query or fragment params that mean this load is an OAuth / magic-link return.
+const authCallbackParamKeys = {
+  'code',
+  'access_token',
+  'error',
+  'error_code',
+  'error_description',
+};
+
+/// True when [uri] is a backend auth callback, including hash fragments.
+bool uriLooksLikeAuthCallback(Uri uri) {
+  final fragment = uri.fragment.isEmpty
+      ? const <String, String>{}
+      : Uri.splitQueryString(uri.fragment);
+  return authCallbackParamKeys.any(
+    (key) => uri.queryParameters.containsKey(key) || fragment.containsKey(key),
+  );
+}

@@ -195,6 +195,25 @@ void main() {
         isFalse,
       );
     });
+
+    test('onboarding last path is never restored', () {
+      expect(
+        shouldRestoreLastRoute(
+          lastPath: '/onboarding/welcome',
+          pendingToken: '',
+          onboardingCompleted: true,
+        ),
+        isFalse,
+      );
+      expect(
+        shouldRestoreLastRoute(
+          lastPath: '/onboarding',
+          pendingToken: '',
+          onboardingCompleted: true,
+        ),
+        isFalse,
+      );
+    });
   });
 
   group('shouldRedirectPendingInvite', () {

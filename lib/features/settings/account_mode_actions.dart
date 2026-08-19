@@ -134,6 +134,12 @@ class AccountModeActions {
     }
 
     if (!context.mounted) return;
+    await settings.controller.set(settingsOnlinePendingSettingDef, true);
+    Log.info(
+      'Setting changed: ${settingsOnlinePendingSettingDef.key}=true '
+      '(before sign-in)',
+    );
+    if (!context.mounted) return;
     final result = await showSignInSheet(context, ref);
     switch (result) {
       case SignInResult.success:
@@ -167,14 +173,9 @@ class AccountModeActions {
         await runMigration(context, ref, settings);
       case SignInResult.pendingRedirect:
       case SignInResult.pendingEmailLink:
-        ref
-            .read(settings.provider(settingsOnlinePendingSettingDef).notifier)
-            .set(true);
-        Log.info(
-          'Setting changed: ${settingsOnlinePendingSettingDef.key}=true '
-          '(${result.name})',
-        );
+        break;
       case SignInResult.cancelled:
+        settings.controller.set(settingsOnlinePendingSettingDef, false);
         break;
     }
   }

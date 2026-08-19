@@ -12,15 +12,24 @@ import '../settings/settings_definitions.dart';
 /// When [clearWhenNoSession] is true (startup only), pending flags are cleared
 /// if there is still no session — treating the redirect as abandoned. Warm
 /// resume must pass false so flags survive until the deep-link session arrives.
+///
+/// [fromAuthCallback] is true when this load started as an OAuth / magic-link
+/// return (`?code=`). Web OAuth navigates away before the pending flags can be
+/// flushed, so a session on that return must still finish onboarding / online.
 void finalizePendingOnlineAuth({
   required SettingsController controller,
   required bool hasSession,
   bool clearWhenNoSession = false,
+  bool fromAuthCallback = false,
 }) {
   final onboardingPending = controller.get(onboardingOnlinePendingSettingDef);
   final settingsPending = controller.get(settingsOnlinePendingSettingDef);
+  final onboardingCompleted = controller.get(onboardingCompletedSettingDef);
 
-  if (onboardingPending && hasSession) {
+  final finishOnboarding =
+      hasSession &&
+      (onboardingPending || (fromAuthCallback && !onboardingCompleted));
+  if (finishOnboarding) {
     controller.set(onboardingOnlinePendingSettingDef, false);
     controller.set(localOnlySettingDef, false);
     controller.set(onboardingCompletedSettingDef, true);
@@ -36,7 +45,9 @@ void finalizePendingOnlineAuth({
     );
   }
 
-  if (settingsPending && hasSession) {
+  final finishSettingsOnline =
+      hasSession && (settingsPending || fromAuthCallback);
+  if (finishSettingsOnline) {
     controller.set(settingsOnlinePendingSettingDef, false);
     controller.set(localOnlySettingDef, false);
     Log.info(

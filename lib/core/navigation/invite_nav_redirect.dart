@@ -7,6 +7,10 @@ library;
 bool isInviteRoutePath(String path) =>
     path == '/invite' || path.startsWith('/invite/');
 
+/// True for `/onboarding` and `/onboarding/...`.
+bool isOnboardingRoutePath(String path) =>
+    path == '/onboarding' || path.startsWith('/onboarding/');
+
 /// Where to send the user when a pending invite token exists.
 ///
 /// Returns:
@@ -55,6 +59,9 @@ bool shouldRestoreLastRoute({
   if (lastPath.isEmpty || lastPath == '/') return false;
   // Invites are entry flows — never restore them after process kill.
   if (isInviteRoutePath(lastPath)) return false;
+  // Onboarding is also an entry flow. Restoring it after OAuth would flash
+  // the welcome page even though onboarding was just marked complete.
+  if (isOnboardingRoutePath(lastPath)) return false;
   return true;
 }
 

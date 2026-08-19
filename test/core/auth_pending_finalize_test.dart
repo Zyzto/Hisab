@@ -113,4 +113,48 @@ void main() {
     expect(c.get(localOnlySettingDef), isTrue);
     expect(c.get(onboardingCompletedSettingDef), isFalse);
   });
+
+  test(
+    'auth-callback session completes onboarding even without pending flag',
+    () async {
+      final c = await buildController(localOnly: true);
+      finalizePendingOnlineAuth(
+        controller: c,
+        hasSession: true,
+        fromAuthCallback: true,
+      );
+      expect(c.get(onboardingCompletedSettingDef), isTrue);
+      expect(c.get(localOnlySettingDef), isFalse);
+      expect(c.get(onboardingOnlinePendingSettingDef), isFalse);
+    },
+  );
+
+  test(
+    'auth-callback session with onboarding already done still goes online',
+    () async {
+      final c = await buildController(
+        onboardingCompleted: true,
+        localOnly: true,
+      );
+      finalizePendingOnlineAuth(
+        controller: c,
+        hasSession: true,
+        fromAuthCallback: true,
+      );
+      expect(c.get(onboardingCompletedSettingDef), isTrue);
+      expect(c.get(localOnlySettingDef), isFalse);
+    },
+  );
+
+  test('auth-callback without session does not complete onboarding', () async {
+    final c = await buildController(onboardingPending: true);
+    finalizePendingOnlineAuth(
+      controller: c,
+      hasSession: false,
+      fromAuthCallback: true,
+      clearWhenNoSession: true,
+    );
+    expect(c.get(onboardingCompletedSettingDef), isFalse);
+    expect(c.get(onboardingOnlinePendingSettingDef), isFalse);
+  });
 }
