@@ -78,5 +78,31 @@ grep -q 'create("cloud")' android/app/build.gradle.kts \
 echo "==> Checking static legal pages"
 [[ -d web/privacy ]] || fail "Missing web/privacy/"
 [[ -d web/delete-account ]] || fail "Missing web/delete-account/"
+[[ -d web/ar ]] || fail "Missing web/ar/"
+[[ -d web/features ]] || fail "Missing web/features/"
+[[ -f web/seo.css ]] || fail "Missing web/seo.css"
+[[ -f web/robots.txt ]] || fail "Missing web/robots.txt"
+[[ -f web/sitemap.xml ]] || fail "Missing web/sitemap.xml"
+for f in web/images/welcome.png web/images/welcome-ar.png \
+  web/images/groups.png web/images/groups-ar.png \
+  web/images/add-expense.png web/images/add-expense-ar.png \
+  web/images/settlement.png web/images/settlement-ar.png \
+  web/images/og-en.png web/images/og-ar.png \
+  web/icons/favicon-32.png web/icons/favicon-48.png; do
+  [[ -f "$f" ]] || fail "Missing $f"
+done
+grep -q 'Allow: /' web/robots.txt || fail "web/robots.txt must allow production crawlers"
+grep -q 'Sitemap: https://hisab.shenepoy.com/sitemap.xml' web/robots.txt \
+  || fail "web/robots.txt must point at the production sitemap"
+if grep -q 'test.hisab.shenepoy.com' web/sitemap.xml web/robots.txt; then
+  fail "committed crawl files must not mention the staging host"
+fi
+grep -q 'https://hisab.shenepoy.com/' web/sitemap.xml \
+  || fail "web/sitemap.xml must list the production origin"
+[[ -f scripts/ci/apply_staging_seo.py ]] || fail "Missing scripts/ci/apply_staging_seo.py"
+if grep -q 'X-Robots-Tag' firebase.json; then
+  fail "committed firebase.json must not set X-Robots-Tag (staging writes a copy under build/)"
+fi
+python3 scripts/ci/apply_staging_seo.py --selftest
 
 echo "✅ Infra check passed"

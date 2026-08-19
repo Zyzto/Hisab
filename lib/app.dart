@@ -34,7 +34,9 @@ import 'core/navigation/last_route_restore.dart';
 import 'core/services/connectivity_service.dart';
 import 'core/celebration/celebration_host.dart';
 import 'core/services/screenshot_report_prompt_host.dart';
+import 'core/build_env.dart';
 import 'core/widgets/back_button_keyboard_dismiss.dart';
+import 'core/widgets/staging_banner.dart';
 import 'features/transaction_scanner/providers/scanner_providers.dart';
 import 'core/widgets/toast.dart';
 
@@ -415,7 +417,10 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
             child: contentWithSyncIndicator,
           )
         : contentWithSyncIndicator;
-    return Stack(children: [rootChild, debugFab]);
+    return wrapWithStagingBanner(
+      enabled: isStagingBuild,
+      child: Stack(children: [rootChild, debugFab]),
+    );
   }
 
   @override

@@ -251,8 +251,10 @@ Major persisted keys include:
 - Invite redirect static page: `web/redirect.html`
   - desktop -> web invite route
   - mobile -> attempts app deep link with timed web fallback
-- Invite/OG assets: `web/invite-redirect-template.html`, `web/og-invite.png`. The template carries a `__CLOUD_INVITE_RESOLVER_URL__` placeholder that the build substitutes with the backend's invite resolver endpoint.
-- Public privacy page: `web/privacy/index.html`
+- Invite/OG assets: `web/invite-redirect-template.html`, `web/og-invite.png` (1200×630 share card), `web/images/og-en.png` / `og-ar.png`. The template carries a `__CLOUD_INVITE_RESOLVER_URL__` placeholder that the build substitutes with the backend's invite resolver endpoint.
+- Public crawlable pages (sitelink / hreflang candidates): `web/features/index.html`, `web/ar/index.html`, `web/ar/features/index.html`, `web/privacy/index.html`, `web/ar/privacy/index.html`. Shared chrome: `web/seo.css`. Screenshots: `web/images/`.
+- Crawl map: `web/robots.txt`, `web/sitemap.xml` (staged by `scripts/ci/stage_web_static.sh`). Staging (`HISAB_ENV=staging`) rewrites robots to `Disallow: /`, drops the sitemap, injects `noindex`, and writes `X-Robots-Tag` into `build/firebase.json` (not the committed Hosting config) so `test.hisab.shenepoy.com` is not indexed.
+- Public privacy page: `web/privacy/index.html` (English) and `web/ar/privacy/index.html` (Arabic, from `privacy_policy_*`).
 - Account deletion is described in `docs/DELETE_ACCOUNT.md`; the in-app options are Delete local data and Delete cloud data under Settings > Advanced (and a public page at `web/delete-account/index.html` when deployed).
 - Deployment cache control is configured in `firebase.json`: entry scripts/manifest/SW/invite HTML + catch-all `**` use `max-age=0, must-revalidate` (Firebase matches header `source` on the **request path before rewrites**; default HTML cache is one hour). Hosting deploys via GitHub Actions tag releases.
 

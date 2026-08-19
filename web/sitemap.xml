@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>https://hisab.shenepoy.com/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://hisab.shenepoy.com/images/og-en.png</image:loc>
+      <image:title>Hisab – Split group expenses and settle up</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://hisab.shenepoy.com/ar/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <image:image>
+      <image:loc>https://hisab.shenepoy.com/images/og-ar.png</image:loc>
+      <image:title>حساب – قسّموا مصاريف المجموعة وصفّوا الحسابات</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://hisab.shenepoy.com/features/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://hisab.shenepoy.com/images/welcome.png</image:loc>
+      <image:title>Hisab welcome screen</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://hisab.shenepoy.com/images/groups.png</image:loc>
+      <image:title>Hisab groups home</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://hisab.shenepoy.com/images/add-expense.png</image:loc>
+      <image:title>Hisab add expense</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://hisab.shenepoy.com/images/settlement.png</image:loc>
+      <image:title>Hisab settle up</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://hisab.shenepoy.com/ar/features/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://hisab.shenepoy.com/images/welcome-ar.png</image:loc>
+      <image:title>شاشة الترحيب في حساب</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://hisab.shenepoy.com/images/groups-ar.png</image:loc>
+      <image:title>قائمة المجموعات في حساب</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://hisab.shenepoy.com/images/add-expense-ar.png</image:loc>
+      <image:title>إضافة مصروف في حساب</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://hisab.shenepoy.com/images/settlement-ar.png</image:loc>
+      <image:title>تصفية الحساب في حساب</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://hisab.shenepoy.com/privacy/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hisab.shenepoy.com/ar/privacy/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://hisab.shenepoy.com/delete-account/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+</urlset>

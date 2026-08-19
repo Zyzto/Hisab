@@ -83,6 +83,7 @@ validates it. For reference, the hosted Hisab backend package uses:
 | `SUPABASE_URL`, `SUPABASE_ANON_KEY` | Project URL and public key. Both must be present or the package registers no backend and the app stays local-only. |
 | `INVITE_BASE_URL` | Origin used to build shareable invite links, so they carry your domain rather than the raw project URL. |
 | `SITE_URL` | Redirect origin for auth emails and web OAuth. Must also be allow-listed server side. |
+| `HISAB_ENV` | `staging` on the test host, `production` on the live host, empty in the public offline build. Only `staging` gets a TEST corner banner and is excluded from search indexes. |
 
 If you write your own package, use whatever names you like. The only contract
 the app enforces is that `registerHisabCloud()` either installs a `CloudBackend`
@@ -208,8 +209,9 @@ bash scripts/ci/build_web.sh
 bash scripts/ci/stage_web_static.sh
 ```
 
-The second script copies the static `privacy` and `delete-account` pages into
-`build/web/`, which Play Console requires to be reachable.
+The second script copies crawlable static pages (`privacy`, `delete-account`,
+`ar/`, `features/`), Open Graph images, `robots.txt`, and `sitemap.xml` into
+`build/web/`.
 
 **Cache headers:** Firebase Hosting matches `headers[].source` against the
 **original request path before rewrites**, first match wins. The default HTML

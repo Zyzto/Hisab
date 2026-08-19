@@ -6,7 +6,7 @@
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "Group expense splitting and settle-up app.",
+    "description": "Split trip, household, and group expenses. See who owes whom, settle up, and work offline. Free web app — English and Arabic (حساب).",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "gcm_sender_id": "103953800507",

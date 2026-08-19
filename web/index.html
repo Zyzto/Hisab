@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <!--
     If you are serving your web app in a path other than the root, change the
@@ -18,7 +18,59 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="Group expense splitting and settle-up app.">
+  <title>Hisab – Split group expenses and settle up</title>
+  <meta name="description" content="Split trip, household, and group expenses. See who owes whom, settle up, and work offline. Free web app — English and Arabic (حساب).">
+  <link rel="canonical" href="https://hisab.shenepoy.com/">
+  <link rel="alternate" hreflang="en" href="https://hisab.shenepoy.com/">
+  <link rel="alternate" hreflang="ar" href="https://hisab.shenepoy.com/ar/">
+  <link rel="alternate" hreflang="x-default" href="https://hisab.shenepoy.com/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Hisab">
+  <meta property="og:url" content="https://hisab.shenepoy.com/">
+  <meta property="og:title" content="Hisab – Split group expenses and settle up">
+  <meta property="og:description" content="Split trip, household, and group expenses. See who owes whom, settle up, and work offline. Free web app — English and Arabic (حساب).">
+  <meta property="og:image" content="https://hisab.shenepoy.com/images/og-en.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="ar_SA">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Hisab – Split group expenses and settle up">
+  <meta name="twitter:description" content="Split trip, household, and group expenses. See who owes whom, settle up, and work offline. Free web app — English and Arabic (حساب).">
+  <meta name="twitter:image" content="https://hisab.shenepoy.com/images/og-en.png">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://hisab.shenepoy.com/#website",
+        "url": "https://hisab.shenepoy.com/",
+        "name": "Hisab",
+        "alternateName": "حساب",
+        "inLanguage": ["en", "ar"],
+        "description": "Split trip, household, and group expenses. See who owes whom, settle up, and work offline."
+      },
+      {
+        "@type": "SoftwareApplication",
+        "name": "Hisab",
+        "alternateName": "حساب",
+        "url": "https://hisab.shenepoy.com/",
+        "applicationCategory": "FinanceApplication",
+        "operatingSystem": "Android, Web",
+        "inLanguage": ["en", "ar"],
+        "description": "Split trip, household, and group expenses. See who owes whom, settle up, and work offline. Free web app — English and Arabic.",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "screenshot": [
+          "https://hisab.shenepoy.com/images/welcome.png",
+          "https://hisab.shenepoy.com/images/groups.png",
+          "https://hisab.shenepoy.com/images/add-expense.png",
+          "https://hisab.shenepoy.com/images/settlement.png"
+        ]
+      }
+    ]
+  }
+  </script>
 
   <!-- iOS / PWA meta tags & icons -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -29,10 +81,11 @@
   <meta name="apple-mobile-web-app-title" content="Hisab">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
+  <!-- Favicon: 48x48 is Google's SERP minimum -->
+  <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="icon" type="image/png" href="favicon.png">
 
-  <title>Hisab</title>
   <link rel="manifest" href="manifest.json">
   <style>
     html, body {
@@ -63,6 +116,18 @@
       font-size: 14px;
       opacity: 0.7;
     }
+    /* Crawler-visible copy; stays in the DOM after Flutter boots (CanvasKit has no indexable text). */
+    #hisab-seo {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
     @media (prefers-color-scheme: dark) {
       html, body {
         background: #121212;
@@ -72,6 +137,15 @@
   </style>
 </head>
 <body>
+  <div id="hisab-seo">
+    <h1>Hisab – Split group expenses and settle up</h1>
+    <p>Split trip, household, and group expenses. See who owes whom, settle up, and work offline. Free web app — English and Arabic (حساب).</p>
+    <nav>
+      <a href="/features/">Features</a>
+      <a href="/privacy/">Privacy</a>
+      <a href="/ar/">العربية</a>
+    </nav>
+  </div>
   <!-- Visible while Flutter boots / OAuth returns — avoids a blank black screen on iOS. -->
   <div id="hisab-boot-splash" aria-live="polite">
     <div class="title">Hisab</div>
