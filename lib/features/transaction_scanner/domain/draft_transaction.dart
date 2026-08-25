@@ -1,3 +1,5 @@
+import 'field_span.dart';
+
 /// Status of a draft transaction awaiting user review.
 enum DraftStatus {
   pending,
@@ -12,12 +14,16 @@ enum DraftStatus {
 /// A transaction extracted from a captured notification, pending user review.
 class DraftTransaction {
   final String id;
-  final String? personalGroupId;
+
+  /// Destination group (personal or shared). Stored as `personal_group_id`.
+  final String? targetGroupId;
   final int amountCents;
   final String currencyCode;
   final String? cardLastFour;
   final String? merchantName;
   final String? merchantCategory;
+  final String? placeName;
+  final List<FieldSpan> fieldSpans;
   final DateTime transactionDate;
   final DateTime capturedAt;
   final double? latitude;
@@ -34,12 +40,14 @@ class DraftTransaction {
 
   const DraftTransaction({
     required this.id,
-    this.personalGroupId,
+    this.targetGroupId,
     required this.amountCents,
     required this.currencyCode,
     this.cardLastFour,
     this.merchantName,
     this.merchantCategory,
+    this.placeName,
+    this.fieldSpans = const [],
     required this.transactionDate,
     required this.capturedAt,
     this.latitude,
@@ -55,14 +63,19 @@ class DraftTransaction {
     required this.updatedAt,
   });
 
+  /// Legacy alias used by older call sites / docs.
+  String? get personalGroupId => targetGroupId;
+
   DraftTransaction copyWith({
     String? id,
-    String? personalGroupId,
+    String? targetGroupId,
     int? amountCents,
     String? currencyCode,
     String? cardLastFour,
     String? merchantName,
     String? merchantCategory,
+    String? placeName,
+    List<FieldSpan>? fieldSpans,
     DateTime? transactionDate,
     DateTime? capturedAt,
     double? latitude,
@@ -79,12 +92,14 @@ class DraftTransaction {
   }) {
     return DraftTransaction(
       id: id ?? this.id,
-      personalGroupId: personalGroupId ?? this.personalGroupId,
+      targetGroupId: targetGroupId ?? this.targetGroupId,
       amountCents: amountCents ?? this.amountCents,
       currencyCode: currencyCode ?? this.currencyCode,
       cardLastFour: cardLastFour ?? this.cardLastFour,
       merchantName: merchantName ?? this.merchantName,
       merchantCategory: merchantCategory ?? this.merchantCategory,
+      placeName: placeName ?? this.placeName,
+      fieldSpans: fieldSpans ?? this.fieldSpans,
       transactionDate: transactionDate ?? this.transactionDate,
       capturedAt: capturedAt ?? this.capturedAt,
       latitude: latitude ?? this.latitude,

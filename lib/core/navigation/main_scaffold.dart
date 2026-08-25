@@ -108,37 +108,18 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     unawaited(ShellNavLayout.saveDesktopNavCollapsed(next));
   }
 
-  /// Same [Drawer] body for mid (temporary) and desktop (permanent).
-  ///
-  /// Permanent uses a square shape so the M3 end-radius does not leave an
-  /// opaque "mask" beside the curve; temporary keeps the themed drawer shape.
-  Drawer _buildShellDrawer({
-    required bool asTemporary,
-    bool collapsed = false,
-    VoidCallback? onToggleCompact,
-  }) {
-    final cs = Theme.of(context).colorScheme;
+  /// Mid-band overlay. Desktop uses a clipping [AppSidenav] rail, not a [Drawer].
+  Drawer _buildTemporaryDrawer() {
     return Drawer(
+      key: const ValueKey('shell_nav_drawer'),
       width: LayoutBreakpoints.shellNavWidth,
-      backgroundColor: cs.surfaceContainerLow,
-      elevation: asTemporary ? null : 0,
-      shadowColor: asTemporary ? null : Colors.transparent,
-      surfaceTintColor: asTemporary ? null : Colors.transparent,
-      shape: asTemporary
-          ? null
-          : const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-      child: asTemporary
-          ? AppSidenav(
-              asDrawer: true,
-              selectedIndex: widget.selectedIndex,
-              onDestinationSelected: _onDestinationSelected,
-            )
-          : AppSidenav(
-              selectedIndex: widget.selectedIndex,
-              onDestinationSelected: _onDestinationSelected,
-              collapsed: collapsed,
-              onToggleCompact: onToggleCompact,
-            ),
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+      child: AppSidenav(
+        asDrawer: true,
+        selectedIndex: widget.selectedIndex,
+        onDestinationSelected: _onDestinationSelected,
+        onProfileSelected: _onProfileSelected,
+      ),
     );
   }
 
@@ -281,6 +262,16 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     }
   }
 
+  void _onProfileSelected() {
+    HapticFeedback.lightImpact();
+    final scaffold = _shellScaffoldKey.currentState;
+    if (scaffold?.isDrawerOpen ?? false) {
+      scaffold!.closeDrawer();
+    }
+    // Profile owns account CTAs (sign-in / local→online).
+    context.push(RoutePaths.profile);
+  }
+
   void _syncReservedWidth({required bool showNavBar, required bool isDesktop}) {
     final next = (showNavBar && isDesktop)
         ? (_desktopNavCollapsed
@@ -325,34 +316,18 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     _syncReservedWidth(showNavBar: showNavBar, isDesktop: isDesktop);
 
     if (useWideShell) {
-      // Same [Drawer] + [AppSidenav]:
       // - mid → temporary Scaffold.drawer (Material slide)
-      // - desktop → permanent side drawer that stays up; collapse = icons-only
-      final permanentWidth = isDesktop
-          ? (_desktopNavCollapsed
-                ? LayoutBreakpoints.shellNavWidthCompact
-                : LayoutBreakpoints.shellNavWidth)
-          : 0.0;
-
+      // - desktop → clipping rail that stays up; collapse = icons-only
       final shellBody = Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (isDesktop)
-            ClipRect(
-              child: AnimatedContainer(
-                duration: AppMotion.shellNav,
-                curve: Curves.fastOutSlowIn,
-                width: permanentWidth,
-                child: OverflowBox(
-                  alignment: AlignmentDirectional.centerStart,
-                  minWidth: LayoutBreakpoints.shellNavWidth,
-                  maxWidth: LayoutBreakpoints.shellNavWidth,
-                  child: _buildShellDrawer(
-                    asTemporary: false,
-                    collapsed: _desktopNavCollapsed,
-                    onToggleCompact: _toggleDesktopNavCollapsed,
-                  ),
-                ),
-              ),
+            AppSidenav(
+              selectedIndex: widget.selectedIndex,
+              onDestinationSelected: _onDestinationSelected,
+              onProfileSelected: _onProfileSelected,
+              collapsed: _desktopNavCollapsed,
+              onToggleCompact: _toggleDesktopNavCollapsed,
             ),
           Expanded(
             child: ShellDrawerScope(
@@ -368,7 +343,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
                     _menuButtonFocusNode.requestFocus();
                   }
                 },
-                drawer: isMid ? _buildShellDrawer(asTemporary: true) : null,
+                drawer: isMid ? _buildTemporaryDrawer() : null,
                 body: _buildContentStack(showNavBar: showNavBar),
               ),
             ),

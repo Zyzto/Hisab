@@ -92,3 +92,48 @@ Future<String> extractReceiptFromImage(
 
   throw ArgumentError('Unsupported receipt AI provider: $provider');
 }
+
+/// Text-only invoke against the same Gemini / OpenAI clients as receipts.
+Future<String> extractReceiptTextOnly(
+  String promptText,
+  String provider,
+  String apiKey,
+) async {
+  if (apiKey.trim().isEmpty) {
+    throw ArgumentError('API key is required for provider: $provider');
+  }
+  final message = ChatMessage.human(ChatMessageContent.text(promptText));
+  final prompt = PromptValue.chat([message]);
+
+  if (provider == 'gemini') {
+    final key = _cacheKey(provider, apiKey);
+    var chatModel = _llmClientCache[key] as ChatGoogleGenerativeAI?;
+    chatModel ??= ChatGoogleGenerativeAI(
+      apiKey: apiKey,
+      defaultOptions: const ChatGoogleGenerativeAIOptions(
+        model: 'gemini-2.0-flash',
+        temperature: 0,
+      ),
+    );
+    _llmClientCache[key] = chatModel;
+    final result = await chatModel.invoke(prompt);
+    return result.outputAsString.trim();
+  }
+
+  if (provider == 'openai') {
+    final key = _cacheKey(provider, apiKey);
+    var chatModel = _llmClientCache[key] as ChatOpenAI?;
+    chatModel ??= ChatOpenAI(
+      apiKey: apiKey,
+      defaultOptions: const ChatOpenAIOptions(
+        model: 'gpt-4o-mini',
+        temperature: 0,
+      ),
+    );
+    _llmClientCache[key] = chatModel;
+    final result = await chatModel.invoke(prompt);
+    return result.outputAsString.trim();
+  }
+
+  throw ArgumentError('Unsupported receipt AI provider: $provider');
+}

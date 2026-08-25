@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 
 import '../../../core/theme/accent_style.dart';
 import '../../../core/theme/theme_config.dart';
@@ -50,13 +51,19 @@ class PersonalBudgetCard extends ConsumerWidget {
     final overBudget = hasBudget && spentCents >= budgetCents!;
     final nearBudget =
         hasBudget && !overBudget && spentCents >= (budgetCents! * 0.8).round();
-    final attentionColor = overBudget
-        ? colorScheme.error
-        : (nearBudget ? colorScheme.tertiary : null);
+    final attention = overBudget
+        ? ProfileBudgetAttention.over
+        : (nearBudget
+              ? ProfileBudgetAttention.near
+              : ProfileBudgetAttention.none);
+    final attentionColor = switch (attention) {
+      ProfileBudgetAttention.over => colorScheme.error,
+      ProfileBudgetAttention.near => colorScheme.tertiary,
+      ProfileBudgetAttention.none => null,
+    };
     final progress = hasBudget
         ? (spentCents / budgetCents!).clamp(0.0, 1.2)
         : 0.0;
-    final barColor = attentionColor ?? colorScheme.primary;
     final subtle = context.subtleAccents;
 
     final BoxDecoration panelDecoration;
@@ -91,72 +98,46 @@ class PersonalBudgetCard extends ConsumerWidget {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
       decoration: panelDecoration,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (showTitle) ...[
-            UserText(
-              group.name,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
-          Text(
-            'my_budget'.tr(),
-            style: theme.textTheme.labelLarge?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            hasBudget
-                ? CurrencyFormatter.formatCentsAsWholeUnits(
-                    budgetCents!,
-                    currencyCode,
-                  )
-                : '—',
-            key: const Key('personal_budget_amount'),
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.3,
-              color: attentionColor ?? colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Text(
-                '${'my_expenses'.tr()}: ',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-              AmountWithSecondaryDisplay(
-                amountCents: spentCents,
-                groupCurrencyCode: currencyCode,
-                primaryStyle: theme.textTheme.bodyMedium?.copyWith(
+      child: ProfileBudgetCard(
+        title: showTitle
+            ? UserText(
+                group.name,
+                style: theme.textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w700,
-                  color: attentionColor ?? colorScheme.onSurface,
                 ),
+              )
+            : null,
+        caption: Text('my_budget'.tr()),
+        limit: Text(
+          hasBudget
+              ? CurrencyFormatter.formatCentsAsWholeUnits(
+                  budgetCents!,
+                  currencyCode,
+                )
+              : '—',
+          key: const Key('personal_budget_amount'),
+        ),
+        spent: Row(
+          children: [
+            Text(
+              '${'my_expenses'.tr()}: ',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
               ),
-            ],
-          ),
-          if (hasBudget) ...[
-            const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: LinearProgressIndicator(
-                value: progress > 1 ? 1 : progress,
-                minHeight: 7,
-                backgroundColor: colorScheme.surface.withValues(alpha: 0.7),
-                color: barColor,
+            ),
+            AmountWithSecondaryDisplay(
+              amountCents: spentCents,
+              groupCurrencyCode: currencyCode,
+              primaryStyle: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: attentionColor ?? colorScheme.onSurface,
               ),
             ),
           ],
-        ],
+        ),
+        progress: progress,
+        attention: attention,
+        showProgress: hasBudget,
       ),
     );
 

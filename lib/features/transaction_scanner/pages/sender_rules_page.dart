@@ -11,8 +11,11 @@ import '../../../core/theme/accent_style.dart';
 import '../../../core/widgets/app_fab.dart';
 import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/user_text.dart';
+import '../../groups/providers/groups_provider.dart';
 import '../domain/sender_rule.dart';
 import '../providers/scanner_providers.dart';
+import '../widgets/scanner_group_picker.dart';
+import 'scanner_history_page.dart';
 
 const _uuid = Uuid();
 
@@ -236,7 +239,79 @@ class _SenderRuleTile extends ConsumerWidget {
           });
         },
       ),
+      onTap: () => _showActions(context, ref),
       onLongPress: () => _confirmDelete(context, ref),
+    );
+  }
+
+  void _showActions(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.history),
+                title: Text('scanner_history_title'.tr()),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          ScannerHistoryPage(packageName: rule.packageName),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.group_outlined),
+                title: Text('scanner_sender_destination'.tr()),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickGroup(context, ref);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline),
+                title: Text('delete'.tr()),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _confirmDelete(context, ref);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _pickGroup(BuildContext context, WidgetRef ref) {
+    final groups = ref.read(groupsProvider).asData?.value ?? [];
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: ScannerGroupPicker(
+              groups: groups,
+              selectedId: rule.targetGroupId,
+              onSelected: (id) {
+                ref
+                    .read(scannerRepositoryProvider)
+                    .upsertSenderRule(rule.copyWith(targetGroupId: id))
+                    .then((_) {
+                      ref.invalidate(senderRulesProvider);
+                    });
+                Navigator.pop(ctx);
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 

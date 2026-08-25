@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/database/database_providers.dart';
@@ -9,6 +10,7 @@ import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/navigation/nav_back.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/settings/settings_definitions.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/user_text.dart';
 import '../../../core/widgets/amount_with_secondary_display.dart';
@@ -596,8 +598,10 @@ class _GlobalNetHero extends ConsumerWidget {
             leading: Icon(Icons.currency_exchange, color: cs.primary),
             title: Text('profile_set_display_currency'.tr()),
             subtitle: Text('profile_set_display_currency_hint'.tr()),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push(RoutePaths.settings),
+            trailing: settingsChevronEnd(context),
+            onTap: () => context.go(
+              RoutePaths.settingsFocus(displayCurrencySettingDef.key),
+            ),
           ),
         ),
       );
@@ -617,58 +621,25 @@ class _GlobalNetHero extends ConsumerWidget {
 
     final owed = net!.netDisplayCents >= 0;
     final label = owed ? 'owes_you'.tr() : 'you_owe'.tr();
-    final color = owed ? cs.primary : cs.error;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerHighest.withValues(alpha: 0.55),
-          borderRadius: BorderRadius.circular(16),
+      child: ProfileHeroMetric(
+        caption: 'profile_global_net'.tr(),
+        status: label,
+        value: CurrencyFormatter.formatCents(
+          net!.netDisplayCents.abs(),
+          net!.displayCurrencyCode,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'profile_global_net'.tr(),
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: cs.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: theme.textTheme.titleSmall?.copyWith(color: color),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              CurrencyFormatter.formatCents(
-                net!.netDisplayCents.abs(),
-                net!.displayCurrencyCode,
-              ),
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: color,
-              ),
-            ),
-            if (net!.isPartial) ...[
-              const SizedBox(height: 8),
-              Text(
-                'profile_global_net_partial'.tr(
-                  namedArgs: {
-                    'converted': '${net!.convertedGroupCount}',
-                    'skipped': '${net!.skippedGroupCount}',
-                  },
-                ),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: cs.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ],
-        ),
+        footnote: net!.isPartial
+            ? 'profile_global_net_partial'.tr(
+                namedArgs: {
+                  'converted': '${net!.convertedGroupCount}',
+                  'skipped': '${net!.skippedGroupCount}',
+                },
+              )
+            : null,
+        tone: owed ? ProfileHeroTone.positive : ProfileHeroTone.negative,
       ),
     );
   }
@@ -697,47 +668,11 @@ class _KpiStrip extends StatelessWidget {
       ),
     ];
 
-    return SizedBox(
-      height: 88,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: items.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (context, i) {
-          final (icon, label, value) = items[i];
-          final cs = Theme.of(context).colorScheme;
-          return Container(
-            width: 108,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(icon, size: 18, color: cs.primary),
-                const Spacer(),
-                Text(
-                  '$value',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
+    return ProfileKpiStrip(
+      items: [
+        for (final item in items)
+          ProfileKpiItem(icon: item.$1, label: item.$2, value: '${item.$3}'),
+      ],
     );
   }
 }
@@ -857,26 +792,28 @@ class _ActivityFeed extends ConsumerWidget {
                   );
 
                   if (item.isGroup) {
-                    return ExpansionTile(
+                    return ProfileNotificationGroup(
                       leading: leading,
+                      unread: unread,
                       title: UserText(
                         title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontWeight: unread
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                        ),
                       ),
                       subtitle: UserText(
                         _groupName(item.groupId),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
+                      footer: ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.open_in_new, size: 18),
+                        title: Text('profile_your_groups'.tr()),
+                        onTap: () => _openItem(context, ref, item),
+                      ),
                       children: [
                         for (final child in item.items)
-                          ListTile(
+                          ProfileNotificationTile(
                             dense: true,
                             title: UserText(
                               child.title,
@@ -894,25 +831,17 @@ class _ActivityFeed extends ConsumerWidget {
                               NotificationFeedItem.single(child),
                             ),
                           ),
-                        ListTile(
-                          dense: true,
-                          leading: const Icon(Icons.open_in_new, size: 18),
-                          title: Text('profile_your_groups'.tr()),
-                          onTap: () => _openItem(context, ref, item),
-                        ),
                       ],
                     );
                   }
 
-                  return ListTile(
+                  return ProfileNotificationTile(
                     leading: leading,
+                    unread: unread,
                     title: UserText(
                       title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontWeight: unread ? FontWeight.w700 : FontWeight.w500,
-                      ),
                     ),
                     subtitle: UserText(
                       n.body,

@@ -13,6 +13,9 @@ String scannerPatternDisplayName(String name) {
     case 'scanner_pattern_generic_amount':
     case 'Generic Amount':
       return 'scanner_pattern_generic_amount'.tr();
+    case 'scanner_pattern_taught':
+    case 'Taught from sample':
+      return 'scanner_pattern_taught'.tr();
     default:
       return name;
   }

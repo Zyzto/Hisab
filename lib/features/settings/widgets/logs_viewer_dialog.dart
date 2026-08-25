@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/utils/log_level_colors.dart';
@@ -102,7 +103,12 @@ class _LogsViewerDialogState extends State<LogsViewerDialog> {
                     padding: const EdgeInsets.all(12),
                     scrollDirection: Axis.vertical,
                     child: SelectionArea(
-                      child: _LogContent(content: widget.content, theme: theme),
+                      child: SettingsLtr(
+                        child: _LogContent(
+                          content: widget.content,
+                          theme: theme,
+                        ),
+                      ),
                     ),
                   ),
                 ),

@@ -16,6 +16,10 @@ part 'theme_providers.g.dart';
 /// Active only when [showDebugMenuProvider] is true (debug / Hisab Debug).
 final experimentStyleIndexProvider = StateProvider<int>((ref) => 0);
 
+/// When true, [MaterialApp] skips the implicit theme tween so a circular
+/// reveal can switch palettes in one frame.
+final suppressThemeLerpProvider = StateProvider<bool>((ref) => false);
+
 /// Effective style index: always 0 outside debug / Hisab Debug builds.
 final effectiveExperimentStyleIndexProvider = Provider<int>((ref) {
   if (!ref.watch(showDebugMenuProvider)) return 0;

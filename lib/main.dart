@@ -22,6 +22,7 @@ import 'core/auth/oauth_callback_state.dart';
 import 'core/auth/oauth_web_url.dart';
 import 'core/constants/firebase_config.dart';
 import 'core/database/database_providers.dart';
+import 'core/debug/crash_error_panel.dart';
 import 'core/debug/marionette_binding.dart';
 import 'core/log_web.dart';
 import 'core/navigation/decorative_route.dart';
@@ -96,31 +97,7 @@ void main() {
           return true;
         };
         ErrorWidget.builder = (FlutterErrorDetails details) {
-          return Material(
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.error_outline,
-                      size: 48,
-                      color: Colors.red,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      details.exceptionAsString(),
-                      style: const TextStyle(fontSize: 14),
-                      textAlign: TextAlign.center,
-                      maxLines: 8,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
+          return CrashErrorPanel(message: details.exceptionAsString());
         };
       }
 

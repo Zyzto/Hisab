@@ -40,6 +40,7 @@ void main() {
       });
 
       expect(draft.id, 'd1');
+      expect(draft.targetGroupId, 'g1');
       expect(draft.amountCents, 2500);
       expect(draft.currencyCode, 'SAR');
       expect(draft.merchantName, 'Cafe');

@@ -3,6 +3,7 @@ package com.shenepoy.hisab
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
@@ -23,6 +24,31 @@ object NotificationBridge {
     private const val TAG = "NotificationBridge"
     private const val METHOD_CHANNEL = "com.shenepoy.hisab/scanner"
     private const val EVENT_CHANNEL = "com.shenepoy.hisab/scanner_events"
+
+    private val SUGGESTED_SCANNER_PACKAGES = arrayOf(
+        "sa.com.stcpay",
+        "com.alrajhibank.retail",
+        "com.alahli.mobile",
+        "com.riyadbank.mobile",
+        "com.anb.mobile",
+        "com.sabb.mobile",
+        "com.bsf.retail",
+        "com.albilad",
+        "com.alinma",
+        "com.emiratesnbd.android",
+        "com.adcb.bank",
+        "ae.hsbc.hsbcmobilebanking",
+        "com.google.android.apps.nbu.paisa.user",
+        "com.phonepe.app",
+        "net.one97.paytm",
+        "com.paypal.android.p2pmobile",
+        "com.revolut.revolut",
+        "com.wise.android",
+        "com.google.android.apps.messaging",
+        "com.samsung.android.messaging",
+        "com.android.mms",
+        "com.google.android.gm",
+    )
 
     @Volatile
     private var eventSink: EventChannel.EventSink? = null
@@ -82,6 +108,21 @@ object NotificationBridge {
                 result.success(null)
             }
 
+            "setRequireSenders" -> {
+                val require = call.argument<Boolean>("require") ?: false
+                val prefs = context.getSharedPreferences(
+                    TransactionNotificationListener.PREFS_NAME, Context.MODE_PRIVATE
+                )
+                prefs.edit().putBoolean(
+                    TransactionNotificationListener.KEY_REQUIRE_SENDERS, require
+                ).apply()
+                result.success(null)
+            }
+
+            "listInstalledApps" -> {
+                result.success(listInstalledApps(context))
+            }
+
             "getPendingNotifications" -> {
                 result.success(getPending(context))
             }
@@ -100,6 +141,44 @@ object NotificationBridge {
 
             else -> result.notImplemented()
         }
+    }
+
+    private fun listInstalledApps(context: Context): List<Map<String, Any?>> {
+        val pm = context.packageManager
+        val seen = HashSet<String>()
+        val out = mutableListOf<Map<String, Any?>>()
+
+        fun add(pkg: String, label: String) {
+            if (!seen.add(pkg)) return
+            out.add(mapOf("package" to pkg, "label" to label))
+        }
+
+        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val resolved = pm.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+        for (info in resolved) {
+            val pkg = info.activityInfo?.applicationInfo?.packageName ?: continue
+            val label = try {
+                info.loadLabel(pm)?.toString() ?: pkg
+            } catch (_: Exception) {
+                pkg
+            }
+            add(pkg, label)
+        }
+
+        // Bank / SMS packages may lack a launcher icon. Resolve them directly
+        // when the manifest <queries> list makes them visible.
+        for (pkg in SUGGESTED_SCANNER_PACKAGES) {
+            try {
+                val app = pm.getApplicationInfo(pkg, 0)
+                val label = pm.getApplicationLabel(app)?.toString() ?: pkg
+                add(pkg, label)
+            } catch (_: Exception) {
+                // Not installed or not visible to this package.
+            }
+        }
+
+        out.sortBy { (it["label"] as? String)?.lowercase() ?: "" }
+        return out
     }
 
     private fun isNotificationListenerEnabled(context: Context): Boolean {

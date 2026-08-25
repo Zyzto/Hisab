@@ -40,6 +40,9 @@ integration_test/online_app_test.dart
 integration_test/helpers/online_test_bootstrap.dart
 test/edge/
 
+# FVM Version Cache
+.fvm/
+
 # Flutter / Dart
 **/doc/api/
 **/ios/Flutter/.last_build_id

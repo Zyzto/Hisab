@@ -562,9 +562,13 @@ class HomePage extends ConsumerWidget {
                   final personal = ordered.where((g) => g.isPersonal).toList();
                   final shared = ordered.where((g) => !g.isPersonal).toList();
 
-                  final scannerBadge = scannerAvailable
-                      ? ref.watch(pendingDraftCountProvider).asData?.value ?? 0
-                      : 0;
+                  final scannerBadges = scannerAvailable
+                      ? ref
+                                .watch(pendingDraftCountByGroupProvider)
+                                .asData
+                                ?.value ??
+                            const <String, int>{}
+                      : const <String, int>{};
 
                   Widget buildCard(Group group, {bool keyed = true}) {
                     // Custom sort: hold-to-drag only (pinning disabled).
@@ -577,7 +581,7 @@ class HomePage extends ConsumerWidget {
                         isSelected:
                             effectiveSelectionMode &&
                             selectedIds.contains(group.id),
-                        badgeCount: group.isPersonal ? scannerBadge : 0,
+                        badgeCount: scannerBadges[group.id] ?? 0,
                         onTap: () {
                           if (pinningEnabled) {
                             final cur = ref.read(selectedGroupIdsProvider);

@@ -6,9 +6,10 @@ because this project's structure is unusual in one specific way.
 ## What lives here
 
 This repository is the **client**: the Flutter app, the backend contract in
-`packages/hisab_backend`, and the offline stub in `packages/hisab_cloud`. It
-builds a fully functional offline app on its own, and that build is what CI
-verifies on every push.
+`packages/hisab_backend`, and the offline stub in `packages/hisab_cloud`.
+Adaptive chrome lives in the separate [Safaeh](https://github.com/Zyzto/Safaeh)
+package (MPL-2.0). This repo builds a fully functional offline app on its own,
+and that build is what CI verifies on every push.
 
 The hosted backend is a separate, private, proprietary project. Nothing in it
 is here, and pull requests cannot touch it. If you want to run your own
@@ -37,8 +38,9 @@ By opening a pull request you agree that:
    including under licences other than the AGPL, and including as part of a
    combined work with proprietary components.
 3. Your contribution stays available under the AGPL to everyone else. This
-   grant is *additional* to the AGPL, not a replacement for it — you keep your
-   copyright.
+   grant is *additional* to that licence, not a replacement — you keep your
+   copyright. Changes to Safaeh belong in
+   [Zyzto/Safaeh](https://github.com/Zyzto/Safaeh) under MPL-2.0.
 4. You provide it without warranty of any kind.
 
 Say so explicitly in your first pull request:

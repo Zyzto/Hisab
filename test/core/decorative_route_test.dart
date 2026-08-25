@@ -125,6 +125,10 @@ void main() {
       expect(RoutePaths.groupDetail('g1').startsWith('/groups/'), isTrue);
       expect(RoutePaths.groupDetail('g1'), '/groups/g1/expenses');
       expect(RoutePaths.settings, '/settings');
+      expect(
+        RoutePaths.settingsFocus('display_currency'),
+        '/settings?focus=display_currency',
+      );
       expect(RoutePaths.groupAnalytics('g1'), '/groups/g1/analytics');
       expect(RoutePaths.groupSettings('g1'), '/groups/g1/settings');
       expect(

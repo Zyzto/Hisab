@@ -23,6 +23,7 @@ class TransactionNotificationListener : NotificationListenerService() {
         const val PREFS_NAME = "scanner_prefs"
         const val KEY_ENABLED = "scanner_enabled"
         const val KEY_SENDERS = "scanner_senders"
+        const val KEY_REQUIRE_SENDERS = "scanner_require_senders"
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
@@ -32,8 +33,9 @@ class TransactionNotificationListener : NotificationListenerService() {
 
         val pkg = sbn.packageName ?: return
         val allowedSenders = prefs.getStringSet(KEY_SENDERS, emptySet()) ?: emptySet()
+        val requireSenders = prefs.getBoolean(KEY_REQUIRE_SENDERS, true)
 
-        // If whitelist is non-empty, only capture from listed packages.
+        if (requireSenders && allowedSenders.isEmpty()) return
         if (allowedSenders.isNotEmpty() && pkg !in allowedSenders) return
 
         val extras = sbn.notification?.extras ?: return

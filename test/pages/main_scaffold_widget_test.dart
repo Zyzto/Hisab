@@ -1,11 +1,12 @@
 // ignore_for_file: prefer_const_constructors
 
-import 'package:easy_localization/easy_localization.dart';
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hisab/core/layout/layout_breakpoints.dart';
 import 'package:hisab/core/navigation/main_scaffold.dart';
 import 'package:hisab/core/navigation/route_paths.dart';
 import 'package:hisab/core/navigation/shell_nav_layout.dart';
@@ -67,6 +68,7 @@ void main() {
     WidgetTester tester, {
     required GoRouter router,
     Size size = const Size(400, 800),
+    bool rtl = false,
   }) async {
     tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1.0;
@@ -80,7 +82,13 @@ void main() {
           fallbackLocale: const Locale('en'),
           startLocale: const Locale('en'),
           child: ToastificationWrapper(
-            child: MaterialApp.router(routerConfig: router),
+            child: MaterialApp.router(
+              routerConfig: router,
+              builder: (context, child) => Directionality(
+                textDirection: rtl ? TextDirection.rtl : TextDirection.ltr,
+                child: child!,
+              ),
+            ),
           ),
         ),
       ),
@@ -123,12 +131,16 @@ void main() {
 
     expect(find.byType(AppSidenav), findsOneWidget);
     expect(find.byType(Drawer), findsOneWidget);
+    expect(find.byKey(const ValueKey('shell_nav_drawer')), findsOneWidget);
     expect(find.byIcon(Icons.group), findsOneWidget);
     expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
+    expect(find.byKey(const ValueKey('shell_nav_groups')), findsOneWidget);
+    expect(find.byKey(const ValueKey('shell_nav_settings')), findsOneWidget);
+    expect(find.byKey(const ValueKey('shell_nav_profile')), findsOneWidget);
     await tester.pump(const Duration(seconds: 2));
   });
 
-  testWidgets('Desktop shows permanent drawer without menu button', (
+  testWidgets('Desktop shows clipping rail without menu button', (
     tester,
   ) async {
     final router = _buildRouter(RoutePaths.home);
@@ -137,11 +149,16 @@ void main() {
 
     expect(find.byType(FloatingNavBar), findsNothing);
     expect(find.byType(AppSidenav), findsOneWidget);
-    expect(find.byType(Drawer), findsOneWidget);
+    expect(find.byType(Drawer), findsNothing);
+    expect(find.byKey(const ValueKey('shell_nav_rail')), findsOneWidget);
     expect(find.byKey(const ValueKey('shell_menu_button')), findsNothing);
     expect(find.byIcon(Icons.group), findsOneWidget);
     expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
     expect(find.byKey(const ValueKey('shell_nav_collapse')), findsOneWidget);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('shell_nav_rail'))).width,
+      LayoutBreakpoints.shellNavWidth,
+    );
     await tester.pump(const Duration(seconds: 2));
   });
 
@@ -159,7 +176,12 @@ void main() {
     expect(find.byKey(const ValueKey('shell_nav_expand')), findsOneWidget);
     expect(find.byKey(const ValueKey('shell_nav_collapse')), findsNothing);
     expect(find.byType(AppSidenav), findsOneWidget);
-    expect(find.byType(Drawer), findsOneWidget);
+    expect(find.byType(Drawer), findsNothing);
+    expect(find.byKey(const ValueKey('shell_nav_rail')), findsOneWidget);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('shell_nav_rail'))).width,
+      LayoutBreakpoints.shellNavWidthCompact,
+    );
     await tester.pump(const Duration(seconds: 1));
   });
 
@@ -175,7 +197,151 @@ void main() {
 
     expect(find.byKey(const ValueKey('shell_nav_expand')), findsOneWidget);
     expect(find.byKey(const ValueKey('shell_nav_collapse')), findsNothing);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('shell_nav_rail'))).width,
+      LayoutBreakpoints.shellNavWidthCompact,
+    );
     await tester.pump(const Duration(seconds: 1));
+  });
+
+  testWidgets('Desktop rail icons stay put while collapsing', (tester) async {
+    final router = _buildRouter(RoutePaths.home);
+    await pumpRouterApp(tester, router: router, size: const Size(1000, 800));
+    await tester.pump(const Duration(seconds: 1));
+
+    final groupsIcon = find.descendant(
+      of: find.byKey(const ValueKey('shell_nav_groups')),
+      matching: find.byType(Icon),
+    );
+    final expandedIcon = tester.getRect(groupsIcon);
+    expect(expandedIcon.left, lessThan(LayoutBreakpoints.shellNavWidthCompact));
+
+    await tester.tap(find.byKey(const ValueKey('shell_nav_collapse')));
+    await tester.pump();
+    expect(tester.getRect(groupsIcon).left, closeTo(expandedIcon.left, 1));
+
+    await tester.pumpAndSettle();
+    final rail = tester.getRect(find.byKey(const ValueKey('shell_nav_rail')));
+    expect(rail.width, LayoutBreakpoints.shellNavWidthCompact);
+    expect(tester.getRect(groupsIcon).center.dx, closeTo(rail.center.dx, 1));
+  });
+
+  testWidgets('Expanding a collapsed rail does not overflow tiles', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      ShellNavLayout.desktopNavCollapsedKey: true,
+    });
+    final router = _buildRouter(RoutePaths.home);
+    await pumpRouterApp(tester, router: router, size: const Size(1000, 800));
+    await tester.pump(const Duration(seconds: 1));
+
+    await tester.tap(find.byKey(const ValueKey('shell_nav_expand')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 40));
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('shell_nav_rail'))).width,
+      LayoutBreakpoints.shellNavWidth,
+    );
+  });
+
+  testWidgets('Arabic rail sits on the start edge', (tester) async {
+    final router = _buildRouter(RoutePaths.home);
+    await pumpRouterApp(
+      tester,
+      router: router,
+      size: const Size(1000, 800),
+      rtl: true,
+    );
+    await tester.pump(const Duration(seconds: 1));
+
+    final rail = tester.getRect(find.byKey(const ValueKey('shell_nav_rail')));
+    expect(rail.right, closeTo(1000, 1));
+    expect(rail.left, greaterThan(700));
+  });
+
+  testWidgets('Arabic rail icons stay on the start edge while collapsing', (
+    tester,
+  ) async {
+    final router = _buildRouter(RoutePaths.home);
+    await pumpRouterApp(
+      tester,
+      router: router,
+      size: const Size(1000, 800),
+      rtl: true,
+    );
+    await tester.pump(const Duration(seconds: 1));
+
+    final icon = find.descendant(
+      of: find.byKey(const ValueKey('shell_nav_groups')),
+      matching: find.byType(Icon),
+    );
+    final expandedRight = tester.getRect(icon).right;
+
+    await tester.tap(find.byKey(const ValueKey('shell_nav_collapse')));
+    await tester.pump();
+    expect(tester.getRect(icon).right, closeTo(expandedRight, 1));
+
+    await tester.pumpAndSettle();
+    final rail = tester.getRect(find.byKey(const ValueKey('shell_nav_rail')));
+    expect(rail.right, closeTo(1000, 1));
+    expect(tester.getRect(icon).center.dx, closeTo(rail.center.dx, 1));
+  });
+
+  testWidgets('Mid drawer Settings then Groups navigates and closes', (
+    tester,
+  ) async {
+    final router = _buildRouter(RoutePaths.home);
+    await pumpRouterApp(tester, router: router, size: const Size(700, 800));
+    await tester.pump(const Duration(seconds: 1));
+
+    await tester.tap(find.byKey(const ValueKey('shell_menu_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('shell_nav_settings')));
+    await tester.pumpAndSettle();
+
+    expect(
+      router.routerDelegate.currentConfiguration.uri.path,
+      RoutePaths.settings,
+    );
+    expect(find.byKey(const ValueKey('shell_nav_drawer')), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('shell_menu_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('shell_nav_groups')));
+    await tester.pumpAndSettle();
+
+    expect(
+      router.routerDelegate.currentConfiguration.uri.path,
+      RoutePaths.home,
+    );
+    expect(find.byKey(const ValueKey('shell_nav_drawer')), findsNothing);
+  });
+
+  testWidgets('Desktop rail Settings then Groups navigates', (tester) async {
+    final router = _buildRouter(RoutePaths.home);
+    await pumpRouterApp(tester, router: router, size: const Size(1000, 800));
+    await tester.pump(const Duration(seconds: 1));
+
+    await tester.tap(find.byKey(const ValueKey('shell_nav_settings')));
+    await tester.pumpAndSettle();
+    expect(
+      router.routerDelegate.currentConfiguration.uri.path,
+      RoutePaths.settings,
+    );
+    expect(find.byIcon(Icons.settings), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('shell_nav_groups')));
+    await tester.pumpAndSettle();
+    expect(
+      router.routerDelegate.currentConfiguration.uri.path,
+      RoutePaths.home,
+    );
+    expect(find.byIcon(Icons.group), findsOneWidget);
   });
 
   testWidgets('Back on settings navigates to home', (tester) async {

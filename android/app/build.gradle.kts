@@ -37,7 +37,9 @@ if (keyPropertiesFile.exists()) {
 
 android {
     namespace = "com.shenepoy.hisab"
-    compileSdk = flutter.compileSdkVersion
+    // permission_handler_android (and peers) compile against 37; Flutter's
+    // default is still 36. compileSdk is backward compatible.
+    compileSdk = maxOf(flutter.compileSdkVersion, 37)
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

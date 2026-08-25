@@ -107,7 +107,7 @@ void main() {
             isTrue,
           );
 
-          // Do NOT tap Export data on mobile: FilePicker.platform.saveFile()
+          // Do NOT tap Export data on mobile: FilePicker.saveFile()
           // opens a native Android save dialog that blocks the test.
           // Just verify the tile is present.
           await scrollUntilVisible(
@@ -132,7 +132,7 @@ void main() {
                 find.text('استيراد البيانات').evaluate().isNotEmpty,
             isTrue,
           );
-          // Do NOT tap Import on device: FilePicker.platform.pickFiles()
+          // Do NOT tap Import on device: FilePicker.pickFile()
           // opens a native picker that blocks the test.
           // Verify we're still on settings
           await waitForAnyText(tester, ['Settings', 'الإعدادات']);

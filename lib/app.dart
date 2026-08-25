@@ -11,6 +11,8 @@ import 'package:go_router/go_router.dart';
 import 'package:upgrader/upgrader.dart';
 import 'package:version/version.dart';
 import 'package:hisab_backend/hisab_backend.dart';
+import 'package:safaeh/safaeh.dart';
+import 'package:toastification/toastification.dart';
 import 'core/auth/auth_pending_finalize.dart';
 import 'core/auth/auth_providers.dart';
 import 'core/auth/oauth_callback_state.dart';
@@ -26,8 +28,8 @@ import 'core/update/upgrader_messages.dart';
 import 'core/settings/providers/settings_framework_providers.dart';
 import 'core/theme/app_scroll_behavior.dart';
 import 'core/theme/theme_providers.dart';
-import 'package:toastification/toastification.dart';
 import 'core/layout/layout_breakpoints.dart';
+import 'core/motion/app_motion.dart';
 import 'core/navigation/app_router.dart';
 import 'core/navigation/invite_link_handler.dart';
 import 'core/navigation/last_route_restore.dart';
@@ -429,6 +431,7 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
     final router = ref.watch(routerProvider);
     final themes = ref.watch(appThemesProvider);
     final themeMode = ref.watch(appThemeModeProvider);
+    final suppressThemeLerp = ref.watch(suppressThemeLerpProvider);
 
     // Locale is read exclusively from EasyLocalization (context.locale) so that
     // locale: and localizationsDelegates always come from the same frame.
@@ -463,54 +466,72 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
                         LayoutBreakpoints.sheetDialogMaxWidth,
                       ),
               ),
-              child: MaterialApp.router(
-                title: 'app_name'.tr(),
-                debugShowCheckedModeBanner: false,
-                scrollBehavior: AppScrollBehavior(),
-                localizationsDelegates: context.localizationDelegates,
-                supportedLocales: context.supportedLocales,
-                locale: context.locale,
-                builder: (context, child) {
-                  final isRtl = context.locale.languageCode == 'ar';
-                  final isDebug = ref.watch(showDebugMenuProvider);
-                  final innerContent = BackButtonKeyboardDismiss(
-                    child: GestureDetector(
-                      onTap: () =>
-                          FocusManager.instance.primaryFocus?.unfocus(),
-                      behavior: HitTestBehavior.deferToChild,
-                      child: Directionality(
-                        textDirection: isRtl
-                            ? ui.TextDirection.rtl
-                            : ui.TextDirection.ltr,
-                        child: child ?? const SizedBox.shrink(),
+              child: SafaehTheme(
+                data: const SafaehThemeData(
+                  tabletBreakpoint: LayoutBreakpoints.breakpointTablet,
+                  dialogMaxWidth: LayoutBreakpoints.sheetDialogMaxWidth,
+                  motion: AppMotion.modal,
+                  enterCurve: AppMotion.enterCurve,
+                  compactNavWidth: LayoutBreakpoints.shellNavWidthCompact,
+                  expandedNavWidth: LayoutBreakpoints.shellNavWidth,
+                  navMotion: AppMotion.shellNav,
+                  sheetRoll: AppMotion.sheetRoll,
+                  sheetRollEnter: AppMotion.sheetRollEnter,
+                  exitCurve: AppMotion.exitCurve,
+                  contentMaxWidth: LayoutBreakpoints.contentMaxWidthTablet,
+                ),
+                child: MaterialApp.router(
+                  title: 'app_name'.tr(),
+                  debugShowCheckedModeBanner: false,
+                  scrollBehavior: AppScrollBehavior(),
+                  localizationsDelegates: context.localizationDelegates,
+                  supportedLocales: context.supportedLocales,
+                  locale: context.locale,
+                  builder: (context, child) {
+                    final isRtl = context.locale.languageCode == 'ar';
+                    final isDebug = ref.watch(showDebugMenuProvider);
+                    final innerContent = BackButtonKeyboardDismiss(
+                      child: GestureDetector(
+                        onTap: () =>
+                            FocusManager.instance.primaryFocus?.unfocus(),
+                        behavior: HitTestBehavior.deferToChild,
+                        child: Directionality(
+                          textDirection: isRtl
+                              ? ui.TextDirection.rtl
+                              : ui.TextDirection.ltr,
+                          child: child ?? const SizedBox.shrink(),
+                        ),
                       ),
-                    ),
-                  );
-                  final contentWithSyncIndicator = Stack(
-                    children: [
-                      Positioned.fill(child: innerContent),
-                      const Positioned(
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        child: _SyncProgressLine(),
-                      ),
-                    ],
-                  );
-                  // In release, first frame paints without UpgradeAlert to avoid
-                  // any upgrader init blocking splash removal.
-                  return _buildRootContent(
-                    context: context,
-                    contentWithSyncIndicator: contentWithSyncIndicator,
-                    isDebug: isDebug,
-                    isRtl: isRtl,
-                    router: router,
-                  );
-                },
-                theme: themes.light,
-                darkTheme: themes.dark,
-                themeMode: themeMode,
-                routerConfig: router,
+                    );
+                    final contentWithSyncIndicator = Stack(
+                      children: [
+                        Positioned.fill(child: innerContent),
+                        const Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          child: _SyncProgressLine(),
+                        ),
+                      ],
+                    );
+                    // In release, first frame paints without UpgradeAlert to avoid
+                    // any upgrader init blocking splash removal.
+                    return _buildRootContent(
+                      context: context,
+                      contentWithSyncIndicator: contentWithSyncIndicator,
+                      isDebug: isDebug,
+                      isRtl: isRtl,
+                      router: router,
+                    );
+                  },
+                  theme: themes.light,
+                  darkTheme: themes.dark,
+                  themeMode: themeMode,
+                  themeAnimationDuration: suppressThemeLerp
+                      ? Duration.zero
+                      : kThemeAnimationDuration,
+                  routerConfig: router,
+                ),
               ),
             ),
           ),

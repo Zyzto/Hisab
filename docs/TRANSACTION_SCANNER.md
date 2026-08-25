@@ -2,17 +2,20 @@
 
 <!-- markdownlint-disable MD060 -->
 
-Opt-in **Android** feature (`scannerAvailable`): reads bank/payment **notification** text, parses on-device into **drafts**, and on confirm creates an expense (or income) in a **personal** group. Disabled by default. No UI on iOS/web (`NotificationBridge` no-ops). Home shows a pending-draft badge on personal group cards.
+Opt-in **Android** feature (`scannerAvailable`): reads bank/payment **notification** text, parses on-device into **drafts**, and on confirm creates an expense (or income) in a **personal or shared** group. Disabled by default. No UI on iOS/web (`NotificationBridge` no-ops). Home shows a pending-draft badge on the destination group card.
 
 Gate: `lib/features/transaction_scanner/providers/scanner_providers.dart`. `App` watches `scannerControllerProvider` when available (`lib/app.dart`).
 
+**Not SMS.** There is no `READ_SMS` / inbox access. Bank SMS is captured only if the SMS or bank app posts a status-bar notification.
+
 ## User flows
 
-1. **Setup** — Settings → Transaction Scanner → hub / setup wizard: explain privacy → open system **Notification Listener** settings → enable `scanner_enabled` when granted.
-2. **Configure** — Hub: sender whitelist (Android package names), extraction patterns (built-in + custom regex).
-3. **Capture** — Native listener queues matching notifications → Flutter flush → `draft_transactions`.
-4. **Review** — Pending list/detail: edit merchant/amount; confirm, dismiss, or Confirm All (confidence ≥ 0.7).
-5. **Confirm** — `ScannerController.confirmDraft` creates expense/income via `expenseRepository` and sets `created_expense_id`.
+1. **Setup** — Settings → Transaction Scanner → wizard: privacy → Notification Listener → pick apps → teach fields on a sample → default destination → categories/AI → done.
+2. **Configure** — Hub: apps, history, patterns (advanced regex), reconfigure.
+3. **Capture** — Native listener queues matching notifications → Flutter flush → `draft_transactions` + `scanner_notification_log`.
+4. **Review** — Pending list/detail: visual annotator, destination, category; confirm, dismiss, or Confirm All (confidence ≥ 0.7).
+5. **Confirm** — `ScannerController.confirmDraft` creates expense/income via `expenseRepository`. Shared groups: current user paid, equal split.
+6. **History** — Per-app / global log of added, ignored (OTP, no amount, dismissed, duplicate), and pending.
 
 ## Android native
 
@@ -21,57 +24,36 @@ Gate: `lib/features/transaction_scanner/providers/scanner_providers.dart`. `App`
 | Listener | `android/app/src/main/kotlin/com/shenepoy/hisab/TransactionNotificationListener.kt` |
 | Bridge | `android/.../NotificationBridge.kt` (`NotificationDbHelper` in listener file) |
 | Register | `MainActivity.configureFlutterEngine` → `NotificationBridge.register` |
-| Manifest | `TransactionNotificationListener` + `BIND_NOTIFICATION_LISTENER_SERVICE` |
+| Manifest | `TransactionNotificationListener` + `BIND_NOTIFICATION_LISTENER_SERVICE`; launcher `<queries>` for app picker |
 
 - Channels: MethodChannel `com.shenepoy.hisab/scanner`, EventChannel `com.shenepoy.hisab/scanner_events`.
-- Native prefs `scanner_prefs` (`scanner_enabled`, sender set); queue DB `scanner_notifications.db` / `captured_notifications` until Flutter flushes.
-- Pre-filter: disabled → ignore; non-empty whitelist → listed packages only; body needs a digit. Empty whitelist = all apps (digit filter still applies). Access is system Notification Listener settings, not a normal runtime permission.
+- Native prefs `scanner_prefs` (`scanner_enabled`, sender set, `scanner_require_senders`); queue DB `scanner_notifications.db`.
+- Pre-filter: disabled → ignore; after completed setup, empty whitelist captures nothing; otherwise non-empty whitelist = listed packages only. Body needs a digit.
 - Flutter: `lib/features/transaction_scanner/services/notification_bridge.dart`.
-
-## Code locations
-
-| Area | Path |
-|------|------|
-| Feature | `lib/features/transaction_scanner/` — `pages/`, `providers/scanner_providers.dart` (`ScannerController`), `repository/scanner_repository.dart`, `services/` (parser, duplicate detector, bridge), `domain/` |
-| Schema | `lib/core/database/powersync_schema.dart` — local-only tables below (never synced) |
-| Settings UI | `settings_definitions.dart` (`scannerSection`, `scanner_enabled`); `settings_page.dart` (Android section → hub) |
-
-**Navigation:** No GoRouter routes; Settings/hub use `Navigator.push` + `MaterialPageRoute`.
 
 ## Local schema (not synced)
 
-### `draft_transactions`
+- `draft_transactions` — amount, currency, merchant, `place_name`, `field_spans_json`, dates, raw text, sender, status, confidence, `created_expense_id`, `personal_group_id` (any destination group).
+- `scanner_sender_rules` — package, label, optional `target_group_id`.
+- `scanner_patterns` — built-in + taught/custom regex. Built-in names are translation keys.
+- `scanner_category_rules` — learned merchant → category.
+- `scanner_notification_log` — every watched-app capture and outcome (90-day retention).
 
-Amount, currency, card last four, merchant, dates, raw notification text, sender package/title, `status` (`pending` / `confirmed` / `dismissed` / `duplicate`), `matched_pattern_id`, `confidence`, `created_expense_id`, timestamps; optional `personal_group_id`.
+## Parsing
 
-### `scanner_sender_rules`
+1. Skip OTP/verification (`ParseSkipReason.otp`) — logged, no draft.
+2. Enabled patterns then generic heuristics (default currency **SAR**; refunds → negative → income).
+3. Local category keywords + learned rules; optional Nano/cloud AI if `scanner_ai_mode` is not `off`.
+4. Duplicates within 60s → `duplicate` + log.
 
-Package name, label, optional sender number, enabled, match count. Pushed to native via `NotificationBridge.setSenders`.
-
-### `scanner_patterns`
-
-Name, sender match, amount/currency/card/merchant/date regexes (+ date format), `is_built_in`, enabled, success count. Built-ins seeded once: `builtin_bank_en_1`, `builtin_bank_ar_1`, `builtin_amount_generic`. Built-in `name` values are **translation keys** (`scanner_pattern_bank_en`, `scanner_pattern_bank_ar`, `scanner_pattern_generic_amount`); UI displays them with `scannerPatternDisplayName()` (`lib/features/transaction_scanner/utils/scanner_pattern_labels.dart`), which also maps legacy English names for older local DBs.
-
-## Parsing and duplicates
-
-1. Skip OTP/verification-like text (`TransactionParser`).
-2. Try enabled patterns in order; first valid amount wins; else generic heuristics (default currency **SAR**; refund keywords → negative amount → income on confirm).
-3. `DuplicateDetector`: same package + amount + currency within **60s** → `duplicate` (hidden from pending).
-4. Confirm uses draft `personalGroupId` or the first personal group; payer = first participant. Negative `amountCents` → `TransactionType.income`.
+Confirm destination: sender override → draft → `scanner_default_group_id` → first personal group. Payer = current user's participant.
 
 ## Settings
 
-`scanner_enabled` (default `false`): Settings → Transaction Scanner toggle; syncs to native. Entry also opens **Pending Transactions** → `ScannerHubPage`.
+`scanner_enabled`, `scanner_categorize_enabled`, `scanner_ai_mode` (`off` / `nano` / `cloud`), hidden `scanner_default_group_id` and `scanner_setup_completed`.
 
-## Privacy and copy
+## Privacy
 
-- Drafts/raw notification text are on-device and **not** synced; confirmed expenses use the normal expense sync path.
-- User-facing UI: `scanner_*` (plus pattern name keys above) in `assets/translations/en.json` / `ar.json`. Conventions: [I18N.md](I18N.md).
-- Disclosure: `privacy_policy_permissions_body` (en + ar) and `web/privacy/index.html` — keep in sync per [PLAY_CONSOLE_DECLARATIONS.md](PLAY_CONSOLE_DECLARATIONS.md) §1. Form answers: same doc §6.
+Drafts, history, and raw notification text stay on-device and are **not** synced. Confirmed expenses use the normal expense sync path. Cloud AI (opt-in) sends notification text to the configured Receipt AI provider.
 
-## Related docs
-
-- [PERSONAL_FEATURE.md](PERSONAL_FEATURE.md) — personal groups (confirm target)
-- [CODEBASE.md](CODEBASE.md) — overview pointers
-- [I18N.md](I18N.md) — localization conventions and key groups
-- [PLAY_CONSOLE_DECLARATIONS.md](PLAY_CONSOLE_DECLARATIONS.md) — privacy sync + Data safety
+User-facing UI: `scanner_*` in `en.json` / `ar.json`. Disclosure: `privacy_policy_permissions_body` and `web/privacy/index.html`.

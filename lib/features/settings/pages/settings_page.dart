@@ -101,6 +101,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
   }
 
+  String? _consumedFocusKey;
+  RouterDelegate<Object>? _routerDelegate;
+
   @override
   void initState() {
     super.initState();
@@ -108,7 +111,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final delegate = GoRouter.maybeOf(context)?.routerDelegate;
+    if (delegate != _routerDelegate) {
+      _routerDelegate?.removeListener(_consumeSettingsFocusQuery);
+      _routerDelegate = delegate;
+      _routerDelegate?.addListener(_consumeSettingsFocusQuery);
+    }
+    _consumeSettingsFocusQuery();
+  }
+
+  @override
   void dispose() {
+    _routerDelegate?.removeListener(_consumeSettingsFocusQuery);
     _searchController.dispose();
     _searchFocusNode.dispose();
     _scrollController.dispose();
@@ -260,6 +276,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     'theme_color': 'theme_scheme',
     'scanner_location_enabled': 'scanner_enabled',
     'scanner_notify_on_capture': 'action_scanner_hub',
+    'scanner_categorize_enabled': 'action_scanner_hub',
+    'scanner_ai_mode': 'action_scanner_hub',
+    'scanner_default_group_id': 'action_scanner_hub',
+    'scanner_setup_completed': 'action_scanner_hub',
     'gemini_api_key': 'receipt_ai_provider',
     'openai_api_key': 'receipt_ai_provider',
     'receipt_ai_provider': 'receipt_scan_mode',
@@ -279,10 +299,46 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     return true;
   }
 
-  Future<void> _onSearchResultSelected(SearchResult result) async {
-    final setting = result.setting;
-    final sectionKey = setting.section;
-    final jumpKey = _searchJumpAliases[setting.key] ?? setting.key;
+  void _consumeSettingsFocusQuery() {
+    final router = GoRouter.maybeOf(context);
+    if (router == null) return;
+    final uri = router.routerDelegate.currentConfiguration.uri;
+    final focus = uri.queryParameters[RoutePaths.settingsFocusParam];
+    if (focus == null || focus.isEmpty) {
+      _consumedFocusKey = null;
+      return;
+    }
+    if (focus == _consumedFocusKey) return;
+    _consumedFocusKey = focus;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final current = GoRouter.maybeOf(
+        context,
+      )?.routerDelegate.currentConfiguration.uri;
+      if (current?.queryParameters[RoutePaths.settingsFocusParam] == focus) {
+        context.go(RoutePaths.settings);
+      }
+      unawaited(_jumpToSetting(focus));
+    });
+  }
+
+  Future<void> _onSearchResultSelected(SearchResult result) {
+    return _jumpToSetting(result.setting.key);
+  }
+
+  Future<void> _jumpToSetting(String settingKey) async {
+    final registry = ref.read(hisabSettingsProvidersProvider)?.registry;
+    SettingDefinition? setting;
+    if (registry != null) {
+      for (final candidate in registry.settings) {
+        if (candidate.key == settingKey) {
+          setting = candidate;
+          break;
+        }
+      }
+    }
+    final sectionKey = setting?.section;
+    final jumpKey = _searchJumpAliases[settingKey] ?? settingKey;
     final token = ++_scrollGeneration;
     setState(() {
       _searchController.clear();
@@ -636,7 +692,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           leading: setting.icon != null ? Icon(setting.icon) : null,
           title: Text(title),
           subtitle: subtitle != null ? Text(subtitle) : null,
-          trailing: const Icon(Icons.chevron_right),
+          trailing: settingsChevronEnd(context),
         );
       },
       sectionTitleBuilder: (sectionKey) {
@@ -681,7 +737,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 ),
           title: Text('profile'.tr()),
           subtitle: Text('profile_settings_link_subtitle'.tr()),
-          trailing: const Icon(Icons.chevron_right),
+          trailing: settingsChevronEnd(context),
           onTap: () => context.push(RoutePaths.profile),
         ),
       ),
@@ -1623,7 +1679,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     try {
       final String formatted = kIsWeb
           ? '**Description**\n$description\n\n**Logs**\n$logsContent'
-          : await LoggingService.formatLogsForGitHub(description);
+          : await LoggingService.formatLogsForGitHub(
+              description,
+              labels: const GitHubLogLabels(),
+            );
       await Clipboard.setData(ClipboardData(text: formatted));
       if (reportIssueUrl.isNotEmpty) {
         await launchUrl(Uri.parse(reportIssueUrl));

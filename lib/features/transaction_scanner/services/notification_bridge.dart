@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../domain/installed_app.dart';
+
 /// Raw notification data returned by the native layer.
 class CapturedNotification {
   final int nativeId;
@@ -73,6 +75,33 @@ class NotificationBridge {
   static Future<void> setSenders(List<String> packageNames) async {
     if (!_isAndroid) return;
     await _method.invokeMethod<void>('setSenders', {'senders': packageNames});
+  }
+
+  /// When true, an empty whitelist captures nothing (post-setup).
+  static Future<void> setRequireSenders(bool require) async {
+    if (!_isAndroid) return;
+    await _method.invokeMethod<void>('setRequireSenders', {
+      'require': require,
+    });
+  }
+
+  /// Launchable apps for the setup picker.
+  static Future<List<InstalledApp>> listInstalledApps() async {
+    if (!_isAndroid) return const [];
+    try {
+      final result = await _method.invokeMethod<List<dynamic>>(
+        'listInstalledApps',
+      );
+      if (result == null) return const [];
+      return result.cast<Map<dynamic, dynamic>>().map((m) {
+        return InstalledApp(
+          packageName: m['package'] as String? ?? '',
+          label: m['label'] as String? ?? '',
+        );
+      }).where((a) => a.packageName.isNotEmpty).toList();
+    } on PlatformException {
+      return const [];
+    }
   }
 
   /// Fetch notifications captured while Flutter was not running.

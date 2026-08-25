@@ -12,5 +12,6 @@
   "deno.enablePaths": [
     "lib"
   ],
-  "deno.enable": true
+  "deno.enable": true,
+  "dart.flutterSdkPath": ".fvm/versions/3.47.1"
 }

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/widgets/sheet_helpers.dart';
+import '../../../core/widgets/toast.dart';
 import '../../../core/widgets/user_text.dart';
 import '../domain/draft_transaction.dart';
 import '../providers/scanner_providers.dart';
@@ -90,13 +91,13 @@ class DraftTransactionsPage extends ConsumerWidget {
     );
   }
 
-  void _confirmAll(BuildContext context, WidgetRef ref) {
+  Future<void> _confirmAll(BuildContext context, WidgetRef ref) async {
     final controller = ref.read(scannerControllerProvider);
     final drafts = ref.read(pendingDraftsProvider).asData?.value ?? [];
     final highConfidence = drafts.where((d) => d.confidence >= 0.7).toList();
     if (highConfidence.isEmpty) return;
 
-    showConfirmSheet(
+    final confirmed = await showConfirmSheet(
       context,
       title: 'scanner_confirm_all_title'.tr(),
       content: 'scanner_confirm_all_body'.tr(
@@ -104,13 +105,17 @@ class DraftTransactionsPage extends ConsumerWidget {
       ),
       confirmLabel: 'confirm'.tr(),
       centerInFullViewport: false,
-    ).then((confirmed) {
-      if (confirmed == true) {
-        for (final d in highConfidence) {
-          controller.confirmDraft(d.id);
-        }
-      }
-    });
+    );
+    if (confirmed != true) return;
+
+    var failed = 0;
+    for (final d in highConfidence) {
+      final ok = await controller.confirmDraft(d.id);
+      if (!ok) failed++;
+    }
+    if (failed > 0 && context.mounted) {
+      context.showError('scanner_confirm_failed'.tr());
+    }
   }
 }
 
@@ -130,12 +135,16 @@ class _DraftCard extends ConsumerWidget {
       direction: DismissDirection.horizontal,
       confirmDismiss: (direction) async {
         if (direction == DismissDirection.startToEnd) {
-          ref.read(scannerControllerProvider).confirmDraft(draft.id);
-          return true;
-        } else {
-          ref.read(scannerControllerProvider).dismissDraft(draft.id);
-          return true;
+          final ok = await ref
+              .read(scannerControllerProvider)
+              .confirmDraft(draft.id);
+          if (!ok && context.mounted) {
+            context.showError('scanner_confirm_failed'.tr());
+          }
+          return ok;
         }
+        await ref.read(scannerControllerProvider).dismissDraft(draft.id);
+        return true;
       },
       background: Container(
         alignment: AlignmentDirectional.centerStart,

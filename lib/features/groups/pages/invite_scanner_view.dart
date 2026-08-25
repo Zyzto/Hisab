@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
@@ -9,6 +8,7 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:safaeh/safaeh.dart';
 
 import '../../../core/motion/app_motion.dart';
 import '../../../core/navigation/invite_link_handler.dart';
@@ -82,7 +82,7 @@ class _InviteScannerViewState extends State<InviteScannerView>
   void _startHardware() {
     if (_hardwareStarted) return;
     _hardwareStarted = true;
-    if (!_scanLine.isAnimating) {
+    if (!MediaQuery.disableAnimationsOf(context) && !_scanLine.isAnimating) {
       _scanLine.repeat(reverse: true);
     }
     unawaited(_bootstrap());
@@ -175,8 +175,12 @@ class _InviteScannerViewState extends State<InviteScannerView>
       final token = extractInviteTokenFromUri(uri);
       if (token != null) {
         _handled = true;
-        HapticFeedback.mediumImpact();
-        setState(() => _successFlash = true);
+        await HapticFeedback.mediumImpact();
+        if (!mounted) return;
+        setState(() {
+          _successFlash = true;
+          _scanLine.stop();
+        });
         await Future<void>.delayed(
           MediaQuery.disableAnimationsOf(context)
               ? Duration.zero
@@ -225,9 +229,20 @@ class _InviteScannerViewState extends State<InviteScannerView>
             _ScanPhase.loading => const Center(
               child: CircularProgressIndicator(color: Colors.white),
             ),
-            _ScanPhase.permissionDenied => _PermissionBody(
+            _ScanPhase.permissionDenied => SafaehQrMessageBody(
               onClose: widget.onClose,
-              onOpenSettings: openAppSettings,
+              message: Text(
+                'scan_invite_permission_body'.tr(),
+                textAlign: TextAlign.center,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(color: Colors.white),
+              ),
+              action: FilledButton.icon(
+                onPressed: openAppSettings,
+                icon: const Icon(Icons.settings),
+                label: Text('permission_open_settings'.tr()),
+              ),
             ),
             _ScanPhase.ready => _ScannerBody(
               controller: _controller!,
@@ -311,161 +326,83 @@ class _ScannerBodyState extends State<_ScannerBody> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        MobileScanner(
-          controller: widget.controller,
-          onDetect: widget.onDetect,
-          errorBuilder: (context, error) {
-            _reportError(error);
-            return _ErrorBody(
-              message: _errorMessage ?? _inviteScannerErrorMessage(error),
-            );
-          },
-        ),
-        if (!_hasError) ...[
-          IgnorePointer(
-            child: AnimatedBuilder(
-              animation: widget.scanLine,
-              builder: (context, _) {
-                return CustomPaint(
-                  painter: _QrFramePainter(
-                    scanT: widget.scanLine.value,
-                    success: widget.successFlash,
-                  ),
-                  child: const SizedBox.expand(),
-                );
-              },
-            ),
+        RepaintBoundary(
+          child: MobileScanner(
+            controller: widget.controller,
+            onDetect: widget.onDetect,
+            errorBuilder: (context, error) {
+              _reportError(error);
+              return SafaehQrMessageBody(
+                safeArea: false,
+                padding: const EdgeInsets.fromLTRB(32, 72, 32, 32),
+                icon: Icons.error_outline,
+                iconColor: Theme.of(context).colorScheme.error,
+                message: Text(
+                  _errorMessage ?? _inviteScannerErrorMessage(error),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge?.copyWith(color: Colors.white),
+                ),
+              );
+            },
           ),
-          if (widget.successFlash)
-            IgnorePointer(
-              child: AnimatedOpacity(
-                opacity: widget.successFlash ? 0.35 : 0,
-                duration: widget.motion == Duration.zero
-                    ? Duration.zero
-                    : const Duration(milliseconds: 180),
-                child: const ColoredBox(color: Color(0xFF43A047)),
-              ),
-            ),
-        ],
-        // Handle already clears the status bar — don't double-pad (that left a
-        // gap above the top bar). Stretch the bar edge-to-edge.
-        Column(
-          children: [
-            _TopBar(
+        ),
+        if (!_hasError)
+          SafaehQrScannerOverlay(
+            scanLine: widget.scanLine,
+            success: widget.successFlash,
+            expanded: widget.expanded,
+            onClose: widget.onClose,
+            onToggleExpanded: widget.onToggleExpanded,
+            motion: widget.motion,
+            expandTooltip: 'receipt_camera_expand'.tr(),
+            collapseTooltip: 'receipt_camera_collapse'.tr(),
+            title: _title(context),
+            torch: _TorchButton(
               controller: widget.controller,
-              expanded: widget.expanded,
-              onClose: widget.onClose,
-              onToggleExpanded: widget.onToggleExpanded,
               onToggleTorch: widget.onToggleTorch,
               motion: widget.motion,
-              showTorch: !_hasError,
             ),
-            const Spacer(),
-            if (!_hasError)
-              SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 28),
-                  child: AnimatedOpacity(
-                    opacity: widget.successFlash ? 0 : 1,
-                    duration: widget.motion,
-                    child: Material(
-                      color: Colors.black.withValues(alpha: 0.55),
-                      borderRadius: BorderRadius.circular(14),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 18,
-                          vertical: 14,
-                        ),
-                        child: Text(
-                          'scan_invite_hint'.tr(),
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.95),
-                              ),
-                        ),
-                      ),
-                    ),
+            hint: Material(
+              color: Colors.black.withValues(alpha: 0.55),
+              borderRadius: BorderRadius.circular(14),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 14,
+                ),
+                child: Text(
+                  'scan_invite_hint'.tr(),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.95),
                   ),
                 ),
               ),
-          ],
-        ),
+            ),
+          )
+        else
+          SafaehQrTopBar(
+            expanded: widget.expanded,
+            onClose: widget.onClose,
+            onToggleExpanded: widget.onToggleExpanded,
+            motion: widget.motion,
+            expandTooltip: 'receipt_camera_expand'.tr(),
+            collapseTooltip: 'receipt_camera_collapse'.tr(),
+            title: _title(context),
+          ),
       ],
     );
   }
-}
 
-class _TopBar extends StatelessWidget {
-  const _TopBar({
-    required this.controller,
-    required this.expanded,
-    required this.onClose,
-    required this.onToggleExpanded,
-    required this.onToggleTorch,
-    required this.motion,
-    this.showTorch = true,
-  });
-
-  final MobileScannerController controller;
-  final bool expanded;
-  final VoidCallback onClose;
-  final VoidCallback onToggleExpanded;
-  final VoidCallback onToggleTorch;
-  final Duration motion;
-  final bool showTorch;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.black.withValues(alpha: 0.55),
-      child: SizedBox(
-        width: double.infinity,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-          child: Row(
-            children: [
-              IconButton(
-                tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-                onPressed: onClose,
-                icon: const Icon(Icons.close, color: Colors.white),
-              ),
-              Expanded(
-                child: Text(
-                  'scan_invite_title'.tr(),
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              if (showTorch)
-                _TorchButton(
-                  controller: controller,
-                  onToggleTorch: onToggleTorch,
-                  motion: motion,
-                )
-              else
-                const SizedBox(width: 48),
-              IconButton(
-                tooltip: expanded
-                    ? 'receipt_camera_collapse'.tr()
-                    : 'receipt_camera_expand'.tr(),
-                onPressed: onToggleExpanded,
-                icon: AnimatedSwitcher(
-                  duration: motion,
-                  child: Icon(
-                    expanded ? Icons.close_fullscreen : Icons.open_in_full,
-                    key: ValueKey(expanded),
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+  Widget _title(BuildContext context) {
+    return Text(
+      'scan_invite_title'.tr(),
+      textAlign: TextAlign.center,
+      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+        color: Colors.white,
+        fontWeight: FontWeight.w600,
       ),
     );
   }
@@ -543,147 +480,4 @@ class _TorchButtonState extends State<_TorchButton> {
       ),
     );
   }
-}
-
-class _PermissionBody extends StatelessWidget {
-  const _PermissionBody({required this.onClose, required this.onOpenSettings});
-
-  final VoidCallback onClose;
-  final Future<bool> Function() onOpenSettings;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: IconButton(
-                onPressed: onClose,
-                icon: const Icon(Icons.close, color: Colors.white),
-              ),
-            ),
-            const Spacer(),
-            Icon(
-              Icons.qr_code_scanner,
-              size: 64,
-              color: Colors.white.withValues(alpha: 0.85),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'scan_invite_permission_body'.tr(),
-              textAlign: TextAlign.center,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyLarge?.copyWith(color: Colors.white),
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: () => onOpenSettings(),
-              icon: const Icon(Icons.settings),
-              label: Text('permission_open_settings'.tr()),
-            ),
-            const Spacer(),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ErrorBody extends StatelessWidget {
-  const _ErrorBody({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    // Close lives in [_TopBar] only — avoid a second X over the chrome.
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(32, 72, 32, 32),
-      child: Column(
-        children: [
-          const Spacer(),
-          Icon(
-            Icons.error_outline,
-            size: 64,
-            color: Theme.of(context).colorScheme.error,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyLarge?.copyWith(color: Colors.white),
-          ),
-          const Spacer(),
-        ],
-      ),
-    );
-  }
-}
-
-class _QrFramePainter extends CustomPainter {
-  _QrFramePainter({required this.scanT, required this.success});
-
-  final double scanT;
-  final bool success;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final side = math.min(size.width, size.height) * 0.68;
-    final rect = Rect.fromCenter(
-      center: Offset(size.width / 2, size.height / 2 - 12),
-      width: side,
-      height: side,
-    );
-    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(18));
-
-    final dim = Path()
-      ..addRect(Offset.zero & size)
-      ..addRRect(rrect)
-      ..fillType = PathFillType.evenOdd;
-    canvas.drawPath(dim, Paint()..color = Colors.black.withValues(alpha: 0.55));
-
-    final accent = success ? const Color(0xFF66BB6A) : Colors.white;
-    final cornerPaint = Paint()
-      ..color = accent.withValues(alpha: 0.95)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4
-      ..strokeCap = StrokeCap.round;
-
-    const len = 28.0;
-    void corner(Offset o, double sx, double sy) {
-      canvas.drawLine(o, o + Offset(len * sx, 0), cornerPaint);
-      canvas.drawLine(o, o + Offset(0, len * sy), cornerPaint);
-    }
-
-    corner(rect.topLeft, 1, 1);
-    corner(rect.topRight, -1, 1);
-    corner(rect.bottomLeft, 1, -1);
-    corner(rect.bottomRight, -1, -1);
-
-    if (!success) {
-      final y = rect.top + 8 + (rect.height - 16) * scanT;
-      final line = Paint()
-        ..shader = LinearGradient(
-          colors: [
-            Colors.white.withValues(alpha: 0),
-            Colors.white.withValues(alpha: 0.85),
-            Colors.white.withValues(alpha: 0),
-          ],
-        ).createShader(Rect.fromLTWH(rect.left, y - 1, rect.width, 2));
-      canvas.drawRect(
-        Rect.fromLTWH(rect.left + 10, y, rect.width - 20, 2),
-        line,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _QrFramePainter oldDelegate) =>
-      oldDelegate.scanT != scanT || oldDelegate.success != success;
 }

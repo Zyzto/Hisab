@@ -1,6 +1,7 @@
 import 'package:powersync/powersync.dart';
 
 import '../../core/receipt/receipt_storage.dart';
+import '../transaction_scanner/services/notification_bridge.dart';
 
 /// Wipe local data tables used by Replace import / delete-local.
 Future<void> wipeLocalDataTables(PowerSyncDatabase db) async {
@@ -17,5 +18,10 @@ Future<void> wipeLocalDataTables(PowerSyncDatabase db) async {
   await db.execute('DELETE FROM draft_transactions');
   await db.execute('DELETE FROM scanner_sender_rules');
   await db.execute('DELETE FROM scanner_patterns');
+  await db.execute('DELETE FROM scanner_category_rules');
+  await db.execute('DELETE FROM scanner_notification_log');
   await clearReceiptAppStorage();
+  await NotificationBridge.clearAll();
+  await NotificationBridge.setSenders([]);
+  await NotificationBridge.setRequireSenders(true);
 }

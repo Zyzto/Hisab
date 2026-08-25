@@ -1,6 +1,10 @@
 import 'dart:math' as math;
 
+import '../domain/field_span.dart';
 import '../domain/scanner_pattern.dart';
+
+/// Why a notification was not turned into a draft.
+enum ParseSkipReason { none, otp, noAmount }
 
 /// Result of parsing a notification body for transaction data.
 class ParseResult {
@@ -8,18 +12,26 @@ class ParseResult {
   final String? currencyCode;
   final String? cardLastFour;
   final String? merchantName;
+  final String? placeName;
   final DateTime? transactionDate;
   final double confidence;
   final String? matchedPatternId;
+  final List<FieldSpan> fieldSpans;
+  final ParseSkipReason skipReason;
+  final String? suggestedCategory;
 
   const ParseResult({
     this.amountCents,
     this.currencyCode,
     this.cardLastFour,
     this.merchantName,
+    this.placeName,
     this.transactionDate,
     this.confidence = 0.0,
     this.matchedPatternId,
+    this.fieldSpans = const [],
+    this.skipReason = ParseSkipReason.none,
+    this.suggestedCategory,
   });
 }
 
@@ -80,7 +92,7 @@ class TransactionParser {
   static final _merchantPatterns = <RegExp>[
     RegExp(
       r'(?:at|from|to)\s+([A-Za-z][A-Za-z\s&'
-      r"'\-.]{1,40}?)(?:\s+on\s|\s*[,.]|\s*$)",
+      r"'\-.]{1,40}?)(?:\s+on\s|\s+in\s|\s*[,.]|\s*$)",
       caseSensitive: false,
     ),
     RegExp(
@@ -88,6 +100,16 @@ class TransactionParser {
       r"'\-.]{1,40})",
       caseSensitive: false,
     ),
+    RegExp(
+      r'(?:\u0639\u0646\u062F|\u0644\u062F\u0649|\u0641\u064A)\s+([^\s\d]{2,40})',
+    ),
+  ];
+
+  static final _placePatterns = <RegExp>[
+    RegExp(
+      r'(?:in|at)\s+([A-Z][A-Za-z][A-Za-z\s]{1,28}?)(?:\s+on\s|\s*[,.]|\s*$)',
+    ),
+    RegExp(r'(?:\u0641\u064A)\s+([^\s\d]{2,30})'),
   ];
 
   static final _refundKeywords = RegExp(
@@ -100,23 +122,56 @@ class TransactionParser {
     caseSensitive: false,
   );
 
+  /// Public amount parser used by the annotator when a span includes symbols.
+  static int? parseAmountToCents(String raw) => _parseAmountToCents(raw);
+
+  /// Public currency parser for a highlighted snippet (`SAR`, `ر.س`, `$`).
+  static String? extractCurrencyCode(String raw) => _extractCurrency(raw);
+
   /// Parse a notification body and extract transaction fields.
   static ParseResult parse(
     String body, {
     String fallbackCurrency = 'SAR',
     List<ScannerPattern> customPatterns = const [],
     DateTime? notificationDate,
+    String? senderPackage,
   }) {
     if (_skipKeywords.hasMatch(body)) {
-      return const ParseResult(confidence: 0.0);
+      return const ParseResult(
+        confidence: 0.0,
+        skipReason: ParseSkipReason.otp,
+      );
     }
 
     for (final pattern in customPatterns.where((p) => p.enabled)) {
+      if (!_senderMatches(pattern.senderMatch, senderPackage)) continue;
       final result = _tryPattern(body, pattern, notificationDate);
       if (result != null && result.amountCents != null) return result;
     }
 
     return _genericParse(body, fallbackCurrency, notificationDate);
+  }
+
+  static bool _senderMatches(String senderMatch, String? packageName) {
+    if (senderMatch.isEmpty || senderMatch == '*') return true;
+    if (packageName == null || packageName.isEmpty) return true;
+    return packageName == senderMatch || packageName.contains(senderMatch);
+  }
+
+  static FieldSpan _spanForMatch(Match match, FieldRole role) {
+    final full = match.group(0);
+    final captured = match.groupCount >= 1 ? match.group(1) : null;
+    if (full != null && captured != null && captured.isNotEmpty) {
+      final offset = full.indexOf(captured);
+      if (offset >= 0) {
+        return FieldSpan(
+          role: role,
+          start: match.start + offset,
+          end: match.start + offset + captured.length,
+        );
+      }
+    }
+    return FieldSpan(role: role, start: match.start, end: match.end);
   }
 
   static ParseResult? _tryPattern(
@@ -134,45 +189,64 @@ class TransactionParser {
       if (amountCents == null || amountCents <= 0) return null;
 
       String? currency;
+      Match? currencyMatch;
       if (pattern.currencyRegex != null) {
-        currency = RegExp(pattern.currencyRegex!).firstMatch(body)?.group(1);
+        currencyMatch = RegExp(pattern.currencyRegex!).firstMatch(body);
+        currency = currencyMatch?.group(1);
       }
 
       String? card;
+      Match? cardMatch;
       if (pattern.cardRegex != null) {
-        card = RegExp(pattern.cardRegex!).firstMatch(body)?.group(1);
+        cardMatch = RegExp(pattern.cardRegex!).firstMatch(body);
+        card = cardMatch?.group(1);
       }
 
       String? merchant;
+      Match? merchantMatch;
       if (pattern.merchantRegex != null) {
-        merchant = RegExp(
-          pattern.merchantRegex!,
-        ).firstMatch(body)?.group(1)?.trim();
+        merchantMatch = RegExp(pattern.merchantRegex!).firstMatch(body);
+        merchant = merchantMatch?.group(1)?.trim();
       }
 
       DateTime? date;
+      Match? dateMatch;
       if (pattern.dateRegex != null) {
-        date = _tryParseDate(
-          RegExp(pattern.dateRegex!).firstMatch(body)?.group(0),
-          pattern.dateFormat,
-        );
+        dateMatch = RegExp(pattern.dateRegex!).firstMatch(body);
+        date = _tryParseDate(dateMatch?.group(0), pattern.dateFormat);
       }
+
+      final place = _extractPlace(body, merchant: merchant);
 
       double conf = 0.35;
       if (currency != null) conf += 0.20;
       if (merchant != null) conf += 0.15;
       if (card != null) conf += 0.15;
       if (date != null) conf += 0.10;
+      if (place != null) conf += 0.05;
       conf += 0.05;
+
+      final spans = <FieldSpan>[
+        _spanForMatch(amountMatch, FieldRole.amount),
+        if (currencyMatch != null)
+          _spanForMatch(currencyMatch, FieldRole.currency),
+        if (merchantMatch != null)
+          _spanForMatch(merchantMatch, FieldRole.merchant),
+        if (cardMatch != null) _spanForMatch(cardMatch, FieldRole.card),
+        if (dateMatch != null) _spanForMatch(dateMatch, FieldRole.date),
+        ..._placeSpans(body, place),
+      ];
 
       return ParseResult(
         amountCents: amountCents,
         currencyCode: currency,
         cardLastFour: card,
         merchantName: merchant,
+        placeName: place,
         transactionDate: date ?? notificationDate,
         confidence: math.min(conf, 1.0),
         matchedPatternId: pattern.id,
+        fieldSpans: spans,
       );
     } catch (_) {
       return null;
@@ -184,39 +258,86 @@ class TransactionParser {
     String fallbackCurrency,
     DateTime? notificationDate,
   ) {
-    final amountCents = _extractAmount(body);
-    final currency = _extractCurrency(body) ?? fallbackCurrency;
-    final card = _extractCard(body);
-    final merchant = _extractMerchant(body);
+    final amountMatch = _firstAmountMatch(body);
+    final amountCents = amountMatch == null
+        ? null
+        : _parseAmountToCents(amountMatch.group(1) ?? amountMatch.group(0)!);
+    final currencyMatch = _isoCodes.firstMatch(body);
+    var currency = currencyMatch?.group(1);
+    if (currency == null) {
+      currency = _extractCurrency(body) ?? fallbackCurrency;
+    }
+    final cardMatch = _firstCardMatch(body);
+    final card = cardMatch?.group(1);
+    final merchantMatch = _firstMerchantMatch(body);
+    final merchant = merchantMatch?.group(1)?.trim();
+    final place = _extractPlace(body, merchant: merchant);
     final isRefund = _refundKeywords.hasMatch(body);
 
-    double conf = 0.0;
-    if (amountCents != null && amountCents > 0) conf += 0.35;
+    if (amountCents == null || amountCents <= 0) {
+      return ParseResult(
+        currencyCode: currency,
+        merchantName: merchant,
+        placeName: place,
+        transactionDate: notificationDate,
+        skipReason: ParseSkipReason.noAmount,
+      );
+    }
+
+    double conf = 0.35;
     if (currency != fallbackCurrency) conf += 0.20;
     if (merchant != null) conf += 0.15;
     if (card != null) conf += 0.15;
+    if (place != null) conf += 0.05;
 
-    final effectiveAmount = (amountCents != null && isRefund)
-        ? -amountCents
-        : amountCents;
+    final effectiveAmount = isRefund ? -amountCents : amountCents;
+
+    final spans = <FieldSpan>[
+      if (amountMatch != null) _spanForMatch(amountMatch, FieldRole.amount),
+      if (currencyMatch != null)
+        _spanForMatch(currencyMatch, FieldRole.currency),
+      if (merchantMatch != null)
+        _spanForMatch(merchantMatch, FieldRole.merchant),
+      if (cardMatch != null) _spanForMatch(cardMatch, FieldRole.card),
+      ..._placeSpans(body, place),
+    ];
 
     return ParseResult(
       amountCents: effectiveAmount,
       currencyCode: currency,
       cardLastFour: card,
       merchantName: merchant,
+      placeName: place,
       transactionDate: notificationDate,
       confidence: math.min(conf, 1.0),
+      fieldSpans: spans,
     );
   }
 
-  static int? _extractAmount(String body) {
+  static Match? _firstAmountMatch(String body) {
     for (final pattern in _amountPatterns) {
       final match = pattern.firstMatch(body);
-      if (match != null) {
-        final cents = _parseAmountToCents(match.group(1) ?? match.group(0)!);
-        if (cents != null && cents > 0) return cents;
-      }
+      if (match == null) continue;
+      final cents = _parseAmountToCents(match.group(1) ?? match.group(0)!);
+      if (cents != null && cents > 0) return match;
+    }
+    return null;
+  }
+
+  static Match? _firstCardMatch(String body) {
+    for (final pattern in _cardPatterns) {
+      final match = pattern.firstMatch(body);
+      final digits = match?.group(1);
+      if (digits != null && digits.length == 4) return match;
+    }
+    return null;
+  }
+
+  static Match? _firstMerchantMatch(String body) {
+    for (final pattern in _merchantPatterns) {
+      final match = pattern.firstMatch(body);
+      final raw = match?.group(1)?.trim();
+      if (raw != null && raw.length >= 2 && raw.length <= 50) return match;
     }
     return null;
   }
@@ -233,26 +354,26 @@ class TransactionParser {
     return null;
   }
 
-  static String? _extractCard(String body) {
-    for (final pattern in _cardPatterns) {
+  static String? _extractPlace(String body, {String? merchant}) {
+    for (final pattern in _placePatterns) {
       final match = pattern.firstMatch(body);
-      if (match != null) {
-        final digits = match.group(1);
-        if (digits != null && digits.length == 4) return digits;
+      final raw = match?.group(1)?.trim();
+      if (raw == null || raw.length < 2) continue;
+      if (merchant != null && raw.toLowerCase() == merchant.toLowerCase()) {
+        continue;
       }
+      return raw;
     }
     return null;
   }
 
-  static String? _extractMerchant(String body) {
-    for (final pattern in _merchantPatterns) {
-      final match = pattern.firstMatch(body);
-      if (match != null) {
-        final raw = match.group(1)?.trim();
-        if (raw != null && raw.length >= 2 && raw.length <= 50) return raw;
-      }
-    }
-    return null;
+  static List<FieldSpan> _placeSpans(String body, String? place) {
+    if (place == null || place.isEmpty) return const [];
+    final index = body.toLowerCase().indexOf(place.toLowerCase());
+    if (index < 0) return const [];
+    return [
+      FieldSpan(role: FieldRole.place, start: index, end: index + place.length),
+    ];
   }
 
   static const _arabicDigits = <String, String>{

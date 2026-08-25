@@ -139,7 +139,7 @@ void main() {
           reason: 'Add Participant sheet did not open',
         );
         final sheetField = find.descendant(
-          of: find.byKey(const ValueKey('responsive_sheet_panel')),
+          of: find.byKey(const ValueKey('safaeh_panel')),
           matching: find.byType(TextField),
         );
         await waitForWidget(

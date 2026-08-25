@@ -3,10 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/layout/constrained_content.dart';
-import '../../../core/utils/user_text.dart';
-import '../../../core/widgets/user_text.dart';
+import '../../../core/widgets/toast.dart';
+import '../../../core/settings/providers/settings_framework_providers.dart';
+import '../../../core/settings/settings_definitions.dart';
+import '../../expenses/category_icons.dart';
+import '../../groups/providers/groups_provider.dart';
 import '../domain/draft_transaction.dart';
+import '../domain/field_span.dart';
 import '../providers/scanner_providers.dart';
+import '../widgets/notification_annotator.dart';
+import '../widgets/scanner_group_picker.dart';
 
 class DraftTransactionDetailPage extends ConsumerStatefulWidget {
   final DraftTransaction draft;
@@ -22,35 +28,60 @@ class _DraftTransactionDetailPageState
     extends ConsumerState<DraftTransactionDetailPage> {
   late TextEditingController _merchantController;
   late TextEditingController _amountController;
+  late TextEditingController _placeController;
+  late List<FieldSpan> _spans;
   late String _currencyCode;
   late bool _isIncome;
-  bool _showRaw = false;
+  late String? _groupId;
+  late String? _category;
 
   @override
   void initState() {
     super.initState();
-    _isIncome = widget.draft.amountCents < 0;
-    _merchantController = TextEditingController(
-      text: widget.draft.merchantName ?? '',
-    );
+    final draft = widget.draft;
+    _isIncome = draft.amountCents < 0;
+    _merchantController = TextEditingController(text: draft.merchantName ?? '');
+    _placeController = TextEditingController(text: draft.placeName ?? '');
     _amountController = TextEditingController(
-      text: (widget.draft.amountCents.abs() / 100).toStringAsFixed(2),
+      text: (draft.amountCents.abs() / 100).toStringAsFixed(2),
     );
-    _currencyCode = widget.draft.currencyCode;
+    _currencyCode = draft.currencyCode;
+    _spans = List.of(draft.fieldSpans);
+    _groupId = draft.targetGroupId;
+    _category = draft.merchantCategory;
+    final settings = ref.read(hisabSettingsProvidersProvider);
+    final fallback = settings?.controller.get(scannerDefaultGroupIdSettingDef);
+    if (fallback is String && fallback.isNotEmpty) {
+      _groupId ??= fallback;
+    }
   }
 
   @override
   void dispose() {
     _merchantController.dispose();
     _amountController.dispose();
+    _placeController.dispose();
     super.dispose();
+  }
+
+  void _applySpans(List<FieldSpan> spans) {
+    final values = valuesFromSpans(widget.draft.rawNotificationText, spans);
+    setState(() {
+      _spans = spans;
+      if (values.merchant != null) _merchantController.text = values.merchant!;
+      if (values.place != null) _placeController.text = values.place!;
+      if (values.amountCents != null) {
+        _amountController.text = (values.amountCents! / 100).toStringAsFixed(2);
+      }
+      if (values.currency != null) _currencyCode = values.currency!;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final draft = widget.draft;
+    final groups = ref.watch(groupsProvider).asData?.value ?? [];
 
     return Scaffold(
       appBar: AppBar(
@@ -70,133 +101,89 @@ class _DraftTransactionDetailPageState
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // ── Extracted fields ──
-            _buildFieldCard(
-              context,
-              icon: Icons.store_outlined,
-              label: 'scanner_merchant'.tr(),
-              child: TextField(
-                controller: _merchantController,
-                decoration: InputDecoration(
-                  hintText: 'scanner_merchant_hint'.tr(),
-                  border: InputBorder.none,
-                  isDense: true,
+            NotificationAnnotator(
+              title: draft.senderTitle ?? draft.senderPackage,
+              body: draft.rawNotificationText,
+              spans: _spans,
+              onSpansChanged: _applySpans,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _merchantController,
+              decoration: InputDecoration(
+                labelText: 'scanner_merchant'.tr(),
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _placeController,
+              decoration: InputDecoration(
+                labelText: 'scanner_place'.tr(),
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _amountController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'scanner_amount'.tr(),
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            _buildFieldCard(
-              context,
-              icon: Icons.attach_money,
-              label: 'scanner_amount'.tr(),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 120,
-                    child: TextField(
-                      controller: _amountController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        isDense: true,
-                      ),
-                    ),
+                const SizedBox(width: 8),
+                Chip(label: Text(_currencyCode)),
+                const SizedBox(width: 8),
+                FilterChip(
+                  label: Text(
+                    _isIncome ? 'scanner_income'.tr() : 'scanner_expense'.tr(),
                   ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      _currencyCode,
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                  selected: _isIncome,
+                  onSelected: (v) => setState(() => _isIncome = v),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            if (draft.cardLastFour != null)
-              _buildInfoRow(
-                context,
-                Icons.credit_card,
-                'scanner_card'.tr(),
-                '••••  ${draft.cardLastFour}',
-              ),
-            _buildInfoRow(
-              context,
-              Icons.calendar_today,
-              'scanner_date'.tr(),
-              _formatFullDate(draft.transactionDate),
+            const SizedBox(height: 12),
+            Text(
+              'scanner_category'.tr(),
+              style: theme.textTheme.labelLarge,
             ),
-            if (draft.hasLocation)
-              _buildInfoRow(
-                context,
-                Icons.location_on_outlined,
-                'scanner_location'.tr(),
-                '${draft.latitude!.toStringAsFixed(4)}, ${draft.longitude!.toStringAsFixed(4)}',
-              ),
-            _buildInfoRow(
-              context,
-              Icons.app_shortcut,
-              'scanner_source'.tr(),
-              draft.senderTitle ?? draft.senderPackage,
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              children: [
+                FilterChip(
+                  label: Text('scanner_no_category'.tr()),
+                  selected: _category == null,
+                  onSelected: (_) => setState(() => _category = null),
+                ),
+                ...presetCategoryTags.map((t) {
+                  return FilterChip(
+                    avatar: Icon(t.icon, size: 16),
+                    label: Text('category_${t.id}'.tr()),
+                    selected: _category == t.id,
+                    onSelected: (_) => setState(() => _category = t.id),
+                  );
+                }),
+              ],
             ),
-            _buildInfoRow(
-              context,
-              Icons.speed,
-              'scanner_confidence'.tr(),
-              '${(draft.confidence * 100).round()}%',
-            ),
-
             const SizedBox(height: 16),
-            const Divider(),
-            const SizedBox(height: 8),
-
-            // ── Raw notification ──
-            InkWell(
-              onTap: () => setState(() => _showRaw = !_showRaw),
-              borderRadius: BorderRadius.circular(8),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  children: [
-                    Icon(
-                      _showRaw ? Icons.expand_less : Icons.expand_more,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'scanner_raw_notification'.tr(),
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            Text(
+              'scanner_default_group'.tr(),
+              style: theme.textTheme.labelLarge,
             ),
-            if (_showRaw) ...[
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: _buildHighlightedText(context, draft),
-              ),
-            ],
+            ScannerGroupPicker(
+              groups: groups,
+              selectedId: _groupId,
+              onSelected: (id) => setState(() => _groupId = id),
+            ),
           ],
         ),
       ),
@@ -216,126 +203,7 @@ class _DraftTransactionDetailPageState
     );
   }
 
-  Widget _buildFieldCard(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required Widget child,
-  }) {
-    final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        child: Row(
-          children: [
-            Icon(icon, size: 20, color: theme.colorScheme.primary),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(width: 8),
-            Expanded(child: child),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(
-    BuildContext context,
-    IconData icon,
-    String label,
-    String value,
-  ) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: theme.colorScheme.onSurfaceVariant),
-          const SizedBox(width: 12),
-          SizedBox(
-            width: 100,
-            child: Text(
-              label,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-          Expanded(child: UserText(value, style: theme.textTheme.bodyMedium)),
-        ],
-      ),
-    );
-  }
-
-  /// Highlights extracted portions of the raw notification text.
-  Widget _buildHighlightedText(BuildContext context, DraftTransaction draft) {
-    final theme = Theme.of(context);
-    final raw = draft.rawNotificationText;
-    final spans = <TextSpan>[];
-    final rawDirection = resolveUserTextDirection(raw);
-
-    final highlights = <String>{};
-    if (draft.merchantName != null) highlights.add(draft.merchantName!);
-    if (draft.cardLastFour != null) highlights.add(draft.cardLastFour!);
-    final amountStr = (draft.amountCents.abs() / 100).toStringAsFixed(2);
-    highlights.add(amountStr);
-
-    if (highlights.isEmpty) {
-      return SelectableText(
-        raw,
-        style: theme.textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
-        textDirection: rawDirection,
-      );
-    }
-
-    final pattern = highlights.map((h) => RegExp.escape(h)).join('|');
-    final regex = RegExp(pattern, caseSensitive: false);
-    int lastEnd = 0;
-
-    for (final match in regex.allMatches(raw)) {
-      if (match.start > lastEnd) {
-        spans.add(TextSpan(text: raw.substring(lastEnd, match.start)));
-      }
-      spans.add(
-        TextSpan(
-          text: match.group(0),
-          style: TextStyle(
-            backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.2),
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      );
-      lastEnd = match.end;
-    }
-    if (lastEnd < raw.length) {
-      spans.add(TextSpan(text: raw.substring(lastEnd)));
-    }
-
-    return SelectableText.rich(
-      TextSpan(
-        style: theme.textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
-        children: spans,
-      ),
-      textDirection: rawDirection,
-    );
-  }
-
-  String _formatFullDate(DateTime date) {
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} '
-        '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-  }
-
-  void _confirm(BuildContext context) {
+  Future<void> _confirm(BuildContext context) async {
     final editedMerchant = _merchantController.text.trim();
     final editedAmount = double.tryParse(_amountController.text.trim());
     int? editedCents;
@@ -344,13 +212,23 @@ class _DraftTransactionDetailPageState
       editedCents = _isIncome ? -absCents : absCents;
     }
 
-    ref
+    final ok = await ref
         .read(scannerControllerProvider)
         .confirmDraft(
           widget.draft.id,
+          targetGroupId: _groupId,
           overrideMerchant: editedMerchant.isNotEmpty ? editedMerchant : null,
           overrideAmountCents: editedCents,
+          overridePlace: _placeController.text.trim().isEmpty
+              ? null
+              : _placeController.text.trim(),
+          overrideCategory: _category,
         );
+    if (!context.mounted) return;
+    if (!ok) {
+      context.showToast('scanner_confirm_failed'.tr());
+      return;
+    }
     Navigator.pop(context);
   }
 }

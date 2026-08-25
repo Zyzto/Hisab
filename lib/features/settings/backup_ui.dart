@@ -65,20 +65,19 @@ Future<void> runBackupExportFlow(BuildContext context, WidgetRef ref) async {
         break;
     }
     if (!context.mounted) return;
-    final ext = kind == BackupExportKind.fullZip
-        ? 'zip'
-        : kind == BackupExportKind.minimalCsv
-        ? 'csv'
-        : 'json';
-    final result = await FilePicker.platform.saveFile(
+    final mimeType = switch (kind) {
+      BackupExportKind.fullZip => 'application/zip',
+      BackupExportKind.minimalCsv => 'text/csv',
+      BackupExportKind.minimalJson => 'application/json',
+    };
+    final result = await FilePicker.saveFile(
       dialogTitle: 'export_data'.tr(),
       fileName: exported.fileName,
-      type: FileType.custom,
-      allowedExtensions: [ext],
+      mimeType: mimeType,
       bytes: exported.bytes,
     );
     if (!context.mounted) return;
-    if (result != null && result.isNotEmpty) {
+    if (result != null) {
       Log.info('Backup exported to $result');
       context.showSuccess('export_success'.tr());
     } else {
@@ -92,18 +91,12 @@ Future<void> runBackupExportFlow(BuildContext context, WidgetRef ref) async {
 
 Future<void> runBackupImportFlow(BuildContext context, WidgetRef ref) async {
   try {
-    final picked = await FilePicker.platform.pickFiles(
+    final file = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: ['json', 'zip'],
-      withData: true,
     );
-    if (picked == null || picked.files.isEmpty || !context.mounted) return;
-    final file = picked.files.single;
-    final bytes = file.bytes;
-    if (bytes == null) {
-      context.showError('import_failed'.tr());
-      return;
-    }
+    if (file == null || !context.mounted) return;
+    final bytes = await file.readAsBytes();
 
     final localOnly = ref.read(effectiveLocalOnlyProvider);
     final service = BackupService.forImport(

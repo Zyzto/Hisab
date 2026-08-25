@@ -1,11 +1,14 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:safaeh/safaeh.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
+import '../../../core/motion/app_motion.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/theme/theme_config.dart';
+import '../../../core/widgets/user_text.dart';
 import '../../../domain/domain.dart';
 
 /// SharedPreferences key: user has dismissed the Balance settle explainer.
@@ -211,150 +214,34 @@ Future<SettlementMethod?> showSettlementMethodPickerSheet(
   BuildContext context, {
   required SettlementMethod selected,
 }) {
-  final theme = Theme.of(context);
-  return showResponsiveSheet<SettlementMethod>(
+  return showSafaehPicker<SettlementMethod>(
     context: context,
     title: 'settlement_method'.tr(),
-    maxHeight: MediaQuery.of(context).size.height * 0.85,
-    isScrollControlled: true,
-    centerInFullViewport: true,
-    child: Builder(
-      builder: (ctx) => SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(ctx).padding.bottom + ThemeConfig.spacingM,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (!LayoutBreakpoints.isTabletOrWider(context))
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    child: Text(
-                      'settlement_method'.tr(),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    children: [
-                      for (final method in SettlementMethod.values) ...[
-                        _SettlementMethodOption(
-                          method: method,
-                          selected: method == selected,
-                          emphasizeLiveChip: method == SettlementMethod.greedy,
-                          onTap: () => Navigator.pop(ctx, method),
-                        ),
-                        const SizedBox(height: 8),
-                      ],
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                  child: Text(
-                    'settlement_picker_footer'.tr(),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      height: 1.35,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    titleBuilder: (ctx, style) => UserText(
+      'settlement_method'.tr(),
+      style: style,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
     ),
-  );
-}
-
-class _SettlementMethodOption extends StatelessWidget {
-  final SettlementMethod method;
-  final bool selected;
-  final bool emphasizeLiveChip;
-  final VoidCallback onTap;
-
-  const _SettlementMethodOption({
-    required this.method,
-    required this.selected,
-    required this.emphasizeLiveChip,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final subtle = context.subtleAccents;
-
-    return Material(
-      color: selected
-          ? AccentSurfaces.emphasizedFill(cs, subtle: subtle)
-          : cs.surfaceContainerLow,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: selected
-                  ? AccentSurfaces.emphasizedBorder(cs, subtle: subtle)
-                  : cs.outlineVariant.withValues(alpha: 0.45),
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  settlementMethodIcon(method),
-                  size: 22,
-                  color: selected ? cs.primary : cs.onSurfaceVariant,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        settlementMethodLabel(method),
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        settlementMethodOutcome(method),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: cs.onSurfaceVariant,
-                          height: 1.3,
-                        ),
-                      ),
-                      if (emphasizeLiveChip) ...[
-                        const SizedBox(height: 8),
-                        const _LivePlanChip(emphasized: true),
-                      ],
-                    ],
-                  ),
-                ),
-                if (selected)
-                  Icon(Icons.check_circle_rounded, color: cs.primary, size: 22),
-              ],
-            ),
-          ),
+    selected: selected,
+    footer: 'settlement_picker_footer'.tr(),
+    fadeScale: ({required animation, required child}) =>
+        AppMotion.buildFadeScaleTransition(animation: animation, child: child),
+    slideUp: ({required animation, required child}) =>
+        AppMotion.buildSlideUpTransition(animation: animation, child: child),
+    options: [
+      for (final method in SettlementMethod.values)
+        SafaehOption(
+          value: method,
+          label: settlementMethodLabel(method),
+          subtitle: settlementMethodOutcome(method),
+          icon: settlementMethodIcon(method),
+          badge: method == SettlementMethod.greedy
+              ? 'settlement_live_plan_chip_reshuffle'.tr()
+              : null,
         ),
-      ),
-    );
-  }
+    ],
+  );
 }
 
 class _LivePlanChip extends StatelessWidget {

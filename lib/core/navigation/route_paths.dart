@@ -2,6 +2,15 @@ class RoutePaths {
   static const String home = '/';
   static const String homeModeBase = '/home';
   static const String settings = '/settings';
+
+  /// Query key for [settingsFocus]. Settings consumes it once, then strips it.
+  static const String settingsFocusParam = 'focus';
+
+  /// Open Settings and jump to [settingKey] with the search highlight.
+  static String settingsFocus(String settingKey) => Uri(
+    path: settings,
+    queryParameters: {settingsFocusParam: settingKey},
+  ).toString();
   static const String profile = '/profile';
   static const String profileExpenses = '/profile/expenses';
   static const String onboarding = '/onboarding';

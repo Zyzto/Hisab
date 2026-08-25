@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:safaeh/safaeh.dart';
 
 import 'layout_breakpoints.dart';
 
@@ -10,19 +11,12 @@ import 'layout_breakpoints.dart';
 ///
 /// Placement follows text direction: end of the content band (right in LTR,
 /// left in RTL), matching [FloatingActionButtonLocation.endFloat].
-class ContentAlignedFabLocation extends FloatingActionButtonLocation {
+class ContentAlignedFabLocation extends SafaehContentAlignedFabLocation {
   ContentAlignedFabLocation._({
-    required this.leftOffset,
-    required this.bandWidth,
-    required this.textDirection,
+    required super.leftOffset,
+    required super.bandWidth,
+    required super.textDirection,
   });
-
-  final double leftOffset;
-  final double bandWidth;
-  final TextDirection textDirection;
-
-  static const double _margin = 16;
-  static const double _minGutterForAlign = 88;
 
   /// Resolve a location from the scaffold's content-area width.
   ///
@@ -50,7 +44,7 @@ class ContentAlignedFabLocation extends FloatingActionButtonLocation {
             0.0,
             double.infinity,
           );
-    if (endFree < _minGutterForAlign) {
+    if (endFree < SafaehContentAlignedFabLocation.minGutterForAlign) {
       return narrowFallback;
     }
     return ContentAlignedFabLocation._(
@@ -58,33 +52,6 @@ class ContentAlignedFabLocation extends FloatingActionButtonLocation {
       bandWidth: bandWidth,
       textDirection: textDirection,
     );
-  }
-
-  @override
-  Offset getOffset(ScaffoldPrelayoutGeometry geometry) {
-    final fabSize = geometry.floatingActionButtonSize;
-    final scaffoldSize = geometry.scaffoldSize;
-
-    // Match [FloatingActionButtonLocation.endFloat] vertical placement.
-    final y = geometry.contentBottom - _margin - fabSize.height;
-
-    if (textDirection == TextDirection.rtl) {
-      final safeLeft = geometry.minInsets.left;
-      var x = leftOffset - _margin - fabSize.width;
-      final minX = safeLeft + _margin;
-      if (x < minX) x = minX;
-      if (x < 0) x = 0;
-      return Offset(x, y);
-    }
-
-    final safeRight = geometry.minInsets.right;
-    final contentRight = leftOffset + bandWidth;
-    var x = contentRight + _margin;
-    final maxX = scaffoldSize.width - _margin - fabSize.width - safeRight;
-    if (x > maxX) x = maxX;
-    if (x < 0) x = 0;
-
-    return Offset(x, y);
   }
 
   // Scaffold restarts the FAB move (scale/rotate) animation when

@@ -289,6 +289,11 @@ filled define/env files. See [SECURITY.md](SECURITY.md).
 [AGPL-3.0](LICENSE) — use, study, modify and redistribute freely; if you run a
 modified version as a network service, its users are entitled to your source.
 
+[Safaeh](https://github.com/Zyzto/Safaeh) (git tag, not in this tree) is
+[MPL-2.0](https://github.com/Zyzto/Safaeh/blob/main/LICENSE), same family as
+[Edadat](https://github.com/Zyzto/Edadat) and
+[Siglat](https://github.com/Zyzto/Siglat). Hisab as a larger work stays AGPL.
+
 The name **Hisab**, the Arabic wordmark <span dir="rtl">**حساب**</span> and the
 logo are not covered by that licence. Fork away, but please ship your fork under
 a different name and icon. The hosted backend is a separate proprietary work

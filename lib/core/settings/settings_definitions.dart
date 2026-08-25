@@ -502,6 +502,7 @@ final scannerLocationEnabledSettingDef = const BoolSetting(
   icon: Icons.location_on_outlined,
   section: 'scanner',
   order: 1,
+  visible: false,
 );
 
 /// Show a local notification when a transaction is captured.
@@ -512,6 +513,56 @@ final scannerNotifyOnCaptureSettingDef = const BoolSetting(
   icon: Icons.notification_add_outlined,
   section: 'scanner',
   order: 2,
+  visible: false,
+);
+
+/// Default destination group for confirmed scanner drafts.
+final scannerDefaultGroupIdSettingDef = const StringSetting(
+  'scanner_default_group_id',
+  defaultValue: '',
+  titleKey: 'scanner_default_group',
+  icon: Icons.group_outlined,
+  section: 'scanner',
+  order: 3,
+  visible: false,
+);
+
+/// When true, apply local merchant/keyword category rules on capture.
+final scannerCategorizeEnabledSettingDef = const BoolSetting(
+  'scanner_categorize_enabled',
+  defaultValue: true,
+  titleKey: 'scanner_categorize_enabled',
+  subtitleKey: 'scanner_categorize_enabled_subtitle',
+  icon: Icons.category_outlined,
+  section: 'scanner',
+  order: 4,
+);
+
+/// Optional AI assist for scanner fields: off | nano | cloud.
+final scannerAiModeSettingDef = const EnumSetting(
+  'scanner_ai_mode',
+  defaultValue: 'off',
+  titleKey: 'scanner_ai_mode',
+  options: ['off', 'nano', 'cloud'],
+  optionLabels: {
+    'off': 'scanner_ai_mode_off',
+    'nano': 'scanner_ai_mode_nano',
+    'cloud': 'scanner_ai_mode_cloud',
+  },
+  icon: Icons.auto_awesome,
+  section: 'scanner',
+  order: 5,
+);
+
+/// True after the user finishes the full scanner setup wizard.
+final scannerSetupCompletedSettingDef = const BoolSetting(
+  'scanner_setup_completed',
+  defaultValue: false,
+  titleKey: 'scanner_setup_completed',
+  icon: Icons.flag_outlined,
+  section: 'scanner',
+  order: -1,
+  visible: false,
 );
 
 final allSections = [
@@ -870,6 +921,10 @@ final allSettings = <SettingDefinition>[
   scannerEnabledSettingDef,
   scannerLocationEnabledSettingDef,
   scannerNotifyOnCaptureSettingDef,
+  scannerDefaultGroupIdSettingDef,
+  scannerCategorizeEnabledSettingDef,
+  scannerAiModeSettingDef,
+  scannerSetupCompletedSettingDef,
   telemetryEnabledSettingDef,
   notificationsEnabledSettingDef,
   screenshotReportPromptEnabledSettingDef,

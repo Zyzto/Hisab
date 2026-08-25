@@ -4,6 +4,7 @@ class SenderRule {
   final String packageName;
   final String? senderLabel;
   final String? senderNumber;
+  final String? targetGroupId;
   final bool enabled;
   final int matchCount;
   final DateTime createdAt;
@@ -13,6 +14,7 @@ class SenderRule {
     required this.packageName,
     this.senderLabel,
     this.senderNumber,
+    this.targetGroupId,
     this.enabled = true,
     this.matchCount = 0,
     required this.createdAt,
@@ -23,15 +25,20 @@ class SenderRule {
     String? packageName,
     String? senderLabel,
     String? senderNumber,
+    String? targetGroupId,
     bool? enabled,
     int? matchCount,
     DateTime? createdAt,
+    bool clearTargetGroupId = false,
   }) {
     return SenderRule(
       id: id ?? this.id,
       packageName: packageName ?? this.packageName,
       senderLabel: senderLabel ?? this.senderLabel,
       senderNumber: senderNumber ?? this.senderNumber,
+      targetGroupId: clearTargetGroupId
+          ? null
+          : (targetGroupId ?? this.targetGroupId),
       enabled: enabled ?? this.enabled,
       matchCount: matchCount ?? this.matchCount,
       createdAt: createdAt ?? this.createdAt,

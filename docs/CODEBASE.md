@@ -15,6 +15,7 @@ Product and install overview: [../README.md](../README.md). Doc index: [README.m
 - PowerSync package as local SQLite engine
 - `packages/hisab_backend`: the backend contract (nine facets, neutral models)
 - `packages/hisab_cloud`: the backend implementation — a no-op stub here
+- [Safaeh](https://github.com/Zyzto/Safaeh): adaptive modals, "On this page" index, and sidenav chrome (git dependency)
 - Firebase Cloud Messaging for push notifications (Android/iOS/Web)
 
 **Platform support:** Run/build/release targets are Android, iOS, and web. Linux is **not** supported as an app target (no launch option, no `flutter build linux`, no Linux release). On a Linux host you can still use test tooling: `flutter test`, integration tests (e.g. `flutter drive -d web-server` or with another device), and CI runs unit/widget/integration tests on `ubuntu-latest`.
@@ -32,6 +33,7 @@ Product and install overview: [../README.md](../README.md). Doc index: [README.m
 | `ios/Runner/Info.plist` | iOS permissions/deep-link/background notification config |
 | `packages/hisab_backend/` | Backend contract: facet interfaces, neutral models, registry |
 | `packages/hisab_cloud/` | Backend implementation. In this repository a stub that registers nothing |
+| [Safaeh](https://github.com/Zyzto/Safaeh) | Adaptive modals, "On this page" index, and sidenav / drawer chrome (external) |
 | `docs/` | Setup and architecture documentation; see [docs/README.md](README.md) for an index |
 | `test/` | Tests mirroring `lib/` layout; see [test/README.md](../test/README.md) |
 | `integration_test/` | Full-app integration tests, backend-free; see [test/README.md](../test/README.md) |
@@ -63,7 +65,7 @@ Product and install overview: [../README.md](../README.md). Doc index: [README.m
 - `lib/core/database/powersync_schema.dart` defines local schema:
   - `groups`, `group_members`, `participants`, `expenses`, `expense_tags`, `group_invites`, `invite_usages`, `user_notifications`
   - `local_archived_groups` — per-user “hide from my list” (not synced)
-  - `draft_transactions`, `scanner_sender_rules`, `scanner_patterns` — Transaction Scanner (local-only; not synced); see [TRANSACTION_SCANNER.md](TRANSACTION_SCANNER.md)
+  - `draft_transactions`, `scanner_sender_rules`, `scanner_patterns`, `scanner_category_rules`, `scanner_notification_log` — Transaction Scanner (local-only; not synced); see [TRANSACTION_SCANNER.md](TRANSACTION_SCANNER.md)
   - `pending_writes` queue for offline-online deferred writes
 - **PowerSync `id` column:** PowerSync adds an `id` column automatically to each table. Do not add `Column.text('id')` (or any custom `id` column) in the schema — it will trigger: *"id column is automatically added, custom id columns are not supported"*. Hisab uses PowerSync 2.x as the **local SQLite engine** with a custom `SyncEngine` (not PowerSync Cloud Sync Streams).
 - **Repositories** (`lib/core/repository/`): `group_repository`, `participant_repository`, `expense_repository`, `group_member_repository`, `group_invite_repository`, `tag_repository`, `user_notification_repository`, `powersync_repository`. Wired in `repository_providers.dart` / profile providers with `effectiveLocalOnlyProvider` and connectivity; implementations in `powersync_repository.dart` and per-entity repositories.
@@ -130,7 +132,7 @@ Expense form **photos**: add up to 5 images (camera or gallery on all platforms,
 - **Group / personal create wizard:** Canonical routes are `/groups/create` and `/groups/create-personal` (each mounts one `GroupCreatePage` so `PageView` state is not disposed between steps). Legacy paths such as `/groups/create/details` **redirect** to the canonical URL (bookmarks still work; refresh on a legacy step URL restarts the wizard at step 0). In-wizard step labels in the address bar use `SystemNavigator.routeInformationUpdated` (decorative), not `context.go`, so state and animations stay intact. Step UI uses 0.6.x flat-panel surfaces (`AccentSurfaces`), `GroupSectionHeader`, living progress dots, `AppMotion` / `UiPerf` chrome, and `WizardStepEnter` (shared with onboarding).
 - **Onboarding wizard:** Per-step routes (`/onboarding/welcome`, …) remain for deep links and cold starts; swiping between steps updates the browser URL the same way (**decorative** `routeInformationUpdated`) so `OnboardingPage` state is not recreated by `go()` on every page.
 - **Group detail tabs:** Tab changes still use `SystemNavigator.routeInformationUpdated` in `group_detail_page.dart` (same pattern: URL reflects tab without replacing the route).
-- **Modals/sheets:** `lib/core/layout/responsive_sheet.dart` — `showResponsiveSheet` (bottom sheet on narrow, centered dialog on tablet+) and `showAppDialog`; both support `centerInFullViewport` and **click-outside-to-close** (barrier dismiss on all platforms, including desktop web via an explicit barrier gesture). See [MODAL_CENTERING_AND_RESPONSIVE_SHEET.md](MODAL_CENTERING_AND_RESPONSIVE_SHEET.md).
+- **Modals/sheets:** [Safaeh](https://github.com/Zyzto/Safaeh) — `showSafaeh` (bottom sheet on narrow, centered dialog on tablet+). Hisab wraps it as `showResponsiveSheet` / `showAppDialog` in `lib/core/layout/responsive_sheet.dart` for rail offset and `UserText`. Both support `centerInFullViewport` and **click-outside-to-close** (barrier dismiss on all platforms, including desktop web via an explicit barrier gesture). See [MODAL_CENTERING_AND_RESPONSIVE_SHEET.md](MODAL_CENTERING_AND_RESPONSIVE_SHEET.md).
 - **Page / window motion:** Shared tokens and builders in `lib/core/motion/app_motion.dart` (`page` 280ms, `shellTab` 200ms, `modal` 320ms, `shellNav` 280ms). GoRouter helpers in `lib/core/navigation/app_page.dart`:
   - **Fade + end-slide** (`appFadeSlidePage` / `PageTransitionsTheme`) for hierarchical pushes and scanner `MaterialPageRoute`s; both share `AppMotion.buildHierarchicalPageTransition`. On iOS web (`UiPerf.preferFadeOnlyPageTransitions`) the end-slide is skipped (fade-only).
   - **No transition** (`appNoTransitionPage`) for IndexedStack roots (`/`, `/home/:mode`, `/settings`), onboarding step routes, and expense detail paging (`/groups/.../expenses/:eid` and invite preview `:eid`) so in-page slides / PageViews are not double-animated. Expense detail uses an interactive [PageView] in `ExpenseDetailShell` (live adjacent-expense peek while swiping; URL sync via decorative path); first-open enter still runs inside the shell.
@@ -222,7 +224,7 @@ contract in [BACKEND_BEHAVIOUR.md](BACKEND_BEHAVIOUR.md).
   - feedback / bug report (**feedback_upload** shared web+native, feedback_clipboard io/web; `submitUserBugReport` in error_report_helper; optional screenshot prompt via `ss_preventer` on iOS/Android 14+)
   - About: version row tappable to check for updates manually; About me shows developer info from GitHub (avatar, name, bio, profile link)
 - `features/onboarding`: multi-step onboarding (welcome, preferences, permissions, connect) with mode selection and auth gate for online mode; step UI uses 0.6.x flat-panel surfaces (`AccentSurfaces`), brand hero + staggered welcome rows, and `WizardStepEnter` motion (UiPerf-gated; `lib/core/widgets/wizard_step_enter.dart`, aliased as `OnboardingStepEnter` in onboarding shared); URL sync for steps is decorative (see Navigation) so wizard state is preserved while swiping
-- `features/transaction_scanner`: Android notification → draft → personal expense (Settings hub; local-only tables). See [TRANSACTION_SCANNER.md](TRANSACTION_SCANNER.md).
+- `features/transaction_scanner`: Android notification → draft → personal or shared expense (setup wizard, visual annotator, history log; local-only tables). See [TRANSACTION_SCANNER.md](TRANSACTION_SCANNER.md).
 
 ## Settings Framework
 
@@ -397,7 +399,7 @@ Local: `bash ./scripts/run_release_checks.sh`.
 
 - state: `flutter_riverpod`, `riverpod_annotation`
 - navigation: `go_router`
-- **Git deps:** `flutter_logging_service` (siglat), `flutter_settings_framework` (edadat) — pinned to `ref: main` in pubspec for CI; local path override (lock not committed) is used for fast iteration on those packages. Optional: publish to pub.dev or vendor into this repo for long-term reproducibility.
+- **Git deps:** `flutter_logging_service` ([Siglat](https://github.com/Zyzto/Siglat) `v0.2.1`), `flutter_settings_framework` ([Edadat](https://github.com/Zyzto/Edadat) `v0.7.1`), `safaeh` ([Safaeh](https://github.com/Zyzto/Safaeh) `v0.1.0`) — pinned to release tags. Local `pubspec_overrides.yaml` (gitignored) can point at sibling checkouts for iteration.
 - local db/sync engine: `powersync`
 - backend contract: `hisab_backend` (interfaces only); implementation supplied by `hisab_cloud`
 - notifications: `firebase_core`, `firebase_messaging`, `flutter_local_notifications`

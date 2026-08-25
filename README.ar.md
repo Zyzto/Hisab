@@ -306,6 +306,8 @@ bash scripts/run_release_checks.sh
 
 [AGPL-3.0](LICENSE) — لكم أن تستخدموا البرنامج وتدرسوه وتعدّلوه وتعيدوا توزيعه بحرية؛ ومن شغّل نسخة معدَّلة كخدمة على الشبكة وجب أن يتيح شفرتها لمستخدميها.
 
+<span dir="ltr"><a href="https://github.com/Zyzto/Safaeh">Safaeh</a></span> (وسم git، ليست في هذا المستودع) مرخّصة بـ <span dir="ltr"><a href="https://github.com/Zyzto/Safaeh/blob/main/LICENSE">MPL-2.0</a></span>، نفس عائلة <span dir="ltr"><a href="https://github.com/Zyzto/Edadat">Edadat</a></span> و<span dir="ltr"><a href="https://github.com/Zyzto/Siglat">Siglat</a></span>. حساب كعمل أكبر يبقى AGPL.
+
 أما الاسم **حساب** والعلامة <span dir="ltr">**Hisab**</span> والشعار فليست مشمولة بالرخصة. اشتقّوا ما شئتم، ونرجو أن تصدر نسختكم باسم وأيقونة مختلفين. والخادم المستضاف مشروع منفصل ومغلق وليس في هذا المستودع — والمواصفة المنشورة لبناء خادمكم في <span dir="ltr">[docs/SELF_HOSTING.md](docs/SELF_HOSTING.md)</span>.
 
 </div>

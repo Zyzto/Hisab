@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:safaeh/safaeh.dart';
 
-import '../../../core/layout/layout_breakpoints.dart';
-import '../../../core/layout/sheet_handle_drag.dart';
-import '../../../core/motion/app_motion.dart';
 import '../../../core/navigation/route_transition_ready.dart';
 import 'receipt_camera_types.dart';
 import 'receipt_camera_viewer.dart';
@@ -28,49 +26,39 @@ Future<ReceiptCameraResult?> showReceiptCamera(
     return Future<ReceiptCameraResult?>.value(null);
   }
 
-  return showGeneralDialog<ReceiptCameraResult>(
+  return showSafaehCameraSheet<ReceiptCameraResult>(
     context: context,
-    useRootNavigator: true,
-    barrierDismissible: false,
-    barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
-    barrierColor: Colors.transparent,
-    transitionDuration: AppMotion.sheetRoll,
-    pageBuilder: (ctx, animation, secondaryAnimation) {
-      return _ReceiptCameraHost(
-        maxRemaining: maxRemaining,
-        scanAfter: scanAfter,
-        mockPreview: mockPreview,
-        galleryThumb: galleryThumb,
-        openAnimation: animation,
-      );
-    },
-    transitionBuilder: (ctx, animation, secondaryAnimation, child) => child,
+    builder: (context, sheet) => _ReceiptCameraBody(
+      sheet: sheet,
+      maxRemaining: maxRemaining,
+      scanAfter: scanAfter,
+      mockPreview: mockPreview,
+      galleryThumb: galleryThumb,
+    ),
   );
 }
 
-class _ReceiptCameraHost extends StatefulWidget {
-  const _ReceiptCameraHost({
+class _ReceiptCameraBody extends StatefulWidget {
+  const _ReceiptCameraBody({
+    required this.sheet,
     required this.maxRemaining,
     required this.scanAfter,
-    required this.openAnimation,
     this.mockPreview = false,
     this.galleryThumb,
   });
 
+  final SafaehCameraSheet sheet;
   final int maxRemaining;
   final bool scanAfter;
   final bool mockPreview;
   final Uint8List? galleryThumb;
-  final Animation<double> openAnimation;
 
   @override
-  State<_ReceiptCameraHost> createState() => _ReceiptCameraHostState();
+  State<_ReceiptCameraBody> createState() => _ReceiptCameraBodyState();
 }
 
-class _ReceiptCameraHostState extends State<_ReceiptCameraHost> {
-  bool _expanded = false;
+class _ReceiptCameraBodyState extends State<_ReceiptCameraBody> {
   bool _viewerReady = false;
-  final _drag = SheetHandleDrag();
   Future<void> Function()? _viewerClose;
   VoidCallback? _cancelArmViewer;
 
@@ -79,6 +67,7 @@ class _ReceiptCameraHostState extends State<_ReceiptCameraHost> {
     super.initState();
     // Keep Flutter layout portrait; sensor orientation drives chrome + capture.
     SystemChrome.setPreferredOrientations(const [DeviceOrientation.portraitUp]);
+    widget.sheet.interceptDismiss = _requestDismiss;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       // Skip hardware during sheet roll; mount viewer when open settles.
@@ -86,9 +75,14 @@ class _ReceiptCameraHostState extends State<_ReceiptCameraHost> {
         setState(() => _viewerReady = true);
         return;
       }
+      final animation = widget.sheet.openAnimation;
+      if (animation == null) {
+        setState(() => _viewerReady = true);
+        return;
+      }
       _cancelArmViewer = armWhenAnimationReady(
         context: context,
-        animation: widget.openAnimation,
+        animation: animation,
         action: () {
           if (!mounted || _viewerReady) return;
           setState(() => _viewerReady = true);
@@ -98,18 +92,21 @@ class _ReceiptCameraHostState extends State<_ReceiptCameraHost> {
   }
 
   @override
+  void didUpdateWidget(covariant _ReceiptCameraBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    widget.sheet.interceptDismiss = _requestDismiss;
+  }
+
+  @override
   void dispose() {
     _cancelArmViewer?.call();
+    widget.sheet.interceptDismiss = null;
     SystemChrome.setPreferredOrientations(kReceiptCameraRestoredOrientations);
     super.dispose();
   }
 
-  Duration _duration(BuildContext context) =>
-      MediaQuery.disableAnimationsOf(context) ? Duration.zero : AppMotion.modal;
-
   void _pop(ReceiptCameraResult? result) {
-    final nav = Navigator.of(context, rootNavigator: true);
-    if (nav.canPop()) nav.pop(result);
+    widget.sheet.pop(result);
   }
 
   Future<void> _requestDismiss() async {
@@ -121,178 +118,18 @@ class _ReceiptCameraHostState extends State<_ReceiptCameraHost> {
     _pop(null);
   }
 
-  void _onHandleDragEnd(DragEndDetails details) {
-    final action = _drag.end(
-      expanded: _expanded,
-      velocity: details.primaryVelocity ?? 0,
-    );
-    setState(() {
-      switch (action) {
-        case SheetHandleDragAction.expand:
-          _expanded = true;
-        case SheetHandleDragAction.collapse:
-          _expanded = false;
-        case SheetHandleDragAction.dismiss:
-          _requestDismiss();
-        case SheetHandleDragAction.none:
-          break;
-      }
-      _drag.reset();
-    });
-  }
-
-  double _rollProgress() {
-    final t = widget.openAnimation.value.clamp(0.0, 1.0);
-    final reversing = widget.openAnimation.status == AnimationStatus.reverse;
-    final curved = reversing
-        ? AppMotion.exitCurve.transform(t)
-        : AppMotion.sheetRollEnter.transform(t);
-    return curved.clamp(0.0, 1.0);
-  }
-
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-    final isWide = size.width >= LayoutBreakpoints.breakpointTablet;
-    final duration = _duration(context);
-    final scrim = Theme.of(context).colorScheme.scrim.withValues(alpha: 0.45);
-
-    final compactH = size.height * kReceiptCameraCompactHeightFraction;
-    final fullH = size.height;
-    final panelH = _drag.panelHeight(
-      expanded: _expanded,
-      compactH: compactH,
-      fullH: fullH,
-    );
-
-    final radius = _expanded && _drag.offset <= 0
-        ? BorderRadius.zero
-        : (isWide
-              ? BorderRadius.circular(16)
-              : const BorderRadius.vertical(top: Radius.circular(16)));
-
-    // Immersive viewer: nearly full width (not the narrow option-sheet dialog).
-    final panelWidth = isWide ? size.width - 32 : size.width;
-
-    final panel = SizedBox(
-      width: panelWidth,
-      height: panelH,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Colors.black,
-          borderRadius: radius,
-          border: _expanded && _drag.offset <= 0
-              ? null
-              : Border.all(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.outlineVariant.withValues(alpha: 0.35),
-                ),
-        ),
-        child: ClipRRect(
-          borderRadius: radius,
-          child: Column(
-            children: [
-              SheetHandleBar(
-                expanded: _expanded,
-                duration: duration,
-                onVerticalDragUpdate: (details) {
-                  setState(
-                    () => _drag.update(details.delta.dy, expanded: _expanded),
-                  );
-                },
-                onVerticalDragEnd: _onHandleDragEnd,
-                onVerticalDragCancel: () => setState(_drag.reset),
-              ),
-              Expanded(
-                child: _viewerReady
-                    ? ReceiptCameraViewer(
-                        maxRemaining: widget.maxRemaining,
-                        scanAfter: widget.scanAfter,
-                        expanded: _expanded,
-                        mockPreview: widget.mockPreview,
-                        galleryThumb: widget.galleryThumb,
-                        onToggleExpanded: () => setState(() {
-                          _expanded = !_expanded;
-                          _drag.reset();
-                        }),
-                        onPop: _pop,
-                        onBindCloseRequest: (fn) => _viewerClose = fn,
-                      )
-                    : const ColoredBox(color: Colors.black),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    return Material(
-      type: MaterialType.transparency,
-      child: SizedBox.expand(
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Positioned.fill(
-              child: AnimatedBuilder(
-                animation: widget.openAnimation,
-                builder: (context, child) {
-                  final t = widget.openAnimation.value.clamp(0.0, 1.0);
-                  final o = Curves.easeInOutCubic.transform(t);
-                  return Opacity(opacity: o, child: child);
-                },
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: _requestDismiss,
-                  child: ColoredBox(color: scrim),
-                ),
-              ),
-            ),
-            AnimatedPadding(
-              duration: duration,
-              curve: AppMotion.enterCurve,
-              padding: isWide && !_expanded
-                  ? const EdgeInsets.symmetric(horizontal: 16)
-                  : EdgeInsets.zero,
-              child: AnimatedBuilder(
-                animation: widget.openAnimation,
-                builder: (context, child) {
-                  final progress = _rollProgress();
-                  final revealH = panelH * progress;
-                  final rolling =
-                      widget.openAnimation.status == AnimationStatus.forward ||
-                      widget.openAnimation.status == AnimationStatus.reverse;
-                  return Align(
-                    alignment: Alignment.bottomCenter,
-                    child: Transform.translate(
-                      offset: Offset(0, _drag.translateY(expanded: _expanded)),
-                      child: AnimatedContainer(
-                        duration: rolling || _drag.offset != 0
-                            ? Duration.zero
-                            : duration,
-                        curve: AppMotion.enterCurve,
-                        width: panelWidth,
-                        height: revealH,
-                        child: ClipRect(
-                          child: OverflowBox(
-                            alignment: Alignment.topCenter,
-                            maxHeight: panelH,
-                            minHeight: panelH,
-                            maxWidth: panelWidth,
-                            minWidth: panelWidth,
-                            child: child,
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-                child: panel,
-              ),
-            ),
-          ],
-        ),
-      ),
+    if (!_viewerReady) return const ColoredBox(color: Colors.black);
+    return ReceiptCameraViewer(
+      maxRemaining: widget.maxRemaining,
+      scanAfter: widget.scanAfter,
+      expanded: widget.sheet.expanded,
+      mockPreview: widget.mockPreview,
+      galleryThumb: widget.galleryThumb,
+      onToggleExpanded: widget.sheet.toggleExpanded,
+      onPop: _pop,
+      onBindCloseRequest: (fn) => _viewerClose = fn,
     );
   }
 }

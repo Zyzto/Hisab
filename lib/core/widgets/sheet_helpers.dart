@@ -1,9 +1,8 @@
-import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/material.dart';
+import 'package:safaeh/safaeh.dart';
 
-import '../layout/layout_breakpoints.dart';
 import '../layout/responsive_sheet.dart';
-import '../theme/accent_style.dart';
 import 'sheet_option_tile.dart';
 import 'user_text.dart';
 
@@ -33,66 +32,38 @@ Future<T?> showOptionPickerSheet<T>(
   bool centerInFullViewport = true,
   Widget? header,
 }) {
-  final isTablet = LayoutBreakpoints.isTabletOrWider(context);
   return showResponsiveSheet<T>(
     context: context,
     title: title,
     maxHeight: MediaQuery.of(context).size.height * 0.75,
     isScrollControlled: true,
     centerInFullViewport: centerInFullViewport,
-    child: Builder(
-      // Bottom safe/IME inset is owned by [showResponsiveSheet].
-      builder: (ctx) => SafeArea(
-        bottom: false,
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (!isTablet)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    child: UserText(
-                      title,
-                      style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                if (header != null)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                    child: header,
-                  ),
-                SheetOptionList(
-                  children: [
-                    for (final opt in options)
-                      SheetOptionTile(
-                        title: opt.label,
-                        subtitle: opt.subtitle,
-                        leading: opt.leading,
-                        enabled: opt.enabled,
-                        selected: selected != null && opt.value == selected,
-                        onTap: opt.enabled
-                            ? () => Navigator.of(ctx).pop(opt.value)
-                            : null,
-                      ),
-                  ],
-                ),
-              ],
-            ),
+    child: SafaehTilePickerBody<T>(
+      title: title,
+      titleBuilder: (ctx, style) => UserText(title, style: style),
+      header: header,
+      selected: selected,
+      options: [
+        for (final opt in options)
+          SafaehTileOption(
+            value: opt.value,
+            label: opt.label,
+            subtitle: opt.subtitle,
+            leading: opt.leading,
+            enabled: opt.enabled,
           ),
-        ),
+      ],
+      tileBuilder: (ctx, opt, isSelected) => SheetOptionTile(
+        title: opt.label,
+        subtitle: opt.subtitle,
+        leading: opt.leading,
+        enabled: opt.enabled,
+        selected: isSelected,
+        onTap: opt.enabled ? () => Navigator.of(ctx).pop(opt.value) : null,
       ),
     ),
   );
 }
-
-const double _kSheetPadding = 20.0;
-const double _kSheetActionsSpacing = 8.0;
-const double _kSheetBodyActionsGap = 20.0;
 
 /// Builds the shared sheet layout: optional title (in body), body, and action row.
 /// When [showTitleInBody] is false, the title is not rendered here (caller shows
@@ -111,74 +82,16 @@ Widget buildSheetShell(
   required List<Widget> actions,
   bool showTitleInBody = true,
 }) {
-  // Bottom safe/IME inset is owned by [showResponsiveSheet]. Nesting another
-  // bottom SafeArea / viewPadding here jumps sheet height when the keyboard
-  // opens (outer SafeArea stops consuming viewPadding once padding.bottom
-  // collapses).
-  return SafeArea(
-    bottom: false,
-    child: SingleChildScrollView(
-      child: Padding(
-        padding: EdgeInsets.only(
-          top: showTitleInBody ? 0 : _kSheetPadding,
-          bottom: _kSheetPadding,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (showTitleInBody)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  _kSheetPadding,
-                  _kSheetPadding,
-                  _kSheetPadding,
-                  8,
-                ),
-                child: UserText(
-                  title,
-                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: _kSheetPadding),
-              child: body,
-            ),
-            if (actions.isNotEmpty) ...[
-              const SizedBox(height: _kSheetBodyActionsGap),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: _kSheetPadding),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    for (int i = 0; i < actions.length; i++) ...[
-                      if (i > 0) const SizedBox(width: _kSheetActionsSpacing),
-                      Focus(
-                        canRequestFocus: false,
-                        skipTraversal: true,
-                        descendantsAreFocusable: false,
-                        child: actions[i],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
+  return buildSafaehSheetShell(
+    body: body,
+    actions: actions,
+    showTitleInBody: showTitleInBody,
+    title: UserText(
+      title,
+      style: Theme.of(
+        ctx,
+      ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
     ),
-  );
-}
-
-Widget _sheetBodyPanel(BuildContext context, {required Widget child}) {
-  final cs = Theme.of(context).colorScheme;
-  // Horizontal inset comes from [buildSheetShell]; panel fills that band.
-  return DecoratedBox(
-    decoration: AccentSurfaces.flatPanel(cs),
-    child: Padding(padding: const EdgeInsets.all(14), child: child),
   );
 }
 
@@ -193,46 +106,20 @@ Future<bool?> showConfirmSheet(
   bool isDestructive = false,
   bool centerInFullViewport = true,
 }) {
-  final isTablet = LayoutBreakpoints.isTabletOrWider(context);
   return showResponsiveSheet<bool>(
     context: context,
     title: title,
     maxHeight: MediaQuery.of(context).size.height * 0.75,
     isScrollControlled: true,
     centerInFullViewport: centerInFullViewport,
-    child: Builder(
-      builder: (ctx) => buildSheetShell(
-        ctx,
-        title: title,
-        body: _sheetBodyPanel(
-          ctx,
-          child: UserText(
-            content,
-            style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(ctx).colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ),
-        actions: [
-          if (!isTablet)
-            TextButton(
-              onPressed: () {
-                final navigator = Navigator.of(ctx, rootNavigator: true);
-                if (navigator.canPop()) navigator.pop(false);
-              },
-              child: Text(cancelLabel ?? 'cancel'.tr()),
-            ),
-          _ConfirmSheetButton(
-            label: confirmLabel,
-            isDestructive: isDestructive,
-            onConfirm: () {
-              final navigator = Navigator.of(ctx, rootNavigator: true);
-              if (navigator.canPop()) navigator.pop(true);
-            },
-          ),
-        ],
-        showTitleInBody: !isTablet,
-      ),
+    child: SafaehConfirmSheet(
+      title: title,
+      content: content,
+      confirmLabel: confirmLabel,
+      cancelLabel: cancelLabel ?? 'cancel'.tr(),
+      isDestructive: isDestructive,
+      titleBuilder: (ctx, style) => UserText(title, style: style),
+      contentBuilder: (ctx, style) => UserText(content, style: style),
     ),
   );
 }
@@ -249,110 +136,22 @@ Future<String?> showTextInputSheet(
   bool obscureText = false,
   bool centerInFullViewport = true,
 }) {
-  final isTablet = LayoutBreakpoints.isTabletOrWider(context);
-  final controller = TextEditingController(text: initialValue);
-  final future = showResponsiveSheet<String?>(
+  return showResponsiveSheet<String?>(
     context: context,
     title: title,
     maxHeight: MediaQuery.of(context).size.height * 0.5,
     isScrollControlled: true,
     centerInFullViewport: centerInFullViewport,
-    child: Builder(
-      builder: (ctx) => buildSheetShell(
-        ctx,
-        title: title,
-        body: _sheetBodyPanel(
-          ctx,
-          child: TextField(
-            controller: controller,
-            obscureText: obscureText,
-            decoration: InputDecoration(
-              hintText: hint,
-              border: const OutlineInputBorder(),
-              counterText: maxLength != null ? '' : null,
-              isDense: true,
-            ),
-            maxLines: maxLines,
-            maxLength: maxLength,
-            autofocus: true,
-          ),
-        ),
-        actions: [
-          if (!isTablet)
-            TextButton(
-              onPressed: () {
-                final navigator = Navigator.of(ctx, rootNavigator: true);
-                if (navigator.canPop()) navigator.pop(null);
-              },
-              child: Text('cancel'.tr()),
-            ),
-          FilledButton(
-            onPressed: () {
-              final navigator = Navigator.of(ctx, rootNavigator: true);
-              if (navigator.canPop()) navigator.pop(controller.text.trim());
-            },
-            child: Text('done'.tr()),
-          ),
-        ],
-        showTitleInBody: !isTablet,
-      ),
+    child: SafaehTextInputSheet(
+      title: title,
+      doneLabel: 'done'.tr(),
+      hint: hint,
+      initialValue: initialValue,
+      maxLines: maxLines,
+      maxLength: maxLength,
+      obscureText: obscureText,
+      cancelLabel: 'cancel'.tr(),
+      titleBuilder: (ctx, style) => UserText(title, style: style),
     ),
   );
-  // Defer dispose until the sheet route is fully removed from the tree.
-  // Disposing when the future completes can run while the TextField is still
-  // in the tree (e.g. during close animation), causing "used after being disposed".
-  // Use a time-based delay so exit animation and overlay updates are done (Android/integration).
-  future.then((_) {
-    Future<void>.delayed(const Duration(milliseconds: 300), () {
-      controller.dispose();
-    });
-  });
-  return future;
-}
-
-/// Confirm button that uses [InkWell] with [canRequestFocus: false] so taps
-/// reliably fire when the sheet is shown on top of other modals (same fix as
-/// currency picker list row).
-class _ConfirmSheetButton extends StatelessWidget {
-  const _ConfirmSheetButton({
-    required this.label,
-    required this.isDestructive,
-    required this.onConfirm,
-  });
-
-  final String label;
-  final bool isDestructive;
-  final VoidCallback onConfirm;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final backgroundColor = isDestructive
-        ? colorScheme.error
-        : colorScheme.primary;
-    final foregroundColor = isDestructive
-        ? colorScheme.onError
-        : colorScheme.onPrimary;
-
-    return Material(
-      color: backgroundColor,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        canRequestFocus: false,
-        onTap: onConfirm,
-        borderRadius: BorderRadius.circular(14),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-          child: Text(
-            label,
-            style: theme.textTheme.labelLarge?.copyWith(
-              color: foregroundColor,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }

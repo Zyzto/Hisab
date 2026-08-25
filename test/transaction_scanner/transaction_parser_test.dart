@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hisab/features/transaction_scanner/domain/field_span.dart';
 import 'package:hisab/features/transaction_scanner/domain/scanner_pattern.dart';
 import 'package:hisab/features/transaction_scanner/services/transaction_parser.dart';
 
@@ -71,6 +72,44 @@ void main() {
       expect(result.amountCents, 9999);
       expect(result.currencyCode, 'AED');
       expect(result.matchedPatternId, 'custom-1');
+    });
+
+    test('amount span covers the numeric capture not the currency prefix', () {
+      const body = 'Purchase of SAR 42.50 at Starbucks';
+      final result = TransactionParser.parse(
+        body,
+        customPatterns: [
+          ScannerPattern(
+            id: 'en-prefix',
+            name: 'EN',
+            senderMatch: '*',
+            amountRegex:
+                r'(?:SAR|USD|EUR|GBP|AED)\s*(\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?)',
+            createdAt: DateTime(2026, 1, 1),
+          ),
+        ],
+      );
+      final span = result.fieldSpans
+          .where((s) => s.role == FieldRole.amount)
+          .first;
+      expect(body.substring(span.start, span.end), '42.50');
+    });
+
+    test('skips a sender-scoped pattern for a different package', () {
+      final pattern = ScannerPattern(
+        id: 'bank-only',
+        name: 'Bank X',
+        senderMatch: 'com.bank.x',
+        amountRegex: r'AMT:(\d+\.\d{2})',
+        createdAt: DateTime(2026, 1, 1),
+      );
+      final result = TransactionParser.parse(
+        'TXN AMT:99.99 extra',
+        customPatterns: [pattern],
+        senderPackage: 'com.other.app',
+        fallbackCurrency: 'SAR',
+      );
+      expect(result.matchedPatternId, isNull);
     });
 
     test('ignores disabled custom patterns', () {

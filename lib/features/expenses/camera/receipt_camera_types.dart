@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:safaeh/safaeh.dart';
 
 /// Result of [showReceiptCamera].
 class ReceiptCameraResult {
@@ -17,7 +18,8 @@ class ReceiptCameraResult {
 }
 
 /// Compact sheet fraction of screen height (within 60–70% band).
-const double kReceiptCameraCompactHeightFraction = 0.65;
+const double kReceiptCameraCompactHeightFraction =
+    kSafaehCameraCompactHeightFraction;
 
 /// Orientations restored after the receipt camera releases its portrait lock.
 const List<DeviceOrientation> kReceiptCameraRestoredOrientations = [

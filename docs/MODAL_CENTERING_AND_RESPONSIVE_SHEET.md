@@ -40,14 +40,15 @@ One composition language; **two layouts**, not two brands:
 | Confirm / text input | `showConfirmSheet` / `showTextInputSheet` with body in `AccentSurfaces.flatPanel` |
 | Actions | Primary filled + secondary text; destructive = error-toned; phone Cancel; tablet close/barrier |
 
-Shared APIs: `lib/core/layout/responsive_sheet.dart`, `lib/core/widgets/sheet_helpers.dart`, `lib/core/widgets/sheet_option_tile.dart`.
+Shared APIs: [Safaeh](https://github.com/Zyzto/Safaeh) (`showSafaeh`), `lib/core/layout/responsive_sheet.dart` (Hisab rail wrapper), `lib/core/widgets/sheet_helpers.dart`, `lib/core/widgets/sheet_option_tile.dart`.
 
 ## Files changed (core)
 
 | File | Role |
 |------|------|
 | `lib/app.dart` | `Positioned.fill` so root navigator gets full viewport size |
-| `lib/core/layout/responsive_sheet.dart` | Adaptive chrome, rail padding, barrier dismiss, flat panel surfaces |
+| [Safaeh](https://github.com/Zyzto/Safaeh) | Adaptive chrome (dialog + bottom sheet), barrier dismiss, flat panel surfaces |
+| `lib/core/layout/responsive_sheet.dart` | Hisab wrapper: rail padding, `UserText`, `showAppDialog` |
 | `lib/core/widgets/sheet_helpers.dart` | `buildSheetShell`, `showConfirmSheet`, `showTextInputSheet`, `showOptionPickerSheet` |
 | `lib/core/widgets/sheet_option_tile.dart` | Dense bordered option rows for pickers and action lists |
 

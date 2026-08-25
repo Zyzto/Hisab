@@ -352,7 +352,7 @@ void installFlutterErrorStageLogger() {
 /// finders alone miss them.
 bool isResponsiveSheetVisible() {
   return find
-      .byKey(const ValueKey('responsive_sheet_panel'))
+      .byKey(const ValueKey('safaeh_panel'))
       .evaluate()
       .isNotEmpty;
 }

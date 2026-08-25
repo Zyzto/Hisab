@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:safaeh/safaeh.dart';
 import '../motion/app_motion.dart';
 import '../platform/ui_perf.dart';
 import '../theme/theme_providers.dart';
@@ -41,104 +42,56 @@ class FloatingNavBar extends ConsumerWidget {
     final iconSize = styleIndex == 2 ? 28.0 : 24.0;
 
     // iOS web only: large blur shadows jank on WebKit / older GPUs (e.g. XR).
-    final decoration = UiPerf.preferCheapShadows
-        ? BoxDecoration(
-            color: background,
-            borderRadius: BorderRadius.circular(barRadius),
-            border: Border.all(
-              color: colorScheme.outlineVariant.withValues(alpha: 0.7),
+    final shadows = UiPerf.preferCheapShadows
+        ? [
+            BoxShadow(
+              color: colorScheme.shadow.withValues(alpha: 0.1),
+              blurRadius: 2,
+              offset: const Offset(0, 1),
             ),
-            boxShadow: [
-              BoxShadow(
-                color: colorScheme.shadow.withValues(alpha: 0.1),
-                blurRadius: 2,
-                offset: const Offset(0, 1),
-              ),
-            ],
-          )
-        : BoxDecoration(
-            color: background,
-            borderRadius: BorderRadius.circular(barRadius),
-            boxShadow: [
-              BoxShadow(
-                color: colorScheme.shadow.withValues(alpha: 0.25),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-              BoxShadow(
-                color: colorScheme.shadow.withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          );
+          ]
+        : [
+            BoxShadow(
+              color: colorScheme.shadow.withValues(alpha: 0.25),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
+            ),
+            BoxShadow(
+              color: colorScheme.shadow.withValues(alpha: 0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ];
+    final border = UiPerf.preferCheapShadows
+        ? Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.7))
+        : null;
 
     final tabAnimDuration = UiPerf.preferInstantShellTabs
         ? Duration.zero
         : AppMotion.shellTab;
 
-    return SafeArea(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16),
-        decoration: decoration,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: List.generate(destinations.length, (index) {
-            final destination = destinations[index];
-            final isSelected = index == selectedIndex;
-            final color = isSelected ? active : inactive;
-
-            return Expanded(
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    onDestinationSelected(index);
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      minHeight: 44,
-                      minWidth: 44,
-                    ),
-                    child: AnimatedContainer(
-                      duration: tabAnimDuration,
-                      curve: Curves.easeInOut,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            isSelected
-                                ? destination.selectedIcon
-                                : destination.icon,
-                            color: color,
-                            size: iconSize,
-                          ),
-                          if (destination.label != null) ...[
-                            const SizedBox(height: 4),
-                            AnimatedDefaultTextStyle(
-                              duration: tabAnimDuration,
-                              style: theme.textTheme.labelSmall!.copyWith(
-                                color: color,
-                                fontWeight: isSelected
-                                    ? FontWeight.w600
-                                    : FontWeight.normal,
-                              ),
-                              child: Text(destination.label!),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }),
-        ),
-      ),
+    return SafaehFloatingNavBar(
+      selectedIndex: selectedIndex,
+      onDestinationSelected: (index) {
+        HapticFeedback.lightImpact();
+        onDestinationSelected(index);
+      },
+      destinations: [
+        for (final destination in destinations)
+          SafaehSidenavDestination(
+            label: destination.label ?? '',
+            icon: destination.icon,
+            selectedIcon: destination.selectedIcon,
+          ),
+      ],
+      activeColor: active,
+      inactiveColor: inactive,
+      backgroundColor: background,
+      radius: barRadius,
+      iconSize: iconSize,
+      shadows: shadows,
+      border: border,
+      motion: tabAnimDuration,
     );
   }
 }

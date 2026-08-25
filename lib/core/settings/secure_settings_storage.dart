@@ -14,7 +14,13 @@ class SecureSettingsStorage implements SettingsStorage {
     SharedPreferencesStorage? prefsStorage,
     FlutterSecureStorage? secureStorage,
   }) : _prefs = prefsStorage ?? SharedPreferencesStorage(),
-       _secure = secureStorage ?? const FlutterSecureStorage();
+       _secure =
+           secureStorage ??
+           const FlutterSecureStorage(
+             // v10 cipher migrate is on by default; backup lets a crash
+             // mid-write recover the previous ciphertext.
+             aOptions: AndroidOptions(migrateWithBackup: true),
+           );
 
   final Set<String> secretKeys;
   final SharedPreferencesStorage _prefs;

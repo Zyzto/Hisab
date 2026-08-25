@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,6 +23,7 @@ import '../../../core/platform/ui_perf.dart';
 import '../../../core/services/permission_service.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/theme/theme_config.dart';
+import '../../../core/theme/theme_providers.dart';
 import '../../../core/widgets/sheet_helpers.dart';
 import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 import 'package:hisab/core/settings/settings_definitions.dart';
@@ -30,6 +32,7 @@ import '../widgets/onboarding_permissions_page.dart';
 import '../widgets/onboarding_preferences_page.dart';
 import '../widgets/onboarding_shared.dart';
 import '../widgets/onboarding_sky_backdrop.dart';
+import '../widgets/onboarding_theme_ripple.dart';
 import '../widgets/onboarding_welcome_page.dart';
 
 /// Maps an onboarding location path to a step index, or null if unmatched.
@@ -82,6 +85,14 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
   bool _themeDemoRunning = true;
   bool _languagePulseStopped = false;
   late final AnimationController _languageTapController;
+  AnimationController? _themeRippleController;
+  final GlobalKey _themeButtonKey = GlobalKey();
+  final GlobalKey _themeRippleHostKey = GlobalKey();
+  final GlobalKey _themeUiCaptureKey = GlobalKey();
+  Offset _themeRippleOrigin = Offset.zero;
+  ui.Image? _themeRippleSnapshot;
+  bool _themeRippleActive = false;
+  bool _themeRippleBusy = false;
   Timer? _hintTimer;
   Timer? _themeDemoTimer;
   Timer? _languagePulseStopTimer;
@@ -206,6 +217,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
       vsync: this,
       duration: const Duration(milliseconds: 150),
     );
+    _ensureThemeRippleController();
 
     // Integration/widget tests use pumpAndSettle; skip looping chrome/timers.
     // Release web minifies binding type names — prefer [isIntegrationTestMode].
@@ -277,6 +289,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
     _languagePulseStopTimer?.cancel();
     _languagePulseController.dispose();
     _languageTapController.dispose();
+    _themeRippleController?.dispose();
+    _disposeThemeRippleSnapshot();
     _hintTimer?.cancel();
     _themeDemoTimer?.cancel();
     _pageController.dispose();
@@ -300,6 +314,92 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
     }
   }
 
+  AnimationController _ensureThemeRippleController() {
+    final existing = _themeRippleController;
+    if (existing != null) return existing;
+    return _themeRippleController = AnimationController(
+      vsync: this,
+      duration: kOnboardingThemeRippleDuration,
+    );
+  }
+
+  bool get _themeRippleAnimating =>
+      _themeRippleController?.isAnimating ?? false;
+
+  void _disposeThemeRippleSnapshot() {
+    _themeRippleSnapshot?.dispose();
+    _themeRippleSnapshot = null;
+  }
+
+  void _setThemeLerpSuppressed(bool suppressed) {
+    ref.read(suppressThemeLerpProvider.notifier).state = suppressed;
+  }
+
+  void _applyThemeMode(SettingsProviders settings, String next) {
+    ref.read(settings.provider(themeModeSettingDef).notifier).set(next);
+    Log.info('Setting changed: ${themeModeSettingDef.key}=$next');
+  }
+
+  Future<ui.Image?> _captureThemeRipple() async {
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return null;
+    final dpr = View.of(context).devicePixelRatio;
+    return themeRippleCaptureBoundary(_themeUiCaptureKey, pixelRatio: dpr);
+  }
+
+  Future<void> _cycleThemeFromButton(SettingsProviders settings) async {
+    if (_isCompleting || _themeRippleBusy || _themeRippleAnimating) return;
+    _themeRippleBusy = true;
+    if (_themeDemoRunning) {
+      _themeDemoTimer?.cancel();
+      _themeDemoTimer = null;
+      setState(() => _themeDemoRunning = false);
+    }
+    const order = ['light', 'dark', 'system', 'amoled'];
+    final current = ref.read(settings.provider(themeModeSettingDef));
+    final idx = order.indexOf(current);
+    final next = order[(idx + 1) % order.length];
+
+    final origin = themeRippleOriginForButton(
+      button: _themeButtonKey.currentContext?.findRenderObject() as RenderBox?,
+      host:
+          _themeRippleHostKey.currentContext?.findRenderObject() as RenderBox?,
+    );
+    final cheap = UiPerf.preferReducedChromeMotion;
+    final snapshot = await _captureThemeRipple();
+    if (!mounted) {
+      snapshot?.dispose();
+      _themeRippleBusy = false;
+      return;
+    }
+
+    _setThemeLerpSuppressed(true);
+    setState(() {
+      _disposeThemeRippleSnapshot();
+      _themeRippleSnapshot = snapshot;
+      _themeRippleOrigin = origin;
+      _themeRippleActive = true;
+    });
+    _applyThemeMode(settings, next);
+
+    final controller = _ensureThemeRippleController();
+    controller.duration = cheap
+        ? kOnboardingThemeRippleCheapDuration
+        : kOnboardingThemeRippleDuration;
+    try {
+      await controller.forward(from: 0);
+    } finally {
+      if (mounted) {
+        _setThemeLerpSuppressed(false);
+        setState(() => _themeRippleActive = false);
+        _disposeThemeRippleSnapshot();
+      } else {
+        snapshot?.dispose();
+      }
+      _themeRippleBusy = false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(hisabSettingsProvidersProvider);
@@ -317,96 +417,124 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
       // expand: in widget tests the sky is a zero-size shrink, and every
       // other child is Positioned — without expand the stack collapses to 0.
       body: Stack(
+        key: _themeRippleHostKey,
         fit: StackFit.expand,
         children: [
           const OnboardingSkyBackdrop(),
-          // Steps fill under the footer so list rows can peek through the
-          // soft wash (scroll affordance without a chevron). Column+Expanded
-          // keeps [ConstrainedContent]'s tablet Row height-bounded.
+          // Chrome only (no Flame meadow) so toImage stays reliable and
+          // every theme — light, dark, AMOLED, system — reveals real UI.
           Positioned.fill(
-            child: SafeArea(
-              bottom: false,
-              child: AbsorbPointer(
-                absorbing: _isCompleting,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: ConstrainedContent(
-                        child: PageView.builder(
-                          controller: _pageController,
-                          itemCount: 4,
-                          physics: _isCompleting
-                              ? const NeverScrollableScrollPhysics()
-                              : null,
-                          onPageChanged: (i) {
-                            setState(() {
-                              _currentPage = i;
-                              _ensurePermissionStatusLoaded();
-                            });
-                            _syncDecorativeUrlToPage(i);
-                          },
-                          itemBuilder: (context, index) {
-                            return _KeepAliveOnboardingStep(
-                              child: RepaintBoundary(
-                                child: switch (index) {
-                                  0 => const OnboardingWelcomePage(),
-                                  1 => const OnboardingPreferencesPage(),
-                                  2 => OnboardingPermissionsPage(
-                                    settings: settings,
-                                    onlineAvailable: onlineAvailable,
-                                    cameraGranted: _cameraGranted,
-                                    notificationGranted: _notificationGranted,
-                                    permissionStatusFuture:
-                                        _permissionStatusFuture,
-                                    onRequestCamera: () async {
-                                      final result =
-                                          await PermissionService.requestCameraPermission(
-                                            context,
-                                          );
-                                      if (mounted) {
-                                        setState(() => _cameraGranted = result);
-                                      }
-                                    },
-                                    onRequestNotification: () async {
-                                      final result =
-                                          await PermissionService.requestNotificationPermission(
-                                            context,
-                                          );
-                                      if (mounted) {
-                                        setState(
-                                          () => _notificationGranted = result,
-                                        );
-                                      }
-                                    },
-                                  ),
-                                  _ => OnboardingConnectPage(
-                                    settings: settings,
-                                    onlineAvailable: onlineAvailable,
-                                  ),
-                                },
+            child: RepaintBoundary(
+              key: _themeUiCaptureKey,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Steps fill under the footer so list rows can peek through the
+                  // soft wash (scroll affordance without a chevron). Column+Expanded
+                  // keeps [ConstrainedContent]'s tablet Row height-bounded.
+                  Positioned.fill(
+                    child: SafeArea(
+                      bottom: false,
+                      child: AbsorbPointer(
+                        absorbing: _isCompleting,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              child: ConstrainedContent(
+                                child: PageView.builder(
+                                  controller: _pageController,
+                                  itemCount: 4,
+                                  physics: _isCompleting
+                                      ? const NeverScrollableScrollPhysics()
+                                      : null,
+                                  onPageChanged: (i) {
+                                    setState(() {
+                                      _currentPage = i;
+                                      _ensurePermissionStatusLoaded();
+                                    });
+                                    _syncDecorativeUrlToPage(i);
+                                  },
+                                  itemBuilder: (context, index) {
+                                    return _KeepAliveOnboardingStep(
+                                      child: RepaintBoundary(
+                                        child: switch (index) {
+                                          0 => const OnboardingWelcomePage(),
+                                          1 =>
+                                            const OnboardingPreferencesPage(),
+                                          2 => OnboardingPermissionsPage(
+                                            settings: settings,
+                                            onlineAvailable: onlineAvailable,
+                                            cameraGranted: _cameraGranted,
+                                            notificationGranted:
+                                                _notificationGranted,
+                                            permissionStatusFuture:
+                                                _permissionStatusFuture,
+                                            onRequestCamera: () async {
+                                              final result =
+                                                  await PermissionService.requestCameraPermission(
+                                                    context,
+                                                  );
+                                              if (mounted) {
+                                                setState(
+                                                  () => _cameraGranted = result,
+                                                );
+                                              }
+                                            },
+                                            onRequestNotification: () async {
+                                              final result =
+                                                  await PermissionService.requestNotificationPermission(
+                                                    context,
+                                                  );
+                                              if (mounted) {
+                                                setState(
+                                                  () => _notificationGranted =
+                                                      result,
+                                                );
+                                              }
+                                            },
+                                          ),
+                                          _ => OnboardingConnectPage(
+                                            settings: settings,
+                                            onlineAvailable: onlineAvailable,
+                                          ),
+                                        },
+                                      ),
+                                    );
+                                  },
+                                ),
                               ),
-                            );
-                          },
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  // Full-bleed to the physical bottom so the home-indicator gap
+                  // never shows a clear triangle of meadow under the scrim.
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: AbsorbPointer(
+                      absorbing: _isCompleting,
+                      child: _buildFooter(context, colorScheme, settings),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-          // Full-bleed to the physical bottom so the home-indicator gap
-          // never shows a clear triangle of meadow under the scrim.
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: AbsorbPointer(
-              absorbing: _isCompleting,
-              child: _buildFooter(context, colorScheme, settings),
+          if (_themeRippleActive)
+            Positioned.fill(
+              child: AbsorbPointer(
+                child: OnboardingThemeRipple(
+                  animation: _ensureThemeRippleController(),
+                  origin: _themeRippleOrigin,
+                  snapshot: _themeRippleSnapshot,
+                ),
+              ),
             ),
-          ),
           if (_isCompleting)
             Positioned.fill(
               child: ColoredBox(
@@ -635,12 +763,6 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
     );
   }
 
-  static const Color _themeLightBg = Color(0xFFF5E6C8);
-  static const Color _themeDarkBg = Color(0xFF37474F);
-  static const Color _themeAmoledBg = Color(0xFF000000);
-  static const Color _themeLightIcon = Color(0xFF5D4037);
-  static const Color _themeDarkIcon = Color(0xFFECEFF1);
-
   static IconData _themeIcon(String theme) {
     switch (theme) {
       case 'system':
@@ -668,37 +790,25 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
         : currentTheme;
     final tooltip = '${'theme'.tr()}: ${currentTheme.tr()}';
     final iconColor = displayTheme == 'light'
-        ? _themeLightIcon
-        : (displayTheme == 'system' ? colorScheme.onSurface : _themeDarkIcon);
+        ? kOnboardingThemeLightIcon
+        : (displayTheme == 'system'
+              ? colorScheme.onSurface
+              : kOnboardingThemeDarkIcon);
     return Semantics(
       button: true,
       label: tooltip,
       child: Tooltip(
         message: tooltip,
         child: SizedBox(
+          key: _themeButtonKey,
           width: 48,
           height: 48,
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: _isCompleting
+              onTap: (_isCompleting || _themeRippleAnimating)
                   ? null
-                  : () {
-                      if (_themeDemoRunning) {
-                        _themeDemoTimer?.cancel();
-                        _themeDemoTimer = null;
-                        setState(() => _themeDemoRunning = false);
-                      }
-                      const order = ['light', 'dark', 'system', 'amoled'];
-                      final idx = order.indexOf(currentTheme);
-                      final next = order[(idx + 1) % order.length];
-                      ref
-                          .read(settings.provider(themeModeSettingDef).notifier)
-                          .set(next);
-                      Log.info(
-                        'Setting changed: ${themeModeSettingDef.key}=$next',
-                      );
-                    },
+                  : () => _cycleThemeFromButton(settings),
               customBorder: const CircleBorder(),
               child: AnimatedContainer(
                 duration: UiPerf.preferReducedChromeMotion
@@ -711,10 +821,10 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                   color: displayTheme == 'system'
                       ? colorScheme.surfaceContainerHighest
                       : (displayTheme == 'light'
-                            ? _themeLightBg
+                            ? kOnboardingThemeLightFill
                             : displayTheme == 'amoled'
-                            ? _themeAmoledBg
-                            : _themeDarkBg),
+                            ? kOnboardingThemeAmoledFill
+                            : kOnboardingThemeDarkFill),
                 ),
                 child: AnimatedSwitcher(
                   duration: UiPerf.preferReducedChromeMotion

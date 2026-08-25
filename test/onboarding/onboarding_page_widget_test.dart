@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:hisab_backend/hisab_backend.dart';
 import 'package:hisab/features/onboarding/pages/onboarding_page.dart';
+import 'package:hisab/features/onboarding/widgets/onboarding_theme_ripple.dart';
 import 'package:hisab/features/onboarding/widgets/onboarding_welcome_page.dart';
 import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 import 'package:hisab/core/settings/settings_definitions.dart';
@@ -92,6 +93,21 @@ void main() {
           find.byIcon(Icons.brightness_auto).evaluate().isNotEmpty ||
           find.byIcon(Icons.contrast).evaluate().isNotEmpty;
       expect(hasThemeIcon, isTrue);
+    });
+
+    testWidgets('theme button ripples and cycles mode', (tester) async {
+      final settings = await pumpOnboardingPage(tester);
+      expect(settings.controller.get(themeModeSettingDef), 'system');
+
+      await tester.tap(find.byIcon(Icons.motion_photos_auto));
+      await tester.pump();
+      // Capture is async (endOfFrame + toImage); give the overlay time to mount.
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byType(OnboardingThemeRipple), findsOneWidget);
+      expect(settings.controller.get(themeModeSettingDef), 'amoled');
+      await tester.pump(kOnboardingThemeRippleDuration);
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(find.byType(OnboardingThemeRipple), findsNothing);
     });
 
     testWidgets('renders Arabic welcome copy', (tester) async {

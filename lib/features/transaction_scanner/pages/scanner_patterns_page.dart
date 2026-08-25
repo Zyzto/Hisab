@@ -72,7 +72,7 @@ class ScannerPatternsPage extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'scanner_no_patterns_subtitle'.tr(),
+              'scanner_patterns_advanced_hint'.tr(),
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),

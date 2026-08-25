@@ -99,10 +99,7 @@ void main() {
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
 
-    expect(
-      find.byKey(const ValueKey('responsive_sheet_panel')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const ValueKey('safaeh_panel')), findsOneWidget);
     expect(find.text('Confirm action'), findsOneWidget);
     expect(find.byIcon(Icons.close), findsOneWidget);
     expect(find.text('Proceed?'), findsOneWidget);
@@ -234,7 +231,7 @@ void main() {
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
 
-    final panel = find.byKey(const ValueKey('responsive_sheet_panel'));
+    final panel = find.byKey(const ValueKey('safaeh_panel'));
     expect(panel, findsOneWidget);
     final beforeBottom = tester.getBottomLeft(panel).dy;
 
@@ -260,7 +257,7 @@ void main() {
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
 
-    final panel = find.byKey(const ValueKey('responsive_sheet_panel'));
+    final panel = find.byKey(const ValueKey('safaeh_panel'));
     final beforeBottom = tester.getBottomLeft(panel).dy;
 
     tester.view.viewInsets = const FakeViewPadding(bottom: 280);
@@ -297,9 +294,7 @@ void main() {
 
     expect(find.text('No fields here'), findsOneWidget);
     expect(
-      tester
-          .getBottomLeft(find.byKey(const ValueKey('responsive_sheet_panel')))
-          .dy,
+      tester.getBottomLeft(find.byKey(const ValueKey('safaeh_panel'))).dy,
       closeTo(500, 1),
     );
   });
@@ -315,7 +310,7 @@ void main() {
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
 
-    final panel = find.byKey(const ValueKey('responsive_sheet_panel'));
+    final panel = find.byKey(const ValueKey('safaeh_panel'));
     final restingBottom = tester.getBottomLeft(panel).dy;
 
     tester.view.viewInsets = const FakeViewPadding(bottom: 300);
@@ -346,7 +341,7 @@ void main() {
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
 
-    final panel = find.byKey(const ValueKey('responsive_sheet_panel'));
+    final panel = find.byKey(const ValueKey('safaeh_panel'));
     final beforeBottom = tester.getBottomLeft(panel).dy;
     final beforeHeight = tester.getSize(panel).height;
 
@@ -375,7 +370,7 @@ void main() {
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
 
-    final panel = find.byKey(const ValueKey('responsive_sheet_panel'));
+    final panel = find.byKey(const ValueKey('safaeh_panel'));
     final restingBottom = tester.getBottomLeft(panel).dy;
 
     addTearDown(tester.view.resetViewInsets);
@@ -426,7 +421,7 @@ void main() {
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
 
-    final panel = find.byKey(const ValueKey('responsive_sheet_panel'));
+    final panel = find.byKey(const ValueKey('safaeh_panel'));
     final restingBottom = tester.getBottomLeft(panel).dy;
 
     tester.view.viewInsets = const FakeViewPadding(bottom: 320);
@@ -458,18 +453,15 @@ void main() {
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
 
-    expect(
-      find.byKey(const ValueKey('responsive_sheet_panel')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const ValueKey('safaeh_panel')), findsOneWidget);
 
     await tester.drag(
-      find.byKey(const ValueKey('responsive_sheet_drag_handle')),
+      find.byKey(const ValueKey('safaeh_drag_handle')),
       const Offset(0, 200),
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('responsive_sheet_panel')), findsNothing);
+    expect(find.byKey(const ValueKey('safaeh_panel')), findsNothing);
   });
 
   testWidgets('phone sheet snaps back when the drag is short', (tester) async {
@@ -488,8 +480,8 @@ void main() {
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
 
-    final handle = find.byKey(const ValueKey('responsive_sheet_drag_handle'));
-    final panel = find.byKey(const ValueKey('responsive_sheet_panel'));
+    final handle = find.byKey(const ValueKey('safaeh_drag_handle'));
+    final panel = find.byKey(const ValueKey('safaeh_panel'));
     final before = tester.getTopLeft(panel).dy;
 
     final gesture = await tester.startGesture(tester.getCenter(handle));
@@ -522,11 +514,8 @@ void main() {
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
 
-    expect(
-      find.byKey(const ValueKey('responsive_sheet_drag_handle')),
-      findsNothing,
-    );
-    final panel = find.byKey(const ValueKey('responsive_sheet_panel'));
+    expect(find.byKey(const ValueKey('safaeh_drag_handle')), findsNothing);
+    final panel = find.byKey(const ValueKey('safaeh_panel'));
     await tester.drag(panel, const Offset(0, 200));
     await tester.pumpAndSettle();
     expect(panel, findsOneWidget);

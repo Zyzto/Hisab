@@ -5,13 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../providers/scanner_providers.dart';
 import 'draft_transactions_page.dart';
+import 'scanner_history_page.dart';
 import 'scanner_patterns_page.dart';
 import 'scanner_setup_page.dart';
 import 'sender_rules_page.dart';
 
 /// Entry point for the Transaction Scanner feature.
-/// Shows pending drafts count, links to review page, sender management,
-/// and pattern configuration.
 class ScannerHubPage extends ConsumerWidget {
   const ScannerHubPage({super.key});
 
@@ -20,6 +19,15 @@ class ScannerHubPage extends ConsumerWidget {
     final isEnabled = ref.watch(scannerEnabledProvider);
     final pendingCount =
         ref.watch(pendingDraftCountProvider).asData?.value ?? 0;
+    final summary = ref.watch(scannerLogSummaryProvider).asData?.value;
+    final enabledSenders =
+        ref
+            .watch(senderRulesProvider)
+            .asData
+            ?.value
+            .where((r) => r.enabled)
+            .length ??
+        0;
 
     return Scaffold(
       appBar: AppBar(title: Text('scanner_hub_title'.tr())),
@@ -48,6 +56,13 @@ class ScannerHubPage extends ConsumerWidget {
                     ? 'scanner_pending_count'.tr(
                         args: [pendingCount.toString()],
                       )
+                    : summary != null
+                    ? 'scanner_summary_24h'.tr(
+                        namedArgs: {
+                          'added': '${summary.added}',
+                          'ignored': '${summary.ignored}',
+                        },
+                      )
                     : 'scanner_no_pending'.tr(),
                 action: pendingCount > 0
                     ? FilledButton.icon(
@@ -58,6 +73,24 @@ class ScannerHubPage extends ConsumerWidget {
                     : null,
               ),
               const SizedBox(height: 16),
+              if (enabledSenders == 0) ...[
+                _StatusCard(
+                  icon: Icons.app_shortcut,
+                  iconColor: Colors.orange,
+                  title: 'scanner_no_enabled_senders'.tr(),
+                  subtitle: 'scanner_no_enabled_senders_subtitle'.tr(),
+                  action: FilledButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const SenderRulesPage(),
+                      ),
+                    ),
+                    icon: const Icon(Icons.add),
+                    label: Text('scanner_add_sender'.tr()),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
             ],
             _NavTile(
               icon: Icons.checklist,
@@ -65,6 +98,16 @@ class ScannerHubPage extends ConsumerWidget {
               subtitle: '$pendingCount ${'scanner_pending_items'.tr()}',
               badge: pendingCount,
               onTap: () => _openReview(context),
+            ),
+            _NavTile(
+              icon: Icons.history,
+              title: 'scanner_history_title'.tr(),
+              subtitle: 'scanner_history_subtitle'.tr(),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const ScannerHistoryPage(),
+                ),
+              ),
             ),
             _NavTile(
               icon: Icons.app_shortcut,
@@ -85,6 +128,12 @@ class ScannerHubPage extends ConsumerWidget {
                   builder: (_) => const ScannerPatternsPage(),
                 ),
               ),
+            ),
+            _NavTile(
+              icon: Icons.tune,
+              title: 'scanner_reconfigure'.tr(),
+              subtitle: 'scanner_reconfigure_subtitle'.tr(),
+              onTap: () => _openSetup(context),
             ),
           ],
         ),

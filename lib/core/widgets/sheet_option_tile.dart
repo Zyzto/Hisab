@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:safaeh/safaeh.dart';
 
 import '../theme/accent_style.dart';
 import 'user_text.dart';
@@ -31,7 +32,6 @@ class SheetOptionTile extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final subtle = context.subtleAccents;
-    final onTapEnabled = enabled ? onTap : null;
     final titleColor = destructive
         ? cs.error
         : (enabled ? cs.onSurface : cs.onSurface.withValues(alpha: 0.38));
@@ -39,104 +39,42 @@ class SheetOptionTile extends StatelessWidget {
         ? cs.error.withValues(alpha: 0.8)
         : cs.onSurfaceVariant;
 
-    return Material(
-      color: selected
-          ? AccentSurfaces.emphasizedFill(cs, subtle: subtle)
-          : cs.surfaceContainerLow,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        canRequestFocus: false,
-        onTap: onTapEnabled,
-        borderRadius: BorderRadius.circular(14),
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: selected
-                  ? AccentSurfaces.emphasizedBorder(cs, subtle: subtle)
-                  : cs.outlineVariant.withValues(alpha: 0.45),
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-            child: Row(
-              children: [
-                if (leading != null) ...[
-                  SizedBox(
-                    width: 36,
-                    height: 36,
-                    child: Center(child: leading!),
-                  ),
-                  const SizedBox(width: 14),
-                ],
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      UserText(
-                        title,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: titleColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (subtitle != null && subtitle!.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        UserText(
-                          subtitle!,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: subtitleColor,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                if (trailing != null) ...[const SizedBox(width: 10), trailing!],
-              ],
-            ),
-          ),
+    return SafaehOptionTile(
+      title: UserText(
+        title,
+        style: theme.textTheme.bodyLarge?.copyWith(
+          color: titleColor,
+          fontWeight: FontWeight.w600,
         ),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
       ),
+      subtitle: subtitle != null && subtitle!.isNotEmpty
+          ? UserText(
+              subtitle!,
+              style: theme.textTheme.bodySmall?.copyWith(color: subtitleColor),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            )
+          : null,
+      leading: leading,
+      trailing: trailing,
+      onTap: onTap,
+      selected: selected,
+      destructive: destructive,
+      enabled: enabled,
+      selectedFill: AccentSurfaces.emphasizedFill(cs, subtle: subtle),
+      selectedBorder: AccentSurfaces.emphasizedBorder(cs, subtle: subtle),
     );
   }
 }
 
 /// Vertical list of [SheetOptionTile]s with consistent gaps.
-///
-/// Default padding includes vertical inset so lists sit correctly under the
-/// shared [showResponsiveSheet] title bar / drag handle without call-site hacks.
-class SheetOptionList extends StatelessWidget {
+class SheetOptionList extends SafaehOptionList {
   const SheetOptionList({
     super.key,
-    required this.children,
-    this.padding = const EdgeInsets.fromLTRB(16, 8, 16, 8),
-    this.spacing = 8,
+    required super.children,
+    super.padding,
+    super.spacing,
   });
-
-  final List<Widget> children;
-  final EdgeInsetsGeometry padding;
-  final double spacing;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: padding,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (var i = 0; i < children.length; i++) ...[
-            if (i > 0) SizedBox(height: spacing),
-            children[i],
-          ],
-        ],
-      ),
-    );
-  }
 }
