@@ -26,7 +26,10 @@ String? resolveScannerDestination({
 }
 
 /// Equal-split remainder loop matching the expense form.
-Map<String, int> equalSplitShares(List<String> participantIds, int amountCents) {
+Map<String, int> equalSplitShares(
+  List<String> participantIds,
+  int amountCents,
+) {
   if (participantIds.isEmpty) return {};
   final n = participantIds.length;
   final each = amountCents ~/ n;

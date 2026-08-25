@@ -24,9 +24,6 @@ void main() {
         createdAt: DateTime(2026, 1, 1),
       ),
     ];
-    expect(
-      suggestCategory(merchant: 'Starbucks', extraRules: rules),
-      'gifts',
-    );
+    expect(suggestCategory(merchant: 'Starbucks', extraRules: rules), 'gifts');
   });
 }

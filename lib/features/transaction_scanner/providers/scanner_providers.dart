@@ -405,7 +405,10 @@ class ScannerController {
     }
   }
 
-  Future<ParseResult> _maybeEnrichWithAi(String body, ParseResult result) async {
+  Future<ParseResult> _maybeEnrichWithAi(
+    String body,
+    ParseResult result,
+  ) async {
     final settings = _ref.read(hisabSettingsProvidersProvider);
     if (settings == null) return result;
     final mode =
@@ -491,9 +494,9 @@ class ScannerController {
       }
 
       final participantRepo = _ref.read(participantRepositoryProvider);
-      final participants = (await participantRepo.getByGroupId(groupId))
-          .where((p) => p.leftAt == null)
-          .toList();
+      final participants = (await participantRepo.getByGroupId(
+        groupId,
+      )).where((p) => p.leftAt == null).toList();
       if (participants.isEmpty) {
         Log.warning('No participant in group $groupId');
         return false;

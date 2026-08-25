@@ -80,9 +80,7 @@ class NotificationBridge {
   /// When true, an empty whitelist captures nothing (post-setup).
   static Future<void> setRequireSenders(bool require) async {
     if (!_isAndroid) return;
-    await _method.invokeMethod<void>('setRequireSenders', {
-      'require': require,
-    });
+    await _method.invokeMethod<void>('setRequireSenders', {'require': require});
   }
 
   /// Launchable apps for the setup picker.
@@ -93,12 +91,16 @@ class NotificationBridge {
         'listInstalledApps',
       );
       if (result == null) return const [];
-      return result.cast<Map<dynamic, dynamic>>().map((m) {
-        return InstalledApp(
-          packageName: m['package'] as String? ?? '',
-          label: m['label'] as String? ?? '',
-        );
-      }).where((a) => a.packageName.isNotEmpty).toList();
+      return result
+          .cast<Map<dynamic, dynamic>>()
+          .map((m) {
+            return InstalledApp(
+              packageName: m['package'] as String? ?? '',
+              label: m['label'] as String? ?? '',
+            );
+          })
+          .where((a) => a.packageName.isNotEmpty)
+          .toList();
     } on PlatformException {
       return const [];
     }

@@ -4,11 +4,8 @@ enum CategoryRuleSource {
   user,
   learned;
 
-  static CategoryRuleSource fromString(String s) =>
-      CategoryRuleSource.values.firstWhere(
-        (v) => v.name == s,
-        orElse: () => CategoryRuleSource.user,
-      );
+  static CategoryRuleSource fromString(String s) => CategoryRuleSource.values
+      .firstWhere((v) => v.name == s, orElse: () => CategoryRuleSource.user);
 }
 
 /// Local rule that maps merchant/keyword text to a category id.

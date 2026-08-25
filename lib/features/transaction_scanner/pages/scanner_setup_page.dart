@@ -146,12 +146,7 @@ class _ScannerSetupPageState extends ConsumerState<ScannerSetupPage> {
     await NotificationBridge.setEnabled(true);
     if (settings != null) {
       await applySetting(ref, settings, scannerEnabledSettingDef, true);
-      await applySetting(
-        ref,
-        settings,
-        scannerSetupCompletedSettingDef,
-        true,
-      );
+      await applySetting(ref, settings, scannerSetupCompletedSettingDef, true);
       await applySetting(
         ref,
         settings,
@@ -341,8 +336,16 @@ class _ExplainStep extends StatelessWidget {
         ),
         const SizedBox(height: 24),
         _bullet(context, Icons.lock_outline, 'scanner_setup_privacy'.tr()),
-        _bullet(context, Icons.filter_alt_outlined, 'scanner_setup_filter'.tr()),
-        _bullet(context, Icons.visibility_outlined, 'scanner_setup_review'.tr()),
+        _bullet(
+          context,
+          Icons.filter_alt_outlined,
+          'scanner_setup_filter'.tr(),
+        ),
+        _bullet(
+          context,
+          Icons.visibility_outlined,
+          'scanner_setup_review'.tr(),
+        ),
         _bullet(context, Icons.history, 'scanner_setup_history_hint'.tr()),
         const Spacer(),
         FilledButton(
@@ -507,10 +510,7 @@ class _AppsStep extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        Text(
-          'scanner_setup_apps_body'.tr(),
-          style: theme.textTheme.bodyMedium,
-        ),
+        Text('scanner_setup_apps_body'.tr(), style: theme.textTheme.bodyMedium),
         const SizedBox(height: 12),
         TextField(
           decoration: InputDecoration(
@@ -653,7 +653,10 @@ class _TeachStep extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        Text('scanner_setup_teach_body'.tr(), style: theme.textTheme.bodyMedium),
+        Text(
+          'scanner_setup_teach_body'.tr(),
+          style: theme.textTheme.bodyMedium,
+        ),
         const SizedBox(height: 8),
         Row(
           children: [
@@ -877,10 +880,7 @@ class _DoneStep extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        Text(
-          'scanner_setup_done_ready'.tr(),
-          style: theme.textTheme.bodyLarge,
-        ),
+        Text('scanner_setup_done_ready'.tr(), style: theme.textTheme.bodyLarge),
         const Spacer(),
         FilledButton(
           onPressed: onFinish,

@@ -95,7 +95,9 @@ ScannerNotificationLog notificationLogFromRow(Map<String, dynamic> row) {
     rawText: row['raw_text'] as String? ?? '',
     postedAt: scannerParseDateTime(row['posted_at']),
     capturedAt: scannerParseDateTime(row['captured_at']),
-    outcome: ScannerLogOutcome.fromString(row['outcome'] as String? ?? 'pending'),
+    outcome: ScannerLogOutcome.fromString(
+      row['outcome'] as String? ?? 'pending',
+    ),
     reason: row['reason'] as String?,
     amountCents: (row['amount_cents'] as num?)?.toInt(),
     currencyCode: row['currency_code'] as String?,

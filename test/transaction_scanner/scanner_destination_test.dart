@@ -98,7 +98,10 @@ void main() {
   });
 
   test('canAddScannerExpense', () {
-    expect(canAddScannerExpense(_group(id: 'p', personal: true), isOwner: false), isTrue);
+    expect(
+      canAddScannerExpense(_group(id: 'p', personal: true), isOwner: false),
+      isTrue,
+    );
     expect(
       canAddScannerExpense(_group(id: 's', allowAdd: false), isOwner: false),
       isFalse,

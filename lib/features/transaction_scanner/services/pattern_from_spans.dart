@@ -60,11 +60,7 @@ String _genericCapture(FieldRole role) {
   }
 }
 
-String _contextRegex(
-  String body,
-  int start, {
-  required String genericCapture,
-}) {
+String _contextRegex(String body, int start, {required String genericCapture}) {
   final prefixStart = start > 16 ? start - 16 : 0;
   final prefix = body.substring(prefixStart, start);
   if (prefix.trim().isEmpty) return genericCapture;

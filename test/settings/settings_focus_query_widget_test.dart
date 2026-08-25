@@ -20,47 +20,52 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('focus query expands appearance and highlights display currency', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(400, 900);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
+  testWidgets(
+    'focus query expands appearance and highlights display currency',
+    (tester) async {
+      tester.view.physicalSize = const Size(400, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
-    final settings = await tester.runAsync(initializeHisabSettings);
-    if (settings == null) {
-      throw Exception('initializeHisabSettings returned null');
-    }
+      final settings = await tester.runAsync(initializeHisabSettings);
+      if (settings == null) {
+        throw Exception('initializeHisabSettings returned null');
+      }
 
-    final router = GoRouter(
-      initialLocation: RoutePaths.settingsFocus(displayCurrencySettingDef.key),
-      routes: [
-        GoRoute(
-          path: RoutePaths.settings,
-          builder: (context, state) => const SettingsPage(),
+      final router = GoRouter(
+        initialLocation: RoutePaths.settingsFocus(
+          displayCurrencySettingDef.key,
         ),
-      ],
-    );
+        routes: [
+          GoRoute(
+            path: RoutePaths.settings,
+            builder: (context, state) => const SettingsPage(),
+          ),
+        ],
+      );
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [hisabSettingsProvidersProvider.overrideWithValue(settings)],
-        child: EasyLocalization(
-          path: 'assets/translations',
-          supportedLocales: testSupportedLocales,
-          fallbackLocale: const Locale('en'),
-          startLocale: const Locale('en'),
-          child: MaterialApp.router(routerConfig: router),
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            hisabSettingsProvidersProvider.overrideWithValue(settings),
+          ],
+          child: EasyLocalization(
+            path: 'assets/translations',
+            supportedLocales: testSupportedLocales,
+            fallbackLocale: const Locale('en'),
+            startLocale: const Locale('en'),
+            child: MaterialApp.router(routerConfig: router),
+          ),
         ),
-      ),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 250));
-    await tester.pump(const Duration(milliseconds: 400));
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.text('display_currency'.tr()), findsOneWidget);
-    expect(router.state.uri.path, RoutePaths.settings);
-    expect(router.state.uri.queryParameters, isEmpty);
-  });
+      expect(find.text('display_currency'.tr()), findsOneWidget);
+      expect(router.state.uri.path, RoutePaths.settings);
+      expect(router.state.uri.queryParameters, isEmpty);
+    },
+  );
 }

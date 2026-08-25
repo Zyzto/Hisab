@@ -151,10 +151,7 @@ class _DraftTransactionDetailPageState
               ],
             ),
             const SizedBox(height: 12),
-            Text(
-              'scanner_category'.tr(),
-              style: theme.textTheme.labelLarge,
-            ),
+            Text('scanner_category'.tr(), style: theme.textTheme.labelLarge),
             const SizedBox(height: 6),
             Wrap(
               spacing: 6,

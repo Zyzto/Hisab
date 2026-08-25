@@ -133,7 +133,10 @@ class NotificationAnnotator extends StatelessWidget {
               ...FieldRole.values.map((r) {
                 return ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: fieldRoleColor(r, Theme.of(ctx).colorScheme),
+                    backgroundColor: fieldRoleColor(
+                      r,
+                      Theme.of(ctx).colorScheme,
+                    ),
                     radius: 8,
                   ),
                   title: Text(fieldRoleLabelKey(r).tr()),
@@ -195,10 +198,7 @@ class _AnnotatedBody extends StatelessWidget {
                     : fieldRoleColor(covering.role, cs).withValues(alpha: 0.22),
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: Text(
-                token.group(0)!,
-                style: theme.textTheme.bodyMedium,
-              ),
+              child: Text(token.group(0)!, style: theme.textTheme.bodyMedium),
             ),
           ),
         ),
@@ -223,7 +223,8 @@ class _AnnotatedBody extends StatelessWidget {
   String? merchant,
   String? place,
   String? card,
-}) valuesFromSpans(String body, List<FieldSpan> spans) {
+})
+valuesFromSpans(String body, List<FieldSpan> spans) {
   String? textFor(FieldRole role) {
     final span = spans.where((s) => s.role == role).firstOrNull;
     if (span == null) return null;
