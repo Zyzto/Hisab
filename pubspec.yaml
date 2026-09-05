@@ -153,6 +153,8 @@ flutter_launcher_icons:
   web:
     generate: true
   image_path: "assets/Hisab.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/Hisab.png"
 
 flutter:
   uses-material-design: true
