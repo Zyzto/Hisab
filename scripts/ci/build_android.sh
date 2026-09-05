@@ -33,7 +33,10 @@ mapfile -t defines < <(bash scripts/ci/dart_defines.sh)
 # Obfuscation and split debug info only apply to a release build.
 extra=()
 if [[ "$MODE" == "release" ]]; then
-  extra=(--obfuscate --split-debug-info=build/app/outputs/symbols --tree-shake-icons)
+  # Use an absolute path so the symbol files are always written to the
+  # directory the private cloud pipeline archives and checks.
+  SYMBOLS_DIR="$ROOT_DIR/build/app/outputs/symbols"
+  extra=(--obfuscate --split-debug-info="$SYMBOLS_DIR" --tree-shake-icons)
 fi
 
 flutter build apk "--$MODE" --flavor "$FLAVOR" --split-per-abi "${extra[@]}" "${defines[@]}"
