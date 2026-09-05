@@ -1,3 +1,5 @@
+import com.android.build.api.dsl.LibraryExtension
+
 allprojects {
     repositories {
         google()
@@ -17,6 +19,20 @@ subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
+
+// Some Flutter plugins still declare an older compile SDK in their own
+// Android library module. Keep their AAR metadata compatible with the
+// dependency graph resolved by the app (notably clipboard + AndroidX).
+subprojects {
+    afterEvaluate {
+        plugins.withId("com.android.library") {
+            extensions.configure<LibraryExtension> {
+                compileSdk = 37
+            }
+        }
+    }
+}
+
 subprojects {
     project.evaluationDependsOn(":app")
 }
