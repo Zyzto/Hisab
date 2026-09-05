@@ -6,6 +6,7 @@ import 'package:powersync/powersync.dart';
 
 import 'package:hisab/core/database/powersync_schema.dart' as ps;
 import 'package:hisab/core/repository/powersync_repository.dart';
+import 'package:hisab/domain/settlement_method.dart';
 
 import 'support/fake_cloud.dart';
 
@@ -101,5 +102,38 @@ void main() {
       expect(groupUpserts.single.data['name'], 'Online Group');
       expect(groupUpserts.single.data['currency_code'], 'EUR');
     });
+
+    test(
+      'online treasurer create links treasurer after participants exist',
+      () async {
+        if (!_powerSyncAvailable || db == null) return;
+        final sync = FakeCloudSync();
+        final repo = PowerSyncGroupRepository(
+          db!,
+          cloud: FakeCloudBackend(sync: sync),
+          isOnline: true,
+          isLocalOnly: false,
+        );
+
+        final id = await repo.create(
+          'Treasurer Group',
+          'USD',
+          initialParticipants: const ['Alice', 'Bob'],
+          settlementMethod: SettlementMethod.treasurer,
+          treasurerInitialParticipantName: 'Bob',
+        );
+
+        final group = sync.upserts.singleWhere((u) => u.table == 'groups');
+        expect(group.data, isNot(contains('treasurer_participant_id')));
+
+        final bob = sync.upserts.singleWhere(
+          (u) => u.table == 'participants' && u.data['name'] == 'Bob',
+        );
+        final treasurerLink = sync.updates.singleWhere(
+          (u) => u.table == 'groups' && u.id == id,
+        );
+        expect(treasurerLink.data['treasurer_participant_id'], bob.data['id']);
+      },
+    );
   });
 }

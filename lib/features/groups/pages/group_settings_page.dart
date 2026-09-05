@@ -16,6 +16,7 @@ import '../widgets/settlement_method_picker.dart';
 import '../utils/group_icon_utils.dart';
 import '../../../core/celebration/celebration_controller.dart';
 import '../../../core/celebration/celebration_kind.dart';
+import '../../../core/constants/confirmation_durations.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/constrained_content.dart';
@@ -1967,7 +1968,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage>
           content: (isPersonal ? 'delete_list_confirm' : 'delete_group_confirm')
               .tr(),
           confirmLabel: (isPersonal ? 'delete_list' : 'delete_group').tr(),
-          seconds: 10,
+          seconds: destructiveConfirmationSeconds,
           isDestructive: true,
         ),
       ),
@@ -1999,7 +2000,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage>
           title: 'leave_group'.tr(),
           content: 'leave_group_confirm'.tr(),
           confirmLabel: 'leave_group'.tr(),
-          seconds: 10,
+          seconds: destructiveConfirmationSeconds,
           isDestructive: true,
         ),
       ),

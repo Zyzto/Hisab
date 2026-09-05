@@ -189,7 +189,12 @@ class PowerSyncGroupRepository implements IGroupRepository {
 
     if (!_isLocalOnly && _isOnline && _cloud != null) {
       // Online: write to Supabase first
-      await _cloud.sync.upsert('groups', groupData);
+      // A participant references its group, while the optional treasurer on
+      // the group references that participant. Break the FK cycle by linking
+      // the treasurer only after all initial participants have been inserted.
+      final cloudGroupData = Map<String, dynamic>.from(groupData)
+        ..remove('treasurer_participant_id');
+      await _cloud.sync.upsert('groups', cloudGroupData);
       // Create owner membership first (without participant_id) so that
       // get_user_role() returns 'owner' for subsequent RLS checks.
       if (ownerId != null && ownerMemberId != null) {
@@ -230,6 +235,11 @@ class PowerSyncGroupRepository implements IGroupRepository {
           'updated_at': now,
         });
       }
+      if (treasurerParticipantId != null) {
+        await _cloud.sync.update('groups', {
+          'treasurer_participant_id': treasurerParticipantId,
+        }, id);
+      }
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,
       isOnline: _isOnline,
@@ -239,7 +249,8 @@ class PowerSyncGroupRepository implements IGroupRepository {
         tableName: 'groups',
         operation: 'insert',
         rowId: id,
-        data: groupData,
+        data: Map<String, dynamic>.from(groupData)
+          ..remove('treasurer_participant_id'),
       );
       await _enqueue(
         _db,
@@ -287,6 +298,15 @@ class PowerSyncGroupRepository implements IGroupRepository {
             'created_at': now,
             'updated_at': now,
           },
+        );
+      }
+      if (treasurerParticipantId != null) {
+        await _enqueue(
+          _db,
+          tableName: 'groups',
+          operation: 'update',
+          rowId: id,
+          data: {'treasurer_participant_id': treasurerParticipantId},
         );
       }
     }

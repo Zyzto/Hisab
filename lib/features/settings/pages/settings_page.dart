@@ -16,6 +16,7 @@ import 'package:flex_color_picker/flex_color_picker.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/log_web.dart';
 import '../../../core/constants/app_config.dart';
+import '../../../core/constants/confirmation_durations.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/layout/layout_breakpoints.dart';
@@ -2118,7 +2119,7 @@ class _DeleteLocalDataDialogContent extends StatefulWidget {
 
 class _DeleteLocalDataDialogContentState
     extends State<_DeleteLocalDataDialogContent> {
-  int _secondsLeft = 30;
+  int _secondsLeft = destructiveConfirmationSeconds;
   Timer? _timer;
 
   @override
@@ -2230,7 +2231,7 @@ class _DeleteCloudDataDialogContent extends StatefulWidget {
 
 class _DeleteCloudDataDialogContentState
     extends State<_DeleteCloudDataDialogContent> {
-  int _secondsLeft = 30;
+  int _secondsLeft = destructiveConfirmationSeconds;
   bool _alsoDeleteLocal = false;
   Timer? _timer;
 
