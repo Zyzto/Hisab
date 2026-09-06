@@ -88,6 +88,14 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
+            // Staging remains side-by-side with production while using the
+            // dedicated staging certificate for App Links in CI. Local debug
+            // builds fall back to Android's normal debug key.
+            signingConfig = if (keyPropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
         release {
             signingConfig = if (keyPropertiesFile.exists()) {

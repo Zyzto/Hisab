@@ -1,5 +1,6 @@
 {
   "app_name": "Hisab",
+  "test_app_name": "Hisab Test",
   "shell_nav_collapse": "Collapse navigation",
   "shell_nav_expand": "Expand navigation",
   "groups": "Groups",

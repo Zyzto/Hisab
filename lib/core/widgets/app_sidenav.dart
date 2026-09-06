@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:safaeh/safaeh.dart';
 
 import '../auth/auth_providers.dart';
+import '../build_env.dart';
 import '../layout/layout_breakpoints.dart';
 import '../motion/app_motion.dart';
 import '../navigation/route_paths.dart';
@@ -82,7 +83,7 @@ class AppSidenav extends ConsumerWidget {
         RoutePaths.profile;
 
     return SafaehSidenav(
-      title: 'app_name'.tr(),
+      title: appNameTranslationKey.tr(),
       asDrawer: asDrawer,
       collapsed: collapsed,
       onToggleCompact: onToggleCompact,

@@ -123,7 +123,8 @@ git push origin v1.0.0
 |-----|----------------|
 | `checks` | `scripts/run_release_checks.sh` (secret scan, infra checks), `scripts/ci/assert_offline_only.sh` (no backend dependency crept in), then `flutter test` |
 | `build-foss` | `scripts/ci/build_android.sh foss` — per-ABI release APKs, obfuscated, with symbols uploaded as an artifact |
-| `github-release` | On `v*` tags only: creates a **draft** release with the three APKs attached |
+| `github-release` | On stable/RC `v*` tags: creates a **draft** release with the three APKs attached |
+| `github-test-release` | On `vX.Y.Z-test.N`: creates an empty **draft prerelease** for the private staging APKs |
 
 The release is a draft on purpose. The private cloud pipeline attaches its own
 artifacts to the same release afterwards, and publishing early would show users

@@ -1,5 +1,6 @@
 {
   "app_name": "حساب",
+  "test_app_name": "حساب التجريبي",
   "shell_nav_collapse": "طي القائمة",
   "shell_nav_expand": "توسيع القائمة",
   "groups": "المجموعات",

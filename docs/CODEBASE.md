@@ -291,7 +291,7 @@ MCP servers enabled in Cursor vary by machine/workspace. Common ones for this pr
 |------|-------------------|--------|
 | **Firebase** | `plugin-firebase-firebase` / `user-firebase` | FCM, Hosting, Auth, docs |
 | **Browser** | `cursor-ide-browser` | Web automation / screenshots |
-| **Mobile debug** | `user-polyscreen`, `user-Mobile MCP` | Device install, UI snapshot, crashes (Hisab Debug) |
+| **Mobile debug** | `user-polyscreen`, `user-Mobile MCP` | Device install, UI snapshot, crashes (Hisab Debug; cloud staging uses Hisab Test) |
 | **App control** | `cursor-app-control` | Workspace / project helpers |
 
 Discover live tools with MCP catalog/`GetMcpTools` rather than hard-coding server names — ids drift between Cursor versions.
@@ -385,6 +385,9 @@ iOS declarations are present in `ios/Runner/Info.plist`, including:
 
 - the same checks, then `scripts/ci/build_android.sh foss`
 - per-ABI signed APKs attached to a **draft** GitHub Release
+
+Tags named `vX.Y.Z-test.N` intentionally skip the offline APK job and create a
+draft prerelease for the private staging pipeline to fill with cloud test APKs.
 
 The release is left as a draft because the private cloud pipeline attaches its
 own artifacts to the same release afterwards. Neither workflow has access to

@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
+import '../../../build_env.dart';
 import '../../../platform/ui_perf.dart';
 import '../../../theme/accent_style.dart';
 import '../../../widgets/app_brand_mark.dart';
@@ -72,7 +73,7 @@ class AuthBrandPanel extends StatelessWidget {
                     const AppBrandMark(size: 56),
                     const SizedBox(height: 16),
                     Text(
-                      'app_name'.tr(),
+                      appNameTranslationKey.tr(),
                       style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w800,
                         letterSpacing: -0.5,

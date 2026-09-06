@@ -13,14 +13,14 @@ import '../settings/providers/settings_framework_providers.dart';
 part 'theme_providers.g.dart';
 
 /// Experiment: cycle through 6 app styles (Default + 5 Material 3). In memory only.
-/// Active only when [showDebugMenuProvider] is true (debug / Hisab Debug).
+/// Active only when [showDebugMenuProvider] is true (local debug builds).
 final experimentStyleIndexProvider = StateProvider<int>((ref) => 0);
 
 /// When true, [MaterialApp] skips the implicit theme tween so a circular
 /// reveal can switch palettes in one frame.
 final suppressThemeLerpProvider = StateProvider<bool>((ref) => false);
 
-/// Effective style index: always 0 outside debug / Hisab Debug builds.
+/// Effective style index: always 0 outside local debug builds.
 final effectiveExperimentStyleIndexProvider = Provider<int>((ref) {
   if (!ref.watch(showDebugMenuProvider)) return 0;
   return ref.watch(experimentStyleIndexProvider);

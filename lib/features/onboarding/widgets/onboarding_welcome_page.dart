@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 
+import '../../../core/build_env.dart';
 import '../../../core/motion/app_motion.dart';
 import '../../../core/platform/network_image_decode.dart';
 import '../../../core/platform/ui_perf.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/theme/theme_config.dart';
+import '../../../core/widgets/test_build_marker.dart';
 import 'onboarding_ambient.dart';
 import 'onboarding_shared.dart';
 
@@ -168,29 +170,31 @@ class _OnboardingWelcomePageState extends State<OnboardingWelcomePage>
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 OnboardingBreathing(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(logoRadius),
-                    child: Image.asset(
-                      'assets/Hisab.png',
-                      width: heroLogoSize,
-                      height: heroLogoSize,
-                      fit: BoxFit.cover,
-                      cacheWidth: decode.width,
-                      cacheHeight: decode.height,
-                      errorBuilder: (_, error, stackTrace) => Container(
+                  child: TestBuildMarker(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(logoRadius),
+                      child: Image.asset(
+                        'assets/Hisab.png',
                         width: heroLogoSize,
                         height: heroLogoSize,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer.withValues(
-                            alpha: 0.55,
+                        fit: BoxFit.cover,
+                        cacheWidth: decode.width,
+                        cacheHeight: decode.height,
+                        errorBuilder: (_, error, stackTrace) => Container(
+                          width: heroLogoSize,
+                          height: heroLogoSize,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: colorScheme.primaryContainer.withValues(
+                              alpha: 0.55,
+                            ),
+                            borderRadius: BorderRadius.circular(logoRadius),
                           ),
-                          borderRadius: BorderRadius.circular(logoRadius),
-                        ),
-                        child: Icon(
-                          Icons.account_balance_wallet_outlined,
-                          color: colorScheme.onPrimaryContainer,
-                          size: 36,
+                          child: Icon(
+                            Icons.account_balance_wallet_outlined,
+                            color: colorScheme.onPrimaryContainer,
+                            size: 36,
+                          ),
                         ),
                       ),
                     ),
@@ -203,7 +207,7 @@ class _OnboardingWelcomePageState extends State<OnboardingWelcomePage>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'app_name'.tr(),
+                        appNameTranslationKey.tr(),
                         style: theme.textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.w800,
                           letterSpacing: -0.5,

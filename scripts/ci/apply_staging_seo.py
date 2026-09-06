@@ -19,23 +19,6 @@ Disallow: /
 
 META = '<meta name="robots" content="noindex, nofollow">'
 HTML_ATTR = 'data-hisab-env="staging"'
-RIBBON_STYLE = """<style id="hisab-staging-ribbon">
-html[data-hisab-env="staging"] body::before {
-  content: "TEST";
-  position: fixed;
-  top: 22px;
-  right: -34px;
-  z-index: 2147483647;
-  transform: rotate(45deg);
-  background: #b71c1c;
-  color: #fff;
-  font: 700 10px/1 sans-serif;
-  letter-spacing: 0.08em;
-  padding: 6px 40px;
-  pointer-events: none;
-}
-</style>
-"""
 
 
 def _insert_after_open_tag(text: str, tag: str, snippet: str) -> str:
@@ -58,8 +41,6 @@ def _inject_html(text: str) -> str:
             end = text.find(">", start)
             if end > start:
                 text = text[:end] + f" {HTML_ATTR}" + text[end:]
-    if 'id="hisab-staging-ribbon"' not in text and "</head>" in text:
-        text = text.replace("</head>", f"{RIBBON_STYLE}</head>", 1)
     return text
 
 
@@ -96,9 +77,6 @@ def apply(root: Path) -> None:
 
     for html in web.rglob("*.html"):
         updated = _inject_html(html.read_text(encoding="utf-8"))
-        # The Flutter shell already has the in-app TEST banner.
-        if html.name == "index.html" and "hisab-boot-splash" in updated:
-            updated = updated.replace(RIBBON_STYLE, "")
         html.write_text(updated)
 
     # Never mutate the committed firebase.json. The patched copy lives next
@@ -152,7 +130,7 @@ def _selftest() -> None:
         assert "hisab-staging-ribbon" not in shell
         privacy = (web / "privacy" / "index.html").read_text()
         assert "noindex" in privacy
-        assert "hisab-staging-ribbon" in privacy
+        assert "hisab-staging-ribbon" not in privacy
         committed = json.loads((root / "firebase.json").read_text())
         committed_keys = [
             h["key"] for h in committed["hosting"]["headers"][0]["headers"]

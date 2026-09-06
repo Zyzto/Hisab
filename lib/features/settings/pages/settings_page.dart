@@ -14,6 +14,7 @@ import 'package:feedback/feedback.dart';
 import 'package:flex_color_picker/flex_color_picker.dart';
 
 import '../../../core/auth/auth_providers.dart';
+import '../../../core/build_env.dart';
 import '../../../core/log_web.dart';
 import '../../../core/constants/app_config.dart';
 import '../../../core/constants/confirmation_durations.dart';
@@ -1704,7 +1705,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   static void _showLicenses(BuildContext context) {
-    showLicensePage(context: context, applicationName: 'app_name'.tr());
+    showLicensePage(
+      context: context,
+      applicationName: appNameTranslationKey.tr(),
+    );
   }
 
   static Future<void> _openDonateLink(BuildContext context) async {

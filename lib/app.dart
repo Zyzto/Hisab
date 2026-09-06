@@ -38,7 +38,6 @@ import 'core/celebration/celebration_host.dart';
 import 'core/services/screenshot_report_prompt_host.dart';
 import 'core/build_env.dart';
 import 'core/widgets/back_button_keyboard_dismiss.dart';
-import 'core/widgets/staging_banner.dart';
 import 'features/transaction_scanner/providers/scanner_providers.dart';
 import 'core/widgets/toast.dart';
 
@@ -419,10 +418,7 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
             child: contentWithSyncIndicator,
           )
         : contentWithSyncIndicator;
-    return wrapWithStagingBanner(
-      enabled: isStagingBuild,
-      child: Stack(children: [rootChild, debugFab]),
-    );
+    return Stack(children: [rootChild, debugFab]);
   }
 
   @override
@@ -481,7 +477,7 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
                   contentMaxWidth: LayoutBreakpoints.contentMaxWidthTablet,
                 ),
                 child: MaterialApp.router(
-                  title: 'app_name'.tr(),
+                  title: appNameTranslationKey.tr(),
                   debugShowCheckedModeBanner: false,
                   scrollBehavior: AppScrollBehavior(),
                   localizationsDelegates: context.localizationDelegates,

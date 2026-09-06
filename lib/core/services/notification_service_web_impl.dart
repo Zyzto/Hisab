@@ -6,6 +6,8 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:web/web.dart' as web;
 
+import '../build_env.dart';
+
 /// Shows a browser Notification with [title] and [body]. On click, focuses the
 /// window and navigates to the group detail if [groupId] is non-empty.
 /// Only shows if Notification.permission is already 'granted' (e.g. from FCM setup).
@@ -19,7 +21,7 @@ void showWebForegroundNotification(String title, String body, String? groupId) {
 }
 
 void _show(String title, String body, String? groupId) {
-  final displayTitle = title.isNotEmpty ? title : 'app_name'.tr();
+  final displayTitle = title.isNotEmpty ? title : appNameTranslationKey.tr();
   final options = web.NotificationOptions(
     body: body.isNotEmpty ? body : 'notification_new'.tr(),
   );

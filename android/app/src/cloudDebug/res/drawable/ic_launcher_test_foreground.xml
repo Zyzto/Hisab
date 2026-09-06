@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <inset
+            android:drawable="@drawable/ic_launcher_foreground"
+            android:inset="16%" />
+    </item>
+    <!-- Keep the marker inside the adaptive-icon safe area while making it
+         visibly distinct from the production logo on every launcher. -->
+    <item
+        android:width="18dp"
+        android:height="18dp"
+        android:gravity="top|left"
+        android:left="18dp"
+        android:top="18dp"
+        android:drawable="@drawable/test_badge_dot" />
+</layer-list>

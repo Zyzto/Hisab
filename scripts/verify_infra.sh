@@ -64,6 +64,17 @@ grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' .flutter-version \
 if grep -rn 'FLUTTER_VERSION:' .github/workflows/ >/dev/null 2>&1; then
   fail "A workflow still pins FLUTTER_VERSION; read .flutter-version instead"
 fi
+if grep -R -n 'build-root-directory:' .github/workflows >/dev/null 2>&1; then
+  fail "gradle/actions/setup-gradle no longer accepts build-root-directory"
+fi
+
+# Release intermediates are short-lived by design. Keep both APKs and Dart
+# symbol maps on the same seven-day policy instead of silently using the repo's
+# longer default.
+release_artifacts=$(grep -c 'uses: actions/upload-artifact@' .github/workflows/release.yml || true)
+release_retention=$(grep -c 'retention-days: 7' .github/workflows/release.yml || true)
+[[ "$release_artifacts" -eq 2 && "$release_retention" -eq 2 ]] \
+  || fail "release artifacts must all declare retention-days: 7"
 
 # ── Android variants ──────────────────────────────────────────────────────────
 echo "==> Checking Android flavors"

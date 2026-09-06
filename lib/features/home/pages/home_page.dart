@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/build_env.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/content_aligned_fab_location.dart';
@@ -430,7 +431,7 @@ class HomePage extends ConsumerWidget {
                   : showExperimentThemes
                   ? _ExperimentTitle()
                   : Text(
-                      'app_name'.tr(),
+                      appNameTranslationKey.tr(),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -893,7 +894,11 @@ class _ExperimentTitle extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text('app_name'.tr(), maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(
+              appNameTranslationKey.tr(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
             Text(
               experimentStyleNameAt(index),
               maxLines: 1,
