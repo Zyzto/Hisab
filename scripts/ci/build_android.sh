@@ -28,8 +28,6 @@ fi
 bash scripts/ci/decode_keystore.sh
 bash scripts/ci/decode_google_services.sh
 
-mapfile -t defines < <(bash scripts/ci/dart_defines.sh)
-
 # Obfuscation and split debug info only apply to a release build.
 extra=()
 if [[ "$MODE" == "release" ]]; then
@@ -38,6 +36,18 @@ if [[ "$MODE" == "release" ]]; then
   SYMBOLS_DIR="$ROOT_DIR/build/app/outputs/symbols"
   extra=(--obfuscate --split-debug-info="$SYMBOLS_DIR" --tree-shake-icons)
 fi
+
+# Keep the Dart redirect and the Android manifest on the same scheme. Debug
+# builds are the staging/test identity and must never claim production links.
+if [[ -z "${HISAB_AUTH_SCHEME:-}" ]]; then
+  if [[ "$MODE" == "debug" ]]; then
+    export HISAB_AUTH_SCHEME="com.shenepoy.hisab.debug"
+  else
+    export HISAB_AUTH_SCHEME="com.shenepoy.hisab"
+  fi
+fi
+
+mapfile -t defines < <(bash scripts/ci/dart_defines.sh)
 
 flutter build apk "--$MODE" --flavor "$FLAVOR" --split-per-abi "${extra[@]}" "${defines[@]}"
 

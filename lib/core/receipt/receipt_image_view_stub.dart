@@ -16,7 +16,7 @@ void showExpenseImageFullScreen(BuildContext context, String imagePath) {
   }
   showResponsiveSheet<void>(
     context: context,
-    title: 'image'.tr(),
+    title: LayoutBreakpoints.isTabletOrWider(context) ? 'image'.tr() : null,
     maxHeight: MediaQuery.of(context).size.height * 0.35,
     isScrollControlled: true,
     centerInFullViewport: true,

@@ -6,6 +6,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/motion/app_motion.dart';
+import '../../../core/widgets/sheet_helpers.dart';
 import 'gallery_latest_thumb.dart';
 import 'receipt_camera_controller.dart';
 import 'receipt_camera_mock_preview.dart';
@@ -205,21 +206,12 @@ class _ReceiptCameraViewerState extends State<ReceiptCameraViewer>
 
   Future<bool> _confirmDiscardIfNeeded() async {
     if (!_session.hasCaptures) return true;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('receipt_camera_discard_confirm'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('cancel'.tr()),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('receipt_camera_discard_action'.tr()),
-          ),
-        ],
-      ),
+    final ok = await showConfirmSheet(
+      context,
+      title: 'receipt_camera_discard_title'.tr(),
+      content: 'receipt_camera_discard_confirm'.tr(),
+      confirmLabel: 'receipt_camera_discard_action'.tr(),
+      isDestructive: true,
     );
     return ok == true;
   }

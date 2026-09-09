@@ -21,7 +21,7 @@ Future<DateTime?> showDateTimePickerDialog(
   final effectiveMaxDate = maxDate ?? DateTime.now();
   return showResponsiveSheet<DateTime>(
     context: context,
-    title: 'date_and_time'.tr(),
+    title: isTabletOrWider ? 'date_and_time'.tr() : null,
     tabletTopBarAction: isTabletOrWider
         ? FilledButton(
             onPressed: () {

@@ -399,6 +399,7 @@ class _InviteCardState extends ConsumerState<_InviteCard> {
       title: 'invite_revoke_title'.tr(),
       content: 'invite_revoke_confirm'.tr(),
       confirmLabel: 'invite_revoke'.tr(),
+      isDestructive: true,
       centerInFullViewport: true,
     );
     if (confirmed != true || !mounted) return;

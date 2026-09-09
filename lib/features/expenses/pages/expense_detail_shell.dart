@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,18 +7,19 @@ import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/constrained_content.dart';
+import '../../../core/constants/confirmation_durations.dart';
 import '../../../core/motion/app_motion.dart';
 import '../../../core/navigation/decorative_route.dart';
 import '../../../core/navigation/nav_back.dart';
 import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/navigation/route_paths.dart';
-import '../../../core/repository/repository_providers.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/expense_display_title.dart';
 import '../../../core/utils/user_text.dart';
+import '../../../core/widgets/toast.dart';
 import '../../../domain/domain.dart';
-import '../../balance/providers/balance_provider.dart';
 import '../../groups/providers/groups_provider.dart';
+import '../providers/pending_expense_deletion_provider.dart';
 import '../widgets/expense_detail_body.dart';
 
 /// Shell for expense detail: fixed app bar and interactive prev/next paging.
@@ -313,7 +316,7 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
                       });
                     }
                   } else if (value == 'delete') {
-                    _confirmDelete(context, ref, expense);
+                    unawaited(_confirmDelete(context, ref, expense));
                   }
                 }
               : (_) {},
@@ -412,19 +415,37 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
           '${isolateBidi(displayTitle)} – ${CurrencyFormatter.formatCents(expense.amountCents, expense.currencyCode)}',
       confirmLabel: 'delete'.tr(),
       isDestructive: true,
+      timedDestructive: false,
       centerInFullViewport: true,
     );
     if (ok == true && context.mounted) {
-      await ref.read(expenseRepositoryProvider).delete(expense.id);
-      ref.invalidate(futureExpenseProvider(expense.id));
-      ref.invalidate(expensesByGroupProvider(widget.groupId));
-      ref.invalidate(groupBalanceProvider(widget.groupId));
-      if (context.mounted) {
-        final parent = widget.readOnlyPreview && widget.previewToken != null
-            ? RoutePaths.invitePreviewExpenses(widget.previewToken!)
-            : RoutePaths.groupExpenses(widget.groupId);
-        popOrGo(context, parent);
-      }
+      final pendingDeletes = ref.read(pendingExpenseDeletionProvider.notifier);
+      pendingDeletes.schedule(
+        expenseId: expense.id,
+        groupId: widget.groupId,
+        onError: (error, _) {
+          if (context.mounted) {
+            context.showError('generic_error'.tr());
+          }
+        },
+      );
+
+      context.showToastWithAction(
+        'expense_delete_scheduled'.tr(
+          namedArgs: {'seconds': '$destructiveConfirmationSeconds'},
+        ),
+        actionLabel: 'undo'.tr(),
+        duration: const Duration(seconds: destructiveConfirmationSeconds),
+        onAction: () {
+          pendingDeletes.undo(expense.id);
+        },
+        icon: Icons.delete_outline,
+      );
+
+      final parent = widget.readOnlyPreview && widget.previewToken != null
+          ? RoutePaths.invitePreviewExpenses(widget.previewToken!)
+          : RoutePaths.groupExpenses(widget.groupId);
+      popOrGo(context, parent);
     }
   }
 }

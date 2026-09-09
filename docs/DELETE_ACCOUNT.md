@@ -6,7 +6,7 @@ This page explains how to delete your data and request account deletion for **Hi
 
 1. Open the Hisab app.
 2. Go to **Settings** → **Advanced** → **Delete local data**.
-3. Read the summary of what will be deleted, wait for the 30-second countdown, then confirm. This removes all local data (groups, expenses, participants, invites) from this device and returns you to the onboarding screen. You are not signed out; you can continue in local-only mode or sign in again.
+3. Read the summary of what will be deleted, wait for the 10-second countdown, then confirm. This removes all local data (groups, expenses, participants, invites) from this device and returns you to the onboarding screen. You are not signed out; you can continue in local-only mode or sign in again.
 
 After this, no app data remains on your device. Data stored on our servers (if you used Online mode) is not removed by this step.
 
@@ -16,7 +16,7 @@ When signed in and online:
 
 1. Go to **Settings** → **Advanced** → **Delete cloud data**.
 2. Read the summary (group memberships, ownership transfer for groups you own, sole-member groups that will be deleted, device tokens, invite records, in-app notifications). You can optionally check **Also delete local data on this device** to wipe the device and return to onboarding after cloud deletion.
-3. Wait for the 30-second countdown, then confirm. The app leaves all your groups (transferring ownership to the next member by join date where you are owner; groups where you are the only member are deleted), removes your device tokens, invite-usage records, and `user_notifications` from the server, then signs you out. If you chose to also delete local data, the device is wiped and you are taken to onboarding.
+3. Wait for the 10-second countdown, then confirm. The app leaves all your groups (transferring ownership to the next member by join date where you are owner; groups where you are the only member are deleted), removes your device tokens, invite-usage records, and `user_notifications` from the server, then signs you out. If you chose to also delete local data, the device is wiped and you are taken to onboarding.
 
 Server-side app data (group memberships, device_tokens, invite_usages, user_notifications) is removed by this action. Your auth account (email/social login) is not deleted; you can request that separately (see below).
 

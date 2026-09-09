@@ -56,7 +56,7 @@ Future<ExpenseDateRangeSheetResult?> showExpenseDateRangeSheet(
   final isTablet = LayoutBreakpoints.isTabletOrWider(context);
   return showResponsiveSheet<ExpenseDateRangeSheetResult>(
     context: context,
-    title: 'expenses_date_range'.tr(),
+    title: isTablet ? 'expenses_date_range'.tr() : null,
     maxHeight: MediaQuery.of(context).size.height * (isTablet ? 0.85 : 0.92),
     maxWidth: isTablet ? 720 : null,
     isScrollControlled: true,

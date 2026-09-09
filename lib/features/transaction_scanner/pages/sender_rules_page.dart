@@ -111,7 +111,7 @@ class SenderRulesPage extends ConsumerWidget {
 
     showResponsiveSheet<void>(
       context: context,
-      title: 'scanner_add_sender'.tr(),
+      title: isTablet ? 'scanner_add_sender'.tr() : null,
       maxHeight: MediaQuery.of(context).size.height * 0.6,
       isScrollControlled: true,
       centerInFullViewport: false,

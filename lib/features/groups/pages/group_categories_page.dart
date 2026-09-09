@@ -11,6 +11,7 @@ import '../../../core/repository/repository_providers.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/form_validators.dart';
 import '../../../core/widgets/error_content.dart';
+import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../core/widgets/user_text.dart';
 import '../../../domain/domain.dart';
@@ -97,22 +98,13 @@ class _GroupCategoriesPageState extends ConsumerState<GroupCategoriesPage> {
   }
 
   Future<void> _deleteTag(ExpenseTag tag, int usageCount) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('delete_tag'.tr()),
-        content: Text('delete_tag_confirm'.tr(namedArgs: {'name': tag.label})),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text('delete_tag'.tr()),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmSheet(
+      context,
+      title: 'delete_tag'.tr(),
+      content: 'delete_tag_confirm'.tr(namedArgs: {'name': tag.label}),
+      confirmLabel: 'delete_tag'.tr(),
+      isDestructive: true,
+      centerInFullViewport: false,
     );
     if (confirmed != true || !mounted) return;
 

@@ -2060,6 +2060,7 @@ class _PeopleTab extends ConsumerWidget {
         isolateBidi(participant.name),
       ),
       confirmLabel: 'archive_participant'.tr(),
+      isDestructive: true,
       centerInFullViewport: true,
     );
     if (ok == true && context.mounted) {
@@ -2262,6 +2263,7 @@ class _PeopleTab extends ConsumerWidget {
         isolateBidi(participant.name),
       ),
       confirmLabel: 'merge_with_user'.tr(),
+      isDestructive: true,
       centerInFullViewport: true,
     );
     if (confirmed != true || !context.mounted) return;
@@ -2370,6 +2372,7 @@ class _PeopleTab extends ConsumerWidget {
       title: 'kick_member'.tr(),
       content: 'kick_member_confirm'.tr(),
       confirmLabel: 'kick_member'.tr(),
+      isDestructive: true,
       centerInFullViewport: true,
     );
     if (ok == true && context.mounted) {

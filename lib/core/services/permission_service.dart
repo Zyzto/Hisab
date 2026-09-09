@@ -161,7 +161,7 @@ class PermissionService {
     final title = 'permission_notification_needs_install_title'.tr();
     await showResponsiveSheet<void>(
       context: context,
-      title: title,
+      title: isTablet ? title : null,
       maxHeight: MediaQuery.of(context).size.height * 0.55,
       isScrollControlled: true,
       centerInFullViewport: true,
@@ -232,7 +232,7 @@ class PermissionService {
     final isTablet = LayoutBreakpoints.isTabletOrWider(context);
     showResponsiveSheet<void>(
       context: context,
-      title: 'permission_denied_title'.tr(),
+      title: isTablet ? 'permission_denied_title'.tr() : null,
       // Short copy — keep a modest cap; shell shrink-wraps to content.
       maxHeight: MediaQuery.of(context).size.height * 0.5,
       isScrollControlled: true,

@@ -338,6 +338,24 @@ void main() {
       expect(c.state.busy, isFalse);
     });
 
+    test(
+      'closing the browser returns to the form without a timeout error',
+      () async {
+        final c = build(timeout: const Duration(seconds: 2));
+        final attempt = c.signInWithProvider(CloudOAuthProvider.github);
+        await Future<void>.delayed(Duration.zero);
+
+        expect(c.awaitingExternalAuth, isTrue);
+        c.cancelPendingExternalAuth();
+        await attempt;
+
+        expect(c.awaitingExternalAuth, isFalse);
+        expect(c.state.busy, isFalse);
+        expect(c.state.errorKey, isNull);
+        expect(c.state.outcome, isNull);
+      },
+    );
+
     test('a launch throw becomes an inline error', () async {
       auth.oauthError = const CloudException('boom');
       final c = build();

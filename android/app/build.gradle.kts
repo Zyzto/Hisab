@@ -50,6 +50,7 @@ android {
 
     defaultConfig {
         applicationId = "com.shenepoy.hisab"
+        manifestPlaceholders["hisabAuthScheme"] = "com.shenepoy.hisab"
         // ML Kit GenAI Prompt (Gemini Nano) requires API 26+
         minSdk = maxOf(flutter.minSdkVersion, 26)
         targetSdk = flutter.targetSdkVersion
@@ -88,6 +89,7 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
+            manifestPlaceholders["hisabAuthScheme"] = "com.shenepoy.hisab.debug"
             // Staging remains side-by-side with production while using the
             // dedicated staging certificate for App Links in CI. Local debug
             // builds fall back to Android's normal debug key.

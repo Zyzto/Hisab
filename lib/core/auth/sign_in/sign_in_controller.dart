@@ -41,6 +41,13 @@ class SignInController extends ChangeNotifier {
   SignInFormState get state => _state;
 
   bool _disposed = false;
+  bool _awaitingExternalAuth = false;
+  Completer<bool>? _externalAuthWaiter;
+
+  /// True while a native browser OAuth round trip is waiting for its callback.
+  /// The sheet uses this to distinguish closing the browser from closing the
+  /// app's own form.
+  bool get awaitingExternalAuth => _awaitingExternalAuth;
 
   void _emit(SignInFormState next) {
     if (_disposed) return;
@@ -51,7 +58,22 @@ class SignInController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _awaitingExternalAuth = false;
+    _externalAuthWaiter = null;
     super.dispose();
+  }
+
+  /// Ends a browser OAuth attempt when the user returns without completing it.
+  /// This is deliberately a quiet reset: cancellation is not an auth error and
+  /// the user should be able to try another provider or enter credentials.
+  void cancelPendingExternalAuth() {
+    if (!_awaitingExternalAuth) return;
+    _awaitingExternalAuth = false;
+    final waiter = _externalAuthWaiter;
+    _externalAuthWaiter = null;
+    if (waiter != null && !waiter.isCompleted) waiter.complete(false);
+    _emit(_state.copyWith(busy: false, clearError: true));
+    Log.info('External OAuth cancelled before callback');
   }
 
   // ---------------------------------------------------------------------------
@@ -318,13 +340,18 @@ class SignInController extends ChangeNotifier {
     StreamSubscription<CloudAuthState>? sub;
     try {
       // Subscribe before launch on native so a fast callback cannot be missed.
-      if (!_isWeb) completer = _listenForSignIn((s) => sub = s);
+      if (!_isWeb) {
+        _awaitingExternalAuth = true;
+        completer = _listenForSignIn((s) => sub = s);
+        _externalAuthWaiter = completer;
+      }
 
       final launched = provider == CloudOAuthProvider.google
           ? await _auth.signInWithGoogle()
           : await _auth.signInWithGithub();
 
       if (!launched) {
+        _awaitingExternalAuth = false;
         _emit(
           _state.copyWith(busy: false, errorKey: AuthErrorKeys.oauthFailed),
         );
@@ -338,11 +365,20 @@ class SignInController extends ChangeNotifier {
       }
 
       Log.debug('Waiting for $label OAuth callback (native)');
-      await _awaitCallback(completer!, label: '$label OAuth');
+      await _awaitCallback(
+        completer!,
+        label: '$label OAuth',
+        externalAuth: true,
+      );
     } catch (e) {
+      _awaitingExternalAuth = false;
       Log.warning('OAuth sign-in failed', error: e);
       _emit(_state.copyWith(busy: false, errorKey: authErrorKey(e)));
     } finally {
+      if (identical(_externalAuthWaiter, completer)) {
+        _externalAuthWaiter = null;
+      }
+      _awaitingExternalAuth = false;
       await sub?.cancel();
     }
   }
@@ -368,11 +404,17 @@ class SignInController extends ChangeNotifier {
   Future<void> _awaitCallback(
     Completer<bool> completer, {
     required String label,
+    bool externalAuth = false,
   }) async {
     final ok = await completer.future.timeout(
       _callbackTimeout,
       onTimeout: () => false,
     );
+    // A browser can be closed without producing an auth event. In that case
+    // the lifecycle observer completes this waiter with false; do not turn a
+    // user cancellation into a misleading timeout error.
+    if (externalAuth && !ok && !_awaitingExternalAuth) return;
+    if (externalAuth) _awaitingExternalAuth = false;
     if (ok) {
       Log.info('$label sign-in completed (native)');
       _finish(SignInResult.success);
@@ -383,6 +425,7 @@ class SignInController extends ChangeNotifier {
   }
 
   void _finish(SignInResult result) {
+    _awaitingExternalAuth = false;
     _emit(_state.copyWith(busy: false, outcome: result));
   }
 }

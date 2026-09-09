@@ -222,6 +222,60 @@ extension ToastContext on BuildContext {
     );
   }
 
+  /// Shows an informational toast with one explicit action. Auto-dismiss does
+  /// not invoke the action, which is important for Undo windows: only tapping
+  /// the button should cancel the pending operation.
+  void showToastWithAction(
+    String message, {
+    required String actionLabel,
+    required VoidCallback onAction,
+    Duration? duration,
+    IconData icon = Icons.undo,
+  }) {
+    if (!mounted) return;
+    toastification.showCustom(
+      context: this,
+      alignment: Alignment.bottomCenter,
+      autoCloseDuration: duration ?? const Duration(seconds: 8),
+      builder: (context, holder) {
+        final theme = Theme.of(context);
+        final colorScheme = theme.colorScheme;
+        return Material(
+          color: colorScheme.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Icon(icon, color: colorScheme.primary),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: UserText(
+                    message,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurface,
+                    ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: () {
+                    toastification.dismiss(holder);
+                    onAction();
+                  },
+                  child: UserText(actionLabel),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   /// Dismisses all visible toasts. Use before showing a replacement (e.g. sync status).
   void dismissAllToasts() {
     if (!mounted) return;

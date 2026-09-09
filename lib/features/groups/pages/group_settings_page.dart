@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:currency_picker/currency_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,7 +14,6 @@ import '../widgets/settlement_method_picker.dart';
 import '../utils/group_icon_utils.dart';
 import '../../../core/celebration/celebration_controller.dart';
 import '../../../core/celebration/celebration_kind.dart';
-import '../../../core/constants/confirmation_durations.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/constrained_content.dart';
@@ -659,9 +656,10 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage>
         CurrencyHelpers.fromCode(group.currencyCode)?.symbol ??
         group.currencyCode;
     final bodyKey = GlobalKey<_BudgetSheetBodyState>();
+    final isTablet = LayoutBreakpoints.isTabletOrWider(context);
     final result = await showResponsiveSheet<String?>(
       context: context,
-      title: 'my_budget'.tr(),
+      title: isTablet ? 'my_budget'.tr() : null,
       maxHeight: MediaQuery.of(context).size.height * 0.5,
       isScrollControlled: true,
       centerInFullViewport: true,
@@ -669,7 +667,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage>
         builder: (ctx) => buildSheetShell(
           ctx,
           title: 'my_budget'.tr(),
-          showTitleInBody: !LayoutBreakpoints.isTabletOrWider(context),
+          showTitleInBody: !isTablet,
           body: _BudgetSheetBody(
             key: bodyKey,
             initialValue: initialValue,
@@ -680,7 +678,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage>
               onPressed: () => Navigator.pop(ctx, ''),
               child: Text('clear'.tr()),
             ),
-            if (!LayoutBreakpoints.isTabletOrWider(context))
+            if (!isTablet)
               TextButton(
                 onPressed: () => Navigator.pop(ctx, null),
                 child: Text('cancel'.tr()),
@@ -1955,23 +1953,14 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage>
             .read(futureGroupProvider(widget.groupId))
             .whenOrNull(data: (g) => g?.isPersonal) ??
         false;
-    final ok = await showResponsiveSheet<bool>(
-      context: context,
+    final ok = await showConfirmSheet(
+      context,
       title: (isPersonal ? 'delete_list' : 'delete_group').tr(),
-      maxHeight: MediaQuery.of(context).size.height * 0.5,
-      isScrollControlled: true,
+      content: (isPersonal ? 'delete_list_confirm' : 'delete_group_confirm')
+          .tr(),
+      confirmLabel: (isPersonal ? 'delete_list' : 'delete_group').tr(),
+      isDestructive: true,
       centerInFullViewport: true,
-      child: Builder(
-        builder: (ctx) => _TimedConfirmSheetContent(
-          sheetContext: ctx,
-          title: (isPersonal ? 'delete_list' : 'delete_group').tr(),
-          content: (isPersonal ? 'delete_list_confirm' : 'delete_group_confirm')
-              .tr(),
-          confirmLabel: (isPersonal ? 'delete_list' : 'delete_group').tr(),
-          seconds: destructiveConfirmationSeconds,
-          isDestructive: true,
-        ),
-      ),
     );
     if (ok != true || !context.mounted) return;
     try {
@@ -1988,22 +1977,13 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage>
   }
 
   Future<void> _showLeaveGroup(BuildContext context, WidgetRef ref) async {
-    final ok = await showResponsiveSheet<bool>(
-      context: context,
+    final ok = await showConfirmSheet(
+      context,
       title: 'leave_group'.tr(),
-      maxHeight: MediaQuery.of(context).size.height * 0.5,
-      isScrollControlled: true,
+      content: 'leave_group_confirm'.tr(),
+      confirmLabel: 'leave_group'.tr(),
+      isDestructive: true,
       centerInFullViewport: true,
-      child: Builder(
-        builder: (ctx) => _TimedConfirmSheetContent(
-          sheetContext: ctx,
-          title: 'leave_group'.tr(),
-          content: 'leave_group_confirm'.tr(),
-          confirmLabel: 'leave_group'.tr(),
-          seconds: destructiveConfirmationSeconds,
-          isDestructive: true,
-        ),
-      ),
     );
     if (ok != true || !context.mounted) return;
     try {
@@ -2114,108 +2094,6 @@ class _InvitePreviewTile extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Timed confirmation sheet -- confirm button is disabled for [seconds] seconds
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _TimedConfirmSheetContent extends StatefulWidget {
-  final BuildContext sheetContext;
-  final String title;
-  final String content;
-  final String confirmLabel;
-  final int seconds;
-  final bool isDestructive;
-
-  const _TimedConfirmSheetContent({
-    required this.sheetContext,
-    required this.title,
-    required this.content,
-    required this.confirmLabel,
-    required this.seconds,
-    this.isDestructive = false,
-  });
-
-  @override
-  State<_TimedConfirmSheetContent> createState() =>
-      _TimedConfirmSheetContentState();
-}
-
-class _TimedConfirmSheetContentState extends State<_TimedConfirmSheetContent> {
-  late int _remaining;
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _remaining = widget.seconds;
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (_remaining <= 1) {
-        _timer?.cancel();
-        _timer = null;
-      }
-      if (mounted) setState(() => _remaining--);
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final ctx = widget.sheetContext;
-    final colorScheme = Theme.of(ctx).colorScheme;
-    final enabled = _remaining <= 0;
-
-    return buildSheetShell(
-      ctx,
-      title: widget.title,
-      showTitleInBody: !LayoutBreakpoints.isTabletOrWider(ctx),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: DecoratedBox(
-          decoration: AccentSurfaces.flatPanel(colorScheme),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Text(
-              widget.content,
-              style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ),
-      ),
-      actions: [
-        if (!LayoutBreakpoints.isTabletOrWider(ctx))
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('cancel'.tr()),
-          ),
-        FilledButton(
-          style: FilledButton.styleFrom(
-            backgroundColor: widget.isDestructive ? colorScheme.error : null,
-            disabledBackgroundColor: widget.isDestructive
-                ? colorScheme.error.withValues(alpha: 0.3)
-                : null,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-          ),
-          onPressed: enabled ? () => Navigator.pop(ctx, true) : null,
-          child: Text(
-            enabled
-                ? widget.confirmLabel
-                : '${widget.confirmLabel} (${_remaining}s)',
-          ),
-        ),
-      ],
     );
   }
 }

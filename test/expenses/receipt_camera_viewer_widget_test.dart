@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hisab/features/expenses/camera/receipt_camera_controller.dart';
 import 'package:hisab/features/expenses/camera/receipt_camera_session.dart';
 import 'package:hisab/features/expenses/camera/receipt_camera_types.dart';
@@ -8,6 +9,31 @@ import 'package:hisab/features/expenses/camera/receipt_camera_viewer.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../widget_test_helpers.dart';
+
+Future<void> pumpAppWithRouter(
+  WidgetTester tester, {
+  required Widget child,
+}) async {
+  final router = GoRouter(
+    initialLocation: '/',
+    routes: [
+      GoRoute(
+        path: '/',
+        builder: (_, _) => Scaffold(body: child),
+      ),
+    ],
+  );
+  await tester.pumpWidget(
+    EasyLocalization(
+      path: 'assets/translations',
+      supportedLocales: testSupportedLocales,
+      fallbackLocale: const Locale('en'),
+      startLocale: const Locale('en'),
+      child: MaterialApp.router(routerConfig: router),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
 
 void main() {
   setUpAll(() {
@@ -90,7 +116,7 @@ void main() {
     session.addCapture(XFile('/tmp/a.jpg'));
     session.returnToCamera();
 
-    await pumpApp(
+    await pumpAppWithRouter(
       tester,
       child: ReceiptCameraViewer(
         maxRemaining: 5,
@@ -109,12 +135,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('receipt_camera_discard_confirm'.tr()), findsOneWidget);
-    await tester.tap(find.text('cancel'.tr()));
+    final cancel = find.text('cancel'.tr());
+    await tester.tap(
+      cancel.evaluate().isNotEmpty ? cancel : find.byIcon(Icons.close).last,
+    );
     await tester.pumpAndSettle();
     expect(popped, isNotNull); // unchanged sentinel
 
     await tester.tap(find.byIcon(Icons.close));
     await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 10));
     await tester.tap(find.text('receipt_camera_discard_action'.tr()));
     await tester.pumpAndSettle();
     expect(popped, isNull);

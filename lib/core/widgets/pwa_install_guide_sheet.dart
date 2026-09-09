@@ -14,7 +14,7 @@ Future<void> showPwaInstallGuide(BuildContext context) {
 
   return showResponsiveSheet<void>(
     context: context,
-    title: title,
+    title: isTablet ? title : null,
     maxHeight: MediaQuery.of(context).size.height * 0.7,
     isScrollControlled: true,
     centerInFullViewport: true,

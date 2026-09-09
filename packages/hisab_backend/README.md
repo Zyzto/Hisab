@@ -159,7 +159,8 @@ user's connection.
 
 `resolveAuthRedirectUrl` and the two deep link constants are exported here
 rather than left to each backend, because the app registers the scheme in its
-own manifests. A backend must accept `hisabAuthCallbackDeepLink`
-(`com.shenepoy.hisab://callback`) in its redirect allowlist, and should keep
-accepting `legacyHisabAuthCallbackDeepLink` until installs predating the scheme
-rename age out.
+own manifests. A backend must accept `hisabAuthCallbackDeepLink` (production
+uses `com.shenepoy.hisab://callback`; staging/debug uses
+`com.shenepoy.hisab.debug://callback`) in its redirect allowlist, and should
+keep accepting `legacyHisabAuthCallbackDeepLink` until installs predating the
+scheme rename age out.

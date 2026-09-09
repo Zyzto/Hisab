@@ -5,7 +5,7 @@
          on devices that have both apps installed. -->
     <application>
         <activity android:name=".MainActivity">
-            <!-- Invite deep links: com.shenepoy.hisab://invite?token=...
+            <!-- Invite deep links: ${hisabAuthScheme}://invite?token=...
                  The io.supabase.hisab scheme stays registered so links shared
                  before the rename keep opening the app. Drop it after two or
                  three releases. -->
@@ -13,15 +13,15 @@
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="com.shenepoy.hisab" android:host="invite"/>
+                <data android:scheme="${hisabAuthScheme}" android:host="invite"/>
                 <data android:scheme="io.supabase.hisab" android:host="invite"/>
             </intent-filter>
-            <!-- OAuth / magic-link callback: com.shenepoy.hisab://callback -->
+            <!-- OAuth / magic-link callback: ${hisabAuthScheme}://callback -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="com.shenepoy.hisab" android:host="callback"/>
+                <data android:scheme="${hisabAuthScheme}" android:host="callback"/>
                 <data android:scheme="io.supabase.hisab" android:host="callback"/>
             </intent-filter>
             <!-- HTTPS App Links: https://hisab.shenepoy.com/invite/... -->

@@ -4,6 +4,7 @@ import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 
 import 'app_router.dart';
 import 'invite_auth_helpers.dart';
@@ -13,7 +14,7 @@ import '../settings/settings_definitions.dart';
 
 /// Scheme used for app deep links. [inviteScheme] is current; [legacyInviteScheme]
 /// stays accepted so links shared before the rename keep opening the app.
-const String inviteScheme = 'com.shenepoy.hisab';
+const String inviteScheme = hisabAuthCallbackScheme;
 const String legacyInviteScheme = 'io.supabase.hisab';
 const String _inviteHost = 'invite';
 

@@ -17,6 +17,7 @@ migrate_working_dir/
 /supabase/.migrations/**
 
 # IDEs / local agent state
+.zvec-grep/
 *.iml
 *.ipr
 *.iws

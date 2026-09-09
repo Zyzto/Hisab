@@ -1634,7 +1634,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
         : 'expense_form_full_features_tooltip';
     showResponsiveSheet<void>(
       context: context,
-      title: 'expense_form_full_features_tooltip_title'.tr(),
+      title: LayoutBreakpoints.isTabletOrWider(context)
+          ? 'expense_form_full_features_tooltip_title'.tr()
+          : null,
       maxHeight: MediaQuery.of(context).size.height * 0.5,
       isScrollControlled: true,
       centerInFullViewport: true,

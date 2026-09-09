@@ -901,20 +901,21 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
                   (profileName != null && profileName.isNotEmpty)
                   ? profileName
                   : 'wizard_you'.tr();
-              return Container(
-                decoration: BoxDecoration(
-                  color: AccentSurfaces.emphasizedFill(
-                    colorScheme,
-                    subtle: context.subtleAccents,
-                  ),
+              return Material(
+                color: AccentSurfaces.emphasizedFill(
+                  colorScheme,
+                  subtle: context.subtleAccents,
+                ),
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
-                  border: Border.all(
+                  side: BorderSide(
                     color: AccentSurfaces.emphasizedBorder(
                       colorScheme,
                       subtle: context.subtleAccents,
                     ),
                   ),
                 ),
+                clipBehavior: Clip.antiAlias,
                 child: ListTile(
                   leading: ParticipantAvatar(
                     name: displayName,
@@ -941,11 +942,15 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
           ...List.generate(_participants.length, (i) {
             return Padding(
               padding: const EdgeInsets.only(bottom: ThemeConfig.spacingS),
-              child: Container(
-                decoration: AccentSurfaces.flatPanel(
-                  colorScheme,
-                  radius: ThemeConfig.radiusL,
+              child: Material(
+                color: colorScheme.surfaceContainerLow,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
+                  side: BorderSide(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.45),
+                  ),
                 ),
+                clipBehavior: Clip.antiAlias,
                 child: ListTile(
                   leading: ParticipantAvatar(
                     name: _participants[i],

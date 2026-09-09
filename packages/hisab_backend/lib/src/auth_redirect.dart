@@ -3,7 +3,14 @@
 /// A backend must accept this exact value in its redirect allowlist, otherwise
 /// native sign-in strands the user in a browser holding a PKCE verifier the app
 /// can no longer reach.
-const String hisabAuthCallbackDeepLink = 'com.shenepoy.hisab://callback';
+const String hisabAuthCallbackScheme = String.fromEnvironment(
+  'HISAB_AUTH_SCHEME',
+  defaultValue: String.fromEnvironment('HISAB_ENV') == 'staging'
+      ? 'com.shenepoy.hisab.debug'
+      : 'com.shenepoy.hisab',
+);
+
+const String hisabAuthCallbackDeepLink = '$hisabAuthCallbackScheme://callback';
 
 /// Deep link accepted for installs predating the scheme rename. Backends should
 /// allowlist it alongside [hisabAuthCallbackDeepLink] until those installs age

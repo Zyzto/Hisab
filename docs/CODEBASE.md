@@ -171,7 +171,9 @@ Expense form **photos**: add up to 5 images (camera or gallery on all platforms,
 Redirect behavior:
 
 - Web uses `SITE_URL` if provided (`authRedirectUrl`). If `SITE_URL` is mistakenly `http://` while the page origin is `https://` on the same host, the app upgrades the redirect to the current origin so OAuth does not bounce through an http→https 301.
-- Native uses deep link callback `com.shenepoy.hisab://callback` (legacy `io.supabase.hisab://callback` still accepted).
+- Native uses `com.shenepoy.hisab://callback` in production and
+  `com.shenepoy.hisab.debug://callback` in staging/debug builds (legacy
+  `io.supabase.hisab://callback` remains accepted for older installs).
 
 **Web OAuth return path** (`lib/main.dart` + `lib/core/auth/oauth_*.dart`):
 

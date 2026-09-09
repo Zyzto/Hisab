@@ -109,7 +109,9 @@ Future<void> showSettleUpExplainerSheet(
 }) async {
   await showResponsiveSheet<void>(
     context: context,
-    title: 'settle_up_explainer_title'.tr(),
+    title: LayoutBreakpoints.isTabletOrWider(context)
+        ? 'settle_up_explainer_title'.tr()
+        : null,
     maxHeight: MediaQuery.of(context).size.height * 0.75,
     isScrollControlled: true,
     centerInFullViewport: true,

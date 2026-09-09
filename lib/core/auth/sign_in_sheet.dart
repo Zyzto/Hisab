@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -33,6 +35,11 @@ const double _kBrandPanelWidth = 320;
 
 /// Below this the panel would squeeze the form, so only the form is shown.
 const double _kBrandPanelMinSheetWidth = 700;
+
+/// Deep-link delivery and the auth-state event can arrive just after Android
+/// resumes the activity. Give a real callback a moment to win the race before
+/// treating resume as "the browser was closed".
+const Duration _externalAuthResumeGrace = Duration(seconds: 1);
 
 /// The adaptive sign-in modal: email/password, magic link, Google and GitHub.
 ///
@@ -87,7 +94,8 @@ class _SignInSheet extends StatefulWidget {
   State<_SignInSheet> createState() => _SignInSheetState();
 }
 
-class _SignInSheetState extends State<_SignInSheet> {
+class _SignInSheetState extends State<_SignInSheet>
+    with WidgetsBindingObserver {
   final _formKey = GlobalKey<FormState>();
   final _emailFieldKey = GlobalKey<FormFieldState<String>>();
   final _emailController = TextEditingController();
@@ -95,22 +103,49 @@ class _SignInSheetState extends State<_SignInSheet> {
   final _nameController = TextEditingController();
 
   bool _popped = false;
+  bool _leftAppForExternalAuth = false;
+  Timer? _externalAuthCancelTimer;
 
   SignInController get _controller => widget.controller;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _controller.addListener(_closeWhenFinished);
   }
 
   @override
   void dispose() {
+    _externalAuthCancelTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _controller.removeListener(_closeWhenFinished);
     _emailController.dispose();
     _passwordController.dispose();
     _nameController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
+      if (_controller.awaitingExternalAuth) {
+        _leftAppForExternalAuth = true;
+      }
+      _externalAuthCancelTimer?.cancel();
+      return;
+    }
+    if (state == AppLifecycleState.resumed && _leftAppForExternalAuth) {
+      _leftAppForExternalAuth = false;
+      _externalAuthCancelTimer?.cancel();
+      _externalAuthCancelTimer = Timer(_externalAuthResumeGrace, () {
+        _externalAuthCancelTimer = null;
+        if (mounted && _controller.awaitingExternalAuth) {
+          _controller.cancelPendingExternalAuth();
+        }
+      });
+    }
   }
 
   /// Pops with whatever result the controller settled on. Guarded because a

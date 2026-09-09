@@ -2,13 +2,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/repository/repository_providers.dart';
 import '../../../domain/domain.dart';
+import '../../expenses/providers/pending_expense_deletion_provider.dart';
 import '../../groups/providers/groups_provider.dart';
 import '../../transaction_scanner/providers/scanner_providers.dart';
 import 'notification_providers.dart';
 
 /// One DB watch for all expenses (avoids N per-group streams on profile).
 final allExpensesProvider = StreamProvider<List<Expense>>((ref) {
-  return ref.watch(expenseRepositoryProvider).watchAll();
+  final pendingIds = ref.watch(pendingExpenseDeletionProvider);
+  return ref
+      .watch(expenseRepositoryProvider)
+      .watchAll()
+      .map(
+        (expenses) => expenses
+            .where((expense) => !pendingIds.contains(expense.id))
+            .toList(),
+      );
 });
 
 /// One DB watch for all participants.

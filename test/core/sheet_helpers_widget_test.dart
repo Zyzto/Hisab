@@ -76,9 +76,55 @@ void main() {
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Delete item'), findsWidgets);
+    expect(find.text('Delete item'), findsOneWidget);
     expect(find.text('This cannot be undone.'), findsOneWidget);
-    expect(find.text('Delete'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('safaeh_confirm')),
+        matching: find.textContaining('Delete'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const ValueKey('safaeh_confirm')))
+          .onPressed,
+      isNull,
+    );
+  });
+
+  testWidgets('timed confirm enables only after its delay', (tester) async {
+    setPhoneViewport(tester);
+    await tester.pumpWidget(
+      buildApp(
+        onOpen: (ctx) => showTimedConfirmSheet(
+          ctx,
+          title: 'Delete item',
+          content: 'Wait before deleting.',
+          confirmLabel: 'Delete',
+          isDestructive: true,
+          seconds: 2,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Delete item'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const ValueKey('safaeh_confirm')))
+          .onPressed,
+      isNull,
+    );
+    await tester.pump(const Duration(seconds: 2));
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const ValueKey('safaeh_confirm')))
+          .onPressed,
+      isNotNull,
+    );
   });
 
   testWidgets('showConfirmSheet tablet uses Dialog chrome with close', (

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../domain/domain.dart';
+import '../../expenses/providers/pending_expense_deletion_provider.dart';
 
 part 'groups_provider.g.dart';
 
@@ -68,11 +69,22 @@ Stream<Group?> futureGroup(Ref ref, String groupId) {
 
 @riverpod
 Stream<List<Expense>> expensesByGroup(Ref ref, String groupId) {
-  return ref.watch(expenseRepositoryProvider).watchByGroupId(groupId);
+  final pendingIds = ref.watch(pendingExpenseDeletionProvider);
+  return ref
+      .watch(expenseRepositoryProvider)
+      .watchByGroupId(groupId)
+      .map(
+        (expenses) => expenses
+            .where((expense) => !pendingIds.contains(expense.id))
+            .toList(),
+      );
 }
 
 @riverpod
 Stream<Expense?> futureExpense(Ref ref, String expenseId) {
+  if (ref.watch(pendingExpenseDeletionProvider).contains(expenseId)) {
+    return Stream<Expense?>.value(null);
+  }
   return ref.watch(expenseRepositoryProvider).watchById(expenseId);
 }
 

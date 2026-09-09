@@ -804,6 +804,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       title: 'reset_all_settings'.tr(),
       content: 'reset_all_settings_confirm'.tr(),
       confirmLabel: 'reset_all_settings'.tr(),
+      isDestructive: true,
       centerInFullViewport: false,
     );
     if (confirmed != true || !context.mounted) return;
@@ -824,7 +825,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (!context.mounted) return;
     final confirmed = await showResponsiveSheet<bool>(
       context: context,
-      title: 'delete_local_data'.tr(),
+      title: LayoutBreakpoints.isTabletOrWider(context)
+          ? 'delete_local_data'.tr()
+          : null,
       maxHeight: MediaQuery.of(context).size.height * 0.75,
       isScrollControlled: true,
       centerInFullViewport: false,
@@ -924,7 +927,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       if (!context.mounted) return;
       final result = await showResponsiveSheet<bool?>(
         context: context,
-        title: 'delete_cloud_data'.tr(),
+        title: LayoutBreakpoints.isTabletOrWider(context)
+            ? 'delete_cloud_data'.tr()
+            : null,
         maxHeight: MediaQuery.of(context).size.height * 0.75,
         isScrollControlled: true,
         centerInFullViewport: false,
@@ -1603,7 +1608,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final scaffoldContext = context;
     await showResponsiveSheet<void>(
       context: context,
-      title: 'view_logs'.tr(),
+      title: LayoutBreakpoints.isTabletOrWider(context)
+          ? 'view_logs'.tr()
+          : null,
       maxWidth: 600,
       maxHeight: 700,
       centerInFullViewport: false,
@@ -1627,6 +1634,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 title: 'clear_logs'.tr(),
                 content: 'clear_logs_confirm'.tr(),
                 confirmLabel: 'clear_logs'.tr(),
+                isDestructive: true,
                 centerInFullViewport: false,
               );
               if (confirmed == true) {
@@ -1739,7 +1747,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final isTablet = LayoutBreakpoints.isTabletOrWider(context);
     showResponsiveSheet<void>(
       context: context,
-      title: 'about_me'.tr(),
+      title: isTablet ? 'about_me'.tr() : null,
       maxHeight: MediaQuery.of(context).size.height * 0.75,
       isScrollControlled: true,
       centerInFullViewport: false,

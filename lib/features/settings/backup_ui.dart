@@ -182,6 +182,7 @@ Future<void> runBackupImportFlow(BuildContext context, WidgetRef ref) async {
       title: 'import_data'.tr(),
       content: confirmKey.tr(),
       confirmLabel: 'import_data'.tr(),
+      isDestructive: mode == BackupImportMode.replaceLocal,
       centerInFullViewport: false,
     );
     if (confirmed != true || !context.mounted) return;
