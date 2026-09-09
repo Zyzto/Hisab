@@ -12,6 +12,7 @@ import 'participant_repository.dart';
 import 'expense_repository.dart';
 import 'tag_repository.dart';
 import 'powersync_repository.dart';
+import 'household_balance_reassignment_repository.dart';
 
 part 'repository_providers.g.dart';
 
@@ -52,6 +53,20 @@ IExpenseRepository expenseRepository(Ref ref) {
   final localOnly = ref.watch(effectiveLocalOnlyProvider);
   final isOnline = ref.watch(connectivityProvider);
   return PowerSyncExpenseRepository(
+    ref.watch(powerSyncDatabaseProvider),
+    cloud: _backendIfOnline(localOnly),
+    isOnline: isOnline,
+    isLocalOnly: localOnly,
+  );
+}
+
+@riverpod
+IHouseholdBalanceReassignmentRepository householdBalanceReassignmentRepository(
+  Ref ref,
+) {
+  final localOnly = ref.watch(effectiveLocalOnlyProvider);
+  final isOnline = ref.watch(connectivityProvider);
+  return PowerSyncHouseholdBalanceReassignmentRepository(
     ref.watch(powerSyncDatabaseProvider),
     cloud: _backendIfOnline(localOnly),
     isOnline: isOnline,

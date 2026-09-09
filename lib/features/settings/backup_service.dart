@@ -12,6 +12,7 @@ import '../../core/repository/group_repository.dart';
 import '../../core/repository/participant_repository.dart';
 import '../../core/repository/powersync_repository.dart';
 import '../../core/repository/tag_repository.dart';
+import '../../core/repository/household_balance_reassignment_repository.dart';
 import '../../domain/domain.dart';
 import 'backup_csv.dart';
 import 'backup_helper.dart';
@@ -75,6 +76,7 @@ class BackupService {
     required this.participantRepo,
     required this.expenseRepo,
     required this.tagRepo,
+    this.householdReassignmentRepo,
     required this.effectiveLocalOnly,
   });
 
@@ -83,6 +85,7 @@ class BackupService {
   final IParticipantRepository participantRepo;
   final IExpenseRepository expenseRepo;
   final ITagRepository tagRepo;
+  final IHouseholdBalanceReassignmentRepository? householdReassignmentRepo;
   final bool effectiveLocalOnly;
 
   /// Repos that never hot-loop PostgREST (queue when not local-only).
@@ -118,6 +121,13 @@ class BackupService {
         isOnline: false,
         isLocalOnly: reposLocalOnly,
       ),
+      householdReassignmentRepo:
+          PowerSyncHouseholdBalanceReassignmentRepository(
+            db,
+            cloud: null,
+            isOnline: false,
+            isLocalOnly: reposLocalOnly,
+          ),
       effectiveLocalOnly: effectiveLocalOnly,
     );
   }
@@ -132,6 +142,7 @@ class BackupService {
       participantRepo: participantRepo,
       expenseRepo: expenseRepo,
       tagRepo: tagRepo,
+      householdReassignmentRepo: householdReassignmentRepo,
       groupIdsFilter: groupIds,
     );
     onProgress?.call('export_building', 0.8);
@@ -153,6 +164,7 @@ class BackupService {
       participantRepo: participantRepo,
       expenseRepo: expenseRepo,
       tagRepo: tagRepo,
+      householdReassignmentRepo: householdReassignmentRepo,
       groupIdsFilter: groupIds,
     );
     final backup = parseBackupJson(jsonEncode(data)).data!;
@@ -181,6 +193,7 @@ class BackupService {
       participantRepo: participantRepo,
       expenseRepo: expenseRepo,
       tagRepo: tagRepo,
+      householdReassignmentRepo: householdReassignmentRepo,
       groupIdsFilter: groupIds,
     );
     final backup = parseBackupJson(jsonEncode(data)).data!;
@@ -221,6 +234,7 @@ class BackupService {
         lineItems: e.lineItems,
         imagePath: newPaths.isNotEmpty ? newPaths.first : null,
         imagePaths: newPaths.isNotEmpty ? newPaths : null,
+        householdSplitSnapshotJson: e.householdSplitSnapshotJson,
       );
     }).toList();
 
@@ -429,6 +443,7 @@ class BackupService {
       allowMemberChangeSettings: g.allowMemberChangeSettings,
       allowExpenseAsOtherParticipant: g.allowExpenseAsOtherParticipant,
       allowMemberSettleForOthers: g.allowMemberSettleForOthers,
+      householdCountingEnabled: g.householdCountingEnabled,
     );
 
     final createdParticipants = await participantRepo.getByGroupId(newGroupId);
@@ -452,6 +467,7 @@ class BackupService {
             name: sole.name,
             avatarId: sole.avatarId,
             leftAt: sole.leftAt,
+            unnamedDependentCount: sole.unnamedDependentCount,
           ),
         );
       }
@@ -472,6 +488,7 @@ class BackupService {
             name: backupOwner.name,
             avatarId: backupOwner.avatarId,
             leftAt: backupOwner.leftAt,
+            unnamedDependentCount: backupOwner.unnamedDependentCount,
           ),
         );
       }
@@ -484,10 +501,32 @@ class BackupService {
           final created = await participantRepo.getById(newId);
           if (created != null) {
             await participantRepo.update(
-              created.copyWith(leftAt: p.leftAt, avatarId: p.avatarId),
+              created.copyWith(
+                leftAt: p.leftAt,
+                avatarId: p.avatarId,
+                unnamedDependentCount: p.unnamedDependentCount,
+              ),
             );
           }
         }
+      }
+      // Apply parent links after all new IDs are known. This also handles
+      // recursive trees and keeps old backups (without links) unchanged.
+      for (final p in oldParticipants) {
+        final newId = participantIds[p.id];
+        if (newId == null) continue;
+        final created = await participantRepo.getById(newId);
+        if (created == null) continue;
+        final newParent = p.parentParticipantId == null
+            ? null
+            : participantIds[p.parentParticipantId!];
+        await participantRepo.update(
+          created.copyWith(
+            parentParticipantId: newParent,
+            clearParentParticipantId: newParent == null,
+            unnamedDependentCount: p.unnamedDependentCount,
+          ),
+        );
       }
     }
 
@@ -556,9 +595,29 @@ class BackupService {
         lineItems: e.lineItems,
         imagePath: storedPaths.isNotEmpty ? storedPaths.first : null,
         imagePaths: storedPaths.isNotEmpty ? storedPaths : null,
+        householdSplitSnapshotJson: remapHouseholdSplitSnapshotJson(
+          e.householdSplitSnapshotJson,
+          participantIds,
+        ),
       );
       final newExpenseId = await expenseRepo.create(expense);
       expenseIds[e.id] = newExpenseId;
+    }
+
+    if (householdReassignmentRepo != null) {
+      for (final reassignment in data.householdReassignments.where(
+        (r) => r.groupId == g.id,
+      )) {
+        final source = participantIds[reassignment.sourceParticipantId];
+        final target = participantIds[reassignment.targetParticipantId];
+        if (source == null || target == null) continue;
+        await householdReassignmentRepo!.create(
+          groupId: newGroupId,
+          sourceParticipantId: source,
+          targetParticipantId: target,
+          amountCents: reassignment.amountCents,
+        );
+      }
     }
 
     final created = await groupRepo.getById(newGroupId);
@@ -581,6 +640,7 @@ class BackupService {
           allowMemberChangeSettings: g.allowMemberChangeSettings,
           allowExpenseAsOtherParticipant: g.allowExpenseAsOtherParticipant,
           allowMemberSettleForOthers: g.allowMemberSettleForOthers,
+          householdCountingEnabled: g.householdCountingEnabled,
           icon: g.icon,
           color: g.color,
           archivedAt: restoreArchivedAt ? g.archivedAt : null,
@@ -622,5 +682,6 @@ class BackupService {
     'lineItems': e.lineItems?.map((l) => l.toJson()).toList(),
     'imagePath': e.imagePath,
     'imagePaths': e.imagePaths,
+    'householdSplitSnapshotJson': e.householdSplitSnapshotJson,
   };
 }

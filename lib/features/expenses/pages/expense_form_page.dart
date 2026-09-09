@@ -24,6 +24,7 @@ import '../../../core/celebration/celebration_controller.dart';
 import '../../../core/celebration/celebration_kind.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/services/exchange_rate_service.dart';
+import '../../../core/services/household_service.dart';
 import '../../../core/telemetry/telemetry_service.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/constrained_content.dart';
@@ -110,6 +111,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
   bool _saving = false;
 
   bool _groupCurrencyInitialized = false;
+  bool _householdMode = false;
+  HouseholdSplitSnapshot? _loadedHouseholdSnapshot;
 
   /// When editing, the loaded expense (for id and createdAt on update).
   Expense? _initialExpense;
@@ -192,6 +195,12 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
         .read(participantRepositoryProvider)
         .getByGroupId(widget.groupId);
     if (!mounted) return;
+    _loadedHouseholdSnapshot = HouseholdSplitSnapshot.fromJsonString(
+      expense.householdSplitSnapshotJson,
+    );
+    _householdMode =
+        group?.householdCountingEnabled == true ||
+        _loadedHouseholdSnapshot != null;
     _amountController.removeListener(_amountListener);
     setState(() {
       _initialExpense = expense;
@@ -220,21 +229,32 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
       _splitTypeSegmentInitial = _splitType;
       _splitTypeSegmentController.value = _splitType;
       _toParticipantId = expense.toParticipantId;
-      _includedInSplitIds.addAll(expense.splitShares.keys);
+      _includedInSplitIds.addAll(
+        _loadedHouseholdSnapshot?.includedUnitCounts.keys ??
+            expense.splitShares.keys,
+      );
       _previousParticipantIds = participants.map((p) => p.id).toSet();
       final total = expense.amountCents;
       if (expense.splitType == SplitType.amounts) {
         for (final entry in expense.splitShares.entries) {
-          _customSplitValues[entry.key] = (entry.value / 100).toStringAsFixed(
-            2,
-          );
+          final snapshotInput =
+              _loadedHouseholdSnapshot?.perPersonInputs[entry.key];
+          if (snapshotInput != null) {
+            _customSplitValues[entry.key] = snapshotInput;
+          } else {
+            final units =
+                _loadedHouseholdSnapshot?.includedUnitCounts[entry.key] ?? 1;
+            _customSplitValues[entry.key] = (entry.value / units / 100)
+                .toStringAsFixed(2);
+          }
         }
       } else if (expense.splitType == SplitType.parts && total > 0) {
         final sum = expense.splitShares.values.fold<int>(0, (a, b) => a + b);
         if (sum > 0) {
           for (final entry in expense.splitShares.entries) {
-            final part = (entry.value * 10 / sum).round().clamp(1, 999);
-            _customSplitValues[entry.key] = part.toString();
+            _customSplitValues[entry.key] =
+                _loadedHouseholdSnapshot?.perPersonInputs[entry.key] ??
+                (entry.value * 10 / sum).round().clamp(1, 999).toString();
           }
         }
       }
@@ -361,6 +381,16 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
         .read(groupRepositoryProvider)
         .getById(widget.groupId);
     if (!mounted || group == null) return;
+    // An existing household expense keeps using its immutable snapshot even
+    // when the group has since been switched off.  A new expense follows the
+    // current group setting.
+    final hasHouseholdSnapshot =
+        _loadedHouseholdSnapshot != null ||
+        (_initialExpense?.householdSplitSnapshotJson?.trim().isNotEmpty ??
+            false);
+    _householdMode =
+        group.householdCountingEnabled ||
+        (_initialExpense != null && hasHouseholdSnapshot);
     final localOnly = ref.read(effectiveLocalOnlyProvider);
     final myRole = await ref.read(myRoleInGroupProvider(widget.groupId).future);
     if (!mounted) return;
@@ -416,18 +446,31 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
       return;
     }
 
+    final unitCounts = {
+      for (final p in included)
+        p.id: _householdMode
+            ? (_loadedHouseholdSnapshot?.includedUnitCounts[p.id] ??
+                  p.directHouseholdSize)
+            : 1,
+    };
     Map<String, int> splitShares;
     if (isTransfer) {
       splitShares = {};
     } else {
-      final n = included.length;
+      final totalUnits = unitCounts.values.fold<int>(0, (s, v) => s + v);
+      final n = totalUnits;
       switch (_splitType) {
         case SplitType.equal:
-          final each = (amount / n).round();
-          final remainder = amount.toInt() - each * n;
+          final each = amount.toInt() ~/ n;
+          var remainder = amount.toInt() - each * n;
           splitShares = {};
-          for (var i = 0; i < n; i++) {
-            splitShares[included[i].id] = each + (i < remainder ? 1 : 0);
+          for (final p in included) {
+            final units = unitCounts[p.id]!;
+            var share = each * units;
+            final extra = remainder.clamp(0, units);
+            share += extra;
+            remainder -= extra;
+            splitShares[p.id] = share;
           }
           break;
         case SplitType.parts:
@@ -436,13 +479,17 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
           for (final p in included) {
             final text = _customSplitValues[p.id]?.trim() ?? '';
             final part = double.tryParse(text);
-            sumParts += (part != null && part >= 0) ? part : 0;
+            sumParts +=
+                (part != null && part >= 0 ? part : 0) * unitCounts[p.id]!;
           }
           if (sumParts <= 0) {
             final each = amount.toInt() ~/ n;
-            final remainder = amount.toInt() - each * n;
-            for (var i = 0; i < n; i++) {
-              splitShares[included[i].id] = each + (i < remainder ? 1 : 0);
+            var remainder = amount.toInt() - each * n;
+            for (final p in included) {
+              final units = unitCounts[p.id]!;
+              final extra = remainder.clamp(0, units);
+              splitShares[p.id] = each * units + extra;
+              remainder -= extra;
             }
           } else {
             var assigned = 0;
@@ -451,7 +498,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
               final text = _customSplitValues[p.id]?.trim() ?? '';
               final part = double.tryParse(text);
               final v = (part != null && part >= 0) ? part : 0.0;
-              final cents = (amount * v / sumParts).round();
+              final cents = (amount * v * unitCounts[p.id]! / sumParts).round();
               splitShares[p.id] = cents;
               assigned += cents;
             }
@@ -469,7 +516,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
             final text = _customSplitValues[p.id]?.trim() ?? '';
             final value = double.tryParse(text);
             final cents = value != null && value >= 0
-                ? (value * 100).round()
+                ? (value * 100 * unitCounts[p.id]!).round()
                 : 0;
             sumCents += cents;
             splitShares[p.id] = cents;
@@ -564,6 +611,19 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
         date: _date,
         splitType: isTransfer ? SplitType.equal : _splitType,
         splitShares: splitShares,
+        householdSplitSnapshotJson: isTransfer
+            ? null
+            : (_householdMode
+                  ? HouseholdSplitSnapshot(
+                      splitType: _splitType,
+                      includedUnitCounts: unitCounts,
+                      perPersonInputs: {
+                        for (final p in included)
+                          if (_customSplitValues[p.id] != null)
+                            p.id: _customSplitValues[p.id]!,
+                      },
+                    ).toJsonString()
+                  : _initialExpense?.householdSplitSnapshotJson),
         createdAt: _initialExpense?.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
         transactionType: effectiveTransactionType,
@@ -668,12 +728,18 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
     if (included.isEmpty || totalCents <= 0) {
       return List.filled(participants.length, 0);
     }
-    final n = included.length;
+    final n = included.fold<int>(
+      0,
+      (sum, p) => sum + (_householdMode ? _unitCount(p) : 1),
+    );
     final each = totalCents ~/ n;
-    final remainder = totalCents - each * n;
+    var remainder = totalCents - each * n;
     final shareById = <String, int>{};
-    for (var i = 0; i < n; i++) {
-      shareById[included[i].id] = each + (i < remainder ? 1 : 0);
+    for (final p in included) {
+      final units = _householdMode ? _unitCount(p) : 1;
+      final extra = remainder.clamp(0, units);
+      shareById[p.id] = each * units + extra;
+      remainder -= extra;
     }
     return participants.map((p) => shareById[p.id] ?? 0).toList();
   }
@@ -692,13 +758,19 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
         final part = double.tryParse(text);
         final v = part != null && part >= 0 ? part : 0.0;
         parts[p.id] = v;
-        sumParts += v;
+        sumParts += v * (_householdMode ? _unitCount(p) : 1);
       }
       if (sumParts <= 0) {
         return List.filled(participants.length, 0);
       }
       for (final p in participants) {
-        result.add((totalCents * (parts[p.id]! / sumParts)).round());
+        result.add(
+          (totalCents *
+                  parts[p.id]! *
+                  (_householdMode ? _unitCount(p) : 1) /
+                  sumParts)
+              .round(),
+        );
       }
       return result;
     }
@@ -706,7 +778,11 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
       for (final p in participants) {
         final text = _customSplitValues[p.id]?.trim() ?? '';
         final value = double.tryParse(text);
-        result.add(value != null && value >= 0 ? (value * 100).round() : 0);
+        result.add(
+          value != null && value >= 0
+              ? (value * 100 * (_householdMode ? _unitCount(p) : 1)).round()
+              : 0,
+        );
       }
       return result;
     }
@@ -719,7 +795,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
     for (final p in participants) {
       if (!_includedInSplitIds.contains(p.id)) continue;
       final v = double.tryParse(_customSplitValues[p.id]?.trim() ?? '');
-      if (v != null && v >= 0) sum += (v * 100).round();
+      if (v != null && v >= 0) {
+        sum += (v * 100 * (_householdMode ? _unitCount(p) : 1)).round();
+      }
     }
     return sum;
   }
@@ -1411,6 +1489,11 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
                                         children: [
                                           ExpenseSplitSection(
                                             participants: participants,
+                                            householdEnabled: _householdMode,
+                                            householdUnitCounts: {
+                                              for (final p in participants)
+                                                p.id: _unitCount(p),
+                                            },
                                             sharesCents: shares,
                                             amountCents: amountCentsInt,
                                             currencyCode: currencyCode,

@@ -3,21 +3,24 @@ import 'dart:convert';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 
 import '../../core/receipt/receipt_utils.dart';
+import '../../core/services/household_service.dart';
 import '../../core/repository/expense_repository.dart';
 import '../../core/repository/group_repository.dart';
 import '../../core/repository/participant_repository.dart';
 import '../../core/repository/tag_repository.dart';
+import '../../core/repository/household_balance_reassignment_repository.dart';
 import '../../domain/domain.dart';
 import 'backup_limits.dart';
 
-const int kBackupSchemaVersion = 2;
+const int kBackupSchemaVersion = 3;
 
-/// Export groups (optionally filtered) to a JSON-serializable map (schema v2).
+/// Export groups (optionally filtered) to a JSON-serializable map (schema v3).
 Future<Map<String, dynamic>> exportDataToJson({
   required IGroupRepository groupRepo,
   required IParticipantRepository participantRepo,
   required IExpenseRepository expenseRepo,
   required ITagRepository tagRepo,
+  IHouseholdBalanceReassignmentRepository? householdReassignmentRepo,
   Set<String>? groupIdsFilter,
 }) async {
   var groups = await groupRepo.getAll();
@@ -39,6 +42,14 @@ Future<Map<String, dynamic>> exportDataToJson({
   final expenseTags = allTags
       .where((t) => groupIds.contains(t.groupId))
       .toList();
+  final householdReassignments = <HouseholdBalanceReassignment>[];
+  if (householdReassignmentRepo != null) {
+    for (final group in groups) {
+      householdReassignments.addAll(
+        await householdReassignmentRepo.getByGroupId(group.id),
+      );
+    }
+  }
 
   final localArchivedGroupIds = (await groupRepo.getLocallyArchivedGroupIds())
       .where(groupIds.contains)
@@ -51,6 +62,9 @@ Future<Map<String, dynamic>> exportDataToJson({
     'participants': participants.map(_participantToMap).toList(),
     'expenses': expenses.map(_expenseToMap).toList(),
     'expense_tags': expenseTags.map(_tagToMap).toList(),
+    'household_balance_reassignments': householdReassignments
+        .map(_householdReassignmentToMap)
+        .toList(),
     'localArchivedGroupIds': localArchivedGroupIds,
   };
 }
@@ -69,6 +83,7 @@ Map<String, dynamic> _groupToMap(Group g) => {
   'allowMemberChangeSettings': g.allowMemberChangeSettings,
   'allowExpenseAsOtherParticipant': g.allowExpenseAsOtherParticipant,
   'allowMemberSettleForOthers': g.allowMemberSettleForOthers,
+  'householdCountingEnabled': g.householdCountingEnabled,
   'icon': g.icon,
   'color': g.color,
   'archivedAt': g.archivedAt?.toIso8601String(),
@@ -83,6 +98,8 @@ Map<String, dynamic> _participantToMap(Participant p) => {
   'order': p.order,
   'avatarId': p.avatarId,
   'leftAt': p.leftAt?.toIso8601String(),
+  'parentParticipantId': p.parentParticipantId,
+  'unnamedDependentCount': p.unnamedDependentCount,
   'createdAt': p.createdAt.toIso8601String(),
   'updatedAt': p.updatedAt.toIso8601String(),
 };
@@ -108,6 +125,18 @@ Map<String, dynamic> _expenseToMap(Expense e) => {
   'lineItems': e.lineItems?.map((l) => l.toJson()).toList(),
   'imagePath': e.imagePath,
   'imagePaths': e.imagePaths,
+  'householdSplitSnapshotJson': e.householdSplitSnapshotJson,
+};
+
+Map<String, dynamic> _householdReassignmentToMap(
+  HouseholdBalanceReassignment r,
+) => {
+  'id': r.id,
+  'groupId': r.groupId,
+  'sourceParticipantId': r.sourceParticipantId,
+  'targetParticipantId': r.targetParticipantId,
+  'amountCents': r.amountCents,
+  'createdAt': r.createdAt.toIso8601String(),
 };
 
 Map<String, dynamic> _tagToMap(ExpenseTag t) => {
@@ -134,7 +163,7 @@ class BackupParseResult {
   final List<String> warnings;
 }
 
-/// Validate and parse backup JSON (schema v1 or v2).
+/// Validate and parse backup JSON (schema v1, v2, or v3).
 BackupParseResult parseBackupJson(String jsonString) {
   if (jsonString.length > BackupLimits.maxFileBytes) {
     return const BackupParseResult(errorMessageKey: 'backup_parse_too_large');
@@ -147,7 +176,7 @@ BackupParseResult parseBackupJson(String jsonString) {
       );
     }
     final version = map['version'] as int?;
-    if (version == null || (version != 1 && version != 2)) {
+    if (version == null || (version != 1 && version != 2 && version != 3)) {
       return const BackupParseResult(
         errorMessageKey: 'backup_parse_unsupported_version',
       );
@@ -177,6 +206,11 @@ BackupParseResult parseBackupJson(String jsonString) {
             ?.map((e) => _mapToTag(e as Map<String, dynamic>))
             .toList() ??
         [];
+    final householdReassignments =
+        (map['household_balance_reassignments'] as List<dynamic>?)
+            ?.map((e) => _mapToHouseholdReassignment(e as Map<String, dynamic>))
+            .toList() ??
+        [];
     final localArchivedGroupIds =
         (map['localArchivedGroupIds'] as List<dynamic>?)
             ?.map((e) => e as String)
@@ -186,7 +220,9 @@ BackupParseResult parseBackupJson(String jsonString) {
     if (groups.length > BackupLimits.maxGroups ||
         participants.length > BackupLimits.maxParticipants ||
         expenses.length > BackupLimits.maxExpenses ||
-        expenseTags.length > BackupLimits.maxTags) {
+        expenseTags.length > BackupLimits.maxTags ||
+        householdReassignments.length >
+            BackupLimits.maxHouseholdReassignments) {
       return const BackupParseResult(errorMessageKey: 'backup_parse_too_large');
     }
 
@@ -196,6 +232,7 @@ BackupParseResult parseBackupJson(String jsonString) {
         participants: participants,
         expenses: expenses,
         expenseTags: expenseTags,
+        householdReassignments: householdReassignments,
         localArchivedGroupIds: localArchivedGroupIds,
       ),
       schemaVersion: version,
@@ -257,6 +294,7 @@ Group _mapToGroup(Map<String, dynamic> m) {
     allowExpenseAsOtherParticipant:
         m['allowExpenseAsOtherParticipant'] != false,
     allowMemberSettleForOthers: m['allowMemberSettleForOthers'] == true,
+    householdCountingEnabled: m['householdCountingEnabled'] == true,
     icon: icon,
     color: (m['color'] as num?)?.toInt(),
     archivedAt: archivedAt != null
@@ -279,6 +317,8 @@ Participant _mapToParticipant(Map<String, dynamic> m) {
     order: (m['order'] as num?)?.toInt() ?? 0,
     avatarId: m['avatarId'] as String?,
     leftAt: leftAt != null ? DateTime.tryParse(leftAt) : null,
+    parentParticipantId: m['parentParticipantId'] as String?,
+    unnamedDependentCount: (m['unnamedDependentCount'] as num?)?.toInt() ?? 0,
     createdAt: DateTime.parse(m['createdAt'] as String),
     updatedAt: DateTime.parse(m['updatedAt'] as String),
   );
@@ -345,6 +385,7 @@ Expense _mapToExpense(Map<String, dynamic> m, int version) {
         .toList(),
     imagePath: imagePaths?.isNotEmpty == true ? imagePaths!.first : null,
     imagePaths: imagePaths,
+    householdSplitSnapshotJson: m['householdSplitSnapshotJson'] as String?,
   );
 }
 
@@ -369,6 +410,17 @@ ExpenseTag _mapToTag(Map<String, dynamic> m) => ExpenseTag(
   colorHex: _clampStrNullable(m['color'] as String?, 7),
   createdAt: DateTime.parse(m['createdAt'] as String),
   updatedAt: DateTime.parse(m['updatedAt'] as String),
+);
+
+HouseholdBalanceReassignment _mapToHouseholdReassignment(
+  Map<String, dynamic> m,
+) => HouseholdBalanceReassignment(
+  id: m['id'] as String,
+  groupId: m['groupId'] as String,
+  sourceParticipantId: m['sourceParticipantId'] as String,
+  targetParticipantId: m['targetParticipantId'] as String,
+  amountCents: (m['amountCents'] as num).toInt(),
+  createdAt: DateTime.parse(m['createdAt'] as String),
 );
 
 String _clampStr(String s, int max) =>
@@ -440,6 +492,35 @@ String? remapSettlementSnapshotJson(
   }
 }
 
+/// Remap participant ids embedded in an immutable household expense snapshot
+/// when a backup is restored into a new group with new row ids.
+String? remapHouseholdSplitSnapshotJson(
+  String? json,
+  Map<String, String> participantIds,
+) {
+  final snapshot = HouseholdSplitSnapshot.fromJsonString(json);
+  if (snapshot == null) return json;
+  final remap = <String, String>{};
+  for (final entry in snapshot.includedUnitCounts.entries) {
+    final id = participantIds[entry.key];
+    if (id != null) remap[id] = entry.value.toString();
+  }
+  final inputs = <String, String>{};
+  for (final entry in snapshot.perPersonInputs.entries) {
+    final id = participantIds[entry.key];
+    if (id != null) inputs[id] = entry.value;
+  }
+  return HouseholdSplitSnapshot(
+    version: snapshot.version,
+    splitType: snapshot.splitType,
+    includedUnitCounts: {
+      for (final entry in remap.entries)
+        entry.key: int.tryParse(entry.value) ?? 1,
+    },
+    perPersonInputs: inputs,
+  ).toJsonString();
+}
+
 String _currencyCode(String? raw) {
   final c = (raw ?? 'USD').trim().toUpperCase();
   if (c.length == 3) return c;
@@ -472,6 +553,7 @@ Expense stripRemoteImagePaths(Expense e) {
     lineItems: e.lineItems,
     imagePath: paths.isNotEmpty ? paths.first : null,
     imagePaths: paths.isNotEmpty ? paths : null,
+    householdSplitSnapshotJson: e.householdSplitSnapshotJson,
   );
 }
 
@@ -481,6 +563,7 @@ class BackupData {
     required this.participants,
     required this.expenses,
     required this.expenseTags,
+    this.householdReassignments = const [],
     this.localArchivedGroupIds = const [],
   });
 
@@ -488,5 +571,6 @@ class BackupData {
   final List<Participant> participants;
   final List<Expense> expenses;
   final List<ExpenseTag> expenseTags;
+  final List<HouseholdBalanceReassignment> householdReassignments;
   final List<String> localArchivedGroupIds;
 }

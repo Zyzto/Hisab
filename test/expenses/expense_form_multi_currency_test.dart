@@ -239,6 +239,7 @@ class FakeGroupRepository implements IGroupRepository {
     bool allowMemberChangeSettings = true,
     bool allowExpenseAsOtherParticipant = true,
     bool allowMemberSettleForOthers = false,
+    bool householdCountingEnabled = false,
     String? treasurerInitialParticipantName,
   }) async => group.id;
 
@@ -313,6 +314,8 @@ class FakeParticipantRepository implements IParticipantRepository {
     int order, {
     String? userId,
     String? avatarId,
+    String? parentParticipantId,
+    int unnamedDependentCount = 0,
   }) async => 'new-participant';
 
   @override

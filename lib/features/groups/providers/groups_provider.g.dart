@@ -305,7 +305,7 @@ final class ExpensesByGroupProvider
   }
 }
 
-String _$expensesByGroupHash() => r'394e975da5b49ebcea458bdd6b91db9a5a7cb55c';
+String _$expensesByGroupHash() => r'63df707e5a4e47925619b58598c6acee571bce6b';
 
 final class ExpensesByGroupFamily extends $Family
     with $FunctionalFamilyOverride<Stream<List<Expense>>, String> {
@@ -375,7 +375,7 @@ final class FutureExpenseProvider
   }
 }
 
-String _$futureExpenseHash() => r'27c6c30e33f216da07e191e04b1b69f26279448d';
+String _$futureExpenseHash() => r'cafee2a32ef2262692db068429782e79a5bf3488';
 
 final class FutureExpenseFamily extends $Family
     with $FunctionalFamilyOverride<Stream<Expense?>, String> {
@@ -473,6 +473,90 @@ final class ParticipantsByGroupFamily extends $Family
   String toString() => r'participantsByGroupProvider';
 }
 
+@ProviderFor(householdReassignmentsByGroup)
+final householdReassignmentsByGroupProvider =
+    HouseholdReassignmentsByGroupFamily._();
+
+final class HouseholdReassignmentsByGroupProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<HouseholdBalanceReassignment>>,
+          List<HouseholdBalanceReassignment>,
+          Stream<List<HouseholdBalanceReassignment>>
+        >
+    with
+        $FutureModifier<List<HouseholdBalanceReassignment>>,
+        $StreamProvider<List<HouseholdBalanceReassignment>> {
+  HouseholdReassignmentsByGroupProvider._({
+    required HouseholdReassignmentsByGroupFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'householdReassignmentsByGroupProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$householdReassignmentsByGroupHash();
+
+  @override
+  String toString() {
+    return r'householdReassignmentsByGroupProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $StreamProviderElement<List<HouseholdBalanceReassignment>> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<List<HouseholdBalanceReassignment>> create(Ref ref) {
+    final argument = this.argument as String;
+    return householdReassignmentsByGroup(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is HouseholdReassignmentsByGroupProvider &&
+        other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$householdReassignmentsByGroupHash() =>
+    r'c6163e822cdb6b64e90a6100e7d06fc454c9a81f';
+
+final class HouseholdReassignmentsByGroupFamily extends $Family
+    with
+        $FunctionalFamilyOverride<
+          Stream<List<HouseholdBalanceReassignment>>,
+          String
+        > {
+  HouseholdReassignmentsByGroupFamily._()
+    : super(
+        retry: null,
+        name: r'householdReassignmentsByGroupProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  HouseholdReassignmentsByGroupProvider call(String groupId) =>
+      HouseholdReassignmentsByGroupProvider._(argument: groupId, from: this);
+
+  @override
+  String toString() => r'householdReassignmentsByGroupProvider';
+}
+
 /// Active participants only (left_at == null). Use for new expenses and balance
 /// so left/archived members do not count towards splits or settlements.
 
@@ -564,6 +648,104 @@ final class ActiveParticipantsByGroupFamily extends $Family
 
   @override
   String toString() => r'activeParticipantsByGroupProvider';
+}
+
+/// Participants needed to explain historical household balances. Archived
+/// rows with no named children remain visible as historical roots; archived
+/// parents with promoted branches are represented by reassignment records.
+
+@ProviderFor(balanceParticipantsByGroup)
+final balanceParticipantsByGroupProvider = BalanceParticipantsByGroupFamily._();
+
+/// Participants needed to explain historical household balances. Archived
+/// rows with no named children remain visible as historical roots; archived
+/// parents with promoted branches are represented by reassignment records.
+
+final class BalanceParticipantsByGroupProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<Participant>>,
+          List<Participant>,
+          Stream<List<Participant>>
+        >
+    with
+        $FutureModifier<List<Participant>>,
+        $StreamProvider<List<Participant>> {
+  /// Participants needed to explain historical household balances. Archived
+  /// rows with no named children remain visible as historical roots; archived
+  /// parents with promoted branches are represented by reassignment records.
+  BalanceParticipantsByGroupProvider._({
+    required BalanceParticipantsByGroupFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'balanceParticipantsByGroupProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$balanceParticipantsByGroupHash();
+
+  @override
+  String toString() {
+    return r'balanceParticipantsByGroupProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $StreamProviderElement<List<Participant>> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<List<Participant>> create(Ref ref) {
+    final argument = this.argument as String;
+    return balanceParticipantsByGroup(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is BalanceParticipantsByGroupProvider &&
+        other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$balanceParticipantsByGroupHash() =>
+    r'861a9347b8c64209aa30a52b45a3887df4c96b51';
+
+/// Participants needed to explain historical household balances. Archived
+/// rows with no named children remain visible as historical roots; archived
+/// parents with promoted branches are represented by reassignment records.
+
+final class BalanceParticipantsByGroupFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<List<Participant>>, String> {
+  BalanceParticipantsByGroupFamily._()
+    : super(
+        retry: null,
+        name: r'balanceParticipantsByGroupProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Participants needed to explain historical household balances. Archived
+  /// rows with no named children remain visible as historical roots; archived
+  /// parents with promoted branches are represented by reassignment records.
+
+  BalanceParticipantsByGroupProvider call(String groupId) =>
+      BalanceParticipantsByGroupProvider._(argument: groupId, from: this);
+
+  @override
+  String toString() => r'balanceParticipantsByGroupProvider';
 }
 
 @ProviderFor(tagsByGroup)

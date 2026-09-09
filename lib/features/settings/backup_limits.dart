@@ -9,6 +9,7 @@ abstract final class BackupLimits {
   static const int maxParticipants = 2000;
   static const int maxExpenses = 20000;
   static const int maxTags = 2000;
+  static const int maxHouseholdReassignments = 5000;
 
   static const int maxGroupName = 200;
   static const int maxParticipantName = 100;

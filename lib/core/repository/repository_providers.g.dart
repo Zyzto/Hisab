@@ -150,6 +150,57 @@ final class ExpenseRepositoryProvider
 
 String _$expenseRepositoryHash() => r'9232e188e3a8a2aaa79d8e36b37ee5b5298f5a73';
 
+@ProviderFor(householdBalanceReassignmentRepository)
+final householdBalanceReassignmentRepositoryProvider =
+    HouseholdBalanceReassignmentRepositoryProvider._();
+
+final class HouseholdBalanceReassignmentRepositoryProvider
+    extends
+        $FunctionalProvider<
+          IHouseholdBalanceReassignmentRepository,
+          IHouseholdBalanceReassignmentRepository,
+          IHouseholdBalanceReassignmentRepository
+        >
+    with $Provider<IHouseholdBalanceReassignmentRepository> {
+  HouseholdBalanceReassignmentRepositoryProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'householdBalanceReassignmentRepositoryProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() =>
+      _$householdBalanceReassignmentRepositoryHash();
+
+  @$internal
+  @override
+  $ProviderElement<IHouseholdBalanceReassignmentRepository> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  IHouseholdBalanceReassignmentRepository create(Ref ref) {
+    return householdBalanceReassignmentRepository(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(IHouseholdBalanceReassignmentRepository value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride:
+          $SyncValueProvider<IHouseholdBalanceReassignmentRepository>(value),
+    );
+  }
+}
+
+String _$householdBalanceReassignmentRepositoryHash() =>
+    r'f39f74f5834ebee5f3ea44af1534ba32a9c14f89';
+
 @ProviderFor(tagRepository)
 final tagRepositoryProvider = TagRepositoryProvider._();
 

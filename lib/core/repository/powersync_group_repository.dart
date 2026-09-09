@@ -96,6 +96,7 @@ class PowerSyncGroupRepository implements IGroupRepository {
     bool allowMemberChangeSettings = true,
     bool allowExpenseAsOtherParticipant = true,
     bool allowMemberSettleForOthers = false,
+    bool householdCountingEnabled = false,
     String? treasurerInitialParticipantName,
   }) async {
     final trimmedName = name.trim();
@@ -133,6 +134,7 @@ class PowerSyncGroupRepository implements IGroupRepository {
       'allow_member_change_settings': allowMemberChangeSettings,
       'allow_expense_as_other_participant': allowExpenseAsOtherParticipant,
       'allow_member_settle_for_others': allowMemberSettleForOthers,
+      'household_counting_enabled': householdCountingEnabled,
       'icon': icon,
       'color': _colorToSigned(color),
       'is_personal': isPersonal,
@@ -214,6 +216,8 @@ class PowerSyncGroupRepository implements IGroupRepository {
         'sort_order': 0,
         'user_id': ownerId,
         'avatar_id': ownerAvatarId,
+        'parent_participant_id': null,
+        'unnamed_dependent_count': 0,
         'created_at': now,
         'updated_at': now,
       });
@@ -231,6 +235,8 @@ class PowerSyncGroupRepository implements IGroupRepository {
           'group_id': id,
           'name': entry.name,
           'sort_order': entry.sortOrder,
+          'parent_participant_id': null,
+          'unnamed_dependent_count': 0,
           'created_at': now,
           'updated_at': now,
         });
@@ -264,6 +270,8 @@ class PowerSyncGroupRepository implements IGroupRepository {
           'sort_order': 0,
           'user_id': ownerId,
           'avatar_id': ownerAvatarId,
+          'parent_participant_id': null,
+          'unnamed_dependent_count': 0,
           'created_at': now,
           'updated_at': now,
         },
@@ -295,6 +303,8 @@ class PowerSyncGroupRepository implements IGroupRepository {
             'group_id': id,
             'name': entry.name,
             'sort_order': entry.sortOrder,
+            'parent_participant_id': null,
+            'unnamed_dependent_count': 0,
             'created_at': now,
             'updated_at': now,
           },
@@ -319,9 +329,10 @@ class PowerSyncGroupRepository implements IGroupRepository {
         treasurer_participant_id,
         allow_member_add_expense, allow_member_change_settings,
         allow_expense_as_other_participant, allow_member_settle_for_others,
+        household_counting_enabled,
         icon, color, archived_at, is_personal, budget_amount_cents,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
       [
         id,
         trimmedName,
@@ -333,6 +344,7 @@ class PowerSyncGroupRepository implements IGroupRepository {
         allowMemberChangeSettings ? 1 : 0,
         allowExpenseAsOtherParticipant ? 1 : 0,
         allowMemberSettleForOthers ? 1 : 0,
+        householdCountingEnabled ? 1 : 0,
         icon,
         colorStored,
         null,
@@ -344,8 +356,19 @@ class PowerSyncGroupRepository implements IGroupRepository {
     );
     // Local participant for owner
     await _db.execute(
-      'INSERT INTO participants (id, group_id, name, sort_order, user_id, avatar_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [participantId, id, participantName, 0, ownerId, ownerAvatarId, now, now],
+      'INSERT INTO participants (id, group_id, name, sort_order, user_id, avatar_id, parent_participant_id, unnamed_dependent_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        participantId,
+        id,
+        participantName,
+        0,
+        ownerId,
+        ownerAvatarId,
+        null,
+        0,
+        now,
+        now,
+      ],
     );
     if (ownerId != null && ownerMemberId != null) {
       await _db.execute(
@@ -356,8 +379,8 @@ class PowerSyncGroupRepository implements IGroupRepository {
     // Create additional participants from the wizard in local DB (same IDs as Supabase)
     for (final entry in additionalParticipantIds) {
       await _db.execute(
-        'INSERT INTO participants (id, group_id, name, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [entry.id, id, entry.name, entry.sortOrder, now, now],
+        'INSERT INTO participants (id, group_id, name, sort_order, parent_participant_id, unnamed_dependent_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [entry.id, id, entry.name, entry.sortOrder, null, 0, now, now],
       );
     }
 
@@ -392,6 +415,7 @@ class PowerSyncGroupRepository implements IGroupRepository {
       'allow_expense_as_other_participant':
           group.allowExpenseAsOtherParticipant,
       'allow_member_settle_for_others': group.allowMemberSettleForOthers,
+      'household_counting_enabled': group.householdCountingEnabled,
       'icon': group.icon,
       'color': _colorToSigned(group.color),
       'archived_at': group.archivedAt?.toUtc().toIso8601String(),
@@ -427,7 +451,7 @@ class PowerSyncGroupRepository implements IGroupRepository {
         treasurer_participant_id = ?, settlement_freeze_at = ?,
         settlement_snapshot_json = ?, allow_member_add_expense = ?,
         allow_member_change_settings = ?, allow_expense_as_other_participant = ?,
-        allow_member_settle_for_others = ?, icon = ?, color = ?, archived_at = ?, is_personal = ?, budget_amount_cents = ?, updated_at = ?
+        allow_member_settle_for_others = ?, household_counting_enabled = ?, icon = ?, color = ?, archived_at = ?, is_personal = ?, budget_amount_cents = ?, updated_at = ?
       WHERE id = ?''',
       [
         trimmedName,
@@ -440,6 +464,7 @@ class PowerSyncGroupRepository implements IGroupRepository {
         group.allowMemberChangeSettings ? 1 : 0,
         group.allowExpenseAsOtherParticipant ? 1 : 0,
         group.allowMemberSettleForOthers ? 1 : 0,
+        group.householdCountingEnabled ? 1 : 0,
         group.icon,
         _colorToSigned(group.color),
         group.archivedAt?.toUtc().toIso8601String(),

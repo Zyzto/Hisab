@@ -12,6 +12,7 @@ const Set<String> kPendingWritesAllowedTables = {
   'participants',
   'expenses',
   'expense_tags',
+  'household_balance_reassignments',
 };
 
 /// Testable sync operations: full fetch from the backend into the local DB,
@@ -63,6 +64,21 @@ class SyncEngine {
           case 'delete':
             await backend.delete(tableName, rowId);
             break;
+          case 'set_household':
+            if (data == null || tableName != 'participants') {
+              throw StateError(
+                'set_household pending write must target participants',
+              );
+            }
+            await backend.setParticipantHousehold(
+              data['group_id'] as String,
+              rowId,
+              data['parent_participant_id'] as String?,
+              (data['unnamed_dependent_count'] as num?)?.toInt() ?? 0,
+            );
+            break;
+          default:
+            throw StateError('Unknown pending write operation: $operation');
         }
 
         await db.execute('DELETE FROM pending_writes WHERE id = ?', [
@@ -123,6 +139,7 @@ class SyncEngine {
         await tx.execute('DELETE FROM participants');
         await tx.execute('DELETE FROM expenses');
         await tx.execute('DELETE FROM expense_tags');
+        await tx.execute('DELETE FROM household_balance_reassignments');
         await tx.execute('DELETE FROM group_invites');
         await tx.execute('DELETE FROM invite_usages');
         await tx.execute('DELETE FROM user_notifications');
@@ -137,6 +154,8 @@ class SyncEngine {
     final members = await backend.getMembers(groupIds);
     final participants = await backend.getParticipants(groupIds);
     final expenses = await backend.getExpenses(groupIds);
+    final householdReassignments = await backend
+        .getHouseholdBalanceReassignments(groupIds);
     final tags = await backend.getTags(groupIds);
     final invites = await backend.getInvites(groupIds);
 
@@ -149,6 +168,10 @@ class SyncEngine {
         await tx.execute('DELETE FROM participants WHERE group_id = ?', [gid]);
         await tx.execute('DELETE FROM expenses WHERE group_id = ?', [gid]);
         await tx.execute('DELETE FROM expense_tags WHERE group_id = ?', [gid]);
+        await tx.execute(
+          'DELETE FROM household_balance_reassignments WHERE group_id = ?',
+          [gid],
+        );
         await tx.execute('DELETE FROM group_invites WHERE group_id = ?', [gid]);
       }
       await tx.execute('DELETE FROM invite_usages');
@@ -162,8 +185,8 @@ class SyncEngine {
           '''INSERT INTO groups (id, name, currency_code, owner_id, settlement_method,
             treasurer_participant_id, settlement_freeze_at, settlement_snapshot_json,
             allow_member_add_expense, allow_member_add_participant, allow_member_change_settings,
-            require_participant_assignment, allow_expense_as_other_participant, allow_member_settle_for_others, icon, color, archived_at, is_personal, budget_amount_cents, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            require_participant_assignment, allow_expense_as_other_participant, allow_member_settle_for_others, household_counting_enabled, icon, color, archived_at, is_personal, budget_amount_cents, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
           [
             g['id'],
             g['name'],
@@ -179,6 +202,7 @@ class SyncEngine {
             g['require_participant_assignment'] == true ? 1 : 0,
             (g['allow_expense_as_other_participant'] ?? true) == true ? 1 : 0,
             (g['allow_member_settle_for_others'] ?? false) == true ? 1 : 0,
+            (g['household_counting_enabled'] ?? false) == true ? 1 : 0,
             g['icon'],
             g['color'],
             g['archived_at'],
@@ -204,7 +228,7 @@ class SyncEngine {
       }
       for (final p in participants) {
         await tx.execute(
-          'INSERT INTO participants (id, group_id, name, sort_order, user_id, avatar_id, left_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          'INSERT INTO participants (id, group_id, name, sort_order, user_id, avatar_id, left_at, parent_participant_id, unnamed_dependent_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [
             p['id'],
             p['group_id'],
@@ -213,6 +237,8 @@ class SyncEngine {
             p['user_id'],
             p['avatar_id'],
             p['left_at'],
+            p['parent_participant_id'],
+            p['unnamed_dependent_count'] ?? 0,
             p['created_at'],
             p['updated_at'],
           ],
@@ -222,9 +248,10 @@ class SyncEngine {
         await tx.execute(
           '''INSERT INTO expenses (id, group_id, payer_participant_id, amount_cents,
             currency_code, exchange_rate, base_amount_cents, title, description, date,
-            split_type, split_shares_json, type, to_participant_id, tag, line_items_json,
-            image_path, image_paths, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            split_type, split_shares_json, household_split_snapshot_json, type,
+            to_participant_id, tag, line_items_json, image_path, image_paths,
+            created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
           [
             e['id'],
             e['group_id'],
@@ -240,6 +267,7 @@ class SyncEngine {
             e['split_shares_json'] is String
                 ? e['split_shares_json']
                 : jsonEncode(e['split_shares_json']),
+            e['household_split_snapshot_json'],
             e['type'],
             e['to_participant_id'],
             e['tag'],
@@ -252,6 +280,19 @@ class SyncEngine {
             e['image_paths'],
             e['created_at'],
             e['updated_at'],
+          ],
+        );
+      }
+      for (final r in householdReassignments) {
+        await tx.execute(
+          'INSERT INTO household_balance_reassignments (id, group_id, source_participant_id, target_participant_id, amount_cents, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+          [
+            r['id'],
+            r['group_id'],
+            r['source_participant_id'],
+            r['target_participant_id'],
+            r['amount_cents'],
+            r['created_at'],
           ],
         );
       }

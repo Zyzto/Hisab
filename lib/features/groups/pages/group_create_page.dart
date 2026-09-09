@@ -29,6 +29,7 @@ import '../../../core/widgets/group_section_header.dart';
 import '../../../core/widgets/participant_avatar.dart';
 import '../../../core/widgets/sheet_option_tile.dart';
 import '../../../core/widgets/user_text.dart';
+import '../../../core/widgets/toast.dart';
 import '../../../core/widgets/wizard_step_enter.dart';
 import '../../../domain/domain.dart';
 import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
@@ -118,10 +119,13 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
   // ── Step 2 state ──
   final _participantController = TextEditingController();
   final _participantFocusNode = FocusNode();
+  final _ownerUnnamedDependentsController = TextEditingController(text: '0');
+  final _namedDependentController = TextEditingController();
 
   /// Prevents the Add button from stealing focus from the name field.
   late final FocusNode _addParticipantButtonFocusNode;
   final List<String> _participants = [];
+  final List<String> _namedDependents = [];
 
   // ── Step 3 state ──
   String? _selectedIcon;
@@ -136,6 +140,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
   bool _allowMemberChangeSettings = true;
   bool _allowExpenseAsOtherParticipant = true;
   bool _allowMemberSettleForOthers = false;
+  bool _householdCountingEnabled = false;
 
   // ── Step 4 state ──
   bool _saving = false;
@@ -225,6 +230,8 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
     _budgetFocusNode.dispose();
     _participantController.dispose();
     _participantFocusNode.dispose();
+    _ownerUnnamedDependentsController.dispose();
+    _namedDependentController.dispose();
     _addParticipantButtonFocusNode.dispose();
     super.dispose();
   }
@@ -322,6 +329,19 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
     setState(() => _participants.removeAt(index));
   }
 
+  void _addNamedDependent() {
+    final name = _namedDependentController.text.trim();
+    if (FormValidators.participantName(name) != null) return;
+    setState(() {
+      _namedDependents.add(name);
+      _namedDependentController.clear();
+    });
+  }
+
+  void _removeNamedDependent(int index) {
+    setState(() => _namedDependents.removeAt(index));
+  }
+
   // ── Create ──────────────────────────────────────────────────────────────
 
   int? _budgetAmountCentsFromField() {
@@ -346,6 +366,13 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
       }
       _nameFormKey.currentState?.validate();
       return;
+    }
+    if (!widget.isPersonal && _householdCountingEnabled) {
+      final count = int.tryParse(_ownerUnnamedDependentsController.text.trim());
+      if (count == null || count < 0 || count > 999) {
+        context.showToast('household_invalid_count'.tr());
+        return;
+      }
     }
     setState(() => _saving = true);
     try {
@@ -383,6 +410,9 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
           allowMemberSettleForOthers: widget.isPersonal
               ? false
               : _allowMemberSettleForOthers,
+          householdCountingEnabled: widget.isPersonal
+              ? false
+              : _householdCountingEnabled,
         ),
         'Group create failed',
         context: context,
@@ -390,6 +420,32 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
         ref: ref,
       );
       if (id == null) return;
+      if (!widget.isPersonal && _householdCountingEnabled) {
+        final count = int.tryParse(
+          _ownerUnnamedDependentsController.text.trim(),
+        );
+        if (count != null) {
+          final participants = await ref
+              .read(participantRepositoryProvider)
+              .getByGroupId(id);
+          if (participants.isNotEmpty) {
+            final owner = participants.first;
+            await ref
+                .read(participantRepositoryProvider)
+                .update(owner.copyWith(unnamedDependentCount: count));
+            for (var i = 0; i < _namedDependents.length; i++) {
+              await ref
+                  .read(participantRepositoryProvider)
+                  .create(
+                    id,
+                    _namedDependents[i],
+                    participants.length + i,
+                    parentParticipantId: owner.id,
+                  );
+            }
+          }
+        }
+      }
       Log.info(
         'Group created via wizard: id=$id name="$name" currency=$currencyCode participants=${_participants.length}',
       );
@@ -938,6 +994,11 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
           ),
           const SizedBox(height: ThemeConfig.spacingS),
 
+          if (!widget.isPersonal) ...[
+            const SizedBox(height: ThemeConfig.spacingM),
+            _householdIntroCard(context),
+          ],
+
           // Added participants
           ...List.generate(_participants.length, (i) {
             return Padding(
@@ -1010,6 +1071,99 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _householdIntroCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Card(
+      elevation: 0,
+      color: colors.secondaryContainer.withValues(alpha: 0.45),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: Text('household_counting_title'.tr()),
+              subtitle: Text('household_enable_intro'.tr()),
+              value: _householdCountingEnabled,
+              onChanged: (value) =>
+                  setState(() => _householdCountingEnabled = value),
+            ),
+            Text(
+              'household_counting_example'.tr(),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colors.onSecondaryContainer,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (_householdCountingEnabled) ...[
+              const SizedBox(height: 10),
+              TextField(
+                controller: _ownerUnnamedDependentsController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'unnamed_dependents'.tr(),
+                  helperText: 'unnamed_dependents_hint'.tr(),
+                  border: const OutlineInputBorder(),
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 6),
+              const Divider(height: 20),
+              Text(
+                'named_dependents'.tr(),
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 6),
+              ...List.generate(
+                _namedDependents.length,
+                (i) => ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.person_outline),
+                  title: UserText(_namedDependents[i]),
+                  trailing: IconButton(
+                    icon: Icon(Icons.close, color: colors.error),
+                    onPressed: () => _removeNamedDependent(i),
+                    tooltip: 'remove'.tr(),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _namedDependentController,
+                      decoration: InputDecoration(
+                        hintText: 'participant_name'.tr(),
+                        border: const OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      maxLength: FormValidators.participantNameMax,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => _addNamedDependent(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton.filledTonal(
+                    onPressed: _addNamedDependent,
+                    icon: const Icon(Icons.add),
+                    tooltip: 'add_dependent'.tr(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text('household_setup_later'.tr()),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -1129,7 +1283,11 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final iconDef = groupIcons.where((g) => g.key == _selectedIcon).firstOrNull;
-    final totalParticipants = 1 + _participants.length; // owner + added
+    final totalParticipants =
+        1 + _participants.length + _namedDependents.length;
+    final unnamed = _householdCountingEnabled
+        ? (int.tryParse(_ownerUnnamedDependentsController.text.trim()) ?? 0)
+        : 0;
 
     return WizardStepEnter(
       child: ListView(
@@ -1222,12 +1380,38 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
                   value: widget.isPersonal ? '1' : '$totalParticipants',
                   onEdit: () => _goToPage(widget.isPersonal ? 0 : 1),
                 ),
+                if (!widget.isPersonal && _householdCountingEnabled) ...[
+                  const SizedBox(height: ThemeConfig.spacingS),
+                  _SummaryRow(
+                    icon: Icons.account_tree_outlined,
+                    label: 'household_counting'.tr(),
+                    value: 'household_people_count'.tr(
+                      namedArgs: {'count': '${totalParticipants + unnamed}'},
+                    ),
+                    onEdit: () => _goToPage(1),
+                  ),
+                ],
                 if (!widget.isPersonal && _participants.isNotEmpty) ...[
                   const SizedBox(height: ThemeConfig.spacingS),
                   Wrap(
                     spacing: 6,
                     runSpacing: 6,
                     children: _participants
+                        .map(
+                          (p) => Chip(
+                            label: UserText(p),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ],
+                if (!widget.isPersonal && _namedDependents.isNotEmpty) ...[
+                  const SizedBox(height: ThemeConfig.spacingS),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: _namedDependents
                         .map(
                           (p) => Chip(
                             label: UserText(p),

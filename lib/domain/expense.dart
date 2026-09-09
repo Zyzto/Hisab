@@ -36,6 +36,10 @@ class Expense {
   final DateTime date;
   final SplitType splitType;
   final Map<String, int> splitShares;
+
+  /// Optional immutable household split explanation for expenses created while
+  /// household counting is enabled. Older expenses leave this null.
+  final String? householdSplitSnapshotJson;
   final DateTime createdAt;
   final DateTime updatedAt;
   final TransactionType transactionType;
@@ -66,6 +70,7 @@ class Expense {
     required this.date,
     required this.splitType,
     required this.splitShares,
+    this.householdSplitSnapshotJson,
     required this.createdAt,
     required this.updatedAt,
     this.transactionType = TransactionType.expense,
@@ -107,6 +112,7 @@ class Expense {
     DateTime? date,
     SplitType? splitType,
     Map<String, int>? splitShares,
+    String? householdSplitSnapshotJson,
     DateTime? createdAt,
     DateTime? updatedAt,
     TransactionType? transactionType,
@@ -130,6 +136,8 @@ class Expense {
       date: date ?? this.date,
       splitType: splitType ?? this.splitType,
       splitShares: splitShares ?? this.splitShares,
+      householdSplitSnapshotJson:
+          householdSplitSnapshotJson ?? this.householdSplitSnapshotJson,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       transactionType: transactionType ?? this.transactionType,

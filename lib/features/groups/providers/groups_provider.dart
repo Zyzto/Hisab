@@ -93,6 +93,16 @@ Stream<List<Participant>> participantsByGroup(Ref ref, String groupId) {
   return ref.watch(participantRepositoryProvider).watchByGroupId(groupId);
 }
 
+@riverpod
+Stream<List<HouseholdBalanceReassignment>> householdReassignmentsByGroup(
+  Ref ref,
+  String groupId,
+) {
+  return ref
+      .watch(householdBalanceReassignmentRepositoryProvider)
+      .watchByGroupId(groupId);
+}
+
 /// Active participants only (left_at == null). Use for new expenses and balance
 /// so left/archived members do not count towards splits or settlements.
 @riverpod
@@ -103,6 +113,24 @@ Stream<List<Participant>> activeParticipantsByGroup(Ref ref, String groupId) {
       .map(
         (participants) => participants.where((p) => p.leftAt == null).toList(),
       );
+}
+
+/// Participants needed to explain historical household balances. Archived
+/// rows with no named children remain visible as historical roots; archived
+/// parents with promoted branches are represented by reassignment records.
+@riverpod
+Stream<List<Participant>> balanceParticipantsByGroup(Ref ref, String groupId) {
+  return ref.watch(participantRepositoryProvider).watchByGroupId(groupId).map((
+    participants,
+  ) {
+    final hasChildren = <String>{
+      for (final p in participants)
+        if (p.parentParticipantId != null) p.parentParticipantId!,
+    };
+    return participants
+        .where((p) => p.leftAt == null || !hasChildren.contains(p.id))
+        .toList();
+  });
 }
 
 @riverpod

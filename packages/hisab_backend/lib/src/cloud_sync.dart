@@ -19,6 +19,9 @@ abstract interface class CloudSync {
   Future<List<Map<String, dynamic>>> getMembers(List<String> groupIds);
   Future<List<Map<String, dynamic>>> getParticipants(List<String> groupIds);
   Future<List<Map<String, dynamic>>> getExpenses(List<String> groupIds);
+  Future<List<Map<String, dynamic>>> getHouseholdBalanceReassignments(
+    List<String> groupIds,
+  );
   Future<List<Map<String, dynamic>>> getTags(List<String> groupIds);
   Future<List<Map<String, dynamic>>> getInvites(List<String> groupIds);
 
@@ -31,7 +34,7 @@ abstract interface class CloudSync {
 
   /// Inserts [data], replacing any existing row that collides.
   ///
-  /// [table] is one of the five writable tables listed in
+  /// [table] is one of the writable tables listed in
   /// `docs/SELF_HOSTING.md`. Collision is decided by primary key unless
   /// [conflictColumns] names a different unique constraint — migrating a local
   /// database re-sends the owner's membership, which is unique on
@@ -61,4 +64,14 @@ abstract interface class CloudSync {
   });
 
   Future<void> delete(String table, String id);
+
+  /// Applies a household hierarchy change through the backend's authoritative
+  /// permission, same-group, and cycle checks. Offline writes use this method
+  /// when they drain instead of sending a plain participant row update.
+  Future<void> setParticipantHousehold(
+    String groupId,
+    String participantId,
+    String? parentParticipantId,
+    int unnamedDependentCount,
+  );
 }

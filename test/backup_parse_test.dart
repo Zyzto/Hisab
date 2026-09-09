@@ -126,6 +126,32 @@ void main() {
       expect(result.data!.groups.first.isPersonal, true);
       expect(result.data!.groups.first.budgetAmountCents, 10000);
     });
+
+    test('parses household tree fields and balance reassignments', () {
+      const json = '''
+      {
+        "version": 3,
+        "groups": [
+          {"id":"g1","name":"Family","currencyCode":"USD","createdAt":"2025-01-01T00:00:00Z","updatedAt":"2025-01-01T00:00:00Z","householdCountingEnabled":true}
+        ],
+        "participants": [
+          {"id":"p1","groupId":"g1","name":"Parent","order":0,"unnamedDependentCount":2,"createdAt":"2025-01-01T00:00:00Z","updatedAt":"2025-01-01T00:00:00Z"},
+          {"id":"p2","groupId":"g1","name":"Child","order":1,"parentParticipantId":"p1","createdAt":"2025-01-01T00:00:00Z","updatedAt":"2025-01-01T00:00:00Z"}
+        ],
+        "expenses": [],
+        "expense_tags": [],
+        "household_balance_reassignments": [
+          {"id":"r1","groupId":"g1","sourceParticipantId":"p1","targetParticipantId":"p2","amountCents":125,"createdAt":"2025-01-02T00:00:00Z"}
+        ]
+      }
+      ''';
+      final result = parseBackupJson(json);
+      expect(result.errorMessageKey, isNull);
+      expect(result.data!.groups.single.householdCountingEnabled, true);
+      expect(result.data!.participants[1].parentParticipantId, 'p1');
+      expect(result.data!.participants.first.unnamedDependentCount, 2);
+      expect(result.data!.householdReassignments.single.amountCents, 125);
+    });
   });
 
   group('remap helpers', () {

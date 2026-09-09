@@ -21,6 +21,10 @@ class Group {
   final bool allowMemberChangeSettings;
   final bool allowExpenseAsOtherParticipant;
   final bool allowMemberSettleForOthers;
+
+  /// When enabled, participant trees and dependent counts affect new splits
+  /// and the group-wide settlement projection.
+  final bool householdCountingEnabled;
   final String? icon;
   final int? color;
   final DateTime? archivedAt;
@@ -46,6 +50,7 @@ class Group {
     this.allowMemberChangeSettings = true,
     this.allowExpenseAsOtherParticipant = true,
     this.allowMemberSettleForOthers = false,
+    this.householdCountingEnabled = false,
     this.icon,
     this.color,
     this.archivedAt,
@@ -71,6 +76,7 @@ class Group {
     bool? allowMemberChangeSettings,
     bool? allowExpenseAsOtherParticipant,
     bool? allowMemberSettleForOthers,
+    bool? householdCountingEnabled,
     String? icon,
     int? color,
     DateTime? archivedAt,
@@ -99,6 +105,8 @@ class Group {
           allowExpenseAsOtherParticipant ?? this.allowExpenseAsOtherParticipant,
       allowMemberSettleForOthers:
           allowMemberSettleForOthers ?? this.allowMemberSettleForOthers,
+      householdCountingEnabled:
+          householdCountingEnabled ?? this.householdCountingEnabled,
       icon: icon ?? this.icon,
       color: color ?? this.color,
       archivedAt: archivedAt ?? this.archivedAt,
@@ -125,6 +133,7 @@ class Group {
     allowMemberChangeSettings: allowMemberChangeSettings,
     allowExpenseAsOtherParticipant: allowExpenseAsOtherParticipant,
     allowMemberSettleForOthers: allowMemberSettleForOthers,
+    householdCountingEnabled: householdCountingEnabled,
     icon: icon,
     color: color,
     archivedAt: archivedAt,

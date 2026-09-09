@@ -20,6 +20,12 @@ class Participant {
   /// When set, this participant is treated as left/archived (hidden from main list; expense history kept).
   final DateTime? leftAt;
 
+  /// Optional parent in the recursive household directory.
+  final String? parentParticipantId;
+
+  /// Number of unnamed people represented directly by this participant.
+  final int unnamedDependentCount;
+
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -31,9 +37,13 @@ class Participant {
     this.userId,
     this.avatarId,
     this.leftAt,
+    this.parentParticipantId,
+    this.unnamedDependentCount = 0,
     required this.createdAt,
     required this.updatedAt,
   });
+
+  int get directHouseholdSize => 1 + unnamedDependentCount;
 
   Participant copyWith({
     String? id,
@@ -43,6 +53,9 @@ class Participant {
     String? userId,
     String? avatarId,
     DateTime? leftAt,
+    String? parentParticipantId,
+    bool clearParentParticipantId = false,
+    int? unnamedDependentCount,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -54,6 +67,11 @@ class Participant {
       userId: userId ?? this.userId,
       avatarId: avatarId ?? this.avatarId,
       leftAt: leftAt ?? this.leftAt,
+      parentParticipantId: clearParentParticipantId
+          ? null
+          : (parentParticipantId ?? this.parentParticipantId),
+      unnamedDependentCount:
+          unnamedDependentCount ?? this.unnamedDependentCount,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

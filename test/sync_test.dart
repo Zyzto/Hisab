@@ -525,6 +525,60 @@ void main() {
       expect(captured[1]['id'], 'group-1');
       expect(captured[2]['id'], 'group-1');
     });
+
+    test(
+      'pushes queued household changes through the authoritative operation',
+      () async {
+        if (!_powerSyncAvailable || db == null) return;
+        final captured = <Map<String, dynamic>>[];
+        final backend = _FakeSyncBackend(
+          userId: 'u-household',
+          groupIds: [],
+          capture: captured,
+        );
+        final participantId =
+            'participant-household-${DateTime.now().microsecondsSinceEpoch}';
+        final pendingId = 'pending-$participantId';
+        await db!.execute(
+          '''INSERT INTO pending_writes (id, table_name, operation, row_id, data_json, created_at)
+          VALUES (?, ?, ?, ?, ?, ?)''',
+          [
+            pendingId,
+            'participants',
+            'set_household',
+            participantId,
+            jsonEncode(<String, dynamic>{
+              'group_id': 'group-household',
+              'parent_participant_id': 'parent-household',
+              'unnamed_dependent_count': 3,
+            }),
+            DateTime.now().toUtc().toIso8601String(),
+          ],
+        );
+
+        await SyncEngine().pushPendingWritesWithBackend(db!, backend);
+
+        expect(
+          captured,
+          contains(
+            allOf({
+              'table': 'participants',
+              'operation': 'set_household',
+              'groupId': 'group-household',
+              'id': participantId,
+              'parentParticipantId': 'parent-household',
+              'unnamedDependentCount': 3,
+            }),
+          ),
+        );
+        expect(
+          await db!.getAll('SELECT id FROM pending_writes WHERE id = ?', [
+            pendingId,
+          ]),
+          isEmpty,
+        );
+      },
+    );
   });
 }
 
@@ -549,6 +603,7 @@ class _FakeSyncBackend implements SyncBackend {
   final List<Map<String, dynamic>> members;
   final List<Map<String, dynamic>> participants;
   final List<Map<String, dynamic>> expenses;
+  final List<Map<String, dynamic>> householdBalanceReassignments = const [];
   final List<Map<String, dynamic>> tags;
   final List<Map<String, dynamic>> invites;
   final List<Map<String, dynamic>> inviteUsages;
@@ -581,6 +636,15 @@ class _FakeSyncBackend implements SyncBackend {
   @override
   Future<List<Map<String, dynamic>>> getExpenses(List<String> ids) async {
     return expenses.where((e) => ids.contains(e['group_id'])).toList();
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getHouseholdBalanceReassignments(
+    List<String> ids,
+  ) async {
+    return householdBalanceReassignments
+        .where((r) => ids.contains(r['group_id']))
+        .toList();
   }
 
   @override
@@ -645,5 +709,22 @@ class _FakeSyncBackend implements SyncBackend {
   @override
   Future<void> delete(String table, String id) async {
     _captured?.add({'table': table, 'operation': 'delete', 'id': id});
+  }
+
+  @override
+  Future<void> setParticipantHousehold(
+    String groupId,
+    String participantId,
+    String? parentParticipantId,
+    int unnamedDependentCount,
+  ) async {
+    _captured?.add({
+      'table': 'participants',
+      'operation': 'set_household',
+      'groupId': groupId,
+      'id': participantId,
+      'parentParticipantId': parentParticipantId,
+      'unnamedDependentCount': unnamedDependentCount,
+    });
   }
 }

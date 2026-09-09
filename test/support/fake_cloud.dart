@@ -235,6 +235,11 @@ class FakeCloudSync implements CloudSync {
   @override
   final String? currentUserId;
 
+  @override
+  Future<List<Map<String, dynamic>>> getHouseholdBalanceReassignments(
+    List<String> groupIds,
+  ) async => const [];
+
   final List<({String table, Map<String, dynamic> data})> upserts = [];
   final List<({String table, String id, Map<String, dynamic> data})> updates =
       [];

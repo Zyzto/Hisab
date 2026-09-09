@@ -91,6 +91,8 @@ class ExpenseSplitSection extends StatelessWidget {
   onAmountChanged;
   final void Function(Participant p, String value) onPartsChanged;
   final int Function() amountsSumCents;
+  final bool householdEnabled;
+  final Map<String, int> householdUnitCounts;
 
   const ExpenseSplitSection({
     super.key,
@@ -112,6 +114,8 @@ class ExpenseSplitSection extends StatelessWidget {
     required this.onAmountChanged,
     required this.onPartsChanged,
     required this.amountsSumCents,
+    this.householdEnabled = false,
+    this.householdUnitCounts = const {},
   });
 
   String _splitTypeLabel(SplitType type) {
@@ -137,6 +141,40 @@ class ExpenseSplitSection extends StatelessWidget {
     final includedList = participants
         .where((p) => includedInSplitIds.contains(p.id))
         .toList();
+    final childrenByParent = <String, List<String>>{};
+    for (final p in participants) {
+      final parent = p.parentParticipantId;
+      if (parent != null) {
+        childrenByParent.putIfAbsent(parent, () => []).add(p.id);
+      }
+    }
+    final depthById = <String, int>{};
+    for (final p in participants) {
+      var depth = 0;
+      var parent = p.parentParticipantId;
+      final seen = <String>{};
+      while (parent != null && seen.add(parent)) {
+        depth++;
+        parent = participants
+            .where((candidate) => candidate.id == parent)
+            .firstOrNull
+            ?.parentParticipantId;
+      }
+      depthById[p.id] = depth;
+    }
+    List<String> descendantsOf(String id) {
+      final result = <String>[];
+      void visit(String parent) {
+        for (final child in childrenByParent[parent] ?? const <String>[]) {
+          result.add(child);
+          visit(child);
+        }
+      }
+
+      visit(id);
+      return result;
+    }
+
     final isCustomSplit =
         splitType == SplitType.parts || splitType == SplitType.amounts;
     final (currencySymbol, symbolOnLeft) = _currencySymbol();
@@ -208,8 +246,13 @@ class ExpenseSplitSection extends StatelessWidget {
           child: Column(
             children: List.generate(participants.length, (i) {
               final p = participants[i];
+              final unitCount = householdUnitCounts[p.id] ?? 1;
               final cents = i < sharesCents.length ? sharesCents[i] : 0;
               final included = includedInSplitIds.contains(p.id);
+              final branchIds = <String>[p.id, ...descendantsOf(p.id)];
+              final branchIsIncluded = branchIds.every(
+                includedInSplitIds.contains,
+              );
               final controller = getOrCreateController(p);
               final focusNode = getOrCreateFocusNode(p);
 
@@ -300,9 +343,12 @@ class ExpenseSplitSection extends StatelessWidget {
               }
 
               return Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 4,
+                padding: EdgeInsetsDirectional.only(
+                  start:
+                      12 + (householdEnabled ? (depthById[p.id] ?? 0) * 18 : 0),
+                  end: 12,
+                  top: 4,
+                  bottom: 4,
                 ),
                 child: SizedBox(
                   height: _kMinTapHeight,
@@ -313,7 +359,19 @@ class ExpenseSplitSection extends StatelessWidget {
                         child: Checkbox(
                           value: included,
                           onChanged: (value) {
-                            onIncludeChanged(p, value ?? false);
+                            final next = value ?? false;
+                            if (childrenByParent[p.id]?.isNotEmpty == true) {
+                              for (final id in branchIds) {
+                                final branchParticipant = participants
+                                    .where((candidate) => candidate.id == id)
+                                    .firstOrNull;
+                                if (branchParticipant != null) {
+                                  onIncludeChanged(branchParticipant, next);
+                                }
+                              }
+                            } else {
+                              onIncludeChanged(p, next);
+                            }
                           },
                           materialTapTargetSize:
                               MaterialTapTargetSize.shrinkWrap,
@@ -341,15 +399,40 @@ class ExpenseSplitSection extends StatelessWidget {
                           onTap: () => onIncludeChanged(p, !included),
                           child: Align(
                             alignment: AlignmentDirectional.centerStart,
-                            child: UserText(
-                              p.name,
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                color: included
-                                    ? colorScheme.onSurface
-                                    : colorScheme.onSurfaceVariant,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                UserText(
+                                  p.name,
+                                  style: theme.textTheme.bodyLarge?.copyWith(
+                                    color: included
+                                        ? colorScheme.onSurface
+                                        : colorScheme.onSurfaceVariant,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (householdEnabled &&
+                                    childrenByParent[p.id]?.isNotEmpty == true)
+                                  Text(
+                                    branchIsIncluded
+                                        ? 'household_total'.tr()
+                                        : 'named_dependents'.tr(),
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                if (householdEnabled && unitCount > 1)
+                                  Text(
+                                    'household_split_explanation'.tr(
+                                      namedArgs: {'count': '$unitCount'},
+                                    ),
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                         ),

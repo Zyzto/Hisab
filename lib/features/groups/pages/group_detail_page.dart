@@ -30,6 +30,7 @@ import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/error_report_helper.dart';
 import '../../../core/services/settle_up_service.dart';
+import '../../../core/services/household_service.dart';
 import '../../../core/utils/expense_totals.dart';
 import '../../../core/utils/form_validators.dart';
 import '../../../core/utils/user_text.dart';
@@ -1560,7 +1561,7 @@ class _BalanceTab extends ConsumerWidget {
   }
 }
 
-class _PeopleTab extends ConsumerWidget {
+class _PeopleTab extends ConsumerStatefulWidget {
   final String groupId;
   final Group group;
   final Future<void> Function() onRefresh;
@@ -1572,6 +1573,15 @@ class _PeopleTab extends ConsumerWidget {
     required this.onRefresh,
     required this.readOnlyPreview,
   });
+
+  @override
+  ConsumerState<_PeopleTab> createState() => _PeopleTabState();
+}
+
+class _PeopleTabState extends ConsumerState<_PeopleTab> {
+  final Set<String> _collapsedHouseholds = <String>{};
+
+  String get groupId => widget.groupId;
 
   String _roleLabel(String role) {
     switch (role) {
@@ -1585,7 +1595,11 @@ class _PeopleTab extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    final groupId = widget.groupId;
+    final group = widget.group;
+    final onRefresh = widget.onRefresh;
+    final readOnlyPreview = widget.readOnlyPreview;
     final localOnly = ref.watch(effectiveLocalOnlyProvider);
     final participantsAsync = ref.watch(participantsByGroupProvider(groupId));
     final membersAsync = localOnly
@@ -1594,12 +1608,16 @@ class _PeopleTab extends ConsumerWidget {
     final myRoleAsync = localOnly
         ? const AsyncValue.data(null)
         : ref.watch(myRoleInGroupProvider(groupId));
+    final myMemberAsync = localOnly
+        ? const AsyncValue<GroupMember?>.data(null)
+        : ref.watch(myMemberInGroupProvider(groupId));
     return participantsAsync.when(
       data: (participants) {
         return membersAsync.when(
           data: (members) {
             final theme = Theme.of(context);
             final myRole = myRoleAsync.value;
+            final myParticipantId = myMemberAsync.value?.participantId;
             final isOwnerOrAdmin =
                 !readOnlyPreview &&
                 (localOnly ||
@@ -1620,7 +1638,7 @@ class _PeopleTab extends ConsumerWidget {
             // Past members: only show participants who had a user account (left/kicked).
             // Manually added participants that were removed stay in expenses but are hidden from this tab.
             final pastParticipants = participants
-                .where((p) => p.leftAt != null && p.userId != null)
+                .where((p) => p.leftAt != null)
                 .toList();
 
             if (activeParticipants.isEmpty && pastParticipants.isEmpty) {
@@ -1687,42 +1705,59 @@ class _PeopleTab extends ConsumerWidget {
                       MediaQuery.of(context).padding.bottom,
                 ),
                 children: [
-                  ...activeParticipants.map((p) {
-                    final linkedMember = memberByParticipantId[p.id];
-                    final hasUserId = p.userId != null;
-                    final isActive = linkedMember != null;
-                    final isLeft = hasUserId && !isActive;
-                    final roleLabel = isActive
-                        ? _roleLabel(linkedMember.role)
-                        : isLeft
-                        ? 'left'.tr()
-                        : null;
+                  if (group.householdCountingEnabled)
+                    ..._buildHouseholdRows(
+                      context,
+                      ref,
+                      groupId,
+                      group,
+                      activeParticipants,
+                      memberByParticipantId,
+                      isOwnerOrAdmin,
+                      myRole,
+                      localOnly,
+                      members,
+                      participants,
+                      myParticipantId,
+                      _collapsedHouseholds,
+                    )
+                  else
+                    ...activeParticipants.map((p) {
+                      final linkedMember = memberByParticipantId[p.id];
+                      final hasUserId = p.userId != null;
+                      final isActive = linkedMember != null;
+                      final isLeft = hasUserId && !isActive;
+                      final roleLabel = isActive
+                          ? _roleLabel(linkedMember.role)
+                          : isLeft
+                          ? 'left'.tr()
+                          : null;
 
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: _PeoplePersonCard(
-                        key: ValueKey(p.id),
-                        name: p.name,
-                        avatarId: p.avatarId,
-                        subtitle: roleLabel,
-                        muted: isLeft,
-                        trailing: _buildTrailing(
-                          context,
-                          ref,
-                          groupId,
-                          p,
-                          linkedMember,
-                          isActive,
-                          isLeft,
-                          isOwnerOrAdmin,
-                          myRole,
-                          localOnly,
-                          members,
-                          participants,
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _PeoplePersonCard(
+                          key: ValueKey(p.id),
+                          name: p.name,
+                          avatarId: p.avatarId,
+                          subtitle: roleLabel,
+                          muted: isLeft,
+                          trailing: _buildTrailing(
+                            context,
+                            ref,
+                            groupId,
+                            p,
+                            linkedMember,
+                            isActive,
+                            isLeft,
+                            isOwnerOrAdmin,
+                            myRole,
+                            localOnly,
+                            members,
+                            participants,
+                          ),
                         ),
-                      ),
-                    );
-                  }),
+                      );
+                    }),
                   if (pastParticipants.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     GroupSectionHeader(label: 'past_members'.tr()),
@@ -1780,6 +1815,300 @@ class _PeopleTab extends ConsumerWidget {
         );
       },
     );
+  }
+
+  List<Widget> _buildHouseholdRows(
+    BuildContext context,
+    WidgetRef ref,
+    String groupId,
+    Group group,
+    List<Participant> activeParticipants,
+    Map<String, GroupMember> memberByParticipantId,
+    bool isOwnerOrAdmin,
+    GroupRole? myRole,
+    bool localOnly,
+    List<GroupMember> members,
+    List<Participant> allParticipants,
+    String? currentUserParticipantId,
+    Set<String> collapsedHouseholds,
+  ) {
+    final activeIds = activeParticipants.map((p) => p.id).toSet();
+    final childrenByParent = <String, List<Participant>>{};
+    for (final p in activeParticipants) {
+      final parent = p.parentParticipantId;
+      if (parent != null && activeIds.contains(parent)) {
+        childrenByParent.putIfAbsent(parent, () => []).add(p);
+      }
+    }
+    final rows = <Widget>[];
+    final visited = <String>{};
+
+    void addRow(Participant p, int depth) {
+      if (!visited.add(p.id)) return;
+      final linkedMember = memberByParticipantId[p.id];
+      final hasUserId = p.userId != null;
+      final isActive = linkedMember != null;
+      final isLeft = hasUserId && !isActive;
+      final roleLabel = isActive
+          ? _roleLabel(linkedMember.role)
+          : isLeft
+          ? 'left'.tr()
+          : null;
+      final canEditBranch =
+          isOwnerOrAdmin ||
+          (currentUserParticipantId != null &&
+              _isInParticipantBranch(
+                p.id,
+                currentUserParticipantId,
+                allParticipants,
+              ));
+      final householdLabel = p.directHouseholdSize > 1
+          ? '${roleLabel == null ? '' : '$roleLabel · '}${'household_direct_people_count'.tr(namedArgs: {'count': '${p.directHouseholdSize}'})}'
+          : roleLabel;
+      final children = List<Participant>.from(
+        childrenByParent[p.id] ?? const <Participant>[],
+      )..sort((a, b) => a.order.compareTo(b.order));
+      var trailing = _buildTrailing(
+        context,
+        ref,
+        groupId,
+        p,
+        linkedMember,
+        isActive,
+        isLeft,
+        isOwnerOrAdmin,
+        myRole,
+        localOnly,
+        members,
+        allParticipants,
+      );
+      if (canEditBranch && p.leftAt == null) {
+        trailing = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.person_add_alt_1),
+              tooltip: 'add_dependent'.tr(),
+              onPressed: () =>
+                  _showAddDependent(context, ref, groupId, p, allParticipants),
+            ),
+            IconButton(
+              icon: const Icon(Icons.drive_file_move_outlined),
+              tooltip: 'household_move'.tr(),
+              onPressed: () => _showMoveDependent(
+                context,
+                ref,
+                p,
+                activeParticipants,
+                allParticipants,
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.account_tree_outlined),
+              tooltip: 'household_counting'.tr(),
+              onPressed: () => _showHouseholdCountEditor(context, ref, p),
+            ),
+            if (trailing != null) trailing,
+          ],
+        );
+      }
+      if (children.isNotEmpty) {
+        final existingTrailing = trailing;
+        trailing = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: Icon(
+                collapsedHouseholds.contains(p.id)
+                    ? Icons.chevron_right
+                    : Icons.expand_more,
+              ),
+              tooltip: 'household_total'.tr(),
+              onPressed: () => setState(() {
+                if (!collapsedHouseholds.add(p.id)) {
+                  collapsedHouseholds.remove(p.id);
+                }
+              }),
+            ),
+            if (existingTrailing != null) existingTrailing,
+          ],
+        );
+      }
+      rows.add(
+        Padding(
+          padding: EdgeInsetsDirectional.only(start: depth * 20.0, bottom: 8),
+          child: _PeoplePersonCard(
+            key: ValueKey('household_${p.id}'),
+            name: p.name,
+            avatarId: p.avatarId,
+            subtitle: householdLabel,
+            muted: isLeft,
+            trailing: trailing,
+          ),
+        ),
+      );
+      if (!collapsedHouseholds.contains(p.id)) {
+        for (final child in children) {
+          addRow(child, depth + 1);
+        }
+      }
+    }
+
+    final roots =
+        activeParticipants
+            .where(
+              (p) =>
+                  p.parentParticipantId == null ||
+                  !activeIds.contains(p.parentParticipantId),
+            )
+            .toList()
+          ..sort((a, b) => a.order.compareTo(b.order));
+    for (final root in roots) {
+      addRow(root, 0);
+    }
+    for (final p in activeParticipants) {
+      if (!visited.contains(p.id) &&
+          (p.parentParticipantId == null ||
+              !activeIds.contains(p.parentParticipantId))) {
+        addRow(p, 0);
+      }
+    }
+    return rows;
+  }
+
+  bool _isInParticipantBranch(
+    String participantId,
+    String rootParticipantId,
+    List<Participant> participants,
+  ) {
+    final byId = {for (final p in participants) p.id: p};
+    var current = byId[participantId];
+    final seen = <String>{};
+    while (current != null && seen.add(current.id)) {
+      if (current.id == rootParticipantId) return true;
+      final parentId = current.parentParticipantId;
+      current = parentId == null ? null : byId[parentId];
+    }
+    return false;
+  }
+
+  Future<void> _showAddDependent(
+    BuildContext context,
+    WidgetRef ref,
+    String groupId,
+    Participant parent,
+    List<Participant> participants,
+  ) async {
+    final name = await showTextInputSheet(
+      context,
+      title: 'add_dependent'.tr(),
+      hint: 'participant_name'.tr(),
+      maxLength: FormValidators.participantNameMax,
+      centerInFullViewport: true,
+    );
+    if (name == null || FormValidators.participantName(name) != null) return;
+    try {
+      await ref
+          .read(participantRepositoryProvider)
+          .create(
+            groupId,
+            name,
+            participants.length,
+            parentParticipantId: parent.id,
+          );
+      ref.invalidate(participantsByGroupProvider(groupId));
+    } catch (e, st) {
+      Log.warning('Add dependent failed', error: e, stackTrace: st);
+      if (context.mounted) context.showError('generic_error'.tr());
+    }
+  }
+
+  Future<void> _showHouseholdCountEditor(
+    BuildContext context,
+    WidgetRef ref,
+    Participant participant,
+  ) async {
+    final value = await showTextInputSheet(
+      context,
+      title: 'unnamed_dependents'.tr(),
+      hint: 'unnamed_dependents_hint'.tr(),
+      initialValue: '${participant.unnamedDependentCount}',
+      centerInFullViewport: true,
+    );
+    if (value == null) return;
+    final count = int.tryParse(value.trim());
+    if (count == null || count < 0 || count > 999) {
+      if (context.mounted) context.showToast('household_invalid_count'.tr());
+      return;
+    }
+    try {
+      await ref
+          .read(participantRepositoryProvider)
+          .update(participant.copyWith(unnamedDependentCount: count));
+      ref.invalidate(participantsByGroupProvider(participant.groupId));
+    } catch (e, st) {
+      Log.warning('Update household count failed', error: e, stackTrace: st);
+      if (context.mounted) context.showError('generic_error'.tr());
+    }
+  }
+
+  Future<void> _showMoveDependent(
+    BuildContext context,
+    WidgetRef ref,
+    Participant participant,
+    List<Participant> activeParticipants,
+    List<Participant> allParticipants,
+  ) async {
+    final options = <SheetPickerOption<String>>[
+      SheetPickerOption(
+        value: '',
+        label: 'household_make_root'.tr(),
+        leading: const Icon(Icons.account_tree_outlined),
+      ),
+      for (final candidate in activeParticipants)
+        if (candidate.id != participant.id &&
+            !_isInParticipantBranch(
+              candidate.id,
+              participant.id,
+              allParticipants,
+            ))
+          SheetPickerOption(
+            value: candidate.id,
+            label: candidate.name,
+            subtitle: candidate.parentParticipantId == null
+                ? 'named_dependents'.tr()
+                : null,
+            leading: ParticipantAvatar(
+              name: candidate.name,
+              avatarId: candidate.avatarId,
+              radius: 16,
+            ),
+          ),
+    ];
+    final choice = await showOptionPickerSheet<String>(
+      context,
+      title: 'household_move'.tr(),
+      options: options,
+      selected: participant.parentParticipantId ?? '',
+    );
+    if (choice == null || !context.mounted) return;
+    try {
+      await ref
+          .read(participantRepositoryProvider)
+          .update(
+            choice.isEmpty
+                ? participant.copyWith(clearParentParticipantId: true)
+                : participant.copyWith(parentParticipantId: choice),
+          );
+      ref.invalidate(participantsByGroupProvider(participant.groupId));
+    } catch (e, st) {
+      Log.warning(
+        'Move household participant failed',
+        error: e,
+        stackTrace: st,
+      );
+      if (context.mounted) context.showError('generic_error'.tr());
+    }
   }
 
   Widget? _buildTrailing(
@@ -2065,6 +2394,7 @@ class _PeopleTab extends ConsumerWidget {
     );
     if (ok == true && context.mounted) {
       try {
+        await _preserveHouseholdOnParticipantRemoval(ref, groupId, participant);
         await ref
             .read(participantRepositoryProvider)
             .archive(groupId, participant.id);
@@ -2124,6 +2454,80 @@ class _PeopleTab extends ConsumerWidget {
     return false;
   }
 
+  /// Promote a removed parent’s direct branches and carry its unresolved net
+  /// balance to those branches before the participant is archived.  This is
+  /// intentionally done before the membership/archive RPC so the local and
+  /// online paths keep the same valid tree at every intermediate state.
+  Future<void> _preserveHouseholdOnParticipantRemoval(
+    WidgetRef ref,
+    String groupId,
+    Participant participant,
+  ) async {
+    final group = await ref.read(groupRepositoryProvider).getById(groupId);
+    final allParticipants = await ref
+        .read(participantRepositoryProvider)
+        .getByGroupId(groupId);
+    final children =
+        allParticipants
+            .where((p) => p.parentParticipantId == participant.id)
+            .toList()
+          ..sort((a, b) => a.order.compareTo(b.order));
+    if (children.isEmpty) return;
+
+    if (group?.householdCountingEnabled == true) {
+      final existingReassignments = await ref
+          .read(householdBalanceReassignmentRepositoryProvider)
+          .getByGroupId(groupId);
+      final expenses = await ref
+          .read(expenseRepositoryProvider)
+          .getByGroupId(groupId);
+      final parentBalance =
+          HouseholdService.applyReassignments(
+            balances: computeBalances(
+              allParticipants,
+              expenses,
+              group!.currencyCode,
+            ),
+            reassignments: existingReassignments,
+          ).firstWhere(
+            (balance) => balance.participantId == participant.id,
+            orElse: () => ParticipantBalance(
+              participantId: participant.id,
+              balanceCents: 0,
+              currencyCode: group.currencyCode,
+            ),
+          );
+      final weights = <String, int>{
+        for (final child in children)
+          child.id: HouseholdService.subtreeSize(child.id, allParticipants),
+      };
+      final totalWeight = weights.values.fold<int>(0, (a, b) => a + b);
+      var assigned = 0;
+      for (var i = 0; i < children.length; i++) {
+        final child = children[i];
+        final amount = i == children.length - 1
+            ? parentBalance.balanceCents - assigned
+            : (parentBalance.balanceCents * weights[child.id]! / totalWeight)
+                  .round();
+        assigned += amount;
+        await ref
+            .read(householdBalanceReassignmentRepositoryProvider)
+            .create(
+              groupId: groupId,
+              sourceParticipantId: participant.id,
+              targetParticipantId: child.id,
+              amountCents: amount,
+            );
+      }
+    }
+
+    for (final child in children) {
+      await ref
+          .read(participantRepositoryProvider)
+          .update(child.copyWith(clearParentParticipantId: true));
+    }
+  }
+
   Future<void> _showDeleteParticipant(
     BuildContext context,
     WidgetRef ref,
@@ -2180,10 +2584,51 @@ class _PeopleTab extends ConsumerWidget {
           participant.id,
           expenses,
         );
+        final allParticipants = await ref
+            .read(participantRepositoryProvider)
+            .getByGroupId(groupId);
+        final children = allParticipants
+            .where((p) => p.parentParticipantId == participant.id)
+            .toList();
+        // Reassignment rows are immutable history.  A participant referenced
+        // by one can no longer be hard-deleted because the foreign key must
+        // remain resolvable for balance reconstruction.
+        final existingReassignments = await ref
+            .read(householdBalanceReassignmentRepositoryProvider)
+            .getByGroupId(groupId);
+        final referencedByReassignment = existingReassignments.any(
+          (r) =>
+              r.sourceParticipantId == participant.id ||
+              r.targetParticipantId == participant.id,
+        );
+        if (children.isNotEmpty && participant.leftAt == null) {
+          await _preserveHouseholdOnParticipantRemoval(
+            ref,
+            groupId,
+            participant,
+          );
+        }
         Log.info(
           'Remove participant: usedInExpenses=$usedInExpenses -> ${usedInExpenses ? "archive" : "delete"}',
         );
-        if (usedInExpenses) {
+        // Household roots are retained so historical expenses keep the
+        // original name. Promote direct children before marking the parent as
+        // left; this keeps the directory valid for future expenses.
+        // The helper above already promoted direct branches.  Keep the
+        // fallback for a participant that was already archived or when the
+        // group is not in household mode.
+        if (children.isNotEmpty && participant.leftAt != null) {
+          for (final child in children) {
+            await ref
+                .read(participantRepositoryProvider)
+                .update(child.copyWith(clearParentParticipantId: true));
+          }
+        }
+        if (usedInExpenses ||
+            children.isNotEmpty ||
+            referencedByReassignment ||
+            participant.leftAt != null ||
+            participant.unnamedDependentCount > 0) {
           await ref
               .read(participantRepositoryProvider)
               .archive(groupId, participant.id);
@@ -2197,7 +2642,9 @@ class _PeopleTab extends ConsumerWidget {
             dedupeKey: CelebrationKeys.personLeft(groupId, participant.id),
           );
           if (context.mounted) {
-            context.showSuccess('archive_participant'.tr());
+            context.showSuccess(
+              'household_left_status'.tr(namedArgs: {'name': participant.name}),
+            );
           }
         } else {
           await ref.read(participantRepositoryProvider).delete(participant.id);
@@ -2377,6 +2824,22 @@ class _PeopleTab extends ConsumerWidget {
     );
     if (ok == true && context.mounted) {
       try {
+        final participantId = member.participantId;
+        if (participantId != null) {
+          final participant = await ref
+              .read(participantRepositoryProvider)
+              .getById(participantId);
+          if (participant != null) {
+            // The kick RPC archives the linked participant.  Reparent and
+            // carry any unresolved household balance first so the server
+            // never exposes an archived parent with dangling active branches.
+            await _preserveHouseholdOnParticipantRemoval(
+              ref,
+              groupId,
+              participant,
+            );
+          }
+        }
         await ref
             .read(groupMemberRepositoryProvider)
             .kickMember(groupId, member.id);
@@ -2388,7 +2851,6 @@ class _PeopleTab extends ConsumerWidget {
         ref.invalidate(membersByGroupProvider(groupId));
         ref.invalidate(participantsByGroupProvider(groupId));
         ref.invalidate(activeParticipantsByGroupProvider(groupId));
-        final participantId = member.participantId;
         if (participantId != null) {
           await fireCelebration(
             ref,

@@ -94,6 +94,7 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
     final id = _uuid.v4();
     final now = _nowIso();
     final splitSharesJson = jsonEncode(expense.splitShares);
+    final householdSplitSnapshotJson = expense.householdSplitSnapshotJson;
     final lineItemsJson = expense.lineItems != null
         ? jsonEncode(expense.lineItems!.map((e) => e.toJson()).toList())
         : null;
@@ -118,6 +119,7 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
       'date': expense.date.toUtc().toIso8601String(),
       'split_type': expense.splitType.name,
       'split_shares_json': splitSharesJson,
+      'household_split_snapshot_json': householdSplitSnapshotJson,
       'type': expense.transactionType.name,
       'to_participant_id': expense.toParticipantId,
       'tag': expense.tag,
@@ -148,8 +150,8 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
         currency_code, exchange_rate, base_amount_cents,
         title, description, date, split_type, split_shares_json,
         type, to_participant_id, tag, line_items_json, image_path, image_paths,
-        created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+        household_split_snapshot_json, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
       [
         id,
         expense.groupId,
@@ -169,6 +171,7 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
         lineItemsJson,
         imagePath,
         imagePathsJson,
+        householdSplitSnapshotJson,
         now,
         now,
       ],
@@ -192,6 +195,7 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
     }
     final now = _nowIso();
     final splitSharesJson = jsonEncode(expense.splitShares);
+    final householdSplitSnapshotJson = expense.householdSplitSnapshotJson;
     final lineItemsJson = expense.lineItems != null
         ? jsonEncode(expense.lineItems!.map((e) => e.toJson()).toList())
         : null;
@@ -216,6 +220,7 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
         'date': expense.date.toUtc().toIso8601String(),
         'split_type': expense.splitType.name,
         'split_shares_json': splitSharesJson,
+        'household_split_snapshot_json': householdSplitSnapshotJson,
         'type': expense.transactionType.name,
         'to_participant_id': expense.toParticipantId,
         'tag': expense.tag,
@@ -244,6 +249,7 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
           'date': expense.date.toUtc().toIso8601String(),
           'split_type': expense.splitType.name,
           'split_shares_json': splitSharesJson,
+          'household_split_snapshot_json': householdSplitSnapshotJson,
           'type': expense.transactionType.name,
           'to_participant_id': expense.toParticipantId,
           'tag': expense.tag,
@@ -262,7 +268,7 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
         payer_participant_id = ?,
         description = ?, date = ?, split_type = ?, split_shares_json = ?,
         type = ?, to_participant_id = ?, tag = ?,
-        line_items_json = ?, image_path = ?, image_paths = ?, updated_at = ?
+        line_items_json = ?, image_path = ?, image_paths = ?, household_split_snapshot_json = ?, updated_at = ?
       WHERE id = ?''',
       [
         title,
@@ -281,6 +287,7 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
         lineItemsJson,
         imagePath,
         imagePathsJson,
+        householdSplitSnapshotJson,
         now,
         expense.id,
       ],

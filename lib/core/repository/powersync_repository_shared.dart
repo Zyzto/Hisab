@@ -48,6 +48,7 @@ Object? _groupFp(Group? g) {
     g.allowMemberChangeSettings,
     g.allowExpenseAsOtherParticipant,
     g.allowMemberSettleForOthers,
+    g.householdCountingEnabled,
     g.icon,
     g.color,
     g.archivedAt?.millisecondsSinceEpoch,
@@ -68,6 +69,7 @@ Object? _expenseFp(Expense? e) {
     e.updatedAt.millisecondsSinceEpoch,
     e.payerParticipantId,
     e.splitType,
+    e.householdSplitSnapshotJson,
     e.tag,
     e.imagePath,
     e.exchangeRate,
@@ -95,6 +97,8 @@ Object? _participantFp(Participant p) => Object.hash(
   p.userId,
   p.avatarId,
   p.leftAt?.millisecondsSinceEpoch,
+  p.parentParticipantId,
+  p.unnamedDependentCount,
   p.updatedAt.millisecondsSinceEpoch,
 );
 
@@ -299,6 +303,9 @@ Group _groupFromRow(Map<String, dynamic> row) => Group(
   allowMemberSettleForOthers: row['allow_member_settle_for_others'] == null
       ? false
       : _parseBool(row['allow_member_settle_for_others']),
+  householdCountingEnabled: row['household_counting_enabled'] == null
+      ? false
+      : _parseBool(row['household_counting_enabled']),
   icon: row['icon'] as String?,
   color: _colorToUnsigned((row['color'] as num?)?.toInt()),
   archivedAt: _parseDateTimeNullable(row['archived_at']),
@@ -314,6 +321,8 @@ Participant _participantFromRow(Map<String, dynamic> row) => Participant(
   userId: row['user_id'] as String?,
   avatarId: row['avatar_id'] as String?,
   leftAt: _parseDateTimeNullable(row['left_at']),
+  parentParticipantId: row['parent_participant_id'] as String?,
+  unnamedDependentCount: (row['unnamed_dependent_count'] as num?)?.toInt() ?? 0,
   createdAt: _parseDateTime(row['created_at']),
   updatedAt: _parseDateTime(row['updated_at']),
 );
@@ -331,6 +340,7 @@ Expense _expenseFromRow(Map<String, dynamic> row) => Expense(
   date: _parseDateTime(row['date']),
   splitType: _parseSplitType(row['split_type']),
   splitShares: _parseSplitShares(row['split_shares_json']),
+  householdSplitSnapshotJson: row['household_split_snapshot_json'] as String?,
   createdAt: _parseDateTime(row['created_at']),
   updatedAt: _parseDateTime(row['updated_at']),
   transactionType: _parseTransactionType(row['type']),

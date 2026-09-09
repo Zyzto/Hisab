@@ -21,6 +21,7 @@ abstract class IGroupRepository {
     bool allowMemberChangeSettings = true,
     bool allowExpenseAsOtherParticipant = true,
     bool allowMemberSettleForOthers = false,
+    bool householdCountingEnabled = false,
 
     /// When [settlementMethod] is treasurer: `null` = owner participant;
     /// otherwise a name from [initialParticipants].

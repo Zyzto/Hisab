@@ -9,6 +9,7 @@ import 'package:powersync/powersync.dart';
 import 'package:uuid/uuid.dart';
 
 import '../utils/user_text.dart';
+import '../services/household_service.dart';
 import '../../domain/domain.dart';
 import 'group_repository.dart';
 import 'participant_repository.dart';
@@ -17,6 +18,7 @@ import 'tag_repository.dart';
 import 'group_member_repository.dart';
 import 'group_invite_repository.dart';
 import 'user_notification_repository.dart';
+import 'household_balance_reassignment_repository.dart';
 
 part 'powersync_repository_shared.dart';
 part 'powersync_group_repository.dart';
@@ -26,3 +28,4 @@ part 'powersync_tag_repository.dart';
 part 'powersync_group_member_repository.dart';
 part 'powersync_group_invite_repository.dart';
 part 'powersync_user_notification_repository.dart';
+part 'powersync_household_balance_reassignment_repository.dart';

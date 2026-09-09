@@ -8,6 +8,10 @@ class GroupBalanceResult {
   final Group group;
   final List<Participant> participants;
   final List<ParticipantBalance> balances;
+
+  /// Individual participant balances before household roll-up. Used for a
+  /// signed-in dependent's personal balance hero.
+  final List<ParticipantBalance> individualBalances;
   final List<SettlementTransaction> settlements;
 
   /// True when the group is frozen but [Group.settlementSnapshotJson] could not
@@ -19,7 +23,8 @@ class GroupBalanceResult {
     required this.group,
     required this.participants,
     required this.balances,
+    List<ParticipantBalance>? individualBalances,
     required this.settlements,
     this.snapshotCorrupt = false,
-  });
+  }) : individualBalances = individualBalances ?? balances;
 }

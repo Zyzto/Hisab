@@ -10,6 +10,7 @@ import '../../../core/widgets/amount_with_secondary_display.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/participant_avatar.dart';
 import '../../../core/widgets/user_text.dart';
+import '../../../core/services/household_service.dart';
 import '../../../domain/domain.dart';
 import '../../groups/providers/group_member_provider.dart';
 import '../../groups/widgets/group_section_header.dart';
@@ -58,12 +59,34 @@ class BalanceList extends ConsumerWidget {
         final group = result.group;
         final participants = result.participants;
         final balances = result.balances;
+        final individualBalances = result.individualBalances;
         final settlements = result.settlements;
 
         final myMember = myMemberAsync.hasValue ? myMemberAsync.value : null;
         final myRole = myRoleAsync.hasValue ? myRoleAsync.value : null;
         final myParticipantId = myMember?.participantId;
         final showHero = myParticipantId != null && myParticipantId.isNotEmpty;
+
+        Map<String, String> familyRoots = const {};
+        if (group.householdCountingEnabled) {
+          try {
+            familyRoots = HouseholdService.rootByParticipant(participants);
+          } catch (_) {
+            // The backend/local validator normally prevents this. Keep the
+            // legacy balance view usable if an old cache contains bad links.
+            familyRoots = const {};
+          }
+        }
+        final familyRootId = showHero
+            ? (familyRoots[myParticipantId] ?? myParticipantId)
+            : null;
+        final settlementParticipantId = familyRootId ?? myParticipantId;
+        final familyBalance =
+            familyRootId == null || familyRootId == myParticipantId
+            ? null
+            : balances
+                  .where((b) => b.participantId == familyRootId)
+                  .firstOrNull;
 
         final sortedBalances = List<ParticipantBalance>.from(balances)
           ..sort(_compareBalances);
@@ -72,13 +95,13 @@ class BalanceList extends ConsumerWidget {
             .toList();
         final groupBalances = showHero
             ? visibleBalances
-                  .where((b) => b.participantId != myParticipantId)
+                  .where((b) => b.participantId != settlementParticipantId)
                   .toList()
             : visibleBalances;
 
         ParticipantBalance? myBalance;
         if (showHero) {
-          for (final b in balances) {
+          for (final b in individualBalances) {
             if (b.participantId == myParticipantId) {
               myBalance = b;
               break;
@@ -97,7 +120,7 @@ class BalanceList extends ConsumerWidget {
           if (group.isSettlementFrozen) return false;
           if (group.allowMemberSettleForOthers) return true;
           if (myRole == GroupRole.owner) return true;
-          if (myMember?.participantId == s.fromParticipantId) return true;
+          if (settlementParticipantId == s.fromParticipantId) return true;
           return false;
         }
 
@@ -110,10 +133,20 @@ class BalanceList extends ConsumerWidget {
           currencyCode: group.currencyCode,
           settlementMethod: group.settlementMethod,
           settlements: settlements,
-          myParticipantId: myParticipantId,
+          myParticipantId: settlementParticipantId,
           myBalance: myBalance,
+          familyBalance: familyBalance,
+          familyRootName: familyRootId == null
+              ? null
+              : participants
+                    .where((p) => p.id == familyRootId)
+                    .firstOrNull
+                    ?.name,
           showHero: showHero,
           groupBalances: groupBalances,
+          individualBalances: individualBalances,
+          participants: participants,
+          householdEnabled: group.householdCountingEnabled,
           nameOf: nameOf,
           avatarOf: avatarOf,
           hasFrozen: hasFrozen,
@@ -152,8 +185,13 @@ class _BalanceListBody extends StatefulWidget {
   final List<SettlementTransaction> settlements;
   final String? myParticipantId;
   final ParticipantBalance? myBalance;
+  final ParticipantBalance? familyBalance;
+  final String? familyRootName;
   final bool showHero;
   final List<ParticipantBalance> groupBalances;
+  final List<ParticipantBalance> individualBalances;
+  final List<Participant> participants;
+  final bool householdEnabled;
   final Map<String, String> nameOf;
   final Map<String, String?> avatarOf;
   final bool hasFrozen;
@@ -171,8 +209,13 @@ class _BalanceListBody extends StatefulWidget {
     required this.settlements,
     required this.myParticipantId,
     required this.myBalance,
+    required this.familyBalance,
+    required this.familyRootName,
     required this.showHero,
     required this.groupBalances,
+    required this.individualBalances,
+    required this.participants,
+    required this.householdEnabled,
     required this.nameOf,
     required this.avatarOf,
     required this.hasFrozen,
@@ -349,6 +392,19 @@ class _BalanceListBodyState extends State<_BalanceListBody> {
       );
     }
 
+    if (widget.householdEnabled && widget.familyBalance != null) {
+      children.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: _YourFamilyBalanceCard(
+            familyName: widget.familyRootName ?? 'household_total'.tr(),
+            balanceCents: widget.familyBalance!.balanceCents,
+            currencyCode: widget.currencyCode,
+          ),
+        ),
+      );
+    }
+
     if (widget.groupBalances.isNotEmpty || !widget.showHero) {
       children.add(
         GroupSectionHeader(
@@ -365,16 +421,39 @@ class _BalanceListBodyState extends State<_BalanceListBody> {
         );
       } else {
         for (final b in widget.groupBalances) {
-          final name = widget.nameOf[b.participantId] ?? b.participantId;
+          final participant = widget.participants
+              .where((p) => p.id == b.participantId)
+              .firstOrNull;
+          final baseName = widget.nameOf[b.participantId] ?? b.participantId;
+          final name = participant?.leftAt != null
+              ? 'household_left_status'.tr(namedArgs: {'name': baseName})
+              : baseName;
+          final descendants = widget.householdEnabled
+              ? _familyDescendants(b.participantId)
+              : const <Participant>[];
           children.add(
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
-              child: _BalancePersonCard(
-                name: name,
-                avatarId: widget.avatarOf[b.participantId],
-                balanceCents: b.balanceCents,
-                currencyCode: widget.currencyCode,
-              ),
+              child: descendants.isEmpty
+                  ? _BalancePersonCard(
+                      name: name,
+                      avatarId: widget.avatarOf[b.participantId],
+                      balanceCents: b.balanceCents,
+                      currencyCode: widget.currencyCode,
+                    )
+                  : _HouseholdBalanceCard(
+                      rootName: name,
+                      rootAvatarId: widget.avatarOf[b.participantId],
+                      rootBalance: b.balanceCents,
+                      currencyCode: widget.currencyCode,
+                      descendants: descendants,
+                      balanceById: {
+                        for (final balance in widget.individualBalances)
+                          balance.participantId: balance,
+                      },
+                      nameOf: widget.nameOf,
+                      avatarOf: widget.avatarOf,
+                    ),
             ),
           );
         }
@@ -392,6 +471,8 @@ class _BalanceListBodyState extends State<_BalanceListBody> {
           currencyCode: widget.currencyCode,
           settlements: widget.settlements,
           settlementMethod: widget.settlementMethod,
+          participants: widget.participants,
+          householdEnabled: widget.householdEnabled,
           myParticipantId: widget.myParticipantId,
           nameOf: widget.nameOf,
           avatarOf: widget.avatarOf,
@@ -474,6 +555,18 @@ class _BalanceListBodyState extends State<_BalanceListBody> {
         );
       },
     );
+  }
+
+  List<Participant> _familyDescendants(String rootId) {
+    try {
+      final roots = HouseholdService.rootByParticipant(widget.participants);
+      return widget.participants
+          .where((p) => p.id != rootId && roots[p.id] == rootId)
+          .toList()
+        ..sort((a, b) => a.order.compareTo(b.order));
+    } catch (_) {
+      return const <Participant>[];
+    }
   }
 }
 
@@ -907,6 +1000,70 @@ class _YourBalanceHero extends StatelessWidget {
   }
 }
 
+class _YourFamilyBalanceCard extends StatelessWidget {
+  final String familyName;
+  final int balanceCents;
+  final String currencyCode;
+
+  const _YourFamilyBalanceCard({
+    required this.familyName,
+    required this.balanceCents,
+    required this.currencyCode,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final isPositive = balanceCents >= 0;
+    final accent = isPositive ? colors.primary : colors.error;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsetsDirectional.fromSTEB(14, 12, 14, 12),
+      decoration: AccentSurfaces.flatPanel(colors),
+      child: Row(
+        children: [
+          Icon(Icons.account_tree_outlined, color: colors.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'household_family_balance'.tr(),
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: colors.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                UserText(
+                  familyName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          AmountWithSecondaryDisplay(
+            amountCents: balanceCents.abs(),
+            groupCurrencyCode: currencyCode,
+            primaryStyle: theme.textTheme.titleMedium?.copyWith(
+              color: accent,
+              fontWeight: FontWeight.w800,
+            ),
+            isNegative: !isPositive,
+            showSecondary: false,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _FrozenBanner extends StatelessWidget {
   final bool readOnlyMode;
   final bool snapshotCorrupt;
@@ -1098,6 +1255,111 @@ class _BalancePersonCard extends StatelessWidget {
   }
 }
 
+class _HouseholdBalanceCard extends StatelessWidget {
+  final String rootName;
+  final String? rootAvatarId;
+  final int rootBalance;
+  final String currencyCode;
+  final List<Participant> descendants;
+  final Map<String, ParticipantBalance> balanceById;
+  final Map<String, String> nameOf;
+  final Map<String, String?> avatarOf;
+
+  const _HouseholdBalanceCard({
+    required this.rootName,
+    required this.rootAvatarId,
+    required this.rootBalance,
+    required this.currencyCode,
+    required this.descendants,
+    required this.balanceById,
+    required this.nameOf,
+    required this.avatarOf,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Container(
+      decoration: AccentSurfaces.flatPanel(colorScheme),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+        childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+        leading: ParticipantAvatar(
+          name: rootName,
+          avatarId: rootAvatarId,
+          backgroundColor: colorScheme.primaryContainer,
+        ),
+        title: UserText(
+          rootName,
+          style: theme.textTheme.bodyLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        subtitle: Text('household_total'.tr()),
+        trailing: AmountWithSecondaryDisplay(
+          amountCents: rootBalance.abs(),
+          groupCurrencyCode: currencyCode,
+          primaryStyle: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: rootBalance >= 0 ? colorScheme.primary : colorScheme.error,
+          ),
+          isNegative: rootBalance < 0,
+          showSecondary: false,
+        ),
+        children: [
+          for (final child in descendants)
+            Builder(
+              builder: (context) {
+                final balance = balanceById[child.id];
+                return ListTile(
+                  dense: true,
+                  contentPadding: const EdgeInsetsDirectional.only(start: 18),
+                  leading: ParticipantAvatar(
+                    name: child.name,
+                    avatarId: avatarOf[child.id],
+                    radius: 15,
+                  ),
+                  title: UserText(
+                    child.leftAt != null
+                        ? 'household_left_status'.tr(
+                            namedArgs: {'name': nameOf[child.id] ?? child.name},
+                          )
+                        : (nameOf[child.id] ?? child.name),
+                  ),
+                  subtitle: child.directHouseholdSize > 1
+                      ? Text(
+                          'household_split_explanation'.tr(
+                            namedArgs: {
+                              'count': '${child.directHouseholdSize}',
+                            },
+                          ),
+                        )
+                      : null,
+                  trailing: balance == null
+                      ? null
+                      : AmountWithSecondaryDisplay(
+                          amountCents: balance.balanceCents.abs(),
+                          groupCurrencyCode: currencyCode,
+                          primaryStyle: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: balance.balanceCents >= 0
+                                ? colorScheme.primary
+                                : colorScheme.error,
+                          ),
+                          isNegative: balance.balanceCents < 0,
+                          showSecondary: false,
+                        ),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 enum _SettleFilter { me, all }
 
 class _SettleUpSection extends ConsumerStatefulWidget {
@@ -1105,6 +1367,8 @@ class _SettleUpSection extends ConsumerStatefulWidget {
   final String currencyCode;
   final List<SettlementTransaction> settlements;
   final SettlementMethod settlementMethod;
+  final List<Participant> participants;
+  final bool householdEnabled;
   final String? myParticipantId;
   final Map<String, String> nameOf;
   final Map<String, String?> avatarOf;
@@ -1117,6 +1381,8 @@ class _SettleUpSection extends ConsumerStatefulWidget {
     required this.currencyCode,
     required this.settlements,
     required this.settlementMethod,
+    required this.participants,
+    required this.householdEnabled,
     required this.myParticipantId,
     required this.nameOf,
     required this.avatarOf,
@@ -1274,6 +1540,8 @@ class _SettleUpSectionState extends ConsumerState<_SettleUpSection> {
                 fromAvatarId: widget.avatarOf[s.fromParticipantId],
                 toAvatarId: widget.avatarOf[s.toParticipantId],
                 settlement: s,
+                participants: widget.participants,
+                householdEnabled: widget.householdEnabled,
                 canRecord: canRecord,
                 readOnlyMode: widget.readOnlyMode,
                 hasFrozen: widget.hasFrozen,
@@ -1329,6 +1597,8 @@ class _SettlementCard extends StatelessWidget {
   final String? fromAvatarId;
   final String? toAvatarId;
   final SettlementTransaction settlement;
+  final List<Participant> participants;
+  final bool householdEnabled;
   final bool canRecord;
   final bool readOnlyMode;
   final bool hasFrozen;
@@ -1340,6 +1610,8 @@ class _SettlementCard extends StatelessWidget {
     this.fromAvatarId,
     this.toAvatarId,
     required this.settlement,
+    required this.participants,
+    required this.householdEnabled,
     required this.canRecord,
     required this.readOnlyMode,
     required this.hasFrozen,
@@ -1353,7 +1625,26 @@ class _SettlementCard extends StatelessWidget {
     final s = settlement;
     final canTap = !hasFrozen && !readOnlyMode && canRecord;
 
-    return Material(
+    final familyMembers = <String, List<Participant>>{};
+    if (householdEnabled && participants.isNotEmpty) {
+      try {
+        final roots = HouseholdService.rootByParticipant(participants);
+        for (final rootId in [s.fromParticipantId, s.toParticipantId]) {
+          familyMembers[rootId] =
+              participants
+                  .where((p) => p.id != rootId && roots[p.id] == rootId)
+                  .toList()
+                ..sort((a, b) => a.order.compareTo(b.order));
+        }
+      } catch (_) {
+        // Keep the settlement row usable if a legacy cache has an invalid tree.
+      }
+    }
+    final fromMembers = familyMembers[s.fromParticipantId] ?? const [];
+    final toMembers = familyMembers[s.toParticipantId] ?? const [];
+    final hasFamilyDetails = fromMembers.isNotEmpty || toMembers.isNotEmpty;
+
+    final row = Material(
       color: colorScheme.surfaceContainerLow,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
@@ -1413,6 +1704,109 @@ class _SettlementCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+
+    if (!hasFamilyDetails) return row;
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.45),
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          row,
+          ExpansionTile(
+            tilePadding: const EdgeInsetsDirectional.fromSTEB(14, 0, 10, 0),
+            childrenPadding: const EdgeInsetsDirectional.fromSTEB(
+              18,
+              0,
+              18,
+              12,
+            ),
+            dense: true,
+            title: Text(
+              'household_family_detail'.tr(),
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            children: [
+              if (fromMembers.isNotEmpty)
+                _SettlementFamilyDetail(
+                  rootName: fromName,
+                  members: fromMembers,
+                ),
+              if (fromMembers.isNotEmpty && toMembers.isNotEmpty)
+                const SizedBox(height: 8),
+              if (toMembers.isNotEmpty)
+                _SettlementFamilyDetail(rootName: toName, members: toMembers),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SettlementFamilyDetail extends StatelessWidget {
+  final String rootName;
+  final List<Participant> members;
+
+  const _SettlementFamilyDetail({
+    required this.rootName,
+    required this.members,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          rootName,
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: colors.onSurfaceVariant,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 4),
+        for (final member in members)
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 8, top: 3),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.subdirectory_arrow_right,
+                  size: 16,
+                  color: colors.onSurfaceVariant,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: UserText(
+                    member.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Text(
+                  'household_split_explanation'.tr(
+                    namedArgs: {'count': '${member.directHouseholdSize}'},
+                  ),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }

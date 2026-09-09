@@ -24,6 +24,7 @@ import '../../../core/navigation/route_paths.dart';
 import '../../../core/navigation/route_transition_ready.dart';
 import '../../../core/widgets/missing_route_page.dart';
 import '../../../core/repository/repository_providers.dart';
+import '../../../core/services/household_service.dart';
 import '../../../core/services/settle_up_service.dart';
 import '../../../core/telemetry/telemetry_service.dart';
 import '../../../core/theme/accent_style.dart';
@@ -270,6 +271,35 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage>
                           ],
                         ),
                       if (!group.isPersonal)
+                        const SizedBox(height: ThemeConfig.spacingL),
+
+                      // ── Household counting ──
+                      if (!group.isPersonal && canEditSettings)
+                        _buildSection(
+                          context,
+                          title: 'household_counting'.tr(),
+                          children: [
+                            SwitchListTile.adaptive(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text('household_counting_title'.tr()),
+                              subtitle: Text(
+                                group.householdCountingEnabled
+                                    ? 'household_counting_enabled_hint'.tr()
+                                    : 'household_counting_disabled_hint'.tr(),
+                              ),
+                              value: group.householdCountingEnabled,
+                              onChanged: _saving
+                                  ? null
+                                  : (value) =>
+                                        _onHouseholdChanged(ref, group, value),
+                            ),
+                            Text(
+                              'household_counting_example'.tr(),
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      if (!group.isPersonal && canEditSettings)
                         const SizedBox(height: ThemeConfig.spacingL),
 
                       // ── Permissions Section (online only, group only) ──
@@ -1714,6 +1744,32 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage>
     }
   }
 
+  Future<void> _onHouseholdChanged(
+    WidgetRef ref,
+    Group group,
+    bool enabled,
+  ) async {
+    try {
+      await _withSaving(() async {
+        await ref
+            .read(groupRepositoryProvider)
+            .update(
+              group.copyWith(
+                householdCountingEnabled: enabled,
+                updatedAt: DateTime.now(),
+              ),
+            );
+        ref.invalidate(futureGroupProvider(widget.groupId));
+        Log.info(
+          'Household counting changed: groupId=${widget.groupId} enabled=$enabled',
+        );
+      });
+    } catch (e, st) {
+      Log.warning('Household counting change failed', error: e, stackTrace: st);
+      if (mounted) context.showError('generic_error'.tr());
+    }
+  }
+
   Future<void> _showShareAsGroup(
     BuildContext context,
     Group group,
@@ -1988,6 +2044,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage>
     if (ok != true || !context.mounted) return;
     try {
       await _withSaving(() async {
+        await _preserveHouseholdBeforeLeave(ref);
         await ref.read(groupMemberRepositoryProvider).leave(widget.groupId);
         TelemetryService.sendEvent('member_left', {
           'groupId': widget.groupId,
@@ -2003,6 +2060,85 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage>
       if (context.mounted) {
         context.showError('generic_error'.tr());
       }
+    }
+  }
+
+  /// Keep the shared directory valid when the signed-in participant leaves.
+  /// The leave RPC removes the membership and archives the participant, so
+  /// direct child branches must be promoted before that server-side change.
+  Future<void> _preserveHouseholdBeforeLeave(WidgetRef ref) async {
+    final member = await ref.read(
+      myMemberInGroupProvider(widget.groupId).future,
+    );
+    final participantId = member?.participantId;
+    if (participantId == null) return;
+    final participant = await ref
+        .read(participantRepositoryProvider)
+        .getById(participantId);
+    if (participant == null) return;
+    final group = await ref
+        .read(groupRepositoryProvider)
+        .getById(widget.groupId);
+    final allParticipants = await ref
+        .read(participantRepositoryProvider)
+        .getByGroupId(widget.groupId);
+    final children =
+        allParticipants
+            .where((p) => p.parentParticipantId == participant.id)
+            .toList()
+          ..sort((a, b) => a.order.compareTo(b.order));
+    if (children.isEmpty) return;
+
+    if (group?.householdCountingEnabled == true) {
+      final reassignmentRepo = ref.read(
+        householdBalanceReassignmentRepositoryProvider,
+      );
+      final existing = await reassignmentRepo.getByGroupId(widget.groupId);
+      final expenses = await ref
+          .read(expenseRepositoryProvider)
+          .getByGroupId(widget.groupId);
+      final parentBalance =
+          HouseholdService.applyReassignments(
+            balances: computeBalances(
+              allParticipants,
+              expenses,
+              group!.currencyCode,
+            ),
+            reassignments: existing,
+          ).firstWhere(
+            (balance) => balance.participantId == participant.id,
+            orElse: () => ParticipantBalance(
+              participantId: participant.id,
+              balanceCents: 0,
+              currencyCode: group.currencyCode,
+            ),
+          );
+      final weights = <String, int>{
+        for (final child in children)
+          child.id: HouseholdService.subtreeSize(child.id, allParticipants),
+      };
+      final totalWeight = weights.values.fold<int>(0, (a, b) => a + b);
+      var assigned = 0;
+      for (var i = 0; i < children.length; i++) {
+        final child = children[i];
+        final amount = i == children.length - 1
+            ? parentBalance.balanceCents - assigned
+            : (parentBalance.balanceCents * weights[child.id]! / totalWeight)
+                  .round();
+        assigned += amount;
+        await reassignmentRepo.create(
+          groupId: widget.groupId,
+          sourceParticipantId: participant.id,
+          targetParticipantId: child.id,
+          amountCents: amount,
+        );
+      }
+    }
+
+    for (final child in children) {
+      await ref
+          .read(participantRepositoryProvider)
+          .update(child.copyWith(clearParentParticipantId: true));
     }
   }
 }

@@ -46,6 +46,9 @@ Future<void> runBackupExportFlow(BuildContext context, WidgetRef ref) async {
     participantRepo: ref.read(participantRepositoryProvider),
     expenseRepo: ref.read(expenseRepositoryProvider),
     tagRepo: ref.read(tagRepositoryProvider),
+    householdReassignmentRepo: ref.read(
+      householdBalanceReassignmentRepositoryProvider,
+    ),
     effectiveLocalOnly: ref.read(effectiveLocalOnlyProvider),
   );
 

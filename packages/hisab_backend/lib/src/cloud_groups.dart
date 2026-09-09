@@ -31,4 +31,14 @@ abstract interface class CloudGroups {
 
   /// Soft-removes a participant, preserving their expense history.
   Future<void> archiveParticipant(String groupId, String participantId);
+
+  /// Moves a participant within the recursive household tree and updates the
+  /// number of unnamed dependents represented by that row. The backend must
+  /// validate same-group references, cycles, and the caller's family scope.
+  Future<void> setParticipantHousehold(
+    String groupId,
+    String participantId,
+    String? parentParticipantId,
+    int unnamedDependentCount,
+  );
 }

@@ -18,7 +18,35 @@ mixin _ExpenseFormSplitLogicMixin on ConsumerState<ExpenseFormPage> {
 
   _ExpenseFormPageState get _splitForm => this as _ExpenseFormPageState;
 
+  int _unitCount(Participant participant) {
+    if (!_splitForm._householdMode) return 1;
+    final count =
+        _splitForm._loadedHouseholdSnapshot?.includedUnitCounts[participant
+            .id] ??
+        participant.directHouseholdSize;
+    return count < 1 ? 1 : count;
+  }
+
+  int _includedUnitCount(List<Participant> participants) => participants
+      .where((p) => _splitForm._includedInSplitIds.contains(p.id))
+      .fold<int>(0, (sum, p) => sum + _unitCount(p));
+
   String _formatCentsAsAmount(int cents) => (cents / 100).toStringAsFixed(2);
+
+  /// Format a household row's per-person amount.  A row with multiple units
+  /// can represent a fractional cent per person (for example, 1.00 split
+  /// across three units).  Keep the ordinary two-decimal currency look when
+  /// it divides cleanly, but retain enough precision for the weighted total
+  /// to round back to the exact expense amount.
+  String _formatPerPersonAmount(int rowCents, int units) {
+    if (units <= 1 || rowCents % units == 0) {
+      return _formatCentsAsAmount(units <= 1 ? rowCents : rowCents ~/ units);
+    }
+    var value = (rowCents / units / 100).toStringAsFixed(6);
+    value = value.replaceFirst(RegExp(r'0+$'), '');
+    value = value.replaceFirst(RegExp(r'\.$'), '');
+    return value.isEmpty ? '0' : value;
+  }
 
   /// When an amount field loses focus with 0 or empty, fill with remainder.
   void _handleAmountFieldUnfocused(Participant p) {
@@ -45,13 +73,16 @@ mixin _ExpenseFormSplitLogicMixin on ConsumerState<ExpenseFormPage> {
     for (final o in includedList) {
       if (o.id == p.id) continue;
       final ov = double.tryParse(_customSplitValues[o.id]?.trim() ?? '');
-      othersSumCents += (ov != null && ov >= 0) ? (ov * 100).round() : 0;
+      othersSumCents += (ov != null && ov >= 0)
+          ? (ov * 100 * _unitCount(o)).round()
+          : 0;
     }
     final remainderCents = (amountCentsInt - othersSumCents).clamp(
       0,
       amountCentsInt,
     );
-    final fillValue = _formatCentsAsAmount(remainderCents);
+    final units = _unitCount(p);
+    final fillValue = _formatPerPersonAmount(remainderCents, units);
     final ctrl = _splitEditControllers[p.id];
     if (!mounted) return;
     setState(() {
@@ -99,9 +130,11 @@ mixin _ExpenseFormSplitLogicMixin on ConsumerState<ExpenseFormPage> {
     double userSetSum = 0;
     for (final o in userSetOthers) {
       userSetSum +=
-          double.tryParse(_customSplitValues[o.id]?.trim() ?? '0') ?? 0;
+          (double.tryParse(_customSplitValues[o.id]?.trim() ?? '0') ?? 0) *
+          _unitCount(o);
     }
-    final remainder = totalCurrency - val - userSetSum;
+    final remainder =
+        totalCurrency - (val * _unitCount(changedParticipant)) - userSetSum;
     if (remainder <= 0) {
       for (final o in nonUserSetOthers) {
         _customSplitValues[o.id] = '0';
@@ -116,17 +149,25 @@ mixin _ExpenseFormSplitLogicMixin on ConsumerState<ExpenseFormPage> {
     double nonUserSetSum = 0;
     for (final o in nonUserSetOthers) {
       nonUserSetSum +=
-          double.tryParse(_customSplitValues[o.id]?.trim() ?? '0') ?? 0;
+          (double.tryParse(_customSplitValues[o.id]?.trim() ?? '0') ?? 0) *
+          _unitCount(o);
     }
     if (nonUserSetSum <= 0) {
       final remainderCents = (remainder * 100).round();
-      final k = nonUserSetOthers.length;
-      final baseCents = k > 0 ? remainderCents ~/ k : 0;
-      final rem = k > 0 ? remainderCents - baseCents * k : 0;
+      final totalUnits = nonUserSetOthers.fold<int>(
+        0,
+        (sum, p) => sum + _unitCount(p),
+      );
+      final baseCents = totalUnits > 0 ? remainderCents ~/ totalUnits : 0;
+      final rem = totalUnits > 0 ? remainderCents - baseCents * totalUnits : 0;
+      var remainingExtra = rem;
       for (var i = 0; i < nonUserSetOthers.length; i++) {
         final o = nonUserSetOthers[i];
-        final shareCents = baseCents + (i < rem ? 1 : 0);
-        final s = _formatCentsAsAmount(shareCents);
+        final units = _unitCount(o);
+        final extra = remainingExtra.clamp(0, units);
+        remainingExtra -= extra;
+        final shareCents = baseCents + (units > 0 ? extra ~/ units : 0);
+        final s = _formatPerPersonAmount(shareCents, _unitCount(o));
         _customSplitValues[o.id] = s;
         _splitEditControllers[o.id]?.text = s;
         _splitEditControllers[o.id]?.selection = TextSelection.collapsed(
@@ -140,7 +181,8 @@ mixin _ExpenseFormSplitLogicMixin on ConsumerState<ExpenseFormPage> {
       for (final o in nonUserSetOthers) {
         final ov =
             double.tryParse(_customSplitValues[o.id]?.trim() ?? '0') ?? 0;
-        final targetCents = (remainder * (ov / nonUserSetSum) * 100).round();
+        final targetCents =
+            (remainder * (ov * _unitCount(o) / nonUserSetSum) * 100).round();
         targetCentsList.add(targetCents);
         sumCents += targetCents;
       }
@@ -150,7 +192,7 @@ mixin _ExpenseFormSplitLogicMixin on ConsumerState<ExpenseFormPage> {
       }
       for (var i = 0; i < nonUserSetOthers.length; i++) {
         final o = nonUserSetOthers[i];
-        final s = _formatCentsAsAmount(targetCentsList[i]);
+        final s = _formatPerPersonAmount(targetCentsList[i], _unitCount(o));
         _customSplitValues[o.id] = s;
         _splitEditControllers[o.id]?.text = s;
         _splitEditControllers[o.id]?.selection = TextSelection.collapsed(
@@ -169,34 +211,30 @@ mixin _ExpenseFormSplitLogicMixin on ConsumerState<ExpenseFormPage> {
         .where((p) => _splitForm._includedInSplitIds.contains(p.id))
         .toList();
     if (included.isEmpty) return;
-    final n = included.length;
+    final n = _includedUnitCount(participants);
     if (_splitForm._splitType == SplitType.parts) {
       for (final p in included) {
         _customSplitValues.putIfAbsent(p.id, () => '1');
       }
     } else if (_splitForm._splitType == SplitType.amounts) {
-      final shareStrings = <String>[];
-      if (n > 0 && amountCents >= 0) {
-        final baseCents = amountCents ~/ n;
-        final remainderCents = amountCents - baseCents * n;
-        for (var i = 0; i < n; i++) {
-          final shareCents = baseCents + (i < remainderCents ? 1 : 0);
-          shareStrings.add(_formatCentsAsAmount(shareCents));
-        }
-      }
       for (var i = 0; i < included.length; i++) {
+        final p = included[i];
+        final units = _unitCount(p);
+        final rowCents = n > 0 ? (amountCents * units / n).round() : 0;
         _customSplitValues.putIfAbsent(
-          included[i].id,
-          () => i < shareStrings.length ? shareStrings[i] : '0',
+          p.id,
+          () => _formatPerPersonAmount(rowCents, units),
         );
       }
       // Sync amounts to equal split when total changes, until user touches a field.
       if (amountCents > 0 && n > 0 && !_amountsFieldsTouched) {
-        for (var i = 0; i < included.length; i++) {
-          final s = i < shareStrings.length ? shareStrings[i] : '0';
-          _customSplitValues[included[i].id] = s;
-          _splitEditControllers[included[i].id]?.dispose();
-          _splitEditControllers.remove(included[i].id);
+        for (final p in included) {
+          final units = _unitCount(p);
+          final rowCents = n > 0 ? (amountCents * units / n).round() : 0;
+          final s = _formatPerPersonAmount(rowCents, units);
+          _customSplitValues[p.id] = s;
+          _splitEditControllers[p.id]?.dispose();
+          _splitEditControllers.remove(p.id);
         }
       }
     }

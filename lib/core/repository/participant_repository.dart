@@ -14,6 +14,8 @@ abstract class IParticipantRepository {
     int order, {
     String? userId,
     String? avatarId,
+    String? parentParticipantId,
+    int unnamedDependentCount = 0,
   });
   Future<void> update(Participant participant);
   Future<void> updateProfileByUserId(

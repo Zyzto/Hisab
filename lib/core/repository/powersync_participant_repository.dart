@@ -78,6 +78,8 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
     int order, {
     String? userId,
     String? avatarId,
+    String? parentParticipantId,
+    int unnamedDependentCount = 0,
   }) async {
     final trimmedName = name.trim();
     if (trimmedName.isEmpty || trimmedName.length > 100) {
@@ -85,8 +87,25 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
         'Participant name must be 1–100 characters (got ${trimmedName.length})',
       );
     }
+    if (unnamedDependentCount < 0 || unnamedDependentCount > 999) {
+      throw ArgumentError('unnamedDependentCount must be between 0 and 999');
+    }
     final id = _uuid.v4();
     final now = _nowIso();
+    await _validateHouseholdParticipant(
+      Participant(
+        id: id,
+        groupId: groupId,
+        name: trimmedName,
+        order: order,
+        userId: userId,
+        avatarId: avatarId,
+        parentParticipantId: parentParticipantId,
+        unnamedDependentCount: unnamedDependentCount,
+        createdAt: DateTime.parse(now),
+        updatedAt: DateTime.parse(now),
+      ),
+    );
     final data = <String, dynamic>{
       'id': id,
       'group_id': groupId,
@@ -94,6 +113,8 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
       'sort_order': order,
       'user_id': userId,
       'avatar_id': avatarId,
+      'parent_participant_id': parentParticipantId,
+      'unnamed_dependent_count': unnamedDependentCount,
       'created_at': now,
       'updated_at': now,
     };
@@ -114,8 +135,20 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
     }
 
     await _db.execute(
-      'INSERT INTO participants (id, group_id, name, sort_order, user_id, avatar_id, left_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, groupId, trimmedName, order, userId, avatarId, null, now, now],
+      'INSERT INTO participants (id, group_id, name, sort_order, user_id, avatar_id, left_at, parent_participant_id, unnamed_dependent_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        id,
+        groupId,
+        trimmedName,
+        order,
+        userId,
+        avatarId,
+        null,
+        parentParticipantId,
+        unnamedDependentCount,
+        now,
+        now,
+      ],
     );
     return id;
   }
@@ -128,47 +161,112 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
         'Participant name must be 1–100 characters (got ${trimmedName.length})',
       );
     }
+    if (participant.unnamedDependentCount < 0 ||
+        participant.unnamedDependentCount > 999) {
+      throw ArgumentError('unnamedDependentCount must be between 0 and 999');
+    }
+    if (participant.parentParticipantId == participant.id) {
+      throw ArgumentError('A participant cannot be its own parent');
+    }
+    await _validateHouseholdParticipant(
+      participant.copyWith(name: trimmedName),
+    );
     final now = _nowIso();
 
     final leftAtIso = participant.leftAt?.toUtc().toIso8601String();
+    final existing = await getById(participant.id);
+    final householdChanged =
+        existing == null ||
+        existing.parentParticipantId != participant.parentParticipantId ||
+        existing.unnamedDependentCount != participant.unnamedDependentCount;
+    // A hierarchy edit is authorized by the dedicated backend RPC.  Do not
+    // follow it with a broad participant UPDATE when the only change is the
+    // parent/count fields: members are allowed to maintain their own family
+    // branch even when the group disallows general participant settings edits.
+    final normalChanged =
+        existing == null ||
+        existing.name != trimmedName ||
+        existing.order != participant.order ||
+        existing.avatarId != participant.avatarId ||
+        existing.leftAt != participant.leftAt;
+    final normalUpdates = <String, dynamic>{
+      'name': trimmedName,
+      'sort_order': participant.order,
+      'avatar_id': participant.avatarId,
+      'left_at': leftAtIso,
+      'updated_at': now,
+    };
     if (!_isLocalOnly && _isOnline && _cloud != null) {
-      await _cloud.sync.update('participants', {
-        'name': trimmedName,
-        'sort_order': participant.order,
-        'avatar_id': participant.avatarId,
-        'left_at': leftAtIso,
-        'updated_at': now,
-      }, participant.id);
+      if (householdChanged) {
+        await _cloud.groups.setParticipantHousehold(
+          participant.groupId,
+          participant.id,
+          participant.parentParticipantId,
+          participant.unnamedDependentCount,
+        );
+      }
+      if (normalChanged) {
+        await _cloud.sync.update('participants', normalUpdates, participant.id);
+      }
     } else if (_shouldQueueOffline(
       isLocalOnly: _isLocalOnly,
       isOnline: _isOnline,
     )) {
-      await _enqueue(
-        _db,
-        tableName: 'participants',
-        operation: 'update',
-        rowId: participant.id,
-        data: {
-          'name': trimmedName,
-          'sort_order': participant.order,
-          'avatar_id': participant.avatarId,
-          'left_at': leftAtIso,
-          'updated_at': now,
-        },
-      );
+      if (householdChanged) {
+        await _enqueue(
+          _db,
+          tableName: 'participants',
+          operation: 'set_household',
+          rowId: participant.id,
+          data: {
+            'group_id': participant.groupId,
+            'parent_participant_id': participant.parentParticipantId,
+            'unnamed_dependent_count': participant.unnamedDependentCount,
+          },
+        );
+      }
+      if (normalChanged) {
+        await _enqueue(
+          _db,
+          tableName: 'participants',
+          operation: 'update',
+          rowId: participant.id,
+          data: normalUpdates,
+        );
+      }
     }
 
     await _db.execute(
-      'UPDATE participants SET name = ?, sort_order = ?, avatar_id = ?, left_at = ?, updated_at = ? WHERE id = ?',
+      'UPDATE participants SET name = ?, sort_order = ?, avatar_id = ?, left_at = ?, parent_participant_id = ?, unnamed_dependent_count = ?, updated_at = ? WHERE id = ?',
       [
         trimmedName,
         participant.order,
         participant.avatarId,
         leftAtIso,
+        participant.parentParticipantId,
+        participant.unnamedDependentCount,
         now,
         participant.id,
       ],
     );
+  }
+
+  Future<void> _validateHouseholdParticipant(Participant candidate) async {
+    final parentId = candidate.parentParticipantId;
+    if (parentId == null) return;
+    if (parentId == candidate.id) {
+      throw ArgumentError('A participant cannot be its own parent');
+    }
+    final parent = await getById(parentId);
+    if (parent == null || parent.groupId != candidate.groupId) {
+      throw ArgumentError('Household parent must belong to the same group');
+    }
+    final participants = await getByGroupId(candidate.groupId);
+    final withoutCandidate = participants
+        .where((p) => p.id != candidate.id)
+        .toList();
+    withoutCandidate.add(candidate);
+    HouseholdService.rootByParticipant(withoutCandidate);
   }
 
   @override

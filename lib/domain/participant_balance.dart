@@ -11,4 +11,14 @@ class ParticipantBalance {
     required this.balanceCents,
     required this.currencyCode,
   });
+
+  ParticipantBalance copyWith({
+    String? participantId,
+    int? balanceCents,
+    String? currencyCode,
+  }) => ParticipantBalance(
+    participantId: participantId ?? this.participantId,
+    balanceCents: balanceCents ?? this.balanceCents,
+    currencyCode: currencyCode ?? this.currencyCode,
+  );
 }
