@@ -28,6 +28,7 @@ import '../../../core/navigation/route_paths.dart';
 import '../../../core/platform/network_image_decode.dart';
 import '../../../core/receipt/receipt_scan_capability.dart';
 import '../../../core/update/update_check_providers.dart';
+import '../../../core/update/app_update_helper.dart';
 import '../../../core/services/delete_my_data_service.dart';
 import '../../../core/services/github_user_client.dart';
 import '../../../core/services/notification_service.dart';
@@ -1449,6 +1450,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   onTap: isWeb
                       ? null
                       : () {
+                          if (isStagingBuild) {
+                            if (context.mounted) {
+                              context.showToast('checking_for_updates'.tr());
+                            }
+                            unawaited(
+                              openTestUpdateSource().then((opened) {
+                                if (!opened && context.mounted) {
+                                  context.showToast(
+                                    'could_not_check_for_updates'.tr(),
+                                  );
+                                }
+                              }),
+                            );
+                            return;
+                          }
                           final trigger = ref
                               .read(updateCheckTriggerProvider)
                               .callback;
