@@ -65,6 +65,69 @@ InputDecoration _splitAmountDecoration(
   );
 }
 
+/// Orders participants as a directory tree while retaining their explicit
+/// [Participant.order] within each branch.  The participant stream normally
+/// already has a stable order, but doing this here keeps the split UI correct
+/// when a sync delivers children before their parent (or when an old row has
+/// a missing parent reference).
+List<Participant> _treeOrderedParticipants(List<Participant> participants) {
+  if (participants.length < 2) return participants;
+
+  final inputIndex = <String, int>{};
+  final byId = <String, Participant>{};
+  for (var i = 0; i < participants.length; i++) {
+    final participant = participants[i];
+    inputIndex[participant.id] = i;
+    byId[participant.id] = participant;
+  }
+
+  final childrenByParent = <String, List<Participant>>{};
+  final roots = <Participant>[];
+  for (final participant in participants) {
+    final parentId = participant.parentParticipantId;
+    if (parentId == null ||
+        parentId == participant.id ||
+        !byId.containsKey(parentId)) {
+      roots.add(participant);
+    } else {
+      childrenByParent.putIfAbsent(parentId, () => []).add(participant);
+    }
+  }
+
+  int compareParticipants(Participant a, Participant b) {
+    final order = a.order.compareTo(b.order);
+    return order != 0
+        ? order
+        : (inputIndex[a.id] ?? 0).compareTo(inputIndex[b.id] ?? 0);
+  }
+
+  roots.sort(compareParticipants);
+  for (final children in childrenByParent.values) {
+    children.sort(compareParticipants);
+  }
+
+  final ordered = <Participant>[];
+  final visited = <String>{};
+  void visit(Participant participant) {
+    if (!visited.add(participant.id)) return;
+    ordered.add(participant);
+    for (final child
+        in childrenByParent[participant.id] ?? const <Participant>[]) {
+      visit(child);
+    }
+  }
+
+  for (final root in roots) {
+    visit(root);
+  }
+  // A cycle has no root.  Keep those rows visible rather than dropping them;
+  // the repository validates cycles, but this is safer for stale local data.
+  for (final participant in participants) {
+    visit(participant);
+  }
+  return ordered;
+}
+
 /// Split configuration: participants, include/exclude, custom parts or amounts.
 class ExpenseSplitSection extends StatelessWidget {
   final List<Participant> participants;
@@ -149,16 +212,16 @@ class ExpenseSplitSection extends StatelessWidget {
       }
     }
     final depthById = <String, int>{};
+    final participantById = <String, Participant>{
+      for (final participant in participants) participant.id: participant,
+    };
     for (final p in participants) {
       var depth = 0;
       var parent = p.parentParticipantId;
       final seen = <String>{};
       while (parent != null && seen.add(parent)) {
         depth++;
-        parent = participants
-            .where((candidate) => candidate.id == parent)
-            .firstOrNull
-            ?.parentParticipantId;
+        parent = participantById[parent]?.parentParticipantId;
       }
       depthById[p.id] = depth;
     }
@@ -178,6 +241,13 @@ class ExpenseSplitSection extends StatelessWidget {
     final isCustomSplit =
         splitType == SplitType.parts || splitType == SplitType.amounts;
     final (currencySymbol, symbolOnLeft) = _currencySymbol();
+    final rowParticipants = householdEnabled
+        ? _treeOrderedParticipants(participants)
+        : participants;
+    final shareByParticipantId = <String, int>{};
+    for (var i = 0; i < participants.length && i < sharesCents.length; i++) {
+      shareByParticipantId[participants[i].id] = sharesCents[i];
+    }
 
     final segmentChildren = <SplitType, Widget>{
       for (final type in SplitType.values)
@@ -236,6 +306,40 @@ class ExpenseSplitSection extends StatelessWidget {
           curve: Curves.easeInOut,
           onValueChanged: onSplitTypeChanged,
         ),
+        if (householdEnabled) ...[
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsetsDirectional.fromSTEB(12, 10, 12, 10),
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer.withValues(alpha: 0.45),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: colorScheme.primary.withValues(alpha: 0.22),
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.account_tree_outlined,
+                  size: 18,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'household_counting_enabled_hint'.tr(),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onPrimaryContainer,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
         Container(
           decoration: AccentSurfaces.flatPanel(
@@ -244,14 +348,22 @@ class ExpenseSplitSection extends StatelessWidget {
           ),
           clipBehavior: Clip.antiAlias,
           child: Column(
-            children: List.generate(participants.length, (i) {
-              final p = participants[i];
+            children: List.generate(rowParticipants.length, (i) {
+              final p = rowParticipants[i];
               final unitCount = householdUnitCounts[p.id] ?? 1;
-              final cents = i < sharesCents.length ? sharesCents[i] : 0;
+              final cents = shareByParticipantId[p.id] ?? 0;
               final included = includedInSplitIds.contains(p.id);
               final branchIds = <String>[p.id, ...descendantsOf(p.id)];
               final branchIsIncluded = branchIds.every(
                 includedInSplitIds.contains,
+              );
+              final branchHasIncluded = branchIds.any(
+                includedInSplitIds.contains,
+              );
+              final hasChildren = childrenByParent[p.id]?.isNotEmpty == true;
+              final branchUnitCount = branchIds.fold<int>(
+                0,
+                (sum, id) => sum + (householdUnitCounts[id] ?? 1),
               );
               final controller = getOrCreateController(p);
               final focusNode = getOrCreateFocusNode(p);
@@ -357,14 +469,20 @@ class ExpenseSplitSection extends StatelessWidget {
                     children: [
                       Center(
                         child: Checkbox(
-                          value: included,
+                          value: hasChildren
+                              ? (branchIsIncluded
+                                    ? true
+                                    : (branchHasIncluded ? null : false))
+                              : included,
+                          tristate: hasChildren,
                           onChanged: (value) {
-                            final next = value ?? false;
-                            if (childrenByParent[p.id]?.isNotEmpty == true) {
+                            // An indeterminate family row becomes selected on
+                            // the first tap, which is the least surprising
+                            // way to recover a partially selected branch.
+                            final next = value ?? true;
+                            if (hasChildren) {
                               for (final id in branchIds) {
-                                final branchParticipant = participants
-                                    .where((candidate) => candidate.id == id)
-                                    .firstOrNull;
+                                final branchParticipant = participantById[id];
                                 if (branchParticipant != null) {
                                   onIncludeChanged(branchParticipant, next);
                                 }
@@ -396,7 +514,21 @@ class ExpenseSplitSection extends StatelessWidget {
                       Expanded(
                         child: InkWell(
                           borderRadius: BorderRadius.circular(_kSplitRadius),
-                          onTap: () => onIncludeChanged(p, !included),
+                          onTap: () {
+                            final next = hasChildren
+                                ? !branchIsIncluded
+                                : !included;
+                            if (hasChildren) {
+                              for (final id in branchIds) {
+                                final branchParticipant = participantById[id];
+                                if (branchParticipant != null) {
+                                  onIncludeChanged(branchParticipant, next);
+                                }
+                              }
+                            } else {
+                              onIncludeChanged(p, next);
+                            }
+                          },
                           child: Align(
                             alignment: AlignmentDirectional.centerStart,
                             child: Column(
@@ -417,7 +549,7 @@ class ExpenseSplitSection extends StatelessWidget {
                                     childrenByParent[p.id]?.isNotEmpty == true)
                                   Text(
                                     branchIsIncluded
-                                        ? 'household_total'.tr()
+                                        ? '${'household_total'.tr()} · ${'household_people_count'.tr(namedArgs: {'count': '$branchUnitCount'})}'
                                         : 'named_dependents'.tr(),
                                     style: theme.textTheme.labelSmall?.copyWith(
                                       color: colorScheme.onSurfaceVariant,

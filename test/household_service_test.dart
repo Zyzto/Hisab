@@ -151,6 +151,19 @@ void main() {
     expect(parsed?.splitType, SplitType.amounts);
     expect(parsed?.includedUnitCounts, {'a': 3, 'b': 1});
     expect(parsed?.perPersonInputs['a'], '10.00');
+    expect(parsed?.parentParticipantIds, isEmpty);
+  });
+
+  test('snapshot round-trips captured parent ids', () {
+    const snapshot = HouseholdSplitSnapshot(
+      splitType: SplitType.equal,
+      includedUnitCounts: {'parent': 1, 'child': 1},
+      parentParticipantIds: {'parent': null, 'child': 'parent'},
+    );
+    final parsed = HouseholdSplitSnapshot.fromJsonString(
+      snapshot.toJsonString(),
+    );
+    expect(parsed?.parentParticipantIds, {'parent': null, 'child': 'parent'});
   });
 
   test('transfer endpoints stay participant-to-participant', () {

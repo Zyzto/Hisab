@@ -1,7 +1,7 @@
 name: hisab
 description: "Group expense splitting and settle-up app."
 publish_to: 'none'
-version: 0.7.19+90
+version: 0.7.20+91
 
 environment:
   sdk: ^3.11.0
@@ -33,11 +33,6 @@ dependencies:
     path: packages/hisab_backend
   hisab_cloud:
     path: packages/hisab_cloud
-  safaeh:
-    git:
-      url: https://github.com/Zyzto/Safaeh.git
-      ref: v0.2.0
-
   # Local database
   powersync: ^2.3.3
   path_provider: ^2.1.2
@@ -54,7 +49,6 @@ dependencies:
   # Brand marks (Google/GitHub) that must stay crisp at any density.
   flutter_svg: ^2.3.0
   custom_sliding_segmented_control: ^1.8.5
-  toastification: ^3.0.3
   fl_chart: ^1.1.1
   flame: ^1.38.0
 
@@ -83,7 +77,13 @@ dependencies:
   flutter_settings_framework:
     git:
       url: https://github.com/Zyzto/edadat.git
-      ref: v0.7.1
+      ref: v0.8.0
+  # Safaeh is also pulled by Edadat; pin the same release directly because the
+  # app uses its shared shell widgets throughout the UI.
+  safaeh:
+    git:
+      url: https://github.com/Zyzto/Safaeh.git
+      ref: v0.2.5
 
   # About (version, licenses)
   package_info_plus: ^10.2.1
@@ -145,6 +145,12 @@ dev_dependencies:
 # Tracked: langchain_google latest (0.7.1+2) still needs googleai_dart 3.0.0 — ApiException.code renamed in 3.6.
 dependency_overrides:
   googleai_dart: 3.0.0
+  # Edadat 0.8.0 uses the hosted Safaeh constraint for pub.dev publishing;
+  # the app consumes the newer tagged Safaeh release until it is published.
+  safaeh:
+    git:
+      url: https://github.com/Zyzto/Safaeh.git
+      ref: v0.2.5
 
 flutter_launcher_icons:
   android: true

@@ -510,6 +510,13 @@ String? remapHouseholdSplitSnapshotJson(
     final id = participantIds[entry.key];
     if (id != null) inputs[id] = entry.value;
   }
+  final parents = <String, String?>{};
+  for (final entry in snapshot.parentParticipantIds.entries) {
+    final id = participantIds[entry.key];
+    if (id == null) continue;
+    final parentId = entry.value == null ? null : participantIds[entry.value!];
+    parents[id] = parentId;
+  }
   return HouseholdSplitSnapshot(
     version: snapshot.version,
     splitType: snapshot.splitType,
@@ -518,6 +525,7 @@ String? remapHouseholdSplitSnapshotJson(
         entry.key: int.tryParse(entry.value) ?? 1,
     },
     perPersonInputs: inputs,
+    parentParticipantIds: parents,
   ).toJsonString();
 }
 

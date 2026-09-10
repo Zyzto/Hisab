@@ -1,7 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
-import 'package:toastification/toastification.dart';
+import 'package:safaeh/safaeh.dart';
 
 import '../utils/error_report_helper.dart';
 import '../utils/user_text.dart';
@@ -10,33 +10,33 @@ import 'user_text.dart';
 /// Max graphemes to show in error toast title.
 const int _errorToastMessageMaxGraphemes = 120;
 
-/// Unified toast API over [toastification]. Use these extensions instead of
+/// Hisab's app adapter over Safaeh feedback. Use these extensions instead of
 /// [ScaffoldMessenger.showSnackBar] for consistent styling and behavior.
 extension ToastContext on BuildContext {
-  /// Shows a toast with optional [duration] and [type]. Default: 4s, info.
-  void showToast(
-    String message, {
-    Duration? duration,
-    ToastificationType? type,
-  }) {
-    if (!mounted) return;
-    toastification.show(
-      context: this,
-      title: UserText(message),
-      type: type ?? ToastificationType.info,
-      style: ToastificationStyle.flat,
-      autoCloseDuration: duration ?? const Duration(seconds: 4),
+  /// Shows an informational toast with an optional [duration].
+  void showToast(String message, {Duration? duration}) {
+    showSafaehFeedback(
+      message,
+      duration: duration ?? const Duration(seconds: 4),
     );
   }
 
   /// Shows a success toast (e.g. "Copied", "Saved").
   void showSuccess(String message, {Duration? duration}) {
-    showToast(message, duration: duration, type: ToastificationType.success);
+    showSafaehFeedback(
+      message,
+      type: SafaehFeedbackType.success,
+      duration: duration ?? const Duration(seconds: 4),
+    );
   }
 
   /// Shows an error toast (no actions).
   void showError(String message, {Duration? duration}) {
-    showToast(message, duration: duration, type: ToastificationType.error);
+    showSafaehFeedback(
+      message,
+      type: SafaehFeedbackType.error,
+      duration: duration ?? const Duration(seconds: 4),
+    );
   }
 
   /// Shows an error toast with Share and Report issue actions.
@@ -58,100 +58,81 @@ extension ToastContext on BuildContext {
       trimInput: false,
     );
     final surfaceContext = this;
-    toastification.showCustom(
-      context: this,
-      alignment: Alignment.bottomCenter,
-      autoCloseDuration: duration ?? const Duration(seconds: 8),
-      builder: (context, holder) {
+    showSafaehCustomFeedback(
+      duration: duration ?? const Duration(seconds: 8),
+      builder: (context, dismiss) {
         final theme = Theme.of(context);
         final colorScheme = theme.colorScheme;
-        return Material(
-          color: colorScheme.errorContainer,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 24,
-                      color: colorScheme.onErrorContainer,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: UserText(
-                        displayMessage,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onErrorContainer,
-                        ),
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
+        return SafaehFeedbackSurface(
+          type: SafaehFeedbackType.error,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              UserText(
+                displayMessage,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onErrorContainer,
                 ),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () async {
-                        // Remove overlay before native share sheet so Android does not
-                        // keep a stale hit target over the bottom of the screen.
-                        toastification.dismiss(holder);
-                        try {
-                          await shareErrorReport(
-                            surfaceContext,
-                            message: message,
-                            details: details,
-                            stackTrace: stackTrace,
-                            summaryEnglish: summaryEnglish,
-                            uiLocaleTag: uiLocaleTag,
-                          );
-                        } catch (e) {
-                          Log.debug('Share from error toast failed', error: e);
-                        }
-                      },
-                      child: Text('share'.tr()),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton(
-                      onPressed: () async {
-                        toastification.dismiss(holder);
-                        try {
-                          await openErrorReportGitHubIssue(
-                            surfaceContext,
-                            message: message,
-                            details: details,
-                            stackTrace: stackTrace,
-                            summaryEnglish: summaryEnglish,
-                            uiLocaleTag: uiLocaleTag,
-                            onCopied: () {
-                              if (surfaceContext.mounted) {
-                                surfaceContext.showSuccess(
-                                  'logs_copied_paste'.tr(),
-                                );
-                              }
-                            },
-                          );
-                        } catch (e) {
-                          Log.debug(
-                            'Report issue from error toast failed',
-                            error: e,
-                          );
-                        }
-                      },
-                      child: Text('report_issue'.tr()),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () async {
+                      // Remove overlay before native share sheet so Android does not
+                      // keep a stale hit target over the bottom of the screen.
+                      dismiss();
+                      try {
+                        await shareErrorReport(
+                          surfaceContext,
+                          message: message,
+                          details: details,
+                          stackTrace: stackTrace,
+                          summaryEnglish: summaryEnglish,
+                          uiLocaleTag: uiLocaleTag,
+                        );
+                      } catch (e) {
+                        Log.debug('Share from error toast failed', error: e);
+                      }
+                    },
+                    child: Text('share'.tr()),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: () async {
+                      dismiss();
+                      try {
+                        await openErrorReportGitHubIssue(
+                          surfaceContext,
+                          message: message,
+                          details: details,
+                          stackTrace: stackTrace,
+                          summaryEnglish: summaryEnglish,
+                          uiLocaleTag: uiLocaleTag,
+                          onCopied: () {
+                            if (surfaceContext.mounted) {
+                              surfaceContext.showSuccess(
+                                'logs_copied_paste'.tr(),
+                              );
+                            }
+                          },
+                        );
+                      } catch (e) {
+                        Log.debug(
+                          'Report issue from error toast failed',
+                          error: e,
+                        );
+                      }
+                    },
+                    child: Text('report_issue'.tr()),
+                  ),
+                ],
+              ),
+            ],
           ),
         );
       },
@@ -166,56 +147,38 @@ extension ToastContext on BuildContext {
     Duration? duration,
   }) {
     if (!mounted) return;
-    toastification.showCustom(
-      context: this,
-      alignment: Alignment.bottomCenter,
-      autoCloseDuration: duration ?? const Duration(seconds: 8),
-      builder: (context, holder) {
+    showSafaehCustomFeedback(
+      duration: duration ?? const Duration(seconds: 8),
+      builder: (context, dismiss) {
         final theme = Theme.of(context);
         final colorScheme = theme.colorScheme;
-        return Material(
-          color: colorScheme.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.screenshot_outlined,
-                      size: 24,
-                      color: colorScheme.primary,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: UserText(
-                        message,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onSurface,
-                        ),
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
+        return SafaehFeedbackSurface(
+          type: SafaehFeedbackType.info,
+          icon: Icons.screenshot_outlined,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              UserText(
+                message,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurface,
                 ),
-                const SizedBox(height: 12),
-                Align(
-                  alignment: AlignmentDirectional.centerEnd,
-                  child: FilledButton(
-                    onPressed: () {
-                      toastification.dismiss(holder);
-                      onAction();
-                    },
-                    child: Text(actionLabel),
-                  ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: FilledButton(
+                  onPressed: () {
+                    dismiss();
+                    onAction();
+                  },
+                  child: Text(actionLabel),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
@@ -232,53 +195,17 @@ extension ToastContext on BuildContext {
     Duration? duration,
     IconData icon = Icons.undo,
   }) {
-    if (!mounted) return;
-    toastification.showCustom(
-      context: this,
-      alignment: Alignment.bottomCenter,
-      autoCloseDuration: duration ?? const Duration(seconds: 8),
-      builder: (context, holder) {
-        final theme = Theme.of(context);
-        final colorScheme = theme.colorScheme;
-        return Material(
-          color: colorScheme.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Icon(icon, color: colorScheme.primary),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: UserText(
-                    message,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurface,
-                    ),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                TextButton(
-                  onPressed: () {
-                    toastification.dismiss(holder);
-                    onAction();
-                  },
-                  child: UserText(actionLabel),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+    showSafaehFeedbackWithAction(
+      message,
+      actionLabel: actionLabel,
+      onAction: onAction,
+      duration: duration ?? const Duration(seconds: 8),
+      icon: icon,
     );
   }
 
   /// Dismisses all visible toasts. Use before showing a replacement (e.g. sync status).
   void dismissAllToasts() {
-    if (!mounted) return;
-    toastification.dismissAll(delayForAnimation: true);
+    dismissSafaehFeedbacks();
   }
 }

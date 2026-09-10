@@ -7,6 +7,7 @@ import '../../../core/layout/constrained_content.dart';
 import '../../../core/layout/content_aligned_fab_location.dart';
 import '../../../core/widgets/app_fab.dart';
 import '../../../core/widgets/sheet_helpers.dart';
+import '../../../core/widgets/toast.dart';
 import '../../../core/widgets/user_text.dart';
 import '../domain/scanner_pattern.dart';
 import '../providers/scanner_providers.dart';
@@ -453,9 +454,7 @@ class _PatternEditorPageState extends ConsumerState<_PatternEditorPage> {
 
   void _save() {
     if (_nameCtrl.text.trim().isEmpty || _amountCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('scanner_pattern_required_fields'.tr())),
-      );
+      context.showError('scanner_pattern_required_fields'.tr());
       return;
     }
 

@@ -28,11 +28,16 @@ class HouseholdSplitSnapshot {
   final Map<String, int> includedUnitCounts;
   final Map<String, String> perPersonInputs;
 
+  /// Parent ids captured at the time of the expense.  This keeps the detail
+  /// view's directory stable if someone is reparented later.
+  final Map<String, String?> parentParticipantIds;
+
   const HouseholdSplitSnapshot({
     this.version = 1,
     required this.splitType,
     required this.includedUnitCounts,
     this.perPersonInputs = const {},
+    this.parentParticipantIds = const {},
   });
 
   String toJsonString() => jsonEncode({
@@ -40,6 +45,8 @@ class HouseholdSplitSnapshot {
     'split_type': splitType.name,
     'included_unit_counts': includedUnitCounts,
     'per_person_inputs': perPersonInputs,
+    if (parentParticipantIds.isNotEmpty)
+      'parent_participant_ids': parentParticipantIds,
   });
 
   static HouseholdSplitSnapshot? fromJsonString(String? value) {
@@ -49,6 +56,7 @@ class HouseholdSplitSnapshot {
       if (decoded is! Map) return null;
       final rawCounts = decoded['included_unit_counts'];
       final rawInputs = decoded['per_person_inputs'];
+      final rawParents = decoded['parent_participant_ids'];
       final counts = rawCounts is Map
           ? rawCounts.map(
               (key, val) => MapEntry(key.toString(), (val as num).toInt()),
@@ -59,6 +67,16 @@ class HouseholdSplitSnapshot {
               (key, val) => MapEntry(key.toString(), val.toString()),
             )
           : <String, String>{};
+      final parents = rawParents is Map
+          ? rawParents.map(
+              (key, value) => MapEntry(
+                key.toString(),
+                value == null || value.toString().isEmpty
+                    ? null
+                    : value.toString(),
+              ),
+            )
+          : <String, String?>{};
       final splitType = switch (decoded['split_type']?.toString()) {
         'parts' => SplitType.parts,
         'amounts' => SplitType.amounts,
@@ -69,6 +87,7 @@ class HouseholdSplitSnapshot {
         splitType: splitType,
         includedUnitCounts: counts,
         perPersonInputs: inputs,
+        parentParticipantIds: parents,
       );
     } catch (_) {
       return null;

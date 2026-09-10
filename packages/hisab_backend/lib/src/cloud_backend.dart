@@ -1,5 +1,6 @@
 import 'cloud_account.dart';
 import 'cloud_auth.dart';
+import 'cloud_billing.dart';
 import 'cloud_files.dart';
 import 'cloud_groups.dart';
 import 'cloud_health.dart';
@@ -11,10 +12,11 @@ import 'cloud_telemetry.dart';
 /// Everything Hisab needs from a server.
 ///
 /// A build either has one of these or runs fully offline; there is no partial
-/// mode. Implement all nine facets, then call [registerCloudBackend] from your
+/// mode. Implement all ten facets, then call [registerCloudBackend] from your
 /// package's entry point.
 abstract interface class CloudBackend {
   CloudAuth get auth;
+  CloudBilling get billing;
   CloudSync get sync;
   CloudGroups get groups;
   CloudInvites get invites;

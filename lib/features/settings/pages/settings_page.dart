@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:flutter_settings_framework/flutter_settings_framework.dart';
+import 'package:flutter_settings_framework/safaeh.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
@@ -25,6 +26,7 @@ import '../../../core/layout/responsive_sheet.dart';
 import 'package:hisab_backend/hisab_backend.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/navigation/shell_nav_layout.dart';
 import '../../../core/platform/network_image_decode.dart';
 import '../../../core/receipt/receipt_scan_capability.dart';
 import '../../../core/update/update_check_providers.dart';
@@ -48,6 +50,7 @@ import '../widgets/setting_tile_helper.dart';
 import '../../transaction_scanner/pages/scanner_hub_page.dart';
 import '../../transaction_scanner/providers/scanner_providers.dart';
 import '../../transaction_scanner/services/notification_bridge.dart';
+import '../../billing/widgets/billing_plus_card.dart';
 import '../sections/settings_functional_section.dart';
 import '../sections/settings_privacy_section.dart';
 import '../sections/settings_advanced_section.dart';
@@ -72,8 +75,6 @@ class SettingsPage extends ConsumerStatefulWidget {
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   final Map<String, bool> _sectionExpanded = {};
   final _scrollController = ScrollController();
-  final _searchController = TextEditingController();
-  final _searchFocusNode = FocusNode();
   final _anchors = SettingAnchorRegistry();
   final Map<String, GlobalKey> _sectionKeys = {
     'account': GlobalKey(),
@@ -90,7 +91,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   String? _activeSectionId;
   bool _programmaticScroll = false;
   int _scrollGeneration = 0;
-  String _searchQuery = '';
+  bool _searchExpanded = false;
 
   static const List<Locale> _supportedLocales = [Locale('en'), Locale('ar')];
 
@@ -110,7 +111,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   @override
   void initState() {
     super.initState();
-    _searchController.addListener(_onSearchChanged);
   }
 
   @override
@@ -128,16 +128,24 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   @override
   void dispose() {
     _routerDelegate?.removeListener(_consumeSettingsFocusQuery);
-    _searchController.dispose();
-    _searchFocusNode.dispose();
     _scrollController.dispose();
     _anchors.dispose();
     super.dispose();
   }
 
-  void _onSearchChanged() {
-    final query = _searchController.text.trim();
-    if (query != _searchQuery) setState(() => _searchQuery = query);
+  bool _isSettingsPath(String path) {
+    return path == RoutePaths.settings ||
+        path.startsWith('${RoutePaths.settings}/');
+  }
+
+  void _openSearch() {
+    if (_searchExpanded) return;
+    setState(() => _searchExpanded = true);
+  }
+
+  void _closeSearch() {
+    if (!_searchExpanded) return;
+    setState(() => _searchExpanded = false);
   }
 
   bool _isExpanded(SettingSection section) {
@@ -306,6 +314,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final router = GoRouter.maybeOf(context);
     if (router == null) return;
     final uri = router.routerDelegate.currentConfiguration.uri;
+    if (!_isSettingsPath(uri.path)) {
+      if (_searchExpanded) _closeSearch();
+      return;
+    }
     final focus = uri.queryParameters[RoutePaths.settingsFocusParam];
     if (focus == null || focus.isEmpty) {
       _consumedFocusKey = null;
@@ -344,15 +356,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final jumpKey = _searchJumpAliases[settingKey] ?? settingKey;
     final token = ++_scrollGeneration;
     setState(() {
-      _searchController.clear();
-      _searchQuery = '';
+      _searchExpanded = false;
       _programmaticScroll = true;
       if (sectionKey != null) {
         _activeSectionId = sectionKey;
         _sectionExpanded[sectionKey] = true;
       }
     });
-    _searchFocusNode.unfocus();
 
     await Future<void>.delayed(const Duration(milliseconds: 220));
     await WidgetsBinding.instance.endOfFrame;
@@ -443,12 +453,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         (_activeSectionId != null && entryIds.contains(_activeSectionId))
         ? _activeSectionId
         : entries.firstOrNull?.id;
-    final hasSearch = _searchQuery.isNotEmpty;
 
     return LayoutBuilder(
       builder: (context, layoutConstraints) {
         final showSideIndex =
-            !hasSearch &&
+            !_searchExpanded &&
             _canShowSideIndex(context, layoutConstraints.maxWidth);
         return Scaffold(
           appBar: ContentAlignedAppBar(
@@ -459,6 +468,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             actions: [
               if (ShellAppBarLeading.syncInActions(context))
                 const SyncStatusChip(),
+              SafaehSettingsSearchButton(
+                isOpen: _searchExpanded,
+                onPressed: _searchExpanded ? _closeSearch : _openSearch,
+                hintText: 'search'.tr(),
+              ),
             ],
           ),
           body: ConstrainedContent(
@@ -469,56 +483,64 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     onSelect: _jumpToSection,
                   )
                 : null,
-            child: Column(
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                  child: SettingsSearchBar(
-                    mode: SettingsSearchBarMode.persistent,
-                    hintText: 'settings_search_hint'.tr(),
-                    controller: _searchController,
-                    focusNode: _searchFocusNode,
-                    onChanged: (_) {},
-                  ),
-                ),
-                Expanded(
-                  child: Stack(
-                    children: [
-                      NotificationListener<ScrollNotification>(
-                        onNotification: (n) => _onScroll(n, entries),
-                        child: hasSearch
-                            ? ListView(
-                                padding: const EdgeInsets.only(bottom: 32),
-                                children: _buildSearchBody(settings),
-                              )
-                            : ListView(
-                                key: const PageStorageKey<String>(
-                                  'settings_list',
-                                ),
-                                controller: _scrollController,
-                                // Keep section cards mounted so index jumps
-                                // don't need multi-step probes.
-                                cacheExtent: 2400,
-                                padding: EdgeInsets.only(
-                                  bottom: showSideIndex ? 32 : 88,
-                                ),
-                                children: _buildBrowseChildren(
-                                  context,
-                                  ref,
-                                  settings,
-                                  showReceiptAi: showReceiptAi,
-                                  showScanner: showScanner,
-                                ),
+                Column(
+                  children: [
+                    Expanded(
+                      child: Stack(
+                        children: [
+                          NotificationListener<ScrollNotification>(
+                            onNotification: (n) => _onScroll(n, entries),
+                            child: ListView(
+                              key: const PageStorageKey<String>(
+                                'settings_list',
                               ),
+                              controller: _scrollController,
+                              // Keep section cards mounted so index jumps don't
+                              // need multi-step probes.
+                              cacheExtent: 2400,
+                              padding: EdgeInsets.only(
+                                bottom:
+                                    (showSideIndex ? 32 : 88) +
+                                    ShellNavLayout.bottomNavListInset(context),
+                              ),
+                              children: _buildBrowseChildren(
+                                context,
+                                ref,
+                                settings,
+                                showReceiptAi: showReceiptAi,
+                                showScanner: showScanner,
+                              ),
+                            ),
+                          ),
+                          if (!_searchExpanded && !showSideIndex)
+                            PageSectionIndexOverlay(
+                              entries: entries,
+                              activeId: activeId,
+                              onSelect: _jumpToSection,
+                            ),
+                        ],
                       ),
-                      if (!hasSearch && !showSideIndex)
-                        PageSectionIndexOverlay(
-                          entries: entries,
-                          activeId: activeId,
-                          onSelect: _jumpToSection,
-                        ),
-                    ],
-                  ),
+                    ),
+                  ],
+                ),
+                SafaehSettingsSearchOverlay(
+                  isOpen: _searchExpanded,
+                  onClose: _closeSearch,
+                  searchIndex: settings.searchIndex,
+                  onQueryChanged: (_) {},
+                  resultFilter: _includeSearchResult,
+                  sectionTitleBuilder: (sectionKey) =>
+                      settings.registry.getSection(sectionKey)?.titleKey.tr() ??
+                      sectionKey,
+                  settingTitleBuilder: (setting) => setting.titleKey.tr(),
+                  settingSubtitleBuilder: (setting) =>
+                      setting.subtitleKey?.tr(),
+                  emptyMessageBuilder: (query) =>
+                      'settings_search_empty'.tr(namedArgs: {'query': query}),
+                  onResultSelected: _onSearchResultSelected,
                 ),
               ],
             ),
@@ -671,42 +693,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     ];
   }
 
-  List<Widget> _buildSearchBody(SettingsProviders settings) {
-    final results = ref
-        .watch(settingsSearchResultsProvider(_searchQuery))
-        .where(_includeSearchResult)
-        .toList();
-    if (results.isEmpty) {
-      return [
-        EmptySearchResults(
-          query: _searchQuery,
-          message: 'settings_search_empty'.tr(
-            namedArgs: {'query': _searchQuery},
-          ),
-        ),
-      ];
-    }
-    return buildSearchResultWidgets(
-      results,
-      tileBuilder: (setting) {
-        final title = setting.titleKey.tr();
-        final subtitle = setting.subtitleKey?.tr();
-        return ListTile(
-          leading: setting.icon != null ? Icon(setting.icon) : null,
-          title: Text(title),
-          subtitle: subtitle != null ? Text(subtitle) : null,
-          trailing: settingsChevronEnd(context),
-        );
-      },
-      sectionTitleBuilder: (sectionKey) {
-        final section = settings.registry.getSection(sectionKey);
-        return (section?.titleKey ?? sectionKey).tr();
-      },
-      settingTitleBuilder: (setting) => setting.titleKey.tr(),
-      onResultSelected: _onSearchResultSelected,
-    );
-  }
-
   Widget _buildAccountSection(
     BuildContext context,
     WidgetRef ref,
@@ -717,6 +703,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final displayName = profile?.name ?? profile?.email ?? 'profile'.tr();
 
     return _buildSection(context, ref, settings, accountSection, [
+      if (cloudAvailable) const BillingPlusCard(),
       _anchors.wrap(
         actionOpenProfileSettingDef.key,
         ListTile(

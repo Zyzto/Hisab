@@ -4,8 +4,8 @@ The contract between the Hisab app and a cloud backend.
 
 Hisab is offline-first. The local SQLite database is the source of truth for
 everything the UI reads, and a backend only moves rows in and out of it. That
-makes the seam small enough to write down, which is what this package is: nine
-interfaces, four models, and a registry.
+makes the seam small enough to write down, which is what this package is: ten
+interfaces, billing models, and a registry.
 
 The app depends on this package and nothing else backend-shaped. A backend is a
 separate package named `hisab_cloud` that implements [`CloudBackend`] and calls
@@ -39,6 +39,7 @@ message:
 | `auth` | Not signed in, expired, or forbidden | Stops; may prompt to re-authenticate |
 | `network` | Connectivity failure or timeout | Retries with backoff; queues the write |
 | `invalidRequest` | Malformed or disallowed by policy | Surfaces the message; does not retry |
+| `quotaExceeded` | Hosted plan cannot accept more cloud capacity | Keeps local data; opens the Plus upgrade path |
 | `notFound` | Row absent or invisible to this user | Treats as a miss |
 | `server` | 5xx or rate limit | Retries with backoff |
 | `unknown` | Anything else | Surfaces the message |
@@ -49,7 +50,7 @@ message:
 Getters never throw. `CloudAuth.currentUser` returns null when signed out
 rather than raising, because it is read during widget builds.
 
-## The nine facets
+## The ten facets
 
 ### CloudAuth
 
@@ -65,6 +66,17 @@ when there is nothing to complete.
 
 `signInWithOAuth` returns whether the flow was *launched*, not whether it
 succeeded; success arrives on `authStateChanges`.
+
+### CloudBilling
+
+Vendor-neutral subscription access for Hisab Plus. The implementation owns
+RevenueCat, App Store, Google Play, and Paddle SDKs; the app only sees
+`CloudOffer`, `CloudBillingSnapshot`, usage/limits, purchase, restore, and
+management URL operations. Supabase is the authorization source of truth.
+
+An offline or local-only build reports billing as unavailable. Local SQLite
+usage remains unlimited, and a hosted quota failure must leave the local row and
+its FIFO outbox entry intact.
 
 ### CloudSync
 
@@ -116,9 +128,11 @@ does not fan out one notification per row to every other group member.
 
 ### CloudFiles
 
-Receipt images and feedback screenshots. Both methods return null on failure
-rather than throwing: an image that fails to upload degrades an expense, it
-does not invalidate it, and the row is already committed locally by then.
+Receipt images and feedback screenshots. Both methods return null on ordinary
+failure rather than throwing: an image that fails to upload degrades an
+expense, it does not invalidate it, and the row is already committed locally
+by then. A hosted receipt quota failure may throw `CloudErrorKind.quotaExceeded`
+so the app can show the Plus upgrade path without deleting local data.
 
 Returned URLs must be fetchable by every member of the owning group.
 
@@ -147,8 +161,9 @@ user's connection.
 ## Models
 
 `CloudUser`, `CloudSession`, `CloudAuthState`, `CloudAuthResponse`,
-`CloudException`, `CloudHealthResult` and the `CloudOAuthProvider`,
-`CloudAuthEvent`, `CloudErrorKind` and `CloudHealthStatus` enums.
+`CloudException`, `CloudHealthResult`, the billing models, and the
+`CloudOAuthProvider`, `CloudAuthEvent`, `CloudErrorKind` and
+`CloudHealthStatus` enums.
 
 `CloudUser.metadata` is free-form; the app reads `full_name`, `name` and
 `avatar_id` from it. `CloudUser.provider` is the lowercase identity provider

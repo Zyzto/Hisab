@@ -271,4 +271,93 @@ void main() {
     expect(updates.last, 'p1:1');
     expect(customSplitValues['p1'], '1');
   });
+
+  testWidgets('household rows follow directory order and indent children', (
+    tester,
+  ) async {
+    final parent = Participant(
+      id: 'parent',
+      groupId: 'g1',
+      name: 'Parent',
+      order: 1,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final child = Participant(
+      id: 'child',
+      groupId: 'g1',
+      name: 'Child',
+      order: 2,
+      parentParticipantId: 'parent',
+      createdAt: now,
+      updatedAt: now,
+    );
+    final other = Participant(
+      id: 'other',
+      groupId: 'g1',
+      name: 'Other',
+      order: 0,
+      createdAt: now,
+      updatedAt: now,
+    );
+    // Deliberately deliver the child before its parent to mimic an out-of-
+    // order sync update.
+    final householdParticipants = [child, parent, other];
+    final controller = CustomSegmentedController<SplitType>(
+      value: SplitType.equal,
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      EasyLocalization(
+        path: 'assets/translations',
+        supportedLocales: const [Locale('en')],
+        fallbackLocale: const Locale('en'),
+        startLocale: const Locale('en'),
+        child: MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: ExpenseSplitSection(
+                participants: householdParticipants,
+                sharesCents: const [1000, 2000, 3000],
+                amountCents: 6000,
+                currencyCode: 'USD',
+                splitType: SplitType.equal,
+                splitTypeSegmentInitial: SplitType.equal,
+                splitTypeController: controller,
+                includedInSplitIds: const {'parent', 'child', 'other'},
+                customSplitValues: const {},
+                splitEditControllers: const {},
+                splitFocusNodes: const {},
+                getOrCreateController: (_) => null,
+                getOrCreateFocusNode: (_) => null,
+                onSplitTypeChanged: (_) {},
+                onIncludeChanged: (_, _) {},
+                onAmountChanged: (_, _, _, _) {},
+                onPartsChanged: (_, _) {},
+                amountsSumCents: () => 6000,
+                householdEnabled: true,
+                householdUnitCounts: const {
+                  'parent': 1,
+                  'child': 1,
+                  'other': 1,
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final otherTop = tester.getTopLeft(find.text('Other')).dy;
+    final parentTop = tester.getTopLeft(find.text('Parent')).dy;
+    final childTop = tester.getTopLeft(find.text('Child')).dy;
+    expect(otherTop, lessThan(parentTop));
+    expect(parentTop, lessThan(childTop));
+    expect(
+      tester.getTopLeft(find.text('Child')).dx,
+      greaterThan(tester.getTopLeft(find.text('Parent')).dx),
+    );
+  });
 }

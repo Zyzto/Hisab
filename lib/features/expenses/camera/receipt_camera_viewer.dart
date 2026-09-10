@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/motion/app_motion.dart';
 import '../../../core/widgets/sheet_helpers.dart';
+import '../../../core/widgets/toast.dart';
 import 'gallery_latest_thumb.dart';
 import 'receipt_camera_controller.dart';
 import 'receipt_camera_mock_preview.dart';
@@ -276,9 +277,7 @@ class _ReceiptCameraViewerState extends State<ReceiptCameraViewer>
     _capturing = false;
 
     if (file == null) {
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(content: Text('receipt_scan_error'.tr(args: ['capture']))),
-      );
+      context.showError('receipt_scan_error'.tr(args: ['capture']));
       return;
     }
     setState(() {

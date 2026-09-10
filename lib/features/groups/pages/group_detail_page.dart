@@ -1578,6 +1578,8 @@ class _PeopleTab extends ConsumerStatefulWidget {
   ConsumerState<_PeopleTab> createState() => _PeopleTabState();
 }
 
+enum _HouseholdAction { addDependent, editCount, move, participantActions }
+
 class _PeopleTabState extends ConsumerState<_PeopleTab> {
   final Set<String> _collapsedHouseholds = <String>{};
 
@@ -1868,48 +1870,46 @@ class _PeopleTabState extends ConsumerState<_PeopleTab> {
       final children = List<Participant>.from(
         childrenByParent[p.id] ?? const <Participant>[],
       )..sort((a, b) => a.order.compareTo(b.order));
-      var trailing = _buildTrailing(
-        context,
-        ref,
-        groupId,
-        p,
-        linkedMember,
-        isActive,
-        isLeft,
-        isOwnerOrAdmin,
-        myRole,
-        localOnly,
-        members,
-        allParticipants,
-      );
+      final participantActionsAvailable =
+          (isActive && isOwnerOrAdmin && linkedMember.role != 'owner') ||
+          (isLeft && isOwnerOrAdmin) ||
+          (!isActive && !isLeft && isOwnerOrAdmin);
+      Widget? trailing;
       if (canEditBranch && p.leftAt == null) {
-        trailing = Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.person_add_alt_1),
-              tooltip: 'add_dependent'.tr(),
-              onPressed: () =>
-                  _showAddDependent(context, ref, groupId, p, allParticipants),
-            ),
-            IconButton(
-              icon: const Icon(Icons.drive_file_move_outlined),
-              tooltip: 'household_move'.tr(),
-              onPressed: () => _showMoveDependent(
-                context,
-                ref,
-                p,
-                activeParticipants,
-                allParticipants,
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.account_tree_outlined),
-              tooltip: 'household_counting'.tr(),
-              onPressed: () => _showHouseholdCountEditor(context, ref, p),
-            ),
-            if (trailing != null) trailing,
-          ],
+        trailing = IconButton(
+          icon: const Icon(Icons.more_vert),
+          tooltip: 'household_more_actions'.tr(),
+          onPressed: () => _showHouseholdActions(
+            context,
+            ref,
+            groupId,
+            p,
+            activeParticipants,
+            allParticipants,
+            linkedMember,
+            isActive,
+            isLeft,
+            isOwnerOrAdmin,
+            myRole,
+            localOnly,
+            members,
+            participantActionsAvailable: participantActionsAvailable,
+          ),
+        );
+      } else {
+        trailing = _buildTrailing(
+          context,
+          ref,
+          groupId,
+          p,
+          linkedMember,
+          isActive,
+          isLeft,
+          isOwnerOrAdmin,
+          myRole,
+          localOnly,
+          members,
+          allParticipants,
         );
       }
       if (children.isNotEmpty) {
@@ -1930,7 +1930,7 @@ class _PeopleTabState extends ConsumerState<_PeopleTab> {
                 }
               }),
             ),
-            if (existingTrailing != null) existingTrailing,
+            ?existingTrailing,
           ],
         );
       }
@@ -1990,6 +1990,112 @@ class _PeopleTabState extends ConsumerState<_PeopleTab> {
       current = parentId == null ? null : byId[parentId];
     }
     return false;
+  }
+
+  Future<void> _showHouseholdActions(
+    BuildContext context,
+    WidgetRef ref,
+    String groupId,
+    Participant participant,
+    List<Participant> activeParticipants,
+    List<Participant> allParticipants,
+    GroupMember? linkedMember,
+    bool isActive,
+    bool isLeft,
+    bool isOwnerOrAdmin,
+    GroupRole? myRole,
+    bool localOnly,
+    List<GroupMember> members, {
+    required bool participantActionsAvailable,
+  }) async {
+    final action = await showResponsiveSheet<_HouseholdAction>(
+      context: context,
+      title: participant.name,
+      isScrollControlled: true,
+      centerInFullViewport: true,
+      child: Builder(
+        builder: (ctx) => SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).padding.bottom + 16,
+            ),
+            child: SheetOptionList(
+              children: [
+                SheetOptionTile(
+                  title: 'add_dependent'.tr(),
+                  leading: const Icon(Icons.person_add_alt_1),
+                  onTap: () =>
+                      Navigator.pop(ctx, _HouseholdAction.addDependent),
+                ),
+                SheetOptionTile(
+                  title: 'unnamed_dependents'.tr(),
+                  leading: const Icon(Icons.people_outline),
+                  onTap: () => Navigator.pop(ctx, _HouseholdAction.editCount),
+                ),
+                SheetOptionTile(
+                  title: 'household_move'.tr(),
+                  leading: const Icon(Icons.drive_file_move_outlined),
+                  onTap: () => Navigator.pop(ctx, _HouseholdAction.move),
+                ),
+                if (participantActionsAvailable)
+                  SheetOptionTile(
+                    title: 'household_manage_participant'.tr(),
+                    leading: const Icon(Icons.manage_accounts_outlined),
+                    onTap: () =>
+                        Navigator.pop(ctx, _HouseholdAction.participantActions),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (action == null || !context.mounted) return;
+    switch (action) {
+      case _HouseholdAction.addDependent:
+        await _showAddDependent(
+          context,
+          ref,
+          groupId,
+          participant,
+          allParticipants,
+        );
+      case _HouseholdAction.editCount:
+        await _showHouseholdCountEditor(context, ref, participant);
+      case _HouseholdAction.move:
+        await _showMoveDependent(
+          context,
+          ref,
+          participant,
+          activeParticipants,
+          allParticipants,
+        );
+      case _HouseholdAction.participantActions:
+        if (isActive &&
+            isOwnerOrAdmin &&
+            linkedMember != null &&
+            linkedMember.role != 'owner') {
+          await _showActiveParticipantActions(
+            context,
+            ref,
+            participant,
+            linkedMember,
+            myRole,
+          );
+        } else if (isLeft && isOwnerOrAdmin) {
+          await _showLeftParticipantActions(context, ref, groupId, participant);
+        } else if (!isActive && !isLeft && isOwnerOrAdmin) {
+          await _showStandaloneParticipantActions(
+            context,
+            ref,
+            groupId,
+            participant,
+            localOnly,
+            members,
+            allParticipants,
+          );
+        }
+    }
   }
 
   Future<void> _showAddDependent(

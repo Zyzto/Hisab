@@ -132,6 +132,7 @@ class DataSyncService extends _$DataSyncService {
       final db = ref.read(powerSyncDatabaseProvider);
       final backend = cloudBackend;
       if (backend == null) {
+        ref.read(syncErrorKindProvider.notifier).state = null;
         syncStatusNotifier.setSynced();
         return;
       }
@@ -156,6 +157,7 @@ class DataSyncService extends _$DataSyncService {
           );
           await engine.fetchAllWithBackend(db, backend.sync);
           Log.info('DataSyncService: sync complete');
+          ref.read(syncErrorKindProvider.notifier).state = null;
           syncStatusNotifier.setSynced();
           return;
         } catch (e, st) {
@@ -167,6 +169,8 @@ class DataSyncService extends _$DataSyncService {
               error: e,
               stackTrace: st,
             );
+            ref.read(syncErrorKindProvider.notifier).state =
+                lastError is CloudException ? lastError.kind : null;
             syncStatusNotifier.setSyncFailed();
             return;
           }
@@ -187,6 +191,8 @@ class DataSyncService extends _$DataSyncService {
         error: lastError,
         stackTrace: lastStack,
       );
+      ref.read(syncErrorKindProvider.notifier).state =
+          lastError is CloudException ? lastError.kind : null;
       syncStatusNotifier.setSyncFailed();
     } finally {
       _isSyncing = false;

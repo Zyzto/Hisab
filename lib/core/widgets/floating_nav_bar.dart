@@ -92,6 +92,7 @@ class FloatingNavBar extends ConsumerWidget {
       shadows: shadows,
       border: border,
       motion: tabAnimDuration,
+      hideWhenKeyboardVisible: true,
     );
   }
 }

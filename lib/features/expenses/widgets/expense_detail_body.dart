@@ -5,6 +5,7 @@ import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import '../../../core/navigation/nav_back.dart';
 import '../../../core/platform/ui_perf.dart';
 import '../../../core/receipt/receipt_image_view.dart';
+import '../../../core/services/household_service.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/widgets/amount_with_secondary_display.dart';
 import '../../../core/widgets/participant_avatar.dart';
@@ -96,6 +97,13 @@ class ExpenseDetailBody extends ConsumerWidget {
                 : expense.currencyCode;
             final isTransfer =
                 expense.transactionType == TransactionType.transfer;
+            final householdSnapshot = HouseholdSplitSnapshot.fromJsonString(
+              expense.householdSplitSnapshotJson,
+            );
+            // A group's current setting must not rewrite the presentation of
+            // an older participant-only expense.  The immutable snapshot is
+            // the source of truth for household-aware detail rows.
+            final householdEnabled = householdSnapshot != null;
             // Personal lists are single-person: "who paid" / split of self is noise.
             final showPeopleSections = !isPersonal || isTransfer;
             final hasDescription =
@@ -109,13 +117,20 @@ class ExpenseDetailBody extends ConsumerWidget {
               nameOf,
               avatarOf,
               useGroupCurrency ? groupCurrencyCode : null,
+              householdEnabled: householdEnabled,
+              householdSnapshot: householdSnapshot,
             );
             final showSplit =
                 showPeopleSections &&
                 shares.isNotEmpty &&
                 (isTransfer ||
                     shares.length > 1 ||
-                    shares.first.participantId != expense.payerParticipantId);
+                    shares.first.participantId != expense.payerParticipantId ||
+                    (householdEnabled &&
+                        shares.any(
+                          (share) =>
+                              share.directUnitCount > 1 || share.hasChildren,
+                        )));
             final isSparse =
                 !hasDescription && !hasLineItems && !showPeopleSections;
 
@@ -199,11 +214,14 @@ class ExpenseDetailBody extends ConsumerWidget {
                   const SizedBox(height: 10),
                   ...shares.map(
                     (e) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
+                      padding: EdgeInsetsDirectional.only(
+                        start: householdEnabled ? e.depth * 20.0 : 0,
+                        bottom: 10,
+                      ),
                       child: _PersonCard(
                         name: e.name,
                         avatarId: e.avatarId,
-                        subtitle: e.percentLabel,
+                        subtitle: e.detailSubtitle(householdEnabled),
                         amountCents: e.cents,
                         currencyCode: e.currencyCode,
                         amountWidget: AmountWithSecondaryDisplay(
@@ -265,8 +283,10 @@ class ExpenseDetailBody extends ConsumerWidget {
     List<Participant> participants,
     Map<String, String> nameOf,
     Map<String, String?> avatarOf,
-    String? groupCurrencyCode,
-  ) {
+    String? groupCurrencyCode, {
+    bool householdEnabled = false,
+    HouseholdSplitSnapshot? householdSnapshot,
+  }) {
     final useGroupCurrency =
         groupCurrencyCode != null &&
         groupCurrencyCode.isNotEmpty &&
@@ -307,7 +327,7 @@ class ExpenseDetailBody extends ConsumerWidget {
       0,
       (sum, p) => sum + (shares[p.id] ?? 0),
     );
-    return included.map((p) {
+    final entries = included.map((p) {
       final cents = shares[p.id]!;
       final percent = totalShareCents > 0
           ? ((cents * 100) / totalShareCents).round()
@@ -319,9 +339,109 @@ class ExpenseDetailBody extends ConsumerWidget {
         cents: toDisplayCents(cents),
         currencyCode: displayCode,
         percentLabel: percent != null ? '$percent%' : null,
+        directUnitCount: householdEnabled
+            ? (householdSnapshot?.includedUnitCounts[p.id] ??
+                  p.directHouseholdSize)
+            : 1,
       );
     }).toList();
+    if (!householdEnabled || entries.length < 2) return entries;
+    return _orderShareEntries(
+      entries,
+      participants,
+      parentParticipantIds: householdSnapshot?.parentParticipantIds,
+    );
   }
+}
+
+List<_ShareEntry> _orderShareEntries(
+  List<_ShareEntry> entries,
+  List<Participant> participants, {
+  Map<String, String?>? parentParticipantIds,
+}) {
+  final entryById = <String, _ShareEntry>{
+    for (final entry in entries) entry.participantId: entry,
+  };
+  final participantById = <String, Participant>{
+    for (final participant in participants) participant.id: participant,
+  };
+  final originalIndex = <String, int>{};
+  for (var i = 0; i < entries.length; i++) {
+    originalIndex[entries[i].participantId] = i;
+  }
+  final childrenByParent = <String, List<_ShareEntry>>{};
+  final roots = <_ShareEntry>[];
+  for (final entry in entries) {
+    final parentId =
+        parentParticipantIds?.containsKey(entry.participantId) == true
+        ? parentParticipantIds![entry.participantId]
+        : participantById[entry.participantId]?.parentParticipantId;
+    if (parentId == null || !entryById.containsKey(parentId)) {
+      roots.add(entry);
+    } else {
+      childrenByParent.putIfAbsent(parentId, () => []).add(entry);
+    }
+  }
+  int compareEntries(_ShareEntry a, _ShareEntry b) {
+    final aParticipant = participantById[a.participantId];
+    final bParticipant = participantById[b.participantId];
+    final order = (aParticipant?.order ?? 0).compareTo(
+      bParticipant?.order ?? 0,
+    );
+    return order != 0
+        ? order
+        : (originalIndex[a.participantId] ?? 0).compareTo(
+            originalIndex[b.participantId] ?? 0,
+          );
+  }
+
+  roots.sort(compareEntries);
+  for (final children in childrenByParent.values) {
+    children.sort(compareEntries);
+  }
+
+  final ordered = <_ShareEntry>[];
+  final visited = <String>{};
+  final totalById = <String, int>{};
+  int totalUnits(_ShareEntry entry, Set<String> path) {
+    final cached = totalById[entry.participantId];
+    if (cached != null) return cached;
+    if (!path.add(entry.participantId)) return 0;
+    final children =
+        childrenByParent[entry.participantId] ?? const <_ShareEntry>[];
+    final total =
+        entry.directUnitCount +
+        children.fold<int>(0, (sum, child) => sum + totalUnits(child, path));
+    path.remove(entry.participantId);
+    totalById[entry.participantId] = total;
+    return total;
+  }
+
+  void visit(_ShareEntry entry, int depth) {
+    if (!visited.add(entry.participantId)) return;
+    final children =
+        childrenByParent[entry.participantId] ?? const <_ShareEntry>[];
+    ordered.add(
+      entry.copyWith(
+        depth: depth,
+        hasChildren: children.isNotEmpty,
+        householdTotalCount: totalUnits(entry, <String>{}),
+      ),
+    );
+    for (final child in children) {
+      visit(child, depth + 1);
+    }
+  }
+
+  for (final root in roots) {
+    visit(root, 0);
+  }
+  // Keep malformed/cyclic local rows visible instead of silently omitting a
+  // person's share.  Server-side hierarchy writes reject cycles.
+  for (final entry in entries) {
+    visit(entry, 0);
+  }
+  return ordered;
 }
 
 class _ShareEntry {
@@ -331,6 +451,11 @@ class _ShareEntry {
   final int cents;
   final String currencyCode;
   final String? percentLabel;
+  final int directUnitCount;
+  final int depth;
+  final bool hasChildren;
+  final int householdTotalCount;
+
   _ShareEntry({
     required this.participantId,
     required this.name,
@@ -338,7 +463,48 @@ class _ShareEntry {
     required this.cents,
     required this.currencyCode,
     required this.percentLabel,
+    this.directUnitCount = 1,
+    this.depth = 0,
+    this.hasChildren = false,
+    this.householdTotalCount = 1,
   });
+
+  _ShareEntry copyWith({
+    int? depth,
+    bool? hasChildren,
+    int? householdTotalCount,
+  }) => _ShareEntry(
+    participantId: participantId,
+    name: name,
+    avatarId: avatarId,
+    cents: cents,
+    currencyCode: currencyCode,
+    percentLabel: percentLabel,
+    directUnitCount: directUnitCount,
+    depth: depth ?? this.depth,
+    hasChildren: hasChildren ?? this.hasChildren,
+    householdTotalCount: householdTotalCount ?? this.householdTotalCount,
+  );
+
+  String? detailSubtitle(bool householdEnabled) {
+    final labels = <String>[];
+    if (percentLabel != null && percentLabel!.isNotEmpty) {
+      labels.add(percentLabel!);
+    }
+    if (householdEnabled && hasChildren) {
+      labels.add(
+        '${'household_total'.tr()} · ${'household_people_count'.tr(namedArgs: {'count': '$householdTotalCount'})}',
+      );
+    }
+    if (householdEnabled && directUnitCount > 1) {
+      labels.add(
+        'household_split_explanation'.tr(
+          namedArgs: {'count': '$directUnitCount'},
+        ),
+      );
+    }
+    return labels.isEmpty ? null : labels.join(' · ');
+  }
 }
 
 class ExpenseDetailBodyHeader extends StatelessWidget {

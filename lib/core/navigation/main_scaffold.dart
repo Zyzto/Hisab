@@ -6,8 +6,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:back_button_interceptor/back_button_interceptor.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
+import 'package:safaeh/safaeh.dart';
 import '../../features/home/pages/home_page.dart';
 import '../../features/home/routes.dart';
 import '../../features/settings/pages/settings_page.dart';
@@ -77,6 +79,15 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     if (_currentIndex == 1 || widget.location == RoutePaths.settings) {
       _ensureSettingsMounted();
     }
+    // Android's navigation channel can bypass a route-level PopScope when
+    // the shell is hosted by GoRouter. Register an explicit shell interceptor
+    // so Settings always returns to the Groups tab instead of closing the app.
+    BackButtonInterceptor.add(
+      _handleAndroidBack,
+      // Let higher-level handlers (for example keyboard dismissal) consume
+      // the back press before changing the route.
+      ifNotYetIntercepted: true,
+    );
     _restoreDesktopNavCollapsed();
     // Defer: settings providers may not be ready during the first frame.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -94,11 +105,26 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
   @override
   void dispose() {
     _menuButtonFocusNode.dispose();
+    BackButtonInterceptor.remove(_handleAndroidBack);
+    ShellNavLayout.mobileBottomNavVisible = false;
     // Clear reserved width if this shell goes away.
     if (ShellNavLayout.reservedWidth.value != 0) {
       ShellNavLayout.reservedWidth.value = 0;
     }
     super.dispose();
+  }
+
+  bool _handleAndroidBack(bool stopDefaultButtonEvent, RouteInfo info) {
+    if (!mounted) return false;
+    final path = GoRouter.maybeOf(
+      context,
+    )?.routerDelegate.currentConfiguration.uri.path;
+    final onSettings =
+        path == RoutePaths.settings ||
+        path?.startsWith('${RoutePaths.settings}/') == true;
+    if (!onSettings) return false;
+    context.go(RoutePaths.home);
+    return true;
   }
 
   void _toggleDesktopNavCollapsed() {
@@ -316,6 +342,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     _syncReservedWidth(showNavBar: showNavBar, isDesktop: isDesktop);
 
     if (useWideShell) {
+      ShellNavLayout.mobileBottomNavVisible = false;
       // - mid → temporary Scaffold.drawer (Material slide)
       // - desktop → clipping rail that stays up; collapse = icons-only
       final shellBody = Row(
@@ -354,27 +381,34 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     }
 
     // Mobile (or shell routes without nav chrome).
+    final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final showMobileNavBar = showNavBar && !keyboardVisible;
+    ShellNavLayout.mobileBottomNavVisible = showMobileNavBar;
     final scaffold = Scaffold(
+      // The shell chrome must not ride up with the IME. The mobile nav is
+      // hidden while the keyboard is visible; page-level scaffolds still
+      // receive the insets and can resize their editing content normally.
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
-          Padding(
-            padding: EdgeInsets.only(bottom: showNavBar ? 100 : 0),
-            child: _buildMainContent(),
-          ),
+          // The nav is an overlay. Let page content continue underneath it;
+          // the Home and Settings lists add their own trailing clearance so
+          // the final row can still be scrolled above the transparent bar.
+          _buildMainContent(),
           const Positioned(
             top: 0,
             left: 0,
             right: 0,
             child: ConnectionBanner(),
           ),
-          if (showNavBar && _currentIndex == 0)
+          if (showMobileNavBar && _currentIndex == 0)
             const Positioned(
               left: 16,
               right: 16,
               bottom: 120,
               child: PwaInstallBanner(),
             ),
-          if (showNavBar)
+          if (showMobileNavBar)
             Positioned(
               left: 0,
               right: 0,
@@ -398,7 +432,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
                 },
               ),
             ),
-          if (showNavBar)
+          if (showMobileNavBar)
             Positioned(
               left: 0,
               right: 0,
@@ -423,7 +457,13 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
         ],
       ),
     );
-    return _wrapWithBackHandler(scaffold);
+    return _wrapWithBackHandler(
+      SafaehBottomNavScope(
+        visible: showNavBar,
+        hideWhenKeyboardVisible: true,
+        child: scaffold,
+      ),
+    );
   }
 
   Widget _buildMainContent() {

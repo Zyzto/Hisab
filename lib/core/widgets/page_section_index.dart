@@ -79,11 +79,13 @@ class PageSectionIndexOverlay extends StatelessWidget {
     required this.entries,
     required this.activeId,
     required this.onSelect,
+    this.bottomInset,
   });
 
   final List<PageSectionIndexEntry> entries;
   final String? activeId;
   final ValueChanged<PageSectionIndexEntry> onSelect;
+  final double? bottomInset;
 
   @override
   Widget build(BuildContext context) {
@@ -93,6 +95,7 @@ class PageSectionIndexOverlay extends StatelessWidget {
       entries: _safaehEntries(entries),
       activeId: activeId,
       onSelect: (selected) => _forward(entries, selected, onSelect),
+      bottomInset: bottomInset,
     );
   }
 }

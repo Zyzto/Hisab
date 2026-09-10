@@ -127,6 +127,9 @@ enum CloudErrorKind {
   /// Retrying unchanged will not help.
   invalidRequest,
 
+  /// The hosted plan does not permit the requested new cloud capacity.
+  quotaExceeded,
+
   /// The requested row does not exist or is not visible to this user.
   notFound,
 

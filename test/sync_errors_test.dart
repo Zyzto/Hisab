@@ -40,6 +40,17 @@ void main() {
       );
     });
 
+    test('quota errors stay blocked instead of retrying as transient', () {
+      const error = CloudException(
+        'quota_exceeded:expenses',
+        kind: CloudErrorKind.quotaExceeded,
+      );
+
+      expect(isSyncQuotaExceeded(error), true);
+      expect(isSyncTransientError(error), false);
+      expect(isSyncAuthError(error), false);
+    });
+
     test('TimeoutException is transient', () {
       expect(isSyncTransientError(TimeoutException('x')), true);
       expect(isSyncAuthError(TimeoutException('x')), false);

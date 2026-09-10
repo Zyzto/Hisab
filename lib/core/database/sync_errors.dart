@@ -1,7 +1,12 @@
 import 'dart:async';
 
+import 'package:flutter_riverpod/legacy.dart' show StateProvider;
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:hisab_backend/hisab_backend.dart';
+
+/// The most recent non-transient sync failure that needs a user decision.
+/// Pending local writes remain in the FIFO outbox while this is set.
+final syncErrorKindProvider = StateProvider<CloudErrorKind?>((ref) => null);
 
 /// Whether the error is an auth failure (401/403). No retry.
 bool isSyncAuthError(Object e) {
@@ -12,12 +17,16 @@ bool isSyncAuthError(Object e) {
 
 /// Whether the error is transient (network, 5xx, 429). Retry with backoff.
 bool isSyncTransientError(Object e) {
+  if (isSyncQuotaExceeded(e)) return false;
   if (e is TimeoutException) return true;
   if (e is CloudException && e.isTransient) return true;
   final code = syncErrorStatusCode(e);
   if (code != null && (code >= 500 || code == 429)) return true;
   return !isSyncAuthError(e);
 }
+
+bool isSyncQuotaExceeded(Object e) =>
+    e is CloudException && e.kind == CloudErrorKind.quotaExceeded;
 
 /// Extracts an HTTP status code from the error when it carries one.
 int? syncErrorStatusCode(Object e) {

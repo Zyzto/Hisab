@@ -13,7 +13,7 @@ Product and install overview: [../README.md](../README.md). Doc index: [README.m
 - GoRouter for navigation
 - Easy Localization (`en`, `ar`, RTL support)
 - PowerSync package as local SQLite engine
-- `packages/hisab_backend`: the backend contract (nine facets, neutral models)
+- `packages/hisab_backend`: the backend contract (ten facets, neutral models)
 - `packages/hisab_cloud`: the backend implementation — a no-op stub here
 - [Safaeh](https://github.com/Zyzto/Safaeh): adaptive modals, "On this page" index, and sidenav chrome (git dependency)
 - Firebase Cloud Messaging for push notifications (Android/iOS/Web)
@@ -265,7 +265,7 @@ Major persisted keys include:
 ## Backend contract
 
 No backend lives in this repository. What lives here is the interface one must
-satisfy: `packages/hisab_backend` declares nine facets (`auth`, `sync`,
+satisfy: `packages/hisab_backend` declares ten facets (`auth`, `billing`, `sync`,
 `groups`, `invites`, `notifications`, `files`, `account`, `telemetry`,
 `health`), and `packages/hisab_cloud` is a stub that registers nothing, which is
 why a default build is local-only.
@@ -404,7 +404,7 @@ Local: `bash ./scripts/run_release_checks.sh`.
 
 - state: `flutter_riverpod`, `riverpod_annotation`
 - navigation: `go_router`
-- **Git deps:** `flutter_logging_service` ([Siglat](https://github.com/Zyzto/Siglat) `v0.2.1`), `flutter_settings_framework` ([Edadat](https://github.com/Zyzto/Edadat) `v0.7.1`), `safaeh` ([Safaeh](https://github.com/Zyzto/Safaeh) `v0.1.0`) — pinned to release tags. Local `pubspec_overrides.yaml` (gitignored) can point at sibling checkouts for iteration.
+- **Git deps:** `flutter_logging_service` ([Siglat](https://github.com/Zyzto/Siglat) `v0.2.1`), `flutter_settings_framework` ([Edadat](https://github.com/Zyzto/Edadat) `v0.8.0`), and `safaeh` ([Safaeh](https://github.com/Zyzto/Safaeh) `v0.2.5`) — pinned to release tags. Local `pubspec_overrides.yaml` (gitignored) can point at sibling checkouts for iteration.
 - local db/sync engine: `powersync`
 - backend contract: `hisab_backend` (interfaces only); implementation supplied by `hisab_cloud`
 - notifications: `firebase_core`, `firebase_messaging`, `flutter_local_notifications`

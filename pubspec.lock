@@ -353,14 +353,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.8.5"
-  dart_jsonwebtoken:
-    dependency: transitive
-    description:
-      name: dart_jsonwebtoken
-      sha256: ad84e60181696513d04d5f2078e0bbc20365b911f46f647797317414bdc88fbe
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.4.1"
   dart_style:
     dependency: transitive
     description:
@@ -731,10 +723,12 @@ packages:
   flutter_logging_service:
     dependency: "direct main"
     description:
-      path: "/home/zyzto/Projects/siglat"
-      relative: false
-    source: path
-    version: "0.2.3"
+      path: "."
+      ref: "v0.2.2"
+      resolved-ref: "3e19a8b022f08dc6bd3203b138cdd502ff200682"
+      url: "https://github.com/Zyzto/siglat.git"
+    source: git
+    version: "0.2.2"
   flutter_plugin_android_lifecycle:
     dependency: transitive
     description:
@@ -802,10 +796,12 @@ packages:
   flutter_settings_framework:
     dependency: "direct main"
     description:
-      path: "/home/zyzto/Projects/edadat"
-      relative: false
-    source: path
-    version: "0.7.2"
+      path: "."
+      ref: "v0.8.0"
+      resolved-ref: "34f322a68c979dde605ac1e933f64c531881bafa"
+      url: "https://github.com/Zyzto/edadat.git"
+    source: git
+    version: "0.8.0"
   flutter_svg:
     dependency: "direct main"
     description:
@@ -845,14 +841,6 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  functions_client:
-    dependency: transitive
-    description:
-      name: functions_client
-      sha256: "931e822688d2e97867b2300e2fdbb08c9db73f8653fc83efc7a259d2e0cca769"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.7.1"
   gcloud:
     dependency: transitive
     description:
@@ -917,46 +905,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.3.1"
-  google_sign_in:
-    dependency: transitive
-    description:
-      name: google_sign_in
-      sha256: "521031b65853b4409b8213c0387d57edaad7e2a949ce6dea0d8b2afc9cb29763"
-      url: "https://pub.dev"
-    source: hosted
-    version: "7.2.0"
-  google_sign_in_android:
-    dependency: transitive
-    description:
-      name: google_sign_in_android
-      sha256: "57782125965ca87b03d42a147d40b046f1fd6a09141a58913e1b86671a5ef22e"
-      url: "https://pub.dev"
-    source: hosted
-    version: "7.2.16"
-  google_sign_in_ios:
-    dependency: transitive
-    description:
-      name: google_sign_in_ios
-      sha256: ac1e4c1205267cb7999d1d81333fccffdfda29e853f434bbaf71525498bb6950
-      url: "https://pub.dev"
-    source: hosted
-    version: "6.3.0"
-  google_sign_in_platform_interface:
-    dependency: transitive
-    description:
-      name: google_sign_in_platform_interface
-      sha256: "7f59208c42b415a3cca203571128d6f84f885fead2d5b53eb65a9e27f2965bb5"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.1.0"
-  google_sign_in_web:
-    dependency: transitive
-    description:
-      name: google_sign_in_web
-      sha256: d473003eeca892f96a01a64fc803378be765071cb0c265ee872c7f8683245d14
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.1.3"
   googleai_dart:
     dependency: "direct overridden"
     description:
@@ -981,14 +929,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.3.3"
-  gotrue:
-    dependency: transitive
-    description:
-      name: gotrue
-      sha256: cd73a6de4198baca71341177bed233673d7965aca2a0257ab5561feb2abdaf59
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.27.2"
   graphs:
     dependency: transitive
     description:
@@ -1015,8 +955,8 @@ packages:
   hisab_cloud:
     dependency: "direct main"
     description:
-      path: "/home/zyzto/Projects/hisab-cloud/packages/hisab_cloud"
-      relative: false
+      path: "packages/hisab_cloud"
+      relative: true
     source: path
     version: "0.1.0"
   hooks:
@@ -1432,14 +1372,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.1.0"
-  passkeys_platform_interface:
-    dependency: transitive
-    description:
-      name: passkeys_platform_interface
-      sha256: e810520c7b79dca629fdc266958564eedd77dc85a955f5e94430dfccb92eef68
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.9.0"
   path:
     dependency: "direct main"
     description:
@@ -1584,14 +1516,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.8"
-  pointycastle:
-    dependency: transitive
-    description:
-      name: pointycastle
-      sha256: "92aa3841d083cc4b0f4709b5c74fd6409a3e6ba833ffc7dc6a8fee096366acf5"
-      url: "https://pub.dev"
-    source: hosted
-    version: "4.0.0"
   pool:
     dependency: transitive
     description:
@@ -1608,14 +1532,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.5.2"
-  postgrest:
-    dependency: transitive
-    description:
-      name: postgrest
-      sha256: b7f957273ba6a1c26cefa987ac524f4138e9ab7542fbb9e6abdfddacb9895a21
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.9.1"
   powersync:
     dependency: "direct main"
     description:
@@ -1672,14 +1588,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.2"
-  realtime_client:
-    dependency: transitive
-    description:
-      name: realtime_client
-      sha256: ff731ce21fd775e0d7accfb1eaccdcf47b687610720822ba8b9fd8f5bccb2bd9
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.13.0"
   record_use:
     dependency: transitive
     description:
@@ -1740,11 +1648,11 @@ packages:
     dependency: "direct main"
     description:
       path: "."
-      ref: "v0.2.0"
-      resolved-ref: a09ba2bc935e2846900e4435fbb1a8ea27e23682
+      ref: "v0.2.5"
+      resolved-ref: "38ba3370bbc758223f3eb99efeac10d8c2907058"
       url: "https://github.com/Zyzto/Safaeh.git"
     source: git
-    version: "0.2.0"
+    version: "0.2.5"
   share_plus:
     dependency: "direct main"
     description:
@@ -1958,14 +1866,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.0"
-  storage_client:
-    dependency: transitive
-    description:
-      name: storage_client
-      sha256: b16aaaadcef812fda31fca056f50fb3485afe64f94e5d537d30f485ed55dec5e
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.8.0"
   stream_channel:
     dependency: transitive
     description:
@@ -1990,30 +1890,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.1"
-  supabase:
-    dependency: transitive
-    description:
-      name: supabase
-      sha256: "0645becf76f49d2633d8ec9bfd78ab98dce42de6899da8fa1f069c2c836d5d23"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.16.1"
-  supabase_common:
-    dependency: transitive
-    description:
-      name: supabase_common
-      sha256: a7961a44953cf8d9da049381fc3377516348255042fbb12b9d4f8540816f2fe9
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.1.2"
-  supabase_flutter:
-    dependency: transitive
-    description:
-      name: supabase_flutter
-      sha256: "26eb3d3b71bcc5651551e64d6b131ba929ea261998570bbcc90356b1b42fd532"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.17.2"
   sync_http:
     dependency: transitive
     description:
@@ -2063,7 +1939,7 @@ packages:
     source: hosted
     version: "0.11.1"
   toastification:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: toastification
       sha256: "66c96678e3dece8ba24de3ea31634bd65a80aaecb8105f9bafe946e5f0d7590a"
@@ -2302,14 +2178,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.1.3"
-  yet_another_json_isolate:
-    dependency: transitive
-    description:
-      name: yet_another_json_isolate
-      sha256: eaa26beb5990b25a49d942374fd5a0c5aa67a837e03b14b4c26134aaa1ed01a9
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.1.1"
 sdks:
   dart: ">=3.12.0 <4.0.0"
   flutter: ">=3.44.0"

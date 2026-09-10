@@ -52,9 +52,9 @@ your overlay produces.
 ## Implementing the contract
 
 Start from [`packages/hisab_backend/README.md`](../packages/hisab_backend/README.md),
-which documents all nine facets method by method. The short version:
+which documents all ten facets method by method. The short version:
 
-1. Implement `CloudBackend` and its nine facet getters.
+1. Implement `CloudBackend` and its ten facet getters.
 2. Translate every vendor error into `CloudException` with an accurate
    `CloudErrorKind`. The app's retry, queue and sign-out logic reads nothing
    else.

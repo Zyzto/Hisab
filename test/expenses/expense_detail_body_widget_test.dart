@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hisab/domain/domain.dart';
+import 'package:hisab/core/services/household_service.dart';
 import 'package:hisab/features/expenses/widgets/expense_detail_body.dart';
 import 'package:hisab/features/groups/providers/groups_provider.dart';
 import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
@@ -351,6 +352,110 @@ void main() {
     expect(_hasText(tester, const ['Paid By', 'paid_by_label']), isFalse);
     expect(_hasText(tester, const ['Split', 'split']), isFalse);
     expect(find.text('Receipt notes'), findsOneWidget);
+  });
+
+  testWidgets('household expense detail follows the saved directory tree', (
+    tester,
+  ) async {
+    final parent = Participant(
+      id: 'parent',
+      groupId: groupId,
+      name: 'Parent',
+      order: 1,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final child = Participant(
+      id: 'child',
+      groupId: groupId,
+      name: 'Child',
+      order: 2,
+      parentParticipantId: 'parent',
+      createdAt: now,
+      updatedAt: now,
+    );
+    final other = Participant(
+      id: 'other',
+      groupId: groupId,
+      name: 'Other',
+      order: 0,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final householdExpense = testExpense.copyWith(
+      payerParticipantId: 'parent',
+      splitShares: const {'parent': 3000, 'child': 1000, 'other': 1000},
+      householdSplitSnapshotJson: const HouseholdSplitSnapshot(
+        splitType: SplitType.equal,
+        includedUnitCounts: {'parent': 1, 'child': 2, 'other': 1},
+        parentParticipantIds: {
+          'parent': null,
+          'child': 'parent',
+          'other': null,
+        },
+      ).toJsonString(),
+    );
+    final householdParticipants = [child, parent, other];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          expensesByGroupProvider(
+            groupId,
+          ).overrideWithValue(AsyncValue.data([householdExpense])),
+          futureExpenseProvider(
+            expenseId,
+          ).overrideWithValue(AsyncValue.data(householdExpense)),
+          participantsByGroupProvider(
+            groupId,
+          ).overrideWithValue(AsyncValue.data(householdParticipants)),
+          futureGroupProvider(
+            groupId,
+          ).overrideWithValue(AsyncValue.data(testGroup)),
+          tagsByGroupProvider(
+            groupId,
+          ).overrideWithValue(const AsyncValue.data([])),
+          use24HourFormatProvider.overrideWithValue(false),
+        ],
+        child: EasyLocalization(
+          path: 'assets/translations',
+          supportedLocales: const [Locale('en')],
+          fallbackLocale: const Locale('en'),
+          startLocale: const Locale('en'),
+          child: const MaterialApp(
+            home: Scaffold(
+              body: ExpenseDetailBody(groupId: groupId, expenseId: expenseId),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final otherTop = tester
+        .getTopLeft(find.text('Other', skipOffstage: false))
+        .dy;
+    final parentEntries = find.text('Parent', skipOffstage: false);
+    final parentTop = tester.getTopLeft(parentEntries.last).dy;
+    final childTop = tester
+        .getTopLeft(find.text('Child', skipOffstage: false))
+        .dy;
+    expect(otherTop, lessThan(parentTop));
+    expect(parentTop, lessThan(childTop));
+    expect(
+      tester.getTopLeft(find.text('Child', skipOffstage: false)).dx,
+      greaterThan(tester.getTopLeft(parentEntries.last).dx),
+    );
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Text &&
+            (widget.data?.contains('Includes 2 people') == true ||
+                widget.data?.contains('household_split_explanation') == true),
+        skipOffstage: false,
+      ),
+      findsOneWidget,
+    );
   });
 }
 

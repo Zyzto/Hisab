@@ -5,6 +5,9 @@ import 'dart:typed_data';
 /// Both methods return a URL that must be fetchable by every member of the
 /// owning group, and both return null on failure rather than throwing: an
 /// image that fails to upload degrades the expense, it does not invalidate it.
+/// A hosted backend may throw [CloudException] with
+/// [CloudErrorKind.quotaExceeded] so the app can offer an upgrade while
+/// retaining the local expense.
 abstract interface class CloudFiles {
   /// Stores a receipt or expense photo and returns its URL.
   ///

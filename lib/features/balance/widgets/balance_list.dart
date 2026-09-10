@@ -1795,14 +1795,15 @@ class _SettlementFamilyDetail extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                Text(
-                  'household_split_explanation'.tr(
-                    namedArgs: {'count': '${member.directHouseholdSize}'},
+                if (member.directHouseholdSize > 1)
+                  Text(
+                    'household_split_explanation'.tr(
+                      namedArgs: {'count': '${member.directHouseholdSize}'},
+                    ),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
                   ),
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
-                ),
               ],
             ),
           ),

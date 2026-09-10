@@ -12,7 +12,6 @@ import 'package:upgrader/upgrader.dart';
 import 'package:version/version.dart';
 import 'package:hisab_backend/hisab_backend.dart';
 import 'package:safaeh/safaeh.dart';
-import 'package:toastification/toastification.dart';
 import 'core/auth/auth_pending_finalize.dart';
 import 'core/auth/auth_providers.dart';
 import 'core/auth/oauth_callback_state.dart';
@@ -33,6 +32,7 @@ import 'core/motion/app_motion.dart';
 import 'core/navigation/app_router.dart';
 import 'core/navigation/invite_link_handler.dart';
 import 'core/navigation/last_route_restore.dart';
+import 'core/navigation/shell_nav_layout.dart';
 import 'core/services/connectivity_service.dart';
 import 'core/celebration/celebration_host.dart';
 import 'core/services/screenshot_report_prompt_host.dart';
@@ -106,7 +106,7 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
   void _showPendingWebOAuthErrorIfAny([int attempt = 0]) {
     final key = pendingWebOAuthCallbackError;
     if (key == null || !mounted) return;
-    // App's own context sits above ToastificationWrapper; use the navigator.
+    // App's own context sits above SafaehFeedbackHost; use the navigator.
     final navContext = ref
         .read(routerProvider)
         .routerDelegate
@@ -452,16 +452,15 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
         ref: ref,
         child: ScreenshotReportPromptHost(
           child: CelebrationHost(
-            child: ToastificationWrapper(
-              config: ToastificationConfig(
-                alignment: Alignment.bottomCenter,
-                itemWidth: LayoutBreakpoints.isTabletOrWider(context)
-                    ? LayoutBreakpoints.sheetDialogMaxWidth
-                    : (MediaQuery.sizeOf(context).width - 32).clamp(
-                        0.0,
-                        LayoutBreakpoints.sheetDialogMaxWidth,
-                      ),
-              ),
+            child: SafaehFeedbackHost(
+              itemWidthBuilder: (context) =>
+                  LayoutBreakpoints.isTabletOrWider(context)
+                  ? LayoutBreakpoints.sheetDialogMaxWidth
+                  : (MediaQuery.sizeOf(context).width - 32).clamp(
+                      0.0,
+                      LayoutBreakpoints.sheetDialogMaxWidth,
+                    ),
+              bottomInsetBuilder: ShellNavLayout.feedbackBottomInset,
               child: SafaehTheme(
                 data: const SafaehThemeData(
                   tabletBreakpoint: LayoutBreakpoints.breakpointTablet,
@@ -475,6 +474,9 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
                   sheetRollEnter: AppMotion.sheetRollEnter,
                   exitCurve: AppMotion.exitCurve,
                   contentMaxWidth: LayoutBreakpoints.contentMaxWidthTablet,
+                  floatingAppearance: SafaehFloatingAppearance(
+                    style: SafaehFloatingSurfaceStyle.glass,
+                  ),
                 ),
                 child: MaterialApp.router(
                   title: appNameTranslationKey.tr(),

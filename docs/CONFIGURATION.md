@@ -84,6 +84,9 @@ validates it. For reference, the hosted Hisab backend package uses:
 | `INVITE_BASE_URL` | Origin used to build shareable invite links, so they carry your domain rather than the raw project URL. |
 | `SITE_URL` | Redirect origin for auth emails and web OAuth. Must also be allow-listed server side. |
 | `HISAB_ENV` | `staging` on the test host, `production` on the live host, empty in the public offline build. Staging uses test-only branding and is excluded from search indexes. |
+| `HISAB_PLUS_ENABLED` | Staged billing rollout switch. Set to `true` only when the cloud backend has the RevenueCat webhook and `billing_config` rollout enabled. |
+| `REVENUECAT_APPLE_API_KEY`, `REVENUECAT_GOOGLE_API_KEY`, `REVENUECAT_WEB_API_KEY` | Public RevenueCat SDK keys used by the private cloud backend for native stores and Paddle-backed Web checkout. |
+| `REVENUECAT_ENTITLEMENT_ID` | RevenueCat entitlement identifier; use `hisab_plus` unless the backend schema is changed with it. |
 
 If you write your own package, use whatever names you like. The only contract
 the app enforces is that `registerHisabCloud()` either installs a `CloudBackend`

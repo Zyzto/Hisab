@@ -11,6 +11,7 @@ library;
 export 'src/auth_redirect.dart';
 export 'src/cloud_account.dart';
 export 'src/cloud_auth.dart';
+export 'src/cloud_billing.dart';
 export 'src/cloud_backend.dart';
 export 'src/cloud_files.dart';
 export 'src/cloud_groups.dart';

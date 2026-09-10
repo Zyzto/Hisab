@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
+import 'package:safaeh/safaeh.dart';
 import '../../../core/build_env.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
@@ -11,6 +12,7 @@ import '../../../core/layout/constrained_content.dart';
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/navigation/route_paths.dart';
+import '../../../core/navigation/shell_nav_layout.dart';
 import '../../../core/debug/debug_menu.dart';
 import '../../../core/theme/theme_providers.dart';
 import '../../../core/widgets/app_fab.dart';
@@ -399,10 +401,14 @@ class HomePage extends ConsumerWidget {
           final contentAreaWidth = layoutConstraints.maxWidth;
 
           return Scaffold(
-            floatingActionButtonLocation: ContentAlignedFabLocation.of(
-              context,
-              contentAreaWidth: contentAreaWidth,
-            ),
+            floatingActionButtonLocation:
+                SafaehBottomNavAwareFabLocation.resolve(
+                  context,
+                  base: ContentAlignedFabLocation.of(
+                    context,
+                    contentAreaWidth: contentAreaWidth,
+                  ),
+                ),
             appBar: ContentAlignedAppBar(
               contentAreaWidth: contentAreaWidth,
               leadingWidth: ShellAppBarLeading.widthFor(context),
@@ -497,6 +503,11 @@ class HomePage extends ConsumerWidget {
                                 'home_list_empty',
                               ),
                               physics: const AlwaysScrollableScrollPhysics(),
+                              padding: EdgeInsets.only(
+                                bottom: ShellNavLayout.bottomNavListInset(
+                                  context,
+                                ),
+                              ),
                               child: ConstrainedBox(
                                 constraints: BoxConstraints(
                                   minHeight: constraints.maxHeight,
@@ -756,6 +767,13 @@ class HomePage extends ConsumerWidget {
                           const SliverPadding(
                             padding: EdgeInsets.only(bottom: 8),
                           ),
+                          SliverPadding(
+                            padding: EdgeInsets.only(
+                              bottom: ShellNavLayout.bottomNavListInset(
+                                context,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     );
@@ -774,8 +792,11 @@ class HomePage extends ConsumerWidget {
                           )
                         else
                           buildGroupSliver(ordered),
-                        const SliverPadding(
-                          padding: EdgeInsets.only(bottom: 8),
+                        SliverPadding(
+                          padding: EdgeInsets.only(
+                            bottom:
+                                8 + ShellNavLayout.bottomNavListInset(context),
+                          ),
                         ),
                       ],
                     ),

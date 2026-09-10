@@ -27,6 +27,7 @@ import '../../../core/utils/run_guarded_async.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/widgets/group_section_header.dart';
 import '../../../core/widgets/participant_avatar.dart';
+import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/sheet_option_tile.dart';
 import '../../../core/widgets/user_text.dart';
 import '../../../core/widgets/toast.dart';
@@ -95,6 +96,45 @@ class _KeepAliveStepState extends State<_KeepAliveStep>
   }
 }
 
+const _draftOwnerId = '__owner__';
+
+enum _DraftRowAction { addChild, editCount, remove }
+
+/// A participant row while the create wizard is still unsaved.
+///
+/// Keeping the parent relationship in the draft makes the setup screen match
+/// the People directory. The repository still receives the same flat ordered
+/// participant list, then the relationships are applied once the real IDs
+/// exist.
+class _DraftPerson {
+  final String id;
+  final String name;
+  final String? parentId;
+  final int unnamedDependentCount;
+
+  const _DraftPerson({
+    required this.id,
+    required this.name,
+    this.parentId,
+    this.unnamedDependentCount = 0,
+  });
+
+  _DraftPerson copyWith({
+    String? name,
+    String? parentId,
+    bool clearParentId = false,
+    int? unnamedDependentCount,
+  }) {
+    return _DraftPerson(
+      id: id,
+      name: name ?? this.name,
+      parentId: clearParentId ? null : (parentId ?? this.parentId),
+      unnamedDependentCount:
+          unnamedDependentCount ?? this.unnamedDependentCount,
+    );
+  }
+}
+
 class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
     with RouteTransitionReady {
   static const _kIndicatorActiveWidth = 28.0;
@@ -119,13 +159,12 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
   // ── Step 2 state ──
   final _participantController = TextEditingController();
   final _participantFocusNode = FocusNode();
-  final _ownerUnnamedDependentsController = TextEditingController(text: '0');
-  final _namedDependentController = TextEditingController();
+  int _draftIdSeed = 0;
+  int _ownerUnnamedDependentCount = 0;
 
   /// Prevents the Add button from stealing focus from the name field.
   late final FocusNode _addParticipantButtonFocusNode;
-  final List<String> _participants = [];
-  final List<String> _namedDependents = [];
+  final List<_DraftPerson> _draftPeople = [];
 
   // ── Step 3 state ──
   String? _selectedIcon;
@@ -134,7 +173,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
   // ── Group settings (group create only; not personal) ──
   SettlementMethod _settlementMethod = SettlementMethod.greedy;
 
-  /// `null` = owner is treasurer; otherwise a name from [_participants].
+  /// `null` = owner is treasurer; otherwise a name from [_draftPeople].
   String? _treasurerParticipantName;
   bool _allowMemberAddExpense = true;
   bool _allowMemberChangeSettings = true;
@@ -230,8 +269,6 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
     _budgetFocusNode.dispose();
     _participantController.dispose();
     _participantFocusNode.dispose();
-    _ownerUnnamedDependentsController.dispose();
-    _namedDependentController.dispose();
     _addParticipantButtonFocusNode.dispose();
     super.dispose();
   }
@@ -311,11 +348,67 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
 
   // ── Participant helpers ─────────────────────────────────────────────────
 
+  List<_DraftPerson> _flattenDraftPeople() {
+    final childrenByParent = <String?, List<_DraftPerson>>{};
+    for (final person in _draftPeople) {
+      childrenByParent.putIfAbsent(person.parentId, () => []).add(person);
+    }
+    for (final people in childrenByParent.values) {
+      people.sort(
+        (a, b) => _draftPeople.indexOf(a).compareTo(_draftPeople.indexOf(b)),
+      );
+    }
+    final result = <_DraftPerson>[];
+    final visited = <String>{};
+
+    void addChildren(String? parentId) {
+      for (final person
+          in childrenByParent[parentId] ?? const <_DraftPerson>[]) {
+        if (!visited.add(person.id)) continue;
+        result.add(person);
+        addChildren(person.id);
+      }
+    }
+
+    // The owner is a synthetic root in the draft, so show their branch first
+    // just as the directory editor does, followed by standalone roots.
+    addChildren(_draftOwnerId);
+    addChildren(null);
+    // Keep malformed drafts visible rather than silently dropping a row.
+    for (final person in _draftPeople) {
+      if (visited.add(person.id)) result.add(person);
+    }
+    return result;
+  }
+
+  List<_DraftPerson> _draftChildren(String parentId) => _draftPeople
+      .where((person) => person.parentId == parentId)
+      .toList(growable: false);
+
+  int get _draftHouseholdPeopleCount =>
+      1 +
+      _draftPeople.length +
+      (_householdCountingEnabled
+          ? _ownerUnnamedDependentCount +
+                _draftPeople.fold<int>(
+                  0,
+                  (sum, person) => sum + person.unnamedDependentCount,
+                )
+          : 0);
+
+  String _householdPeopleLabel(int count) => count == 1
+      ? 'household_one_person'.tr()
+      : 'household_people_count'.tr(namedArgs: {'count': '$count'});
+
+  String _householdDirectPeopleLabel(int count) => count == 1
+      ? 'household_one_person_represented'.tr()
+      : 'household_direct_people_count'.tr(namedArgs: {'count': '$count'});
+
   void _addParticipant() {
     final name = _participantController.text.trim();
     if (FormValidators.participantName(name) != null) return;
     setState(() {
-      _participants.add(name);
+      _draftPeople.add(_DraftPerson(id: 'draft_${_draftIdSeed++}', name: name));
       _participantController.clear();
     });
     // Re-focus after rebuild so Add / Done does not leave the field unfocused.
@@ -325,21 +418,79 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
     });
   }
 
-  void _removeParticipant(int index) {
-    setState(() => _participants.removeAt(index));
-  }
-
-  void _addNamedDependent() {
-    final name = _namedDependentController.text.trim();
-    if (FormValidators.participantName(name) != null) return;
+  Future<void> _addDraftChild(_DraftPerson parent) async {
+    final name = await showTextInputSheet(
+      context,
+      title: 'add_dependent'.tr(),
+      hint: 'participant_name'.tr(),
+      maxLength: FormValidators.participantNameMax,
+      centerInFullViewport: true,
+    );
+    if (!mounted || name == null) return;
+    final trimmed = name.trim();
+    if (FormValidators.participantName(trimmed) != null) return;
     setState(() {
-      _namedDependents.add(name);
-      _namedDependentController.clear();
+      _draftPeople.add(
+        _DraftPerson(
+          id: 'draft_${_draftIdSeed++}',
+          name: trimmed,
+          parentId: parent.id,
+        ),
+      );
     });
   }
 
-  void _removeNamedDependent(int index) {
-    setState(() => _namedDependents.removeAt(index));
+  Future<void> _editDraftCount({required String? personId}) async {
+    final current = personId == null
+        ? _ownerUnnamedDependentCount
+        : _draftPeople
+              .firstWhere((person) => person.id == personId)
+              .unnamedDependentCount;
+    final value = await showTextInputSheet(
+      context,
+      title: 'unnamed_dependents'.tr(),
+      hint: 'unnamed_dependents_hint'.tr(),
+      initialValue: '$current',
+      centerInFullViewport: true,
+    );
+    if (!mounted || value == null) return;
+    final count = int.tryParse(value.trim());
+    if (count == null || count < 0 || count > 999) {
+      context.showToast('household_invalid_count'.tr());
+      return;
+    }
+    setState(() {
+      if (personId == null) {
+        _ownerUnnamedDependentCount = count;
+      } else {
+        final index = _draftPeople.indexWhere(
+          (person) => person.id == personId,
+        );
+        if (index >= 0) {
+          _draftPeople[index] = _draftPeople[index].copyWith(
+            unnamedDependentCount: count,
+          );
+        }
+      }
+    });
+  }
+
+  void _removeDraftPerson(_DraftPerson person) {
+    final branchIds = <String>{person.id};
+    var changed = true;
+    while (changed) {
+      changed = false;
+      for (final candidate in _draftPeople) {
+        if (candidate.parentId != null &&
+            branchIds.contains(candidate.parentId) &&
+            branchIds.add(candidate.id)) {
+          changed = true;
+        }
+      }
+    }
+    setState(() {
+      _draftPeople.removeWhere((candidate) => branchIds.contains(candidate.id));
+    });
   }
 
   // ── Create ──────────────────────────────────────────────────────────────
@@ -357,6 +508,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
 
   Future<void> _createGroup() async {
     if (_saving) return;
+    final orderedDraftPeople = _flattenDraftPeople();
     final name = _nameController.text.trim();
     if (FormValidators.groupName(name) != null) {
       // Jump back to name step if somehow invalid on create.
@@ -366,13 +518,6 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
       }
       _nameFormKey.currentState?.validate();
       return;
-    }
-    if (!widget.isPersonal && _householdCountingEnabled) {
-      final count = int.tryParse(_ownerUnnamedDependentsController.text.trim());
-      if (count == null || count < 0 || count > 999) {
-        context.showToast('household_invalid_count'.tr());
-        return;
-      }
     }
     setState(() => _saving = true);
     try {
@@ -387,7 +532,9 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
           currencyCode,
           icon: _selectedIcon,
           color: _selectedColor.toARGB32(),
-          initialParticipants: widget.isPersonal ? [] : _participants,
+          initialParticipants: widget.isPersonal
+              ? []
+              : orderedDraftPeople.map((person) => person.name).toList(),
           isPersonal: widget.isPersonal,
           budgetAmountCents: budgetAmountCents,
           settlementMethod: widget.isPersonal
@@ -420,40 +567,59 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
         ref: ref,
       );
       if (id == null) return;
-      if (!widget.isPersonal && _householdCountingEnabled) {
-        final count = int.tryParse(
-          _ownerUnnamedDependentsController.text.trim(),
-        );
-        if (count != null) {
-          final participants = await ref
-              .read(participantRepositoryProvider)
-              .getByGroupId(id);
-          if (participants.isNotEmpty) {
-            final owner = participants.first;
-            await ref
-                .read(participantRepositoryProvider)
-                .update(owner.copyWith(unnamedDependentCount: count));
-            for (var i = 0; i < _namedDependents.length; i++) {
-              await ref
-                  .read(participantRepositoryProvider)
-                  .create(
-                    id,
-                    _namedDependents[i],
-                    participants.length + i,
-                    parentParticipantId: owner.id,
-                  );
-            }
+      // Keep the directory tree even when household counting is switched off
+      // at the end of setup. The group flag controls calculations; the
+      // participant relationships remain available if the owner enables it
+      // later from People/settings.
+      if (!widget.isPersonal) {
+        final participants =
+            (await ref.read(participantRepositoryProvider).getByGroupId(id))
+                .toList()
+              ..sort((a, b) => a.order.compareTo(b.order));
+        if (participants.isNotEmpty) {
+          final owner = participants.first;
+          final participantByDraftId = <String, String>{
+            _draftOwnerId: owner.id,
+          };
+          for (
+            var i = 0;
+            i < orderedDraftPeople.length && i + 1 < participants.length;
+            i++
+          ) {
+            participantByDraftId[orderedDraftPeople[i].id] =
+                participants[i + 1].id;
+          }
+          final participantRepo = ref.read(participantRepositoryProvider);
+          await participantRepo.update(
+            owner.copyWith(unnamedDependentCount: _ownerUnnamedDependentCount),
+          );
+          for (final person in orderedDraftPeople) {
+            final participantId = participantByDraftId[person.id];
+            if (participantId == null) continue;
+            final participant = participants.firstWhere(
+              (candidate) => candidate.id == participantId,
+            );
+            final parentId = person.parentId == null
+                ? null
+                : participantByDraftId[person.parentId] ?? owner.id;
+            await participantRepo.update(
+              participant.copyWith(
+                parentParticipantId: parentId,
+                unnamedDependentCount: person.unnamedDependentCount,
+                clearParentParticipantId: parentId == null,
+              ),
+            );
           }
         }
       }
       Log.info(
-        'Group created via wizard: id=$id name="$name" currency=$currencyCode participants=${_participants.length}',
+        'Group created via wizard: id=$id name="$name" currency=$currencyCode participants=${orderedDraftPeople.length + 1}',
       );
       try {
-        TelemetryService.sendEvent('group_created', {
+        await TelemetryService.sendEvent('group_created', {
           'groupId': id,
           'currencyCode': currencyCode,
-          'participantCount': _participants.length,
+          'participantCount': orderedDraftPeople.length + 1,
           'hasIcon': _selectedIcon != null,
         }, enabled: ref.read(telemetryEnabledProvider));
       } catch (e) {
@@ -714,7 +880,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
                         icon: const Icon(Icons.arrow_forward),
                         label: Text(
                           _currentPage == 1 && !widget.isPersonal
-                              ? (_participants.isEmpty
+                              ? (_draftPeople.isEmpty
                                     ? 'wizard_skip'.tr()
                                     : 'wizard_next'.tr())
                               : 'wizard_next'.tr(),
@@ -933,9 +1099,6 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
   // ═══════════════════════════════════════════════════════════════════════════
 
   Widget _buildStep2Participants(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
     return WizardStepEnter(
       child: ListView(
         padding: const EdgeInsets.all(ThemeConfig.spacingM),
@@ -947,222 +1110,245 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
             subtitleKey: 'wizard_step2_subtitle',
           ),
           const SizedBox(height: ThemeConfig.spacingL),
-
-          // Owner card (non-removable)
-          Builder(
-            builder: (context) {
-              final profile = ref.watch(authUserProfileProvider).value;
-              final profileName = profile?.name?.trim();
-              final displayName =
-                  (profileName != null && profileName.isNotEmpty)
-                  ? profileName
-                  : 'wizard_you'.tr();
-              return Material(
-                color: AccentSurfaces.emphasizedFill(
-                  colorScheme,
-                  subtle: context.subtleAccents,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
-                  side: BorderSide(
-                    color: AccentSurfaces.emphasizedBorder(
-                      colorScheme,
-                      subtle: context.subtleAccents,
-                    ),
-                  ),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: ListTile(
-                  leading: ParticipantAvatar(
-                    name: displayName,
-                    avatarId: profile?.avatarId,
-                    backgroundColor: colorScheme.primary.withValues(
-                      alpha: 0.16,
-                    ),
-                    foregroundColor: colorScheme.primary,
-                  ),
-                  title: Text(
-                    'wizard_you'.tr(),
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  subtitle: Text('wizard_owner'.tr()),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: ThemeConfig.spacingS),
-
-          if (!widget.isPersonal) ...[
-            const SizedBox(height: ThemeConfig.spacingM),
-            _householdIntroCard(context),
-          ],
-
-          // Added participants
-          ...List.generate(_participants.length, (i) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: ThemeConfig.spacingS),
-              child: Material(
-                color: colorScheme.surfaceContainerLow,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(ThemeConfig.radiusL),
-                  side: BorderSide(
-                    color: colorScheme.outlineVariant.withValues(alpha: 0.45),
-                  ),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: ListTile(
-                  leading: ParticipantAvatar(
-                    name: _participants[i],
-                    backgroundColor: colorScheme.surfaceContainerHighest,
-                    foregroundColor: colorScheme.onSurface,
-                  ),
-                  title: UserText(_participants[i]),
-                  trailing: IconButton(
-                    icon: Icon(Icons.close, color: colorScheme.error),
-                    onPressed: () => _removeParticipant(i),
-                    tooltip: 'remove'.tr(),
-                  ),
-                ),
-              ),
-            );
-          }),
-
-          const SizedBox(height: ThemeConfig.spacingM),
-
-          _formPanel(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _participantController,
-                        focusNode: _participantFocusNode,
-                        decoration: InputDecoration(
-                          hintText: 'wizard_participant_hint'.tr(),
-                          border: const OutlineInputBorder(),
-                          prefixIcon: const Icon(Icons.person_add_outlined),
-                          counterText: '',
-                        ),
-                        maxLength: FormValidators.participantNameMax,
-                        textInputAction: TextInputAction.done,
-                        onSubmitted: (_) => _addParticipant(),
-                      ),
-                    ),
-                    const SizedBox(width: ThemeConfig.spacingS),
-                    FilledButton.tonal(
-                      focusNode: _addParticipantButtonFocusNode,
-                      onPressed: _addParticipant,
-                      child: Text('wizard_add'.tr()),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: ThemeConfig.spacingS),
-                Text(
-                  'wizard_participants_hint'.tr(),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          if (!widget.isPersonal) _buildDirectoryEditor(context),
         ],
       ),
     );
   }
 
-  Widget _householdIntroCard(BuildContext context) {
+  Widget _buildDirectoryEditor(BuildContext context) {
     final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    return Card(
-      elevation: 0,
-      color: colors.secondaryContainer.withValues(alpha: 0.45),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              title: Text('household_counting_title'.tr()),
-              subtitle: Text('household_enable_intro'.tr()),
-              value: _householdCountingEnabled,
-              onChanged: (value) =>
-                  setState(() => _householdCountingEnabled = value),
-            ),
+    final colorScheme = theme.colorScheme;
+    final profile = ref.watch(authUserProfileProvider).value;
+    final profileName = profile?.name?.trim();
+    final ownerName = (profileName != null && profileName.isNotEmpty)
+        ? profileName
+        : 'wizard_you'.tr();
+    final owner = _DraftPerson(
+      id: _draftOwnerId,
+      name: ownerName,
+      unnamedDependentCount: _ownerUnnamedDependentCount,
+    );
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: AccentSurfaces.flatPanel(colorScheme),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.account_tree_outlined, color: colorScheme.primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'participants'.tr(),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _householdCountingEnabled
+                          ? 'household_enable_intro'.tr()
+                          : 'household_counting_disabled_hint'.tr(),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Switch.adaptive(
+                value: _householdCountingEnabled,
+                onChanged: (value) =>
+                    setState(() => _householdCountingEnabled = value),
+              ),
+            ],
+          ),
+          if (_householdCountingEnabled) ...[
+            const SizedBox(height: 8),
             Text(
               'household_counting_example'.tr(),
               style: theme.textTheme.bodySmall?.copyWith(
-                color: colors.onSecondaryContainer,
+                color: colorScheme.primary,
                 fontWeight: FontWeight.w600,
               ),
             ),
-            if (_householdCountingEnabled) ...[
-              const SizedBox(height: 10),
-              TextField(
-                controller: _ownerUnnamedDependentsController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: 'unnamed_dependents'.tr(),
-                  helperText: 'unnamed_dependents_hint'.tr(),
-                  border: const OutlineInputBorder(),
-                ),
-                onChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: 6),
-              const Divider(height: 20),
-              Text(
-                'named_dependents'.tr(),
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 6),
-              ...List.generate(
-                _namedDependents.length,
-                (i) => ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.person_outline),
-                  title: UserText(_namedDependents[i]),
-                  trailing: IconButton(
-                    icon: Icon(Icons.close, color: colors.error),
-                    onPressed: () => _removeNamedDependent(i),
-                    tooltip: 'remove'.tr(),
-                  ),
-                ),
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _namedDependentController,
-                      decoration: InputDecoration(
-                        hintText: 'participant_name'.tr(),
-                        border: const OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                      maxLength: FormValidators.participantNameMax,
-                      textInputAction: TextInputAction.done,
-                      onSubmitted: (_) => _addNamedDependent(),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton.filledTonal(
-                    onPressed: _addNamedDependent,
-                    icon: const Icon(Icons.add),
-                    tooltip: 'add_dependent'.tr(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text('household_setup_later'.tr()),
-            ],
           ],
+          const SizedBox(height: 14),
+          _buildDraftDirectoryRow(
+            context,
+            owner,
+            depth: 0,
+            avatarId: profile?.avatarId,
+            isOwner: true,
+          ),
+          for (final person in _draftPeople.where(
+            (person) => person.parentId == _draftOwnerId,
+          ))
+            ..._buildDraftDirectoryBranch(context, person, depth: 1),
+          for (final person in _draftPeople.where(
+            (person) => person.parentId == null,
+          ))
+            ..._buildDraftDirectoryBranch(context, person, depth: 0),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _participantController,
+                  focusNode: _participantFocusNode,
+                  decoration: InputDecoration(
+                    hintText: 'wizard_participant_hint'.tr(),
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.person_add_outlined),
+                    counterText: '',
+                  ),
+                  maxLength: FormValidators.participantNameMax,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _addParticipant(),
+                ),
+              ),
+              const SizedBox(width: ThemeConfig.spacingS),
+              FilledButton.tonal(
+                focusNode: _addParticipantButtonFocusNode,
+                onPressed: _addParticipant,
+                child: Text('wizard_add'.tr()),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            _householdCountingEnabled
+                ? 'household_setup_later'.tr()
+                : 'household_counting_disabled_hint'.tr(),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          if (_householdCountingEnabled) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Text(
+                _householdPeopleLabel(_draftHouseholdPeopleCount),
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildDraftDirectoryBranch(
+    BuildContext context,
+    _DraftPerson person, {
+    required int depth,
+  }) {
+    final rows = <Widget>[
+      _buildDraftDirectoryRow(context, person, depth: depth),
+    ];
+    for (final child in _draftChildren(person.id)) {
+      rows.addAll(_buildDraftDirectoryBranch(context, child, depth: depth + 1));
+    }
+    return rows;
+  }
+
+  Widget _buildDraftDirectoryRow(
+    BuildContext context,
+    _DraftPerson person, {
+    required int depth,
+    String? avatarId,
+    bool isOwner = false,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final children = _draftChildren(person.id);
+    final directPeopleCount = 1 + person.unnamedDependentCount;
+    final countLabel = _householdCountingEnabled && directPeopleCount > 1
+        ? _householdDirectPeopleLabel(directPeopleCount)
+        : (!_householdCountingEnabled && isOwner ? 'wizard_owner'.tr() : null);
+    final subtitle = [
+      ?countLabel,
+      if (children.isNotEmpty) '${children.length} ${'named_dependents'.tr()}',
+    ].join(' · ');
+    return Padding(
+      padding: EdgeInsetsDirectional.only(start: depth * 22.0, bottom: 6),
+      child: Material(
+        color: isOwner
+            ? colorScheme.primaryContainer.withValues(alpha: 0.45)
+            : colorScheme.surfaceContainerLow,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(
+            color: isOwner
+                ? colorScheme.primary.withValues(alpha: 0.35)
+                : colorScheme.outlineVariant.withValues(alpha: 0.5),
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          dense: true,
+          contentPadding: const EdgeInsetsDirectional.only(start: 10, end: 4),
+          leading: ParticipantAvatar(
+            name: person.name,
+            avatarId: avatarId,
+            backgroundColor: isOwner
+                ? colorScheme.primary.withValues(alpha: 0.16)
+                : colorScheme.surfaceContainerHighest,
+            foregroundColor: isOwner
+                ? colorScheme.primary
+                : colorScheme.onSurface,
+          ),
+          title: UserText(
+            isOwner ? 'wizard_you'.tr() : person.name,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          subtitle: subtitle.isEmpty ? null : Text(subtitle),
+          trailing: (_householdCountingEnabled || !isOwner)
+              ? PopupMenuButton<_DraftRowAction>(
+                  onSelected: (action) {
+                    switch (action) {
+                      case _DraftRowAction.addChild:
+                        _addDraftChild(person);
+                      case _DraftRowAction.editCount:
+                        _editDraftCount(personId: isOwner ? null : person.id);
+                      case _DraftRowAction.remove:
+                        if (!isOwner) _removeDraftPerson(person);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    if (_householdCountingEnabled)
+                      PopupMenuItem(
+                        value: _DraftRowAction.addChild,
+                        child: Text('add_dependent'.tr()),
+                      ),
+                    if (_householdCountingEnabled)
+                      PopupMenuItem(
+                        value: _DraftRowAction.editCount,
+                        child: Text('unnamed_dependents'.tr()),
+                      ),
+                    if (!isOwner)
+                      PopupMenuItem(
+                        value: _DraftRowAction.remove,
+                        child: Text('remove'.tr()),
+                      ),
+                  ],
+                )
+              : null,
         ),
       ),
     );
@@ -1283,11 +1469,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final iconDef = groupIcons.where((g) => g.key == _selectedIcon).firstOrNull;
-    final totalParticipants =
-        1 + _participants.length + _namedDependents.length;
-    final unnamed = _householdCountingEnabled
-        ? (int.tryParse(_ownerUnnamedDependentsController.text.trim()) ?? 0)
-        : 0;
+    final totalParticipants = 1 + _draftPeople.length;
 
     return WizardStepEnter(
       child: ListView(
@@ -1385,36 +1567,19 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
                   _SummaryRow(
                     icon: Icons.account_tree_outlined,
                     label: 'household_counting'.tr(),
-                    value: 'household_people_count'.tr(
-                      namedArgs: {'count': '${totalParticipants + unnamed}'},
-                    ),
+                    value: _householdPeopleLabel(_draftHouseholdPeopleCount),
                     onEdit: () => _goToPage(1),
                   ),
                 ],
-                if (!widget.isPersonal && _participants.isNotEmpty) ...[
+                if (!widget.isPersonal && _draftPeople.isNotEmpty) ...[
                   const SizedBox(height: ThemeConfig.spacingS),
                   Wrap(
                     spacing: 6,
                     runSpacing: 6,
-                    children: _participants
+                    children: _flattenDraftPeople()
                         .map(
-                          (p) => Chip(
-                            label: UserText(p),
-                            visualDensity: VisualDensity.compact,
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ],
-                if (!widget.isPersonal && _namedDependents.isNotEmpty) ...[
-                  const SizedBox(height: ThemeConfig.spacingS),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: _namedDependents
-                        .map(
-                          (p) => Chip(
-                            label: UserText(p),
+                          (person) => Chip(
+                            label: UserText(person.name),
                             visualDensity: VisualDensity.compact,
                           ),
                         )
@@ -1546,9 +1711,12 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
 
   String _treasurerDisplayName() {
     final selected = _treasurerParticipantName?.trim();
+    final participantNames = _flattenDraftPeople()
+        .map((person) => person.name)
+        .toSet();
     if (selected != null &&
         selected.isNotEmpty &&
-        _participants.contains(selected)) {
+        participantNames.contains(selected)) {
       return selected;
     }
     return _ownerTreasurerLabel();
@@ -1556,9 +1724,12 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
 
   void _syncTreasurerSelection() {
     final selected = _treasurerParticipantName?.trim();
+    final participantNames = _flattenDraftPeople()
+        .map((person) => person.name)
+        .toSet();
     if (selected != null &&
         selected.isNotEmpty &&
-        !_participants.contains(selected)) {
+        !participantNames.contains(selected)) {
       _treasurerParticipantName = null;
     }
   }
@@ -1643,12 +1814,14 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
                         onTap: () =>
                             Navigator.pop(ctx, const _TreasurerPick.owner()),
                       ),
-                      for (final name in _participants)
+                      for (final person in _flattenDraftPeople())
                         SheetOptionTile(
-                          title: name,
-                          selected: _treasurerParticipantName == name,
-                          onTap: () =>
-                              Navigator.pop(ctx, _TreasurerPick.named(name)),
+                          title: person.name,
+                          selected: _treasurerParticipantName == person.name,
+                          onTap: () => Navigator.pop(
+                            ctx,
+                            _TreasurerPick.named(person.name),
+                          ),
                         ),
                     ],
                   ),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:currency_picker/currency_picker.dart';
@@ -5,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hisab_backend/hisab_backend.dart';
 import 'package:custom_sliding_segmented_control/custom_sliding_segmented_control.dart';
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:image_picker/image_picker.dart';
@@ -48,6 +50,7 @@ import '../../../core/widgets/user_text.dart';
 import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 import 'package:hisab/core/settings/settings_definitions.dart';
 import '../../balance/providers/balance_provider.dart';
+import '../../billing/widgets/billing_plus_card.dart';
 import '../../groups/providers/group_member_provider.dart';
 import '../../groups/providers/groups_provider.dart';
 import '../camera/receipt_camera_debug.dart';
@@ -622,6 +625,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
                           if (_customSplitValues[p.id] != null)
                             p.id: _customSplitValues[p.id]!,
                       },
+                      parentParticipantIds: {
+                        for (final p in included) p.id: p.parentParticipantId,
+                      },
                     ).toJsonString()
                   : _initialExpense?.householdSplitSnapshotJson),
         createdAt: _initialExpense?.createdAt ?? DateTime.now(),
@@ -690,10 +696,12 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
           'Expense created: id=$id groupId=${expense.groupId} title="${expense.title}" amountCents=${expense.amountCents} currencyCode=${expense.currencyCode}',
         );
         try {
-          TelemetryService.sendEvent('expense_created', {
-            'groupId': expense.groupId,
-            'amountCents': expense.amountCents,
-          }, enabled: ref.read(telemetryEnabledProvider));
+          unawaited(
+            TelemetryService.sendEvent('expense_created', {
+              'groupId': expense.groupId,
+              'amountCents': expense.amountCents,
+            }, enabled: ref.read(telemetryEnabledProvider)),
+          );
         } catch (e) {
           Log.debug('Telemetry expense_created failed', error: e);
         }
@@ -712,6 +720,12 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
       didPop = true;
     } catch (e, st) {
       Log.warning('Expense save failed', error: e, stackTrace: st);
+      if (mounted &&
+          e is CloudException &&
+          e.kind == CloudErrorKind.quotaExceeded) {
+        context.showError('hisab_plus_limit_reached'.tr());
+        unawaited(showBillingPlusSheet(context, ref));
+      }
     } finally {
       if (!didPop && mounted) setState(() => _saving = false);
     }
@@ -837,6 +851,14 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
             messageKey: 'group_not_found_message',
             fallbackPath: _formBackPath,
           );
+        }
+        // New expenses inherit the group's opt-in household setting.  Keep
+        // this in sync before split previews are calculated; otherwise the
+        // add-expense form silently falls back to a flat participant split
+        // until the expense is saved and reopened.
+        if (widget.expenseId == null &&
+            _householdMode != group.householdCountingEnabled) {
+          _householdMode = group.householdCountingEnabled;
         }
         if (group.isSettlementFrozen && widget.expenseId == null) {
           return LayoutBuilder(
@@ -1067,7 +1089,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
                         key: _formKey,
                         child: FocusTraversalGroup(
                           child: ListView(
-                            padding: EdgeInsets.only(
+                            padding: const EdgeInsets.only(
                               left: 16,
                               right: 16,
                               top: 12,

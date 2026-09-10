@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hisab_backend/hisab_backend.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../features/billing/widgets/billing_plus_card.dart';
+import '../database/sync_errors.dart';
 import '../layout/layout_breakpoints.dart';
 import '../layout/responsive_sheet.dart';
 import '../settings/providers/settings_framework_providers.dart';
@@ -64,6 +66,7 @@ class _ServicesStatusSheetState extends ConsumerState<_ServicesStatusSheet> {
   @override
   Widget build(BuildContext context) {
     final syncStatus = ref.watch(syncStatusForDisplayProvider);
+    final syncErrorKind = ref.watch(syncErrorKindProvider);
     final scanMode = ref.watch(receiptScanModeProvider);
     final cloudAi = !kIsWeb && scanMode == 'cloud';
     final aiProvider = ref.watch(receiptAiProviderProvider);
@@ -94,6 +97,14 @@ class _ServicesStatusSheetState extends ConsumerState<_ServicesStatusSheet> {
                 ),
               const SizedBox(height: 6),
               _SyncStatusLine(status: syncStatus),
+              if (syncErrorKind == CloudErrorKind.quotaExceeded) ...[
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: () => showBillingPlusSheet(context, ref),
+                  icon: const Icon(Icons.workspace_premium_outlined),
+                  label: Text('hisab_plus_upgrade'.tr()),
+                ),
+              ],
               const SizedBox(height: 16),
               Text(
                 'services_status_services'.tr(),
