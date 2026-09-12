@@ -14,7 +14,7 @@ void main() {
     test('routes secret strings away from SharedPreferences', () async {
       final prefs = SharedPreferencesStorage();
       final storage = SecureSettingsStorage(
-        secretKeys: {'gemini_api_key'},
+        secretKeys: {'legacy_secret'},
         prefsStorage: prefs,
         // Use real FlutterSecureStorage with mocked platform via prefs-only
         // path when secure plugin is unavailable in unit tests: exercise
@@ -34,12 +34,12 @@ void main() {
 
     test('migrates plaintext secret prefs into secure path on init', () async {
       SharedPreferences.setMockInitialValues({
-        'gemini_api_key': 'legacy-secret',
+        'legacy_secret': 'legacy-secret',
         'theme_mode': 'system',
       });
       final prefs = SharedPreferencesStorage();
       final storage = SecureSettingsStorage(
-        secretKeys: {'gemini_api_key'},
+        secretKeys: {'legacy_secret'},
         prefsStorage: prefs,
       );
       await storage.init();

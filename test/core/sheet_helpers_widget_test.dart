@@ -435,7 +435,7 @@ void main() {
     tester,
   ) async {
     setPhoneViewport(tester);
-    // Mirrors sign-in / edit-profile: no caller maxHeight (uses size*0.92).
+    // Mirrors form sheets: no caller maxHeight (uses size*0.92).
     await tester.pumpWidget(
       buildApp(
         onOpen: (ctx) => showResponsiveSheet<void>(

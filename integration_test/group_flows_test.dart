@@ -98,7 +98,8 @@ void main() {
         // On web, watchByGroupId uses polling (800ms). Wait for content.
         await tester.pump(const Duration(milliseconds: 2500));
         // Tab should show either participants or "add participants first"
-        final hasContent = find.textContaining('Add Participants').evaluate().isNotEmpty ||
+        final hasContent =
+            find.textContaining('Add Participants').evaluate().isNotEmpty ||
             find.text('Owner').evaluate().isNotEmpty ||
             find.textContaining('Alice').evaluate().isNotEmpty ||
             find.byIcon(Icons.person_add).evaluate().isNotEmpty;
@@ -202,7 +203,7 @@ void main() {
 
       // ── Stage: verify settings content ──
       await stage('verify settings content', () async {
-        // On Group Settings page; group name is in profile header
+        // On Group Settings page; group name is in the group header.
         expect(find.text('Group Settings'), findsOneWidget);
 
         await scrollUntilVisible(tester, find.text('Group Currency'));
@@ -269,11 +270,11 @@ void main() {
         await waitForResponsiveSheetClosed(tester);
       });
 
-      // ── Stage: verify permission toggles in settings (online only) ──
-      await stage('verify group permission toggles (online only)', () async {
+      // ── Stage: verify local group settings ──
+      await stage('verify local group settings', () async {
         final permissionsTitle = find.text('Group Permissions');
         if (permissionsTitle.evaluate().isEmpty) {
-          // Local-only runs do not render online group permission controls.
+          // The public build keeps group settings local-only.
           return;
         }
 

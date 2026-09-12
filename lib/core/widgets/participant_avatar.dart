@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../auth/predefined_avatars.dart';
+import '../avatars/predefined_avatars.dart';
 
-/// Circle avatar for a participant/profile: emoji from [avatarId], else initials.
+/// Circle avatar for a participant: emoji from [avatarId], else initials.
 class ParticipantAvatar extends StatelessWidget {
   final String name;
   final String? avatarId;

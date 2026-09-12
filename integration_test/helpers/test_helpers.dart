@@ -232,7 +232,7 @@ Future<T> waitForAsyncResult<T>(
 /// widget is already in the tree, or manual drag-scrolling otherwise.
 ///
 /// Avoids [pumpAndSettle] entirely — background animations (UpgradeAlert,
-/// sync indicator, loaders) prevent settling and can also cause scroll physics
+/// status indicators and loaders prevent settling and can also cause scroll physics
 /// to drift lazy-list items back out of view during the settle window.
 Future<void> scrollUntilVisible(
   WidgetTester tester,
@@ -320,7 +320,7 @@ Future<void> ensureFormClosed(WidgetTester tester) async {
   }
 }
 
-/// Advance time so app [Timer]s (sync-chip collapse, toasts) can finish.
+/// Advance time so app [Timer]s (chrome collapse, toasts) can finish.
 ///
 /// Integration [testWidgets] fails after the body returns if a [Timer] is still
 /// pending — even when every [stage] already PASSED (empty failureDetails on
@@ -351,10 +351,7 @@ void installFlutterErrorStageLogger() {
 /// Sheets use [showGeneralDialog], not [BottomSheet] / [Dialog], so type
 /// finders alone miss them.
 bool isResponsiveSheetVisible() {
-  return find
-      .byKey(const ValueKey('safaeh_panel'))
-      .evaluate()
-      .isNotEmpty;
+  return find.byKey(const ValueKey('safaeh_panel')).evaluate().isNotEmpty;
 }
 
 /// Waits until the adaptive sheet/dialog is gone (or [timeout] elapses).
@@ -389,9 +386,7 @@ void ensureBootstrapReady(bool ready, {String? reason}) {
     final suffix = (reason != null && reason.trim().isNotEmpty)
         ? ' Reason: $reason'
         : '';
-    throw TestFailure(
-      'Integration test bootstrap failed.$suffix',
-    );
+    throw TestFailure('Integration test bootstrap failed.$suffix');
   }
 }
 

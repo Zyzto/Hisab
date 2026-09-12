@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 /// The Hisab app mark.
 ///
-/// Onboarding and the invite QR each reached for `assets/Hisab.png` with their
+/// Onboarding and other local surfaces use the bundled app mark with their
 /// own rounding. Keeping the radius proportional here means the mark reads the
 /// same whether it is 40px in a sheet header or 76px on the welcome screen.
 class AppBrandMark extends StatelessWidget {

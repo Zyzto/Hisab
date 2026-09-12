@@ -11,7 +11,6 @@ void main() {
       expect(canPromptPwaInstall, isFalse);
       // Non-web: treat as already installed so install UI stays hidden.
       expect(pwaInstallMode, PwaInstallMode.alreadyInstalled);
-      expect(pwaNotificationSupport, PwaNotificationSupport.supported);
     });
 
     test('promptPwaInstall is a no-op outside web', () async {
@@ -90,52 +89,6 @@ void main() {
           isAndroid: true,
         ),
         PwaInstallMode.manualAndroid,
-      );
-    });
-  });
-
-  group('resolvePwaNotificationSupport', () {
-    test('unsupported when Notification API missing', () {
-      expect(
-        resolvePwaNotificationSupport(
-          notificationApiAvailable: false,
-          isIos: false,
-          isStandalone: false,
-        ),
-        PwaNotificationSupport.unsupported,
-      );
-    });
-
-    test('iOS browser tab needs install', () {
-      expect(
-        resolvePwaNotificationSupport(
-          notificationApiAvailable: true,
-          isIos: true,
-          isStandalone: false,
-        ),
-        PwaNotificationSupport.needsInstall,
-      );
-    });
-
-    test('iOS Home Screen PWA is supported', () {
-      expect(
-        resolvePwaNotificationSupport(
-          notificationApiAvailable: true,
-          isIos: true,
-          isStandalone: true,
-        ),
-        PwaNotificationSupport.supported,
-      );
-    });
-
-    test('Android browser tab is supported', () {
-      expect(
-        resolvePwaNotificationSupport(
-          notificationApiAvailable: true,
-          isIos: false,
-          isStandalone: false,
-        ),
-        PwaNotificationSupport.supported,
       );
     });
   });

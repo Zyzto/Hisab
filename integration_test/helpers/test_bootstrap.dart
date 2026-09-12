@@ -42,7 +42,7 @@ void _recordBootstrapError(String error) {
 /// Initializes the app for integration tests: EasyLocalization, temp PowerSync
 /// DB, and settings (local-only mode, optionally skip onboarding).
 ///
-/// Does not initialize Supabase, Firebase, or LoggingService.
+/// Does not initialize any hosted services.
 ///
 /// Returns `true` if the app was started successfully, `false` if PowerSync
 /// or settings init failed (e.g. PowerSync binary unavailable).
@@ -72,7 +72,6 @@ Future<bool> runIntegrationTestApp({bool skipOnboarding = true}) async {
     } else {
       settingsProviders.controller.set(onboardingCompletedSettingDef, false);
     }
-    settingsProviders.controller.set(localOnlySettingDef, true);
     settingsProviders.controller.set(languageSettingDef, 'en');
   }
 

@@ -1,45 +1,24 @@
-# Delete your Hisab account and data
+# Data deletion
 
-This page explains how to delete your data and request account deletion for **Hisab** (the app and developer name as shown on the Google Play Store listing).
+The local Hisab application does not create accounts or store app records on a
+service. The public deletion page is:
 
-## Remove data from your device (Delete local data)
+`https://hisab.shenepoy.com/delete-account/`
 
-1. Open the Hisab app.
-2. Go to **Settings** → **Advanced** → **Delete local data**.
-3. Read the summary of what will be deleted, wait for the 10-second countdown, then confirm. This removes all local data (groups, expenses, participants, invites) from this device and returns you to the onboarding screen. You are not signed out; you can continue in local-only mode or sign in again.
+It is also linked from the public privacy page and is suitable for the Google
+Play and Apple App Store legal-information fields.
 
-After this, no app data remains on your device. Data stored on our servers (if you used Online mode) is not removed by this step.
+## Delete local records
 
-## Remove your data from the server (Delete cloud data)
+Use Settings → Data & Backup to remove records from the app. Exported JSON,
+CSV, and ZIP backups are separate files and must be deleted from wherever they
+were saved.
 
-When signed in and online:
+To remove all remaining local data, clear the app's storage on Android, delete
+the app on iOS, or clear the site's storage in the browser on web. This also
+removes local receipts and transaction-scanner drafts that were not exported.
 
-1. Go to **Settings** → **Advanced** → **Delete cloud data**.
-2. Read the summary (group memberships, ownership transfer for groups you own, sole-member groups that will be deleted, device tokens, invite records, in-app notifications). You can optionally check **Also delete local data on this device** to wipe the device and return to onboarding after cloud deletion.
-3. Wait for the 10-second countdown, then confirm. The app leaves all your groups (transferring ownership to the next member by join date where you are owner; groups where you are the only member are deleted), removes your device tokens, invite-usage records, and `user_notifications` from the server, then signs you out. If you chose to also delete local data, the device is wiped and you are taken to onboarding.
-
-Server-side app data (group memberships, device_tokens, invite_usages, user_notifications) is removed by this action. Your auth account (email/social login) is not deleted; you can request that separately (see below).
-
-## Request deletion of your account and server data
-
-To request deletion of your **account** and **all data stored on our servers** (e.g. groups, expenses, and profile data in our cloud database):
-
-- **Open an issue** on our GitHub repository with the subject “Account deletion request” and the email address (or identifier) you used to sign in, or  
-- **Contact the developer** through the app’s **About** section.
-
-Once we process your request, we will delete your account and associated data from our systems. We do not retain backups of deleted user data; deletion is permanent.
-
-## What is deleted
-
-- **Delete local data:** All data on this device (local groups, expenses, participants, invites) is deleted. Server-side data is not deleted. You are not signed out.
-- **Delete cloud data:** Your presence on the server is removed: you leave all groups (ownership is transferred where applicable; groups where you are the only member are deleted), your device tokens, invite-usage records, and in-app notification history are deleted, and you are signed out. Optionally you can also delete local data on the device. Your auth account (login) is not deleted by this action.
-- **When you request account deletion:** Your auth account and all associated data stored on our servers are deleted. When your account is deleted, your display name in any group (in expense history) is replaced with a neutral placeholder so past expenses remain meaningful without showing your name. We do not retain deleted user data.
-
-## Retention
-
-We do not retain deleted user data. After deletion, we have no additional retention period for that data.
-
-## See also
-
-- The app’s Privacy Policy (Settings → Privacy Policy in the app, or at [https://hisab.shenepoy.com/privacy](https://hisab.shenepoy.com/privacy)).
-- Short summary of deletion options on the web: [https://hisab.shenepoy.com/delete-account](https://hisab.shenepoy.com/delete-account) (Firebase Hosting, same deploy as the app).
+Because this application has no account or remote data store, there is no
+separate account-closure request to process. If a release appears to have
+created an account or retained data outside the local app, contact the
+maintainer through the public issue tracker without sending sensitive records.

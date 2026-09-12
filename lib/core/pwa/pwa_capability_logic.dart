@@ -18,17 +18,6 @@ PwaInstallMode resolvePwaInstallMode({
   return PwaInstallMode.manualAndroid;
 }
 
-/// Pure resolution of web notification support from capability flags.
-PwaNotificationSupport resolvePwaNotificationSupport({
-  required bool notificationApiAvailable,
-  required bool isIos,
-  required bool isStandalone,
-}) {
-  if (!notificationApiAvailable) return PwaNotificationSupport.unsupported;
-  if (isIos && !isStandalone) return PwaNotificationSupport.needsInstall;
-  return PwaNotificationSupport.supported;
-}
-
 /// Whether the install guide should use iOS Share → Add to Home Screen copy.
 bool useIosInstallGuide({required PwaInstallMode mode, required bool isIos}) {
   return mode == PwaInstallMode.manualIos || isIos;

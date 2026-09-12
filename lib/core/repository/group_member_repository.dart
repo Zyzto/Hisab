@@ -1,13 +1,12 @@
 import '../../domain/domain.dart';
 
+/// Read-only compatibility surface for membership rows from older databases.
+///
+/// Local-only groups use participants directly and never create these rows.
 abstract class IGroupMemberRepository {
   Future<GroupRole?> getMyRole(String groupId);
   Future<GroupMember?> getMyMember(String groupId);
-
-  /// Live updates for the signed-in user's membership in [groupId].
   Stream<GroupMember?> watchMyMember(String groupId);
-
-  /// All memberships for the signed-in user (one query for profile dashboards).
   Future<List<GroupMember>> listMyMembers();
   Stream<List<GroupMember>> watchMyMembers();
   Future<List<GroupMember>> listByGroup(String groupId);

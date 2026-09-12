@@ -29,7 +29,7 @@ This plan is based on the [Flutter Adaptive and Responsive Design](https://docs.
 
 ### Current state
 
-- **SafeArea:** Used in many places: scaffold bodies (e.g. `main.dart`, `app.dart`), sheets (`sheet_helpers.dart`, onboarding, settings, group create, invite, expense form, etc.), `FloatingNavBar`, `ConnectionBanner`, debug menu. Doc recommends wrapping scaffold **body** (not whole scaffold); current usage is mixed (some body, some full screen).
+- **SafeArea:** Used in many places: scaffold bodies (e.g. `main.dart`, `app.dart`), sheets (`sheet_helpers.dart`, onboarding, settings, group create, expense form, etc.), `FloatingNavBar`, and the debug menu. Doc recommends wrapping scaffold **body** (not whole scaffold); current usage is mixed (some body, some full screen).
 - **MediaQuery:** Used for padding (safe area, view insets), size (max heights for dialogs/sheets), 24h format, and breakpoints. No nesting issues observed with SafeArea.
 
 ### Planned changes
@@ -89,7 +89,7 @@ This plan is based on the [Flutter Adaptive and Responsive Design](https://docs.
 - **Don’t lock orientation:** No lock found; good.
 - **Avoid orientation-based layouts:** No `OrientationBuilder` or `MediaQuery.orientation` for layout branching; we use width only. Good.
 - **Don’t gobble horizontal space:** `ConstrainedContent` and max widths used; good.
-- **Avoid device-type checks for layout:** We use **width** (MediaQuery) for rail vs bottom nav and sheet vs dialog. **`kIsWeb`** is used for: scrollbars, DB path, PWA banner, invite flow, receipt long-press, logging. Doc says avoid “phone vs tablet” for layout; we don’t use device type for layout. `kIsWeb` is used for capabilities (e.g. no file path, different storage), which is acceptable but could be moved to a Capability (see below).
+- **Avoid device-type checks for layout:** We use **width** (MediaQuery) for rail vs bottom nav and sheet vs dialog. **`kIsWeb`** is used for scrollbars, the local database path, the PWA banner, receipt long-press, and logging. Doc says avoid “phone vs tablet” for layout; we don’t use device type for layout. `kIsWeb` is used for capabilities (e.g. no file path, different storage), which is acceptable but could be moved to a Capability (see below).
 - **Restore list state:** No **PageStorageKey** on home list or other scrollables; rotation/resize may lose scroll position.
 - **Save app state:** No explicit handling; rely on framework and plugins. Doc suggests verifying plugins support large screens and fold/unfold.
 
@@ -114,7 +114,7 @@ This plan is based on the [Flutter Adaptive and Responsive Design](https://docs.
 
 | Priority | Change | Where | Notes |
 |----------|--------|--------|------|
-| Low | Introduce a **Capability** (e.g. `hasFilePaths`, `hasPersistentLocalStorage`) and optionally a **Policy** for “show purchase link” / “use web-only logging” style decisions. Replace direct `kIsWeb` / `Platform` checks in layout or business logic with calls to these classes so tests can mock and intent is clear. | New: e.g. `lib/core/capabilities.dart`; then refactor `main.dart`, `powersync_repository.dart`, `theme_providers.dart`, etc. | Doc: “Capabilities” vs “Policies”; name methods by intent, not device. |
+| Low | Introduce a **Capability** (e.g. `hasFilePaths`, `hasPersistentLocalStorage`) for platform-specific local behavior. Replace direct `kIsWeb` / `Platform` checks in layout or business logic with calls to these classes so tests can mock and intent is clear. | New: e.g. `lib/core/capabilities.dart`; then refactor `main.dart`, `powersync_repository.dart`, `theme_providers.dart`, etc. | Doc: “Capabilities” vs “Policies”; name methods by intent, not device. |
 | Low | Keep **platform checks** only where truly required (e.g. platform channel, plugin init); move “should we show X” and “can we do Y” into Policy/Capability. | As above | Reduces coupling to Platform/kIsWeb. |
 
 ---

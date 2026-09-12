@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/utils/expense_totals.dart';
 import '../../../domain/domain.dart';
 import '../../expenses/category_icons.dart';
-import 'group_member_provider.dart';
 import 'groups_provider.dart';
 
 enum AnalyticsRangePreset { days30, days90, all }
@@ -290,8 +289,6 @@ final groupAnalyticsDataProvider =
       );
       final expensesAsync = ref.watch(expensesByGroupProvider(query.groupId));
       final tagsAsync = ref.watch(tagsByGroupProvider(query.groupId));
-      final myMemberAsync = ref.watch(myMemberInGroupProvider(query.groupId));
-
       return groupAsync.when(
         data: (group) {
           if (group == null) return const AsyncValue.data(null);
@@ -301,21 +298,15 @@ final groupAnalyticsDataProvider =
                 data: (expenses) {
                   return tagsAsync.when(
                     data: (tags) {
-                      return myMemberAsync.when(
-                        data: (myMember) {
-                          return AsyncValue.data(
-                            computeGroupAnalytics(
-                              group: group,
-                              participants: participants,
-                              tags: tags,
-                              expenses: expenses,
-                              query: query,
-                              currentUserParticipantId: myMember?.participantId,
-                            ),
-                          );
-                        },
-                        loading: () => const AsyncValue.loading(),
-                        error: (e, s) => AsyncValue.error(e, s),
+                      return AsyncValue.data(
+                        computeGroupAnalytics(
+                          group: group,
+                          participants: participants,
+                          tags: tags,
+                          expenses: expenses,
+                          query: query,
+                          currentUserParticipantId: participants.firstOrNull?.id,
+                        ),
                       );
                     },
                     loading: () => const AsyncValue.loading(),

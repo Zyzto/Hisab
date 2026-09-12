@@ -6,18 +6,8 @@ part of 'powersync_repository.dart';
 
 class PowerSyncTagRepository implements ITagRepository {
   final PowerSyncDatabase _db;
-  final CloudBackend? _cloud;
-  final bool _isOnline;
-  final bool _isLocalOnly;
 
-  PowerSyncTagRepository(
-    this._db, {
-    CloudBackend? cloud,
-    bool isOnline = false,
-    bool isLocalOnly = true,
-  }) : _cloud = cloud,
-       _isOnline = isOnline,
-       _isLocalOnly = isLocalOnly;
+  PowerSyncTagRepository(this._db);
 
   @override
   Future<List<ExpenseTag>> getAll() async {
@@ -95,21 +85,6 @@ class PowerSyncTagRepository implements ITagRepository {
       'updated_at': now,
     };
 
-    if (!_isLocalOnly && _isOnline && _cloud != null) {
-      await _cloud.sync.upsert('expense_tags', data);
-    } else if (_shouldQueueOffline(
-      isLocalOnly: _isLocalOnly,
-      isOnline: _isOnline,
-    )) {
-      await _enqueue(
-        _db,
-        tableName: 'expense_tags',
-        operation: 'insert',
-        rowId: id,
-        data: data,
-      );
-    }
-
     await _db.execute(
       'INSERT INTO expense_tags (id, group_id, label, icon_name, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [id, groupId, trimmedLabel, trimmedIcon, normalizedColor, now, now],
@@ -134,31 +109,6 @@ class PowerSyncTagRepository implements ITagRepository {
     }
     final now = _nowIso();
 
-    if (!_isLocalOnly && _isOnline && _cloud != null) {
-      await _cloud.sync.update('expense_tags', {
-        'label': trimmedLabel,
-        'icon_name': trimmedIcon,
-        'color': normalizedColor,
-        'updated_at': now,
-      }, tag.id);
-    } else if (_shouldQueueOffline(
-      isLocalOnly: _isLocalOnly,
-      isOnline: _isOnline,
-    )) {
-      await _enqueue(
-        _db,
-        tableName: 'expense_tags',
-        operation: 'update',
-        rowId: tag.id,
-        data: {
-          'label': trimmedLabel,
-          'icon_name': trimmedIcon,
-          'color': normalizedColor,
-          'updated_at': now,
-        },
-      );
-    }
-
     await _db.execute(
       'UPDATE expense_tags SET label = ?, icon_name = ?, color = ?, updated_at = ? WHERE id = ?',
       [trimmedLabel, trimmedIcon, normalizedColor, now, tag.id],
@@ -167,19 +117,6 @@ class PowerSyncTagRepository implements ITagRepository {
 
   @override
   Future<void> delete(String id) async {
-    if (!_isLocalOnly && _isOnline && _cloud != null) {
-      await _cloud.sync.delete('expense_tags', id);
-    } else if (_shouldQueueOffline(
-      isLocalOnly: _isLocalOnly,
-      isOnline: _isOnline,
-    )) {
-      await _enqueue(
-        _db,
-        tableName: 'expense_tags',
-        operation: 'delete',
-        rowId: id,
-      );
-    }
     await _db.execute('DELETE FROM expense_tags WHERE id = ?', [id]);
   }
 }

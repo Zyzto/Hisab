@@ -6,7 +6,6 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../../core/auth/auth_providers.dart';
 import '../../../core/database/database_providers.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../domain/domain.dart';
@@ -21,7 +20,6 @@ import '../repository/scanner_repository.dart';
 import '../services/category_rules.dart';
 import '../services/duplicate_detector.dart';
 import '../services/notification_bridge.dart';
-import '../services/scanner_ai_service.dart';
 import '../services/transaction_parser.dart';
 import '../utils/scanner_destination.dart';
 
@@ -296,8 +294,6 @@ class ScannerController {
           continue;
         }
 
-        result = await _maybeEnrichWithAi(notif.body, result);
-
         final category = categorize
             ? (result.suggestedCategory ??
                   suggestCategory(
@@ -405,42 +401,6 @@ class ScannerController {
     }
   }
 
-  Future<ParseResult> _maybeEnrichWithAi(
-    String body,
-    ParseResult result,
-  ) async {
-    final settings = _ref.read(hisabSettingsProvidersProvider);
-    if (settings == null) return result;
-    final mode =
-        settings.controller.get(scannerAiModeSettingDef) as String? ?? 'off';
-    if (mode == 'off') return result;
-    final categorize =
-        settings.controller.get(scannerCategorizeEnabledSettingDef) == true;
-    final missingField =
-        result.amountCents == null ||
-        result.merchantName == null ||
-        result.placeName == null;
-    if (!categorize && !missingField && result.confidence >= 0.5) {
-      return result;
-    }
-    if (result.confidence >= 0.7 && !missingField) return result;
-
-    final provider =
-        settings.controller.get(receiptAiProviderSettingDef) as String?;
-    final apiKey = provider == 'openai'
-        ? settings.controller.get(openaiApiKeySettingDef) as String?
-        : settings.controller.get(geminiApiKeySettingDef) as String?;
-
-    final ai = await classifyNotification(
-      body: body,
-      mode: mode,
-      provider: provider,
-      apiKey: apiKey,
-    ).timeout(const Duration(seconds: 8), onTimeout: () => null);
-    if (ai == null) return result;
-    return mergeAiIntoParse(result, ai);
-  }
-
   /// Confirm a draft and create a real expense in the chosen group.
   ///
   /// Returns `false` when the expense could not be created.
@@ -486,9 +446,7 @@ class ScannerController {
       final group = groups.where((g) => g.id == groupId).firstOrNull;
       if (group == null) return false;
 
-      final currentUserId = _ref.read(authServiceProvider).currentUser?.id;
-      final isOwner = group.ownerId != null && group.ownerId == currentUserId;
-      if (!canAddScannerExpense(group, isOwner: isOwner)) {
+      if (!canAddScannerExpense(group, isOwner: true)) {
         Log.warning('Cannot add scanner expense to group $groupId');
         return false;
       }
@@ -502,20 +460,7 @@ class ScannerController {
         return false;
       }
 
-      var payerId = participants
-          .where((p) => currentUserId != null && p.userId == currentUserId)
-          .firstOrNull
-          ?.id;
-      if (payerId == null && currentUserId != null) {
-        final member = await _ref
-            .read(groupMemberRepositoryProvider)
-            .getMyMember(groupId);
-        final pid = member?.participantId;
-        if (pid != null && participants.any((p) => p.id == pid)) {
-          payerId = pid;
-        }
-      }
-      payerId ??= participants.first.id;
+      final payerId = participants.first.id;
 
       final merchant =
           overrideMerchant ?? draft.merchantName ?? draft.displayTitle;

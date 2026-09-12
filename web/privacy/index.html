@@ -4,124 +4,56 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Privacy Policy — Hisab</title>
-  <meta name="description" content="Hisab Privacy Policy — how we collect, use, and protect your information.">
+  <meta name="description" content="Hisab stores app data locally on your device.">
   <link rel="canonical" href="https://hisab.shenepoy.com/privacy/">
-  <link rel="alternate" hreflang="en" href="https://hisab.shenepoy.com/privacy/">
-  <link rel="alternate" hreflang="ar" href="https://hisab.shenepoy.com/ar/privacy/">
-  <link rel="alternate" hreflang="x-default" href="https://hisab.shenepoy.com/privacy/">
-  <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Hisab">
-  <meta property="og:url" content="https://hisab.shenepoy.com/privacy/">
-  <meta property="og:title" content="Privacy Policy — Hisab">
-  <meta property="og:description" content="Hisab Privacy Policy — how we collect, use, and protect your information.">
-  <meta property="og:image" content="https://hisab.shenepoy.com/images/og-en.png">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-  <meta property="og:locale" content="en_US">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Privacy Policy — Hisab">
-  <meta name="twitter:description" content="Hisab Privacy Policy — how we collect, use, and protect your information.">
-  <meta name="twitter:image" content="https://hisab.shenepoy.com/images/og-en.png">
+  <link rel="alternate" hreflang="ar" href="/ar/privacy/">
+  <link rel="alternate" hreflang="en" href="/privacy/">
   <link rel="icon" type="image/png" sizes="48x48" href="/icons/favicon-48.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
   <link rel="stylesheet" href="/seo.css">
 </head>
 <body>
-  <header class="site-header">
-    <div class="inner">
-      <a class="brand" href="/"><img src="/icons/Icon-192.png" width="40" height="40" alt=""><span>Hisab</span></a>
-      <nav class="site-nav" aria-label="Primary">
-        <a href="/">Home</a>
-        <a href="/features/">Features</a>
-        <a href="/privacy/" aria-current="page">Privacy</a>
-        <a href="/ar/privacy/" lang="ar" hreflang="ar">العربية</a>
-      </nav>
-    </div>
-  </header>
+  <header class="site-header"><div class="inner">
+    <a class="brand" href="/"><img src="/icons/Icon-192.png" width="40" height="40" alt=""><span>Hisab</span></a>
+    <nav class="site-nav" aria-label="Primary">
+      <a href="/">Home</a><a href="/features/">Features</a>
+      <a href="/privacy/" aria-current="page">Privacy</a>
+      <a href="/delete-account/">Delete data</a>
+      <a href="/ar/privacy/" lang="ar">العربية</a>
+    </nav>
+  </div></header>
   <article class="legal">
     <h1>Privacy Policy</h1>
-    <p class="updated">Last updated: July 2026</p>
-
-    <h2>Introduction</h2>
-    <p>Hisab ("we", "our", or "the app") is an open-source group expense splitting application. This Privacy Policy explains how we collect, use, and protect your information when you use our app. We are committed to transparency and respecting your privacy.</p>
-
-    <h2>App Permissions</h2>
-    <p>The app may request the following permissions. All are optional and requested only when you use the related feature.
-
-• Camera — To scan receipts when you choose the scan flow while adding an expense (tap the camera button). We do not record or store video; images are used only for this scan flow and are processed on your device or via optional AI services you configure.
-
-• Photos / Photo library — To let you choose expense images from your gallery when adding an expense (tap the gallery option). We only access images you explicitly select.
-
-• Notifications — To send you push notifications when group members add or edit expenses (Online mode only). You can disable this at any time in Settings &gt; Privacy &gt; Push Notifications. If you deny or disable notifications, the app works fully; you simply won't receive push alerts.
-
-• Notification access (Android, Transaction Scanner) — Only if you enable Transaction Scanner in Settings. The app may read notification text from apps you allow to detect bank or payment transactions, process them on your device, keep a local history of added and ignored messages, and show drafts for your approval before they become expenses. After setup, an empty app list captures nothing. You can turn the scanner off or revoke Notification access in Android system settings at any time. Draft and history text stays on your device and is not synced. Optional cloud AI, if you turn it on, sends that text to the AI provider you configured.</p>
-
-    <h2>Data We Collect</h2>
-    <p>In Offline mode, all data stays on your device. No data is sent to any server.
-
-In Online mode, we collect:
-- Email address (for authentication)
-- Display name and avatar (optional, set by you)
-- Group names, participant names, and expense data you create
-- Anonymous usage telemetry (if enabled in Settings)</p>
-
-    <h2>How Data Is Stored</h2>
-    <p>Offline mode: Data is stored locally on your device using SQLite. Nothing leaves your device.
-
-Online mode: Data is stored in clear text on cloud servers powered by Supabase (PostgreSQL). Data is NOT end-to-end encrypted. Do not store sensitive personal, financial, or confidential information. We recommend backing up your data regularly using the Export feature in Settings.</p>
-
-    <h2>How We Use Your Data</h2>
-    <p>Your data is used solely to provide app functionality:
-- Syncing expenses across your devices
-- Managing group memberships and invites
-- Calculating balances and settlements
-
-We do not sell, rent, or trade your personal data to any third party. We do not use your data for advertising or profiling.</p>
-
-    <h2>Third-Party Services</h2>
-    <p>The app may use the following third-party services:
-- Supabase: Cloud database and authentication (when using Online mode)
-- Google OAuth / GitHub OAuth: Sign-in authentication (optional)
-- Gemini / OpenAI: Cloud receipt scanning AI (optional, requires your own API key)
-- Gemini Nano (Android AI Core): Optional on-device receipt AI when you enable it and your device supports it
-
-These services have their own privacy policies. We encourage you to review them.</p>
-
-    <h2>Data Sharing</h2>
-    <p>We do not share your data with third parties except as required to operate the services listed above. Group data is shared only with members of the same group. We may disclose data if required by law.</p>
-
-    <h2>Data Security</h2>
-    <p>We implement row-level security policies on our database to ensure users can only access their own data. However, data in Online mode is stored in clear text and is not end-to-end encrypted. We cannot guarantee absolute security. We accept no liability for data loss, breaches, or unauthorized access.</p>
-
-    <h2>Your Rights</h2>
-    <p>You have the right to:
-- Export all your data at any time (Settings &gt; Data &amp; Backup &gt; Export)
-- Delete local data from this device (Settings &gt; Advanced &gt; Delete local data)
-- Delete your data from the server (Settings &gt; Advanced &gt; Delete cloud data)
-- Request full account deletion (<a href="/delete-account/">account deletion page</a>, or open an issue on our GitHub repository or contact the developer via the app's About section)
-- Disable telemetry at any time (Settings &gt; Privacy)
-- Use the app entirely offline with no data collection</p>
-
-    <h2>Data Retention</h2>
-    <p>Your data is retained until you delete it. When you delete your data through the app, it is removed from our servers. We do not retain backups of deleted user data.</p>
-
-    <h2>Children's Privacy</h2>
-    <p>This app is not directed at children under the age of 13. We do not knowingly collect personal information from children under 13. If you believe a child has provided us with personal data, please contact us so we can delete it.</p>
-
-    <h2>Changes to This Policy</h2>
-    <p>We may update this Privacy Policy from time to time. Changes will be reflected in app updates. We encourage you to review this policy periodically. Continued use of the app after changes constitutes acceptance of the updated policy.</p>
-
-    <h2>Contact Us</h2>
-    <p>If you have questions or concerns about this Privacy Policy, please open an issue on our GitHub repository or contact the developer through the app's About section.</p>
+    <p class="updated">Last updated: September 2026</p>
+    <h2>Summary</h2>
+    <p>Hisab is a local-only open-source application. The public application
+    does not create accounts, send app data to a service, show ads, or collect
+    usage analytics.</p>
+    <h2>Local data</h2>
+    <p>Groups, participants, expenses, balances, settlements, receipt images,
+    scanner drafts, and settings are stored in the local SQLite database on
+    your device. The app reads and writes this data to provide its features.
+    It is not transmitted by the application.</p>
+    <h2>Permissions</h2>
+    <p>Camera and photo-library access are requested only when you choose to
+    scan or attach a receipt. Android notification access is requested only
+    when you enable the local transaction scanner. Captured text and drafts
+    remain on the device.</p>
+    <h2>Backups and deletion</h2>
+    <p>You control local backups through Settings → Data &amp; Backup. You can
+    export, import, or delete local records at any time. Deleting app data
+    through the operating system removes the remaining local database.</p>
+    <h2>Third-party components</h2>
+    <p>Hisab uses open-source Flutter, SQLite/PowerSync, and platform OCR
+    components. The public app does not initialize an external data service.
+    Platform stores and the browser may collect information under their own
+    policies when you download or run an application.</p>
+    <h2>Changes</h2>
+    <p>Changes to this policy will be published with a new application release.
+    Questions can be raised through the project's public issue tracker.</p>
   </article>
-  <footer class="site-footer">
-    <div class="inner">
-      <span>Hisab — حساب</span>
-      <nav class="site-nav" aria-label="Footer">
-        <a href="/">Home</a>
-        <a href="/features/">Features</a>
-      </nav>
-    </div>
-  </footer>
+  <footer class="site-footer"><div class="inner">
+    <span>Hisab — حساب</span>
+    <nav class="site-nav" aria-label="Footer"><a href="/">Home</a><a href="/features/">Features</a><a href="/delete-account/">Delete data</a></nav>
+  </div></footer>
 </body>
 </html>

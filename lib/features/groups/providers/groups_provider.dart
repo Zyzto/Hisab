@@ -61,7 +61,7 @@ Stream<Set<String>> locallyArchivedGroupIds(Ref ref) {
 }
 
 /// Kept name `futureGroup` for call-site stability; backed by a live stream
-/// so group detail/settings/balance refresh after remote sync.
+/// so group detail/settings/balance refresh after database updates.
 @riverpod
 Stream<Group?> futureGroup(Ref ref, String groupId) {
   return ref.watch(groupRepositoryProvider).watchById(groupId);

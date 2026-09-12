@@ -33,7 +33,8 @@ class ExpenseListTile extends StatelessWidget {
   /// Show a trailing chevron when the tile is navigable.
   final bool showDisclosure;
 
-  /// When set, shows this amount instead of the expense total (e.g. profile my-share).
+  /// When set, shows this amount instead of the expense total (e.g. a
+  /// participant's share).
   final int? amountCentsOverride;
 
   /// Optional second line; when null and [showPaidBy], shows paid_by.

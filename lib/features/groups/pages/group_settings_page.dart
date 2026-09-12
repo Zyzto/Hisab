@@ -6,15 +6,12 @@ import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../providers/groups_provider.dart';
 import '../providers/group_member_provider.dart';
-import '../providers/group_invite_provider.dart';
-import '../widgets/create_invite_sheet.dart';
 import '../widgets/group_color_picker.dart';
 import '../widgets/group_section_header.dart';
 import '../widgets/settlement_method_picker.dart';
 import '../utils/group_icon_utils.dart';
 import '../../../core/celebration/celebration_controller.dart';
 import '../../../core/celebration/celebration_kind.dart';
-import '../../../core/database/database_providers.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/layout/layout_breakpoints.dart';
@@ -26,12 +23,11 @@ import '../../../core/widgets/missing_route_page.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/services/household_service.dart';
 import '../../../core/services/settle_up_service.dart';
-import '../../../core/telemetry/telemetry_service.dart';
+import '../../../core/settings/providers/settings_framework_providers.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/currency_helpers.dart';
-import '../../../core/utils/error_report_helper.dart';
 import '../../../core/utils/form_validators.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/participant_avatar.dart';
@@ -39,7 +35,6 @@ import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../core/widgets/user_text.dart';
 import '../../../domain/domain.dart';
-import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 
 class GroupSettingsPage extends ConsumerStatefulWidget {
   final String groupId;
@@ -123,10 +118,8 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage>
       activeParticipantsByGroupProvider(widget.groupId),
     );
     final expensesAsync = ref.watch(expensesByGroupProvider(widget.groupId));
-    final localOnly = ref.watch(effectiveLocalOnlyProvider);
-    final myRoleAsync = localOnly
-        ? const AsyncValue.data(null)
-        : ref.watch(myRoleInGroupProvider(widget.groupId));
+    const localOnly = true;
+    const myRoleAsync = AsyncValue<GroupRole?>.data(null);
     final localArchivedIdsAsync = ref.watch(locallyArchivedGroupIdsProvider);
 
     return groupAsync.when(
@@ -170,7 +163,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage>
                       vertical: ThemeConfig.spacingS,
                     ),
                     children: [
-                      // ── Group Profile Header ──
+                      // ── Group Header ──
                       _buildProfileHeader(
                         context,
                         group,
@@ -302,106 +295,6 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage>
                       if (!group.isPersonal && canEditSettings)
                         const SizedBox(height: ThemeConfig.spacingL),
 
-                      // ── Permissions Section (online only, group only) ──
-                      if (!localOnly && !group.isPersonal)
-                        myRoleAsync.when(
-                          data: (myRole) {
-                            final isOwnerOrAdmin =
-                                myRole == GroupRole.owner ||
-                                myRole == GroupRole.admin;
-                            if (!isOwnerOrAdmin || group.ownerId == null) {
-                              return const SizedBox.shrink();
-                            }
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const SizedBox(height: ThemeConfig.spacingL),
-                                _buildSection(
-                                  context,
-                                  title: 'group_permissions'.tr(),
-                                  children: [
-                                    SwitchListTile(
-                                      contentPadding: EdgeInsets.zero,
-                                      title: Text('allow_add_expense'.tr()),
-                                      value: group.allowMemberAddExpense,
-                                      onChanged: _saving
-                                          ? null
-                                          : (v) => _onPermissionChanged(
-                                              ref,
-                                              group,
-                                              allowMemberAddExpense: v,
-                                            ),
-                                    ),
-                                    SwitchListTile(
-                                      contentPadding: EdgeInsets.zero,
-                                      title: Text('allow_change_settings'.tr()),
-                                      value: group.allowMemberChangeSettings,
-                                      onChanged: _saving
-                                          ? null
-                                          : (v) => _onPermissionChanged(
-                                              ref,
-                                              group,
-                                              allowMemberChangeSettings: v,
-                                            ),
-                                    ),
-                                    SwitchListTile(
-                                      contentPadding: EdgeInsets.zero,
-                                      title: Text(
-                                        'allow_expense_as_other'.tr(),
-                                      ),
-                                      value:
-                                          group.allowExpenseAsOtherParticipant,
-                                      onChanged: _saving
-                                          ? null
-                                          : (v) => _onPermissionChanged(
-                                              ref,
-                                              group,
-                                              allowExpenseAsOtherParticipant: v,
-                                            ),
-                                    ),
-                                    SwitchListTile(
-                                      contentPadding: EdgeInsets.zero,
-                                      title: Text(
-                                        'allow_settle_for_others'.tr(),
-                                      ),
-                                      value: group.allowMemberSettleForOthers,
-                                      onChanged: _saving
-                                          ? null
-                                          : (v) => _onPermissionChanged(
-                                              ref,
-                                              group,
-                                              allowMemberSettleForOthers: v,
-                                            ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            );
-                          },
-                          loading: () => const SizedBox.shrink(),
-                          error: (_, _) => const SizedBox.shrink(),
-                        ),
-
-                      // ── Invite Section (online only, owner/admin, group only) ──
-                      if (!localOnly && !group.isPersonal)
-                        myRoleAsync.when(
-                          data: (myRole) {
-                            final isOwnerOrAdmin =
-                                myRole == GroupRole.owner ||
-                                myRole == GroupRole.admin;
-                            if (!isOwnerOrAdmin) return const SizedBox.shrink();
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const SizedBox(height: ThemeConfig.spacingL),
-                                _buildInviteSection(context, ref),
-                              ],
-                            );
-                          },
-                          loading: () => const SizedBox.shrink(),
-                          error: (_, _) => const SizedBox.shrink(),
-                        ),
-
                       // ── Danger Zone ──
                       const SizedBox(height: ThemeConfig.spacingXL),
                       localArchivedIdsAsync.when(
@@ -447,11 +340,6 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage>
         body: const Center(child: CircularProgressIndicator()),
       ),
       error: (e, st) {
-        sendErrorTelemetryIfOnline(
-          ref,
-          message: e.toString(),
-          details: e.toString(),
-        );
         return _settingsShell(
           context,
           title: 'list_settings'.tr(),
@@ -470,7 +358,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage>
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Profile Header
+  // Group Header
   // ═══════════════════════════════════════════════════════════════════════════
 
   Widget _buildProfileHeader(
@@ -969,11 +857,6 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage>
       loading: () => const CircularProgressIndicator(),
       error: (e, st) {
         Log.warning('Group settings load error', error: e, stackTrace: st);
-        sendErrorTelemetryIfOnline(
-          ref,
-          message: e.toString(),
-          details: e.toString(),
-        );
         return ErrorContentWidget(
           titleKey: 'generic_error',
           message: e.toString(),
@@ -1023,100 +906,6 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage>
   // ═══════════════════════════════════════════════════════════════════════════
   // Danger Zone
   // ═══════════════════════════════════════════════════════════════════════════
-  // Invite section – inline preview + manage button
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  Widget _buildInviteSection(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final invitesAsync = ref.watch(invitesByGroupProvider(widget.groupId));
-
-    return _buildSection(
-      context,
-      title: 'invite_links'.tr(),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.add, size: 20),
-            tooltip: 'create_invite'.tr(),
-            onPressed: () =>
-                showCreateInviteSheet(context, ref, widget.groupId),
-            visualDensity: VisualDensity.compact,
-            constraints: const BoxConstraints(),
-            padding: EdgeInsets.zero,
-          ),
-        ],
-      ),
-      children: [
-        invitesAsync.when(
-          data: (invites) {
-            if (invites.isEmpty) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(
-                  vertical: ThemeConfig.spacingS,
-                ),
-                child: Text(
-                  'invite_empty'.tr(),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              );
-            }
-
-            // Show up to 3 most recent active invites
-            final sorted = List.of(invites)
-              ..sort((a, b) {
-                final aActive = a.status == InviteStatus.active ? 0 : 1;
-                final bActive = b.status == InviteStatus.active ? 0 : 1;
-                if (aActive != bActive) return aActive.compareTo(bActive);
-                return b.createdAt.compareTo(a.createdAt);
-              });
-            final preview = sorted.take(3).toList();
-
-            return Column(
-              children: [
-                ...preview.map((invite) => _InvitePreviewTile(invite: invite)),
-                if (invites.length > 3)
-                  Padding(
-                    padding: const EdgeInsets.only(top: ThemeConfig.spacingXS),
-                    child: Text(
-                      'invite_and_more'.tr(args: ['${invites.length - 3}']),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-              ],
-            );
-          },
-          loading: () => const Padding(
-            padding: EdgeInsets.all(8.0),
-            child: Center(
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
-          ),
-          error: (_, _) => const SizedBox.shrink(),
-        ),
-        const SizedBox(height: ThemeConfig.spacingS),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: () =>
-                context.push(RoutePaths.groupInvites(widget.groupId)),
-            icon: const Icon(Icons.open_in_new, size: 16),
-            label: Text('invite_manage_all'.tr()),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
 
   Widget _buildDangerZone(
     BuildContext context,
@@ -1134,7 +923,7 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage>
     final List<Widget> actions = [];
 
     if (group.isPersonal) {
-      // Personal: Archive (if online), Delete, Share as group only
+      // Personal: archive, delete, or share as group.
       if (!localOnly) {
         myRoleAsync.whenData((myRole) {
           if (myRole == GroupRole.owner) {
@@ -1817,14 +1606,6 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage>
     if (ok != true || !context.mounted) return;
     try {
       await _withSaving(() async {
-        final invites = await ref
-            .read(groupInviteRepositoryProvider)
-            .listByGroup(widget.groupId);
-        for (final invite in invites) {
-          if (invite.status == InviteStatus.active) {
-            await ref.read(groupInviteRepositoryProvider).revoke(invite.id);
-          }
-        }
         await ref
             .read(groupRepositoryProvider)
             .update(
@@ -1873,12 +1654,6 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage>
         await ref
             .read(groupMemberRepositoryProvider)
             .transferOwnership(widget.groupId, chosen);
-        if (!ref.read(effectiveLocalOnlyProvider)) {
-          await ref.read(dataSyncServiceProvider.notifier).syncNow();
-        }
-        TelemetryService.sendEvent('ownership_transferred', {
-          'groupId': widget.groupId,
-        }, enabled: ref.read(telemetryEnabledProvider));
         ref.invalidate(futureGroupProvider(widget.groupId));
         ref.invalidate(membersByGroupProvider(widget.groupId));
         ref.invalidate(myRoleInGroupProvider(widget.groupId));
@@ -2046,11 +1821,6 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage>
       await _withSaving(() async {
         await _preserveHouseholdBeforeLeave(ref);
         await ref.read(groupMemberRepositoryProvider).leave(widget.groupId);
-        TelemetryService.sendEvent('member_left', {
-          'groupId': widget.groupId,
-        }, enabled: ref.read(telemetryEnabledProvider));
-        // Trigger immediate sync so the groups list reflects the change
-        await ref.read(dataSyncServiceProvider.notifier).syncNow();
         // Farewell overlay on the way home (no participant id on this path).
         await fireCelebration(ref, CelebrationKind.personLeft);
         if (context.mounted) context.go(RoutePaths.home);
@@ -2140,97 +1910,6 @@ class _GroupSettingsPageState extends ConsumerState<GroupSettingsPage>
           .read(participantRepositoryProvider)
           .update(child.copyWith(clearParentParticipantId: true));
     }
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Compact invite preview tile for the settings page
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _InvitePreviewTile extends StatelessWidget {
-  final GroupInvite invite;
-  const _InvitePreviewTile({required this.invite});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final displayLabel = invite.label?.isNotEmpty == true
-        ? invite.label!
-        : 'invite_untitled'.tr();
-
-    Color statusColor;
-    String statusText;
-    switch (invite.status) {
-      case InviteStatus.active:
-        statusColor = theme.colorScheme.primary;
-        statusText = 'invite_status_active'.tr();
-        break;
-      case InviteStatus.expired:
-        statusColor = theme.colorScheme.onSurfaceVariant;
-        statusText = 'invite_status_expired'.tr();
-        break;
-      case InviteStatus.maxedOut:
-        statusColor = theme.colorScheme.tertiary;
-        statusText = 'invite_status_maxed'.tr();
-        break;
-      case InviteStatus.revoked:
-        statusColor = theme.colorScheme.error;
-        statusText = 'invite_status_revoked'.tr();
-        break;
-    }
-
-    final usageText = invite.maxUses != null
-        ? '${invite.useCount}/${invite.maxUses}'
-        : '${invite.useCount}';
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        children: [
-          Icon(Icons.link, size: 16, color: theme.colorScheme.onSurfaceVariant),
-          const SizedBox(width: 8),
-          Expanded(
-            child: invite.label?.isNotEmpty == true
-                ? UserText(
-                    invite.label!,
-                    style: theme.textTheme.bodyMedium,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  )
-                : Text(
-                    displayLabel,
-                    style: theme.textTheme.bodyMedium,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-            decoration: BoxDecoration(
-              color: statusColor.withAlpha(25),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              statusText,
-              style: theme.textTheme.labelSmall?.copyWith(color: statusColor),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Icon(
-            Icons.people_outline,
-            size: 14,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-          const SizedBox(width: 2),
-          Text(
-            usageText,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 

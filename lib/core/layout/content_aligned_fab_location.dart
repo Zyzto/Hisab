@@ -4,7 +4,7 @@ import 'package:safaeh/safaeh.dart';
 import 'layout_breakpoints.dart';
 
 /// Positions the scaffold FAB beside the content band on wide layouts
-/// (same gutter idea as [ConstrainedContent.aside] / profile page index).
+/// (same gutter idea as [ConstrainedContent.aside] / page index).
 ///
 /// On narrow screens, or when the end gutter is too tight, falls back to
 /// [narrowFallback] (default [FloatingActionButtonLocation.endFloat]).

@@ -106,7 +106,7 @@ void main() {
         await tapAndSettle(tester, find.byIcon(Icons.settings).last);
         await pumpAndSettleWithTimeout(tester);
         // Personal list settings page uses the group settings page,
-        // which shows the list name in the profile header.
+        // which shows the list name in the group header.
         expect(find.text('My Budget'), findsWidgets);
       });
 

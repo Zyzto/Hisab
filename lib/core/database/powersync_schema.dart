@@ -1,8 +1,7 @@
 import 'package:powersync/powersync.dart';
 
 /// Local SQLite schema managed by PowerSync (used as a local DB engine).
-/// Mirrors the Supabase Postgres tables for caching, plus a pending_writes
-/// queue for offline operations.
+/// Includes legacy queue tables so existing databases can be upgraded safely.
 const schema = Schema([
   Table('groups', [
     Column.text('name'),
@@ -116,7 +115,7 @@ const schema = Schema([
   ]),
 
   // ── Local-only (not synced) ──────────────────────────────────────────
-  // Per-user "hide from my list" for non-owners; never written by sync.
+  // Legacy per-user "hide from my list" flag; retained for upgrades.
   Table('local_archived_groups', [
     Column.text('group_id'),
     Column.text('archived_at'),
@@ -196,8 +195,8 @@ const schema = Schema([
   ]),
 
   // ── Offline queue ────────────────────────────────────────────────────
-  // Stores writes made while in Online mode but temporarily offline.
-  // Processed by DataSyncService when connectivity returns.
+  // Legacy pending-write records; retained for upgrades.
+  // Retained for compatibility with databases created by older releases.
   Table('pending_writes', [
     Column.text('table_name'),
     Column.text('operation'), // insert, update, delete

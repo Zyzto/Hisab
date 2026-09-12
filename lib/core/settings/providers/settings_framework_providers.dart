@@ -8,9 +8,6 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../secure_settings_storage.dart';
 import '../settings_definitions.dart';
-import '../../auth/auth_providers.dart';
-import '../../auth/auth_user_profile.dart';
-import 'package:hisab_backend/hisab_backend.dart';
 import '../../theme/flex_theme_builder.dart' show defaultThemeSchemeId;
 
 part 'settings_framework_providers.g.dart';
@@ -100,24 +97,13 @@ Future<void> runThemeSchemeTealMigration(SettingsProviders settings) async {
   }
 }
 
-/// Derive [receipt_scan_mode] from legacy OCR/AI toggles (one-time).
-String receiptScanModeFromLegacy({
-  required bool ocrEnabled,
-  required bool aiEnabled,
-  required String provider,
-}) {
-  final p = provider.trim();
-  if (aiEnabled && (p == 'gemini' || p == 'openai')) {
-    return 'cloud';
-  }
-  if (aiEnabled) {
-    return ocrEnabled ? 'local' : 'off';
-  }
+/// Derive [receipt_scan_mode] from the legacy local OCR toggle (one-time).
+String receiptScanModeFromLegacy({required bool ocrEnabled}) {
   if (ocrEnabled) return 'local';
   return 'off';
 }
 
-/// One-time migration: OCR/AI bools → receipt_scan_mode.
+/// One-time migration from the old local OCR preference to receipt_scan_mode.
 Future<void> runReceiptScanModeMigration(SettingsProviders settings) async {
   try {
     final prefs = await SharedPreferences.getInstance();
@@ -127,27 +113,14 @@ Future<void> runReceiptScanModeMigration(SettingsProviders settings) async {
     final existing = prefs.getString('receipt_scan_mode');
     if (existing == null || existing.isEmpty) {
       final ocr = prefs.getBool('receipt_ocr_enabled') ?? false;
-      final ai = prefs.getBool('receipt_ai_enabled') ?? false;
-      final provider = prefs.getString('receipt_ai_provider') ?? 'none';
-      final mode = receiptScanModeFromLegacy(
-        ocrEnabled: ocr,
-        aiEnabled: ai,
-        provider: provider,
-      );
+      final mode = receiptScanModeFromLegacy(ocrEnabled: ocr);
       settings.controller.set(receiptScanModeSettingDef, mode);
       Log.info(
         'Setting changed: ${receiptScanModeSettingDef.key}=$mode (migration)',
       );
     }
 
-    // Coerce legacy provider "none" to gemini.
-    final provider = prefs.getString('receipt_ai_provider');
-    if (provider == null || provider == 'none' || provider.isEmpty) {
-      settings.controller.set(receiptAiProviderSettingDef, 'gemini');
-    }
-
     await prefs.remove('receipt_ocr_enabled');
-    await prefs.remove('receipt_ai_enabled');
     await prefs.setBool('receipt_scan_mode_migrated', true);
   } catch (e, stackTrace) {
     Log.warning(
@@ -161,9 +134,7 @@ Future<void> runReceiptScanModeMigration(SettingsProviders settings) async {
 Future<SettingsProviders?> initializeHisabSettings() async {
   try {
     final registry = createHisabSettingsRegistry();
-    final storage = SecureSettingsStorage(
-      secretKeys: {geminiApiKeySettingDef.key, openaiApiKeySettingDef.key},
-    );
+    final storage = SecureSettingsStorage(secretKeys: const {});
     final localizationProvider = await loadSettingsLocalizationProvider();
     final providers = await initializeSettings(
       registry: registry,
@@ -204,34 +175,15 @@ bool onboardingCompleted(Ref ref) {
 }
 
 @riverpod
-bool localOnly(Ref ref) {
-  try {
-    final settings = ref.watch(hisabSettingsProvidersProvider);
-    if (settings == null) return true;
-    return ref.watch(settings.provider(localOnlySettingDef));
-  } catch (e, stackTrace) {
-    Log.warning(
-      'localOnly read failed, defaulting to true',
-      error: e,
-      stackTrace: stackTrace,
-    );
-    return true;
-  }
-}
-
-/// When true, app uses only local storage. When config is missing, effectively true.
-@riverpod
-bool effectiveLocalOnly(Ref ref) {
-  final local = ref.watch(localOnlyProvider);
-  return local || !cloudAvailable;
-}
-
-@riverpod
 String receiptScanMode(Ref ref) {
   try {
     final settings = ref.watch(hisabSettingsProvidersProvider);
     if (settings == null) return 'off';
-    return ref.watch(settings.provider(receiptScanModeSettingDef));
+    final mode = ref.watch(settings.provider(receiptScanModeSettingDef));
+    return switch (mode) {
+      'local' => 'local',
+      _ => 'off',
+    };
   } catch (e, stackTrace) {
     Log.warning(
       'receiptScanMode read failed, defaulting to off',
@@ -239,56 +191,6 @@ String receiptScanMode(Ref ref) {
       stackTrace: stackTrace,
     );
     return 'off';
-  }
-}
-
-@riverpod
-String receiptAiProvider(Ref ref) {
-  try {
-    final settings = ref.watch(hisabSettingsProvidersProvider);
-    if (settings == null) return 'gemini';
-    final value = ref.watch(settings.provider(receiptAiProviderSettingDef));
-    if (value == 'none' || value.isEmpty) return 'gemini';
-    return value;
-  } catch (e, stackTrace) {
-    Log.warning(
-      'receiptAiProvider read failed, defaulting to gemini',
-      error: e,
-      stackTrace: stackTrace,
-    );
-    return 'gemini';
-  }
-}
-
-@riverpod
-String geminiApiKey(Ref ref) {
-  try {
-    final settings = ref.watch(hisabSettingsProvidersProvider);
-    if (settings == null) return '';
-    return ref.watch(settings.provider(geminiApiKeySettingDef));
-  } catch (e, stackTrace) {
-    Log.warning(
-      'geminiApiKey read failed, defaulting to empty',
-      error: e,
-      stackTrace: stackTrace,
-    );
-    return '';
-  }
-}
-
-@riverpod
-String openaiApiKey(Ref ref) {
-  try {
-    final settings = ref.watch(hisabSettingsProvidersProvider);
-    if (settings == null) return '';
-    return ref.watch(settings.provider(openaiApiKeySettingDef));
-  } catch (e, stackTrace) {
-    Log.warning(
-      'openaiApiKey read failed, defaulting to empty',
-      error: e,
-      stackTrace: stackTrace,
-    );
-    return '';
   }
 }
 
@@ -451,66 +353,6 @@ bool extraAnimationsEnabled(Ref ref) {
     return true;
   }
 }
-
-@riverpod
-Future<AuthUserProfile?> authUserProfile(Ref ref) async {
-  final localOnly = ref.watch(effectiveLocalOnlyProvider);
-  if (localOnly) return null;
-  // Watch auth state changes so the profile updates reactively when the
-  // user signs in, signs out, or the session is restored after a page reload.
-  ref.watch(authStateChangesProvider);
-  return ref.watch(authServiceProvider).getUserProfile();
-}
-
-@riverpod
-bool telemetryEnabled(Ref ref) {
-  try {
-    final settings = ref.watch(hisabSettingsProvidersProvider);
-    if (settings == null) return true;
-    return ref.watch(settings.provider(telemetryEnabledSettingDef));
-  } catch (e, stackTrace) {
-    Log.warning(
-      'telemetryEnabled read failed, defaulting to true',
-      error: e,
-      stackTrace: stackTrace,
-    );
-    return true;
-  }
-}
-
-@riverpod
-bool notificationsEnabled(Ref ref) {
-  try {
-    final settings = ref.watch(hisabSettingsProvidersProvider);
-    if (settings == null) return true;
-    return ref.watch(settings.provider(notificationsEnabledSettingDef));
-  } catch (e, stackTrace) {
-    Log.warning(
-      'notificationsEnabled read failed, defaulting to true',
-      error: e,
-      stackTrace: stackTrace,
-    );
-    return true;
-  }
-}
-
-/// Opt-in OS screenshot → report prompt (iOS / Android 14+).
-final screenshotReportPromptEnabledProvider = Provider<bool>((ref) {
-  try {
-    final settings = ref.watch(hisabSettingsProvidersProvider);
-    if (settings == null) return false;
-    return ref.watch(
-      settings.provider(screenshotReportPromptEnabledSettingDef),
-    );
-  } catch (e, stackTrace) {
-    Log.warning(
-      'screenshotReportPromptEnabled read failed, defaulting to false',
-      error: e,
-      stackTrace: stackTrace,
-    );
-    return false;
-  }
-});
 
 @riverpod
 bool expenseFormFullFeatures(Ref ref) {

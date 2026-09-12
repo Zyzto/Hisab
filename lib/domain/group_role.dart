@@ -1,12 +1,11 @@
-/// Role of a user in a group.
+/// Legacy role values retained for displaying older local records.
 enum GroupRole {
   owner,
   admin,
   member;
 
-  static GroupRole? fromString(String? s) {
-    if (s == null) return null;
-    switch (s) {
+  static GroupRole? fromString(String? value) {
+    switch (value) {
       case 'owner':
         return GroupRole.owner;
       case 'admin':
@@ -14,7 +13,7 @@ enum GroupRole {
       case 'member':
         return GroupRole.member;
       default:
-        return GroupRole.member;
+        return null;
     }
   }
 }

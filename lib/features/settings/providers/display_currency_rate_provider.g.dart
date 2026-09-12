@@ -8,17 +8,20 @@ part of 'display_currency_rate_provider.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Key format: "groupCurrency|displayCurrency". When displayCurrency is empty or equals groupCurrency, returns null.
+/// Currency conversion is intentionally unavailable in the offline build.
+/// Stored display-currency preferences remain intact for future overlays.
 
 @ProviderFor(displayCurrencyRate)
 final displayCurrencyRateProvider = DisplayCurrencyRateFamily._();
 
-/// Key format: "groupCurrency|displayCurrency". When displayCurrency is empty or equals groupCurrency, returns null.
+/// Currency conversion is intentionally unavailable in the offline build.
+/// Stored display-currency preferences remain intact for future overlays.
 
 final class DisplayCurrencyRateProvider
     extends $FunctionalProvider<AsyncValue<double?>, double?, FutureOr<double?>>
     with $FutureModifier<double?>, $FutureProvider<double?> {
-  /// Key format: "groupCurrency|displayCurrency". When displayCurrency is empty or equals groupCurrency, returns null.
+  /// Currency conversion is intentionally unavailable in the offline build.
+  /// Stored display-currency preferences remain intact for future overlays.
   DisplayCurrencyRateProvider._({
     required DisplayCurrencyRateFamily super.from,
     required String super.argument,
@@ -63,9 +66,10 @@ final class DisplayCurrencyRateProvider
 }
 
 String _$displayCurrencyRateHash() =>
-    r'be29b20da41d849e46811294922f87973bf01870';
+    r'1597d4b415e035f0a502e601eb0d7fa3a45e07ad';
 
-/// Key format: "groupCurrency|displayCurrency". When displayCurrency is empty or equals groupCurrency, returns null.
+/// Currency conversion is intentionally unavailable in the offline build.
+/// Stored display-currency preferences remain intact for future overlays.
 
 final class DisplayCurrencyRateFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<double?>, String> {
@@ -78,7 +82,8 @@ final class DisplayCurrencyRateFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// Key format: "groupCurrency|displayCurrency". When displayCurrency is empty or equals groupCurrency, returns null.
+  /// Currency conversion is intentionally unavailable in the offline build.
+  /// Stored display-currency preferences remain intact for future overlays.
 
   DisplayCurrencyRateProvider call(String key) =>
       DisplayCurrencyRateProvider._(argument: key, from: this);

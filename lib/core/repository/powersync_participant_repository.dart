@@ -6,18 +6,8 @@ part of 'powersync_repository.dart';
 
 class PowerSyncParticipantRepository implements IParticipantRepository {
   final PowerSyncDatabase _db;
-  final CloudBackend? _cloud;
-  final bool _isOnline;
-  final bool _isLocalOnly;
 
-  PowerSyncParticipantRepository(
-    this._db, {
-    CloudBackend? cloud,
-    bool isOnline = false,
-    bool isLocalOnly = true,
-  }) : _cloud = cloud,
-       _isOnline = isOnline,
-       _isLocalOnly = isLocalOnly;
+  PowerSyncParticipantRepository(this._db);
 
   @override
   Future<List<Participant>> getAll() async {
@@ -106,34 +96,6 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
         updatedAt: DateTime.parse(now),
       ),
     );
-    final data = <String, dynamic>{
-      'id': id,
-      'group_id': groupId,
-      'name': trimmedName,
-      'sort_order': order,
-      'user_id': userId,
-      'avatar_id': avatarId,
-      'parent_participant_id': parentParticipantId,
-      'unnamed_dependent_count': unnamedDependentCount,
-      'created_at': now,
-      'updated_at': now,
-    };
-
-    if (!_isLocalOnly && _isOnline && _cloud != null) {
-      await _cloud.sync.upsert('participants', data);
-    } else if (_shouldQueueOffline(
-      isLocalOnly: _isLocalOnly,
-      isOnline: _isOnline,
-    )) {
-      await _enqueue(
-        _db,
-        tableName: 'participants',
-        operation: 'insert',
-        rowId: id,
-        data: data,
-      );
-    }
-
     await _db.execute(
       'INSERT INTO participants (id, group_id, name, sort_order, user_id, avatar_id, left_at, parent_participant_id, unnamed_dependent_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
@@ -179,63 +141,6 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
         existing == null ||
         existing.parentParticipantId != participant.parentParticipantId ||
         existing.unnamedDependentCount != participant.unnamedDependentCount;
-    // A hierarchy edit is authorized by the dedicated backend RPC.  Do not
-    // follow it with a broad participant UPDATE when the only change is the
-    // parent/count fields: members are allowed to maintain their own family
-    // branch even when the group disallows general participant settings edits.
-    final normalChanged =
-        existing == null ||
-        existing.name != trimmedName ||
-        existing.order != participant.order ||
-        existing.avatarId != participant.avatarId ||
-        existing.leftAt != participant.leftAt;
-    final normalUpdates = <String, dynamic>{
-      'name': trimmedName,
-      'sort_order': participant.order,
-      'avatar_id': participant.avatarId,
-      'left_at': leftAtIso,
-      'updated_at': now,
-    };
-    if (!_isLocalOnly && _isOnline && _cloud != null) {
-      if (householdChanged) {
-        await _cloud.groups.setParticipantHousehold(
-          participant.groupId,
-          participant.id,
-          participant.parentParticipantId,
-          participant.unnamedDependentCount,
-        );
-      }
-      if (normalChanged) {
-        await _cloud.sync.update('participants', normalUpdates, participant.id);
-      }
-    } else if (_shouldQueueOffline(
-      isLocalOnly: _isLocalOnly,
-      isOnline: _isOnline,
-    )) {
-      if (householdChanged) {
-        await _enqueue(
-          _db,
-          tableName: 'participants',
-          operation: 'set_household',
-          rowId: participant.id,
-          data: {
-            'group_id': participant.groupId,
-            'parent_participant_id': participant.parentParticipantId,
-            'unnamed_dependent_count': participant.unnamedDependentCount,
-          },
-        );
-      }
-      if (normalChanged) {
-        await _enqueue(
-          _db,
-          tableName: 'participants',
-          operation: 'update',
-          rowId: participant.id,
-          data: normalUpdates,
-        );
-      }
-    }
-
     await _db.execute(
       'UPDATE participants SET name = ?, sort_order = ?, avatar_id = ?, left_at = ?, parent_participant_id = ?, unnamed_dependent_count = ?, updated_at = ? WHERE id = ?',
       [
@@ -272,21 +177,6 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
   @override
   Future<void> archive(String groupId, String participantId) async {
     final now = _nowIso();
-    if (!_isLocalOnly && _isOnline && _cloud != null) {
-      await _cloud.groups.archiveParticipant(groupId, participantId);
-      Log.info('Participant archived via backend');
-    } else if (_shouldQueueOffline(
-      isLocalOnly: _isLocalOnly,
-      isOnline: _isOnline,
-    )) {
-      await _enqueue(
-        _db,
-        tableName: 'participants',
-        operation: 'update',
-        rowId: participantId,
-        data: {'left_at': now, 'updated_at': now},
-      );
-    }
     await _db.execute(
       'UPDATE participants SET left_at = ?, updated_at = ? WHERE id = ?',
       [now, now, participantId],
@@ -306,37 +196,6 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
       );
     }
     final now = _nowIso();
-    final updates = <String, dynamic>{'name': trimmedName, 'updated_at': now};
-    if (avatarId != null) updates['avatar_id'] = avatarId;
-
-    if (!_isLocalOnly && _isOnline && _cloud != null) {
-      await _cloud.sync.updateWhere(
-        'participants',
-        updates,
-        column: 'user_id',
-        value: userId,
-      );
-    } else if (_shouldQueueOffline(
-      isLocalOnly: _isLocalOnly,
-      isOnline: _isOnline,
-    )) {
-      final rows = await _db.getAll(
-        'SELECT id FROM participants WHERE user_id = ?',
-        [userId],
-      );
-      for (final row in rows) {
-        final participantId = row['id'] as String?;
-        if (participantId == null) continue;
-        await _enqueue(
-          _db,
-          tableName: 'participants',
-          operation: 'update',
-          rowId: participantId,
-          data: updates,
-        );
-      }
-    }
-
     if (avatarId != null) {
       await _db.execute(
         'UPDATE participants SET name = ?, avatar_id = ?, updated_at = ? WHERE user_id = ?',
@@ -352,24 +211,6 @@ class PowerSyncParticipantRepository implements IParticipantRepository {
 
   @override
   Future<void> delete(String id) async {
-    Log.info(
-      'ParticipantRepository.delete: participantId=$id localOnly=$_isLocalOnly online=$_isOnline',
-    );
-    if (!_isLocalOnly && _isOnline && _cloud != null) {
-      await _cloud.sync.delete('participants', id);
-      Log.info('ParticipantRepository.delete: deleted on server');
-    } else if (_shouldQueueOffline(
-      isLocalOnly: _isLocalOnly,
-      isOnline: _isOnline,
-    )) {
-      await _enqueue(
-        _db,
-        tableName: 'participants',
-        operation: 'delete',
-        rowId: id,
-      );
-    }
     await _db.execute('DELETE FROM participants WHERE id = ?', [id]);
-    Log.info('ParticipantRepository.delete: deleted from local DB');
   }
 }

@@ -1,88 +1,27 @@
 part of 'powersync_repository.dart';
 
-// =============================================================================
-// PowerSync GroupMember Repository
-// =============================================================================
-
+/// Compatibility reader for the legacy group_members table.
 class PowerSyncGroupMemberRepository implements IGroupMemberRepository {
+  PowerSyncGroupMemberRepository(this._db);
+
   final PowerSyncDatabase _db;
-  final bool isLocalOnly;
-  PowerSyncGroupMemberRepository(this._db, {this.isLocalOnly = false});
-
-  String? get _currentUserId => cloudBackend?.auth.currentUser?.id;
-
-  /// Membership changes are always server-authorized, so they need the backend
-  /// even when the caller is otherwise offline-capable.
-  CloudGroups? get _groups => isLocalOnly ? null : cloudBackend?.groups;
 
   @override
-  Future<GroupRole?> getMyRole(String groupId) async {
-    final userId = _currentUserId;
-    if (userId == null) return null;
-    final rows = await _db.getAll(
-      'SELECT role FROM group_members WHERE group_id = ? AND user_id = ?',
-      [groupId, userId],
-    );
-    if (rows.isEmpty) return null;
-    return GroupRole.fromString(rows.first['role'] as String?);
-  }
+  Future<GroupRole?> getMyRole(String groupId) async => null;
 
   @override
-  Future<GroupMember?> getMyMember(String groupId) async {
-    final userId = _currentUserId;
-    if (userId == null) return null;
-    final rows = await _db.getAll(
-      'SELECT * FROM group_members WHERE group_id = ? AND user_id = ?',
-      [groupId, userId],
-    );
-    if (rows.isEmpty) return null;
-    return _memberFromRow(rows.first);
-  }
+  Future<GroupMember?> getMyMember(String groupId) async => null;
 
   @override
-  Stream<GroupMember?> watchMyMember(String groupId) {
-    if (kIsWeb) {
-      return _pollStream(() => getMyMember(groupId), fingerprint: _memberFp);
-    }
-    final userId = _currentUserId;
-    if (userId == null) {
-      return Stream<GroupMember?>.value(null);
-    }
-    return _db
-        .watch(
-          'SELECT * FROM group_members WHERE group_id = ? AND user_id = ?',
-          parameters: [groupId, userId],
-        )
-        .map((rows) => rows.isEmpty ? null : _memberFromRow(rows.first));
-  }
+  Stream<GroupMember?> watchMyMember(String groupId) =>
+      Stream<GroupMember?>.value(null);
 
   @override
-  Future<List<GroupMember>> listMyMembers() async {
-    final userId = _currentUserId;
-    if (userId == null) return const [];
-    final rows = await _db.getAll(
-      'SELECT * FROM group_members WHERE user_id = ? ORDER BY joined_at ASC',
-      [userId],
-    );
-    return rows.map(_memberFromRow).toList();
-  }
+  Future<List<GroupMember>> listMyMembers() async => const [];
 
   @override
-  Stream<List<GroupMember>> watchMyMembers() {
-    if (kIsWeb) {
-      return _pollStream(listMyMembers, fingerprint: _membersListFp);
-    }
-    final userId = _currentUserId;
-    if (userId == null) {
-      return Stream<List<GroupMember>>.value(const []);
-    }
-    return _db
-        .watch(
-          'SELECT * FROM group_members WHERE user_id = ? ORDER BY joined_at ASC',
-          parameters: [userId],
-        )
-        .map((rows) => rows.map(_memberFromRow).toList());
-  }
+  Stream<List<GroupMember>> watchMyMembers() =>
+      Stream<List<GroupMember>>.value(const []);
 
   @override
   Future<List<GroupMember>> listByGroup(String groupId) async {
@@ -90,83 +29,52 @@ class PowerSyncGroupMemberRepository implements IGroupMemberRepository {
       'SELECT * FROM group_members WHERE group_id = ? ORDER BY joined_at ASC',
       [groupId],
     );
-    return rows.map(_memberFromRow).toList();
+    return rows.map(_legacyMemberFromRow).toList();
   }
 
   @override
   Stream<List<GroupMember>> watchByGroup(String groupId) {
-    if (kIsWeb) {
-      return _pollStream(
-        () => listByGroup(groupId),
-        fingerprint: _membersListFp,
-      );
-    }
+    if (kIsWeb) return _pollStream(() => listByGroup(groupId));
     return _db
         .watch(
           'SELECT * FROM group_members WHERE group_id = ? ORDER BY joined_at ASC',
           parameters: [groupId],
         )
-        .map((rows) => rows.map(_memberFromRow).toList());
+        .map((rows) => rows.map(_legacyMemberFromRow).toList());
   }
 
   @override
-  Future<void> kickMember(String groupId, String memberId) async {
-    final groups = _groups;
-    if (groups == null) {
-      throw UnsupportedError('kickMember requires online mode');
-    }
-    await groups.kickMember(groupId, memberId);
-    Log.info('Member kicked');
-  }
+  Future<void> kickMember(String groupId, String memberId) =>
+      _unsupported();
 
   @override
-  Future<void> leave(String groupId) async {
-    final groups = _groups;
-    if (groups == null) {
-      throw UnsupportedError('leave requires online mode');
-    }
-    await groups.leaveGroup(groupId);
-    Log.info('Left group');
-  }
+  Future<void> leave(String groupId) => _unsupported();
 
   @override
-  Future<void> updateRole(
-    String groupId,
-    String memberId,
-    GroupRole role,
-  ) async {
-    final groups = _groups;
-    if (groups == null) {
-      throw UnsupportedError('updateRole requires online mode');
-    }
-    await groups.updateMemberRole(groupId, memberId, role.name);
-    Log.info('Member role updated');
-  }
+  Future<void> updateRole(String groupId, String memberId, GroupRole role) =>
+      _unsupported();
 
   @override
-  Future<void> transferOwnership(
-    String groupId,
-    String newOwnerMemberId,
-  ) async {
-    final groups = _groups;
-    if (groups == null) {
-      throw UnsupportedError('transferOwnership requires online mode');
-    }
-    await groups.transferOwnership(groupId, newOwnerMemberId);
-    Log.info('Ownership transferred');
-  }
+  Future<void> transferOwnership(String groupId, String newOwnerMemberId) =>
+      _unsupported();
 
   @override
   Future<void> mergeParticipantWithMember(
     String groupId,
     String participantId,
     String memberId,
-  ) async {
-    final groups = _groups;
-    if (groups == null) {
-      throw UnsupportedError('mergeParticipantWithMember requires online mode');
-    }
-    await groups.mergeParticipantWithMember(groupId, participantId, memberId);
-    Log.info('Participant merged with member');
+  ) => _unsupported();
+
+  Future<void> _unsupported() async {
+    throw UnsupportedError('Legacy membership is read-only');
   }
 }
+
+GroupMember _legacyMemberFromRow(Map<String, dynamic> row) => GroupMember(
+  id: row['id'] as String,
+  groupId: row['group_id'] as String,
+  userId: row['user_id'] as String,
+  role: row['role'] as String? ?? 'member',
+  participantId: row['participant_id'] as String?,
+  joinedAt: _parseDateTime(row['joined_at']),
+);

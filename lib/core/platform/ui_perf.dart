@@ -15,7 +15,7 @@ export 'ui_perf_logic.dart';
 /// - **Desktop web:** full visual polish.
 /// - **Native iOS / Android:** full polish (OS compositors handle elevation).
 ///
-/// Unconditional wins (sliver lists, [RepaintBoundary], async Firebase boot)
+/// Unconditional wins (sliver lists, [RepaintBoundary], asynchronous startup)
 /// stay outside this class — they help every platform.
 ///
 /// See [docs/WEB_IOS_SAFARI_PERFORMANCE.md].

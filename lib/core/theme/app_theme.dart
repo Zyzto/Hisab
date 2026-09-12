@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../motion/app_motion.dart';
 import 'theme_config.dart';
 import 'theme_extensions.dart';
@@ -183,7 +182,7 @@ class AppTheme {
         );
     final textScaleFactor = ThemeConfig.getTextScaleFactor(fontSizeScale);
     final textTheme = _scaleTextTheme(
-      GoogleFonts.cairoTextTheme(ThemeData.light().textTheme),
+      ThemeData.light().textTheme,
       textScaleFactor,
     );
     return _buildThemeData(
@@ -225,7 +224,7 @@ class AppTheme {
         );
     final textScaleFactor = ThemeConfig.getTextScaleFactor(fontSizeScale);
     final textTheme = _scaleTextTheme(
-      GoogleFonts.cairoTextTheme(ThemeData.dark().textTheme),
+      ThemeData.dark().textTheme,
       textScaleFactor,
     );
     return _buildThemeData(
@@ -267,7 +266,7 @@ class AppTheme {
         );
     final textScaleFactor = ThemeConfig.getTextScaleFactor(fontSizeScale);
     final textTheme = _scaleTextTheme(
-      GoogleFonts.cairoTextTheme(ThemeData.dark().textTheme),
+      ThemeData.dark().textTheme,
       textScaleFactor,
     );
     return _buildThemeData(

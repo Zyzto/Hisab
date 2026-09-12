@@ -19,9 +19,9 @@ import '../layout/layout_breakpoints.dart';
 import '../motion/app_motion.dart';
 import '../platform/ui_perf.dart';
 import '../widgets/app_sidenav.dart';
-import '../widgets/connection_banner.dart';
 import '../widgets/floating_nav_bar.dart';
 import '../widgets/pwa_install_banner.dart';
+import '../widgets/shell_menu_button.dart';
 import '../widgets/toast.dart';
 import 'route_paths.dart';
 import 'shell_drawer_scope.dart';
@@ -58,7 +58,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
   bool _desktopNavCollapsed = false;
 
   /// When true, tab index change snaps without crossfade (e.g. returning from
-  /// profile/archived onto settings so home does not flash through).
+  /// archived onto settings so home does not flash through).
   bool _snapTabIndex = false;
 
   void _ensureSettingsMounted() {
@@ -144,7 +144,6 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
         asDrawer: true,
         selectedIndex: widget.selectedIndex,
         onDestinationSelected: _onDestinationSelected,
-        onProfileSelected: _onProfileSelected,
       ),
     );
   }
@@ -154,9 +153,8 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
         currentPath == RoutePaths.settings ||
         currentPath.startsWith('${RoutePaths.settings}/');
     final isAtArchived = currentPath == RoutePaths.archivedGroups;
-    final isAtProfile = currentPath == RoutePaths.profile;
     final isAtHome = _isHomePath(currentPath);
-    return isAtSettings || isAtArchived || isAtProfile || isAtHome;
+    return isAtSettings || isAtArchived || isAtHome;
   }
 
   void _handleManagedBack(String currentPath) {
@@ -164,9 +162,8 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
         currentPath == RoutePaths.settings ||
         currentPath.startsWith('${RoutePaths.settings}/');
     final isAtArchived = currentPath == RoutePaths.archivedGroups;
-    final isAtProfile = currentPath == RoutePaths.profile;
     final isAtHome = _isHomePath(currentPath);
-    if (isAtSettings || isAtArchived || isAtProfile) {
+    if (isAtSettings || isAtArchived) {
       context.go(RoutePaths.home);
       return;
     }
@@ -288,16 +285,6 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     }
   }
 
-  void _onProfileSelected() {
-    HapticFeedback.lightImpact();
-    final scaffold = _shellScaffoldKey.currentState;
-    if (scaffold?.isDrawerOpen ?? false) {
-      scaffold!.closeDrawer();
-    }
-    // Profile owns account CTAs (sign-in / local→online).
-    context.push(RoutePaths.profile);
-  }
-
   void _syncReservedWidth({required bool showNavBar, required bool isDesktop}) {
     final next = (showNavBar && isDesktop)
         ? (_desktopNavCollapsed
@@ -318,7 +305,14 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     return Stack(
       children: [
         _buildMainContent(),
-        const Positioned(top: 0, left: 0, right: 0, child: ConnectionBanner()),
+        if (showNavBar &&
+            _currentIndex == 1 &&
+            LayoutBreakpoints.isMidBand(context))
+          const PositionedDirectional(
+            top: 8,
+            start: 4,
+            child: ShellMenuButton(),
+          ),
         if (showNavBar && _currentIndex == 0)
           Positioned(
             left: 16,
@@ -352,7 +346,6 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
             AppSidenav(
               selectedIndex: widget.selectedIndex,
               onDestinationSelected: _onDestinationSelected,
-              onProfileSelected: _onProfileSelected,
               collapsed: _desktopNavCollapsed,
               onToggleCompact: _toggleDesktopNavCollapsed,
             ),
@@ -395,12 +388,6 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
           // the Home and Settings lists add their own trailing clearance so
           // the final row can still be scrolled above the transparent bar.
           _buildMainContent(),
-          const Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: ConnectionBanner(),
-          ),
           if (showMobileNavBar && _currentIndex == 0)
             const Positioned(
               left: 16,
@@ -481,7 +468,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     }
 
     // Home stays mounted; Settings mounts on first visit then stays alive so
-    // State survives profile/archived round-trips.
+    // State survives archived round-trips.
     // Tickers stay enabled under Offstage so an in-flight tab crossfade can
     // finish (disabling TickerMode when leaving main stranded _animating).
     // iOS web: skip Opacity crossfade — painting both tabs janks on XR-class GPUs.

@@ -65,7 +65,8 @@ final class GalleryThumbBridge: NSObject {
     let req = PHImageRequestOptions()
     req.deliveryMode = .highQualityFormat
     req.resizeMode = .fast
-    req.isNetworkAccessAllowed = true
+    // Never fetch an image from iCloud while the local-only app is running.
+    req.isNetworkAccessAllowed = false
     req.isSynchronous = true
 
     var output: FlutterStandardTypedData?

@@ -68,7 +68,7 @@ InputDecoration _splitAmountDecoration(
 /// Orders participants as a directory tree while retaining their explicit
 /// [Participant.order] within each branch.  The participant stream normally
 /// already has a stable order, but doing this here keeps the split UI correct
-/// when a sync delivers children before their parent (or when an old row has
+/// when local rows contain children before their parent (or when an old row has
 /// a missing parent reference).
 List<Participant> _treeOrderedParticipants(List<Participant> participants) {
   if (participants.length < 2) return participants;

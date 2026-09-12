@@ -6,7 +6,6 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:custom_sliding_segmented_control/custom_sliding_segmented_control.dart';
 import '../../../core/celebration/celebration_controller.dart';
 import '../../../core/celebration/celebration_kind.dart';
-import '../../../core/celebration/membership_celebration_binder.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/content_aligned_fab_location.dart';
 import '../../../core/layout/constrained_content.dart';
@@ -15,20 +14,16 @@ import '../../../core/layout/responsive_sheet.dart';
 import '../../../core/platform/ui_perf.dart';
 import '../providers/groups_provider.dart';
 import '../providers/group_member_provider.dart';
-import '../widgets/create_invite_sheet.dart';
 import '../widgets/expense_summary_card.dart';
 import '../widgets/group_section_header.dart';
-import '../../../core/database/database_providers.dart';
 import '../../../core/repository/repository_providers.dart';
 import '../../../core/navigation/decorative_route.dart';
-import '../../../core/navigation/invite_auth_helpers.dart';
 import '../../../core/navigation/nav_back.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/navigation/route_transition_ready.dart';
 import '../../../core/widgets/missing_route_page.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/currency_formatter.dart';
-import '../../../core/utils/error_report_helper.dart';
 import '../../../core/services/settle_up_service.dart';
 import '../../../core/services/household_service.dart';
 import '../../../core/utils/expense_totals.dart';
@@ -49,9 +44,6 @@ import '../../expenses/widgets/expense_list_tile.dart';
 import '../../expenses/category_icons.dart';
 import '../providers/group_analytics_provider.dart';
 import '../../balance/widgets/balance_list.dart';
-import '../../profile/widgets/personal_budget_card.dart';
-import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
-import 'package:hisab/core/settings/settings_definitions.dart';
 import '../../../domain/domain.dart';
 import '../utils/group_icon_utils.dart';
 
@@ -67,17 +59,7 @@ enum GroupDetailTab { expenses, balance, people }
 int? groupDetailTabIndexFromPath({
   required String path,
   required String groupId,
-  bool readOnlyPreview = false,
-  String? previewToken,
 }) {
-  if (readOnlyPreview) {
-    final token = previewToken ?? '';
-    if (token.isEmpty) return null;
-    if (path == RoutePaths.invitePreviewBalance(token)) return 1;
-    if (path == RoutePaths.invitePreviewPeople(token)) return 2;
-    if (path == RoutePaths.invitePreviewExpenses(token)) return 0;
-    return null;
-  }
   if (path == RoutePaths.groupBalance(groupId)) return 1;
   if (path == RoutePaths.groupPeople(groupId)) return 2;
   if (path == RoutePaths.groupExpenses(groupId)) return 0;
@@ -108,17 +90,11 @@ class _KeepAliveTabState extends State<_KeepAliveTab>
 
 class GroupDetailPage extends ConsumerStatefulWidget {
   final String groupId;
-  final bool readOnlyPreview;
-  final String? previewToken;
-  final InviteAccessMode? previewAccessMode;
   final GroupDetailTab initialTab;
 
   const GroupDetailPage({
     super.key,
     required this.groupId,
-    this.readOnlyPreview = false,
-    this.previewToken,
-    this.previewAccessMode,
     this.initialTab = GroupDetailTab.expenses,
   });
 
@@ -158,9 +134,6 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
         }
         return _GroupDetailContent(
           group: group,
-          readOnlyPreview: widget.readOnlyPreview,
-          previewToken: widget.previewToken,
-          previewAccessMode: widget.previewAccessMode,
           initialTab: widget.initialTab,
         );
       },
@@ -172,16 +145,10 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage> {
 
 class _GroupDetailContent extends ConsumerStatefulWidget {
   final Group group;
-  final bool readOnlyPreview;
-  final String? previewToken;
-  final InviteAccessMode? previewAccessMode;
   final GroupDetailTab initialTab;
 
   const _GroupDetailContent({
     required this.group,
-    required this.readOnlyPreview,
-    required this.previewToken,
-    required this.previewAccessMode,
     required this.initialTab,
   });
 
@@ -229,25 +196,10 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
     return groupDetailTabIndexFromPath(
       path: path,
       groupId: widget.group.id,
-      readOnlyPreview: widget.readOnlyPreview,
-      previewToken: widget.previewToken,
     );
   }
 
   String _targetPathForTabIndex(int index) {
-    if (widget.readOnlyPreview) {
-      final token = widget.previewToken ?? '';
-      if (token.isEmpty) return RoutePaths.home;
-      switch (index) {
-        case 1:
-          return RoutePaths.invitePreviewBalance(token);
-        case 2:
-          return RoutePaths.invitePreviewPeople(token);
-        case 0:
-        default:
-          return RoutePaths.invitePreviewExpenses(token);
-      }
-    }
     switch (index) {
       case 1:
         return RoutePaths.groupBalance(widget.group.id);
@@ -288,11 +240,6 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
   }
 
   void _navigateBack() {
-    // Preview Join may have set pending invite; clear on dismiss so
-    // home is not redirected straight back to /invite.
-    if (widget.readOnlyPreview) {
-      clearInviteFlowState(ref);
-    }
     popOrGo(context, RoutePaths.home);
   }
 
@@ -306,17 +253,6 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
   }
 
   Future<void> _onRefresh() async {
-    if (widget.readOnlyPreview) return;
-    final localOnly = ref.read(effectiveLocalOnlyProvider);
-    if (!localOnly) {
-      Log.info('Group detail refresh: syncing group ${widget.group.id}');
-      await ref.read(dataSyncServiceProvider.notifier).syncNow();
-      Log.info('Group detail refresh: sync complete, invalidating providers');
-    } else {
-      Log.debug(
-        'Group detail refresh: local-only, invalidating providers only',
-      );
-    }
     ref.invalidate(futureGroupProvider(widget.group.id));
     ref.invalidate(expensesByGroupProvider(widget.group.id));
     ref.invalidate(participantsByGroupProvider(widget.group.id));
@@ -413,9 +349,8 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
     GroupRole? myRole,
     bool localOnly,
   ) {
-    if (widget.readOnlyPreview) return null;
     final isOwnerOrAdmin =
-        localOnly || myRole == GroupRole.owner || myRole == GroupRole.admin;
+        true;
     final canAddExpense = isOwnerOrAdmin || widget.group.allowMemberAddExpense;
 
     if (index == 0) {
@@ -454,75 +389,15 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
     return null;
   }
 
-  Widget? _buildPreviewJoinBar(BuildContext context) {
-    if (!widget.readOnlyPreview) return null;
-    if (widget.previewAccessMode != InviteAccessMode.readonlyJoin) return null;
-    final token = widget.previewToken;
-    if (token == null || token.isEmpty) return null;
-    final theme = Theme.of(context);
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-        child: Card(
-          elevation: 2,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'invite_preview_readonly_join_message'.tr(),
-                    style: theme.textTheme.bodySmall,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                FilledButton(
-                  onPressed: () {
-                    final settings = ref.read(hisabSettingsProvidersProvider);
-                    if (settings != null) {
-                      ref
-                          .read(
-                            settings
-                                .provider(pendingInviteTokenSettingDef)
-                                .notifier,
-                          )
-                          .set(token);
-                      ref
-                          .read(
-                            settings
-                                .provider(pendingInviteAutoJoinSettingDef)
-                                .notifier,
-                          )
-                          .set(true);
-                    }
-                    context.push(RoutePaths.inviteAccept(token));
-                  },
-                  child: Text('invite_preview_join_cta'.tr()),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     ensureRouteReady(context);
-    final localOnly = ref.watch(effectiveLocalOnlyProvider);
-    final myRoleAsync = localOnly
-        ? const AsyncValue.data(null)
-        : ref.watch(myRoleInGroupProvider(widget.group.id));
+    const localOnly = true;
+    final myRoleAsync = ref.watch(myRoleInGroupProvider(widget.group.id));
     final myRole = myRoleAsync.value;
 
     final canPop = routerCanPop(context);
-    return MembershipCelebrationBinder(
-      groupId: widget.group.id,
-      child: PopScope(
+    return PopScope(
         canPop: canPop,
         onPopInvokedWithResult: (didPop, _) {
           if (!didPop) _navigateBack();
@@ -557,32 +432,19 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
                 ),
                 title: _buildAppBarTitle(context),
                 actions: [
-                  if (!widget.readOnlyPreview)
-                    IconButton(
-                      icon: const Icon(Icons.analytics_outlined),
-                      tooltip: 'analytics'.tr(),
-                      onPressed: () => context.push(
-                        RoutePaths.groupAnalytics(widget.group.id),
-                      ),
+                  IconButton(
+                    icon: const Icon(Icons.analytics_outlined),
+                    tooltip: 'analytics'.tr(),
+                    onPressed: () => context.push(
+                      RoutePaths.groupAnalytics(widget.group.id),
                     ),
-                  if (!localOnly &&
-                      !widget.readOnlyPreview &&
-                      (myRole == GroupRole.owner ||
-                          myRole == GroupRole.admin) &&
-                      !widget.group.isPersonal)
-                    IconButton(
-                      icon: const Icon(Icons.person_add),
-                      tooltip: 'invite_people'.tr(),
-                      onPressed: () =>
-                          showCreateInviteSheet(context, ref, widget.group.id),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.settings),
+                    onPressed: () => context.push(
+                      RoutePaths.groupSettings(widget.group.id),
                     ),
-                  if (!widget.readOnlyPreview)
-                    IconButton(
-                      icon: const Icon(Icons.settings),
-                      onPressed: () => context.push(
-                        RoutePaths.groupSettings(widget.group.id),
-                      ),
-                    ),
+                  ),
                 ],
               ),
               body: ConstrainedContent(
@@ -590,14 +452,11 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
                   children: [
                     if (widget.group.isArchived) _buildArchivedBanner(context),
                     if (widget.group.isPersonal) ...[
-                      _PersonalBudgetHeader(group: widget.group),
                       Expanded(
                         child: _ExpensesTab(
                           groupId: widget.group.id,
                           group: widget.group,
                           onRefresh: _onRefresh,
-                          readOnlyPreview: widget.readOnlyPreview,
-                          previewToken: widget.previewToken,
                         ),
                       ),
                     ] else ...[
@@ -766,19 +625,15 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
                                   groupId: widget.group.id,
                                   group: widget.group,
                                   onRefresh: _onRefresh,
-                                  readOnlyPreview: widget.readOnlyPreview,
-                                  previewToken: widget.previewToken,
                                 ),
                                 1 => _BalanceTab(
                                   groupId: widget.group.id,
                                   onRefresh: _onRefresh,
-                                  readOnlyPreview: widget.readOnlyPreview,
                                 ),
                                 _ => _PeopleTab(
                                   groupId: widget.group.id,
                                   group: widget.group,
                                   onRefresh: _onRefresh,
-                                  readOnlyPreview: widget.readOnlyPreview,
                                 ),
                               },
                             );
@@ -800,49 +655,9 @@ class _GroupDetailContentState extends ConsumerState<_GroupDetailContent>
                     ) ??
                     const SizedBox.shrink(),
               ),
-              bottomNavigationBar: _buildPreviewJoinBar(context),
             );
           },
         ),
-      ),
-    );
-  }
-}
-
-/// Budget summary for personal groups: My budget + total spent; theme-aware color when near/over budget.
-class _PersonalBudgetHeader extends ConsumerWidget {
-  const _PersonalBudgetHeader({required this.group});
-
-  final Group group;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final expensesAsync = ref.watch(expensesByGroupProvider(group.id));
-
-    return expensesAsync.when(
-      data: (expenses) {
-        final totalSpentCents = expenses.fold<int>(
-          0,
-          (s, e) => s + contributionToExpenseTotal(e),
-        );
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: PersonalBudgetCard(
-            group: group,
-            spentCents: totalSpentCents,
-            budgetCents: group.budgetAmountCents,
-            showTitle: false,
-          ),
-        );
-      },
-      loading: () => const Padding(
-        padding: EdgeInsets.all(16),
-        child: SizedBox(
-          height: 56,
-          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-        ),
-      ),
-      error: (_, _) => const SizedBox.shrink(),
     );
   }
 }
@@ -851,25 +666,16 @@ class _ExpensesTab extends ConsumerStatefulWidget {
   final String groupId;
   final Group group;
   final Future<void> Function() onRefresh;
-  final bool readOnlyPreview;
-  final String? previewToken;
 
   const _ExpensesTab({
     required this.groupId,
     required this.group,
     required this.onRefresh,
-    required this.readOnlyPreview,
-    required this.previewToken,
   });
 
   static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
   static Widget _buildError(WidgetRef ref, String groupId, Object error) {
-    sendErrorTelemetryIfOnline(
-      ref,
-      message: error.toString(),
-      details: error.toString(),
-    );
     return Center(
       child: ErrorContentWidget(
         message: error.toString(),
@@ -937,8 +743,6 @@ class _ExpensesTabState extends ConsumerState<_ExpensesTab> {
     final groupId = widget.groupId;
     final group = widget.group;
     final onRefresh = widget.onRefresh;
-    final readOnlyPreview = widget.readOnlyPreview;
-    final previewToken = widget.previewToken;
 
     final expensesAsync = ref.watch(expensesByGroupProvider(groupId));
     final participantsAsync = ref.watch(participantsByGroupProvider(groupId));
@@ -1510,16 +1314,6 @@ class _ExpensesTabState extends ConsumerState<_ExpensesTab> {
                         groupCurrencyCode: group.currencyCode,
                         showDisclosure: true,
                         onTap: () {
-                          final token = previewToken;
-                          if (readOnlyPreview && token != null) {
-                            context.push(
-                              RoutePaths.invitePreviewExpenseDetail(
-                                token,
-                                expense.id,
-                              ),
-                            );
-                            return;
-                          }
                           context.push(
                             RoutePaths.groupExpenseDetail(groupId, expense.id),
                           );
@@ -1543,12 +1337,10 @@ class _ExpensesTabState extends ConsumerState<_ExpensesTab> {
 class _BalanceTab extends ConsumerWidget {
   final String groupId;
   final Future<void> Function() onRefresh;
-  final bool readOnlyPreview;
 
   const _BalanceTab({
     required this.groupId,
     required this.onRefresh,
-    required this.readOnlyPreview,
   });
 
   @override
@@ -1556,7 +1348,7 @@ class _BalanceTab extends ConsumerWidget {
     return BalanceList(
       groupId: groupId,
       onRefresh: onRefresh,
-      readOnlyMode: readOnlyPreview,
+      readOnlyMode: false,
     );
   }
 }
@@ -1565,13 +1357,11 @@ class _PeopleTab extends ConsumerStatefulWidget {
   final String groupId;
   final Group group;
   final Future<void> Function() onRefresh;
-  final bool readOnlyPreview;
 
   const _PeopleTab({
     required this.groupId,
     required this.group,
     required this.onRefresh,
-    required this.readOnlyPreview,
   });
 
   @override
@@ -1601,18 +1391,11 @@ class _PeopleTabState extends ConsumerState<_PeopleTab> {
     final groupId = widget.groupId;
     final group = widget.group;
     final onRefresh = widget.onRefresh;
-    final readOnlyPreview = widget.readOnlyPreview;
-    final localOnly = ref.watch(effectiveLocalOnlyProvider);
+    const localOnly = true;
     final participantsAsync = ref.watch(participantsByGroupProvider(groupId));
-    final membersAsync = localOnly
-        ? const AsyncValue<List<GroupMember>>.data([])
-        : ref.watch(membersByGroupProvider(groupId));
-    final myRoleAsync = localOnly
-        ? const AsyncValue.data(null)
-        : ref.watch(myRoleInGroupProvider(groupId));
-    final myMemberAsync = localOnly
-        ? const AsyncValue<GroupMember?>.data(null)
-        : ref.watch(myMemberInGroupProvider(groupId));
+    const membersAsync = AsyncValue<List<GroupMember>>.data([]);
+    final myRoleAsync = ref.watch(myRoleInGroupProvider(groupId));
+    const myMemberAsync = AsyncValue<GroupMember?>.data(null);
     return participantsAsync.when(
       data: (participants) {
         return membersAsync.when(
@@ -1621,10 +1404,7 @@ class _PeopleTabState extends ConsumerState<_PeopleTab> {
             final myRole = myRoleAsync.value;
             final myParticipantId = myMemberAsync.value?.participantId;
             final isOwnerOrAdmin =
-                !readOnlyPreview &&
-                (localOnly ||
-                    myRole == GroupRole.owner ||
-                    myRole == GroupRole.admin);
+                true;
 
             // Build lookup: participantId -> GroupMember
             final memberByParticipantId = <String, GroupMember>{};
@@ -1783,11 +1563,6 @@ class _PeopleTabState extends ConsumerState<_PeopleTab> {
           },
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, st) {
-            sendErrorTelemetryIfOnline(
-              ref,
-              message: e.toString(),
-              details: e.toString(),
-            );
             return Center(
               child: ErrorContentWidget(
                 message: e.toString(),
@@ -1802,11 +1577,6 @@ class _PeopleTabState extends ConsumerState<_PeopleTab> {
       },
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, st) {
-        sendErrorTelemetryIfOnline(
-          ref,
-          message: e.toString(),
-          details: e.toString(),
-        );
         return Center(
           child: ErrorContentWidget(
             message: e.toString(),
@@ -2505,9 +2275,6 @@ class _PeopleTabState extends ConsumerState<_PeopleTab> {
             .read(participantRepositoryProvider)
             .archive(groupId, participant.id);
         ref.invalidate(participantsByGroupProvider(groupId));
-        if (!ref.read(effectiveLocalOnlyProvider)) {
-          await ref.read(dataSyncServiceProvider.notifier).syncNow();
-        }
         await fireCelebration(
           ref,
           CelebrationKind.personLeft,
@@ -2563,7 +2330,7 @@ class _PeopleTabState extends ConsumerState<_PeopleTab> {
   /// Promote a removed parent’s direct branches and carry its unresolved net
   /// balance to those branches before the participant is archived.  This is
   /// intentionally done before the membership/archive RPC so the local and
-  /// online paths keep the same valid tree at every intermediate state.
+  /// Keep the participant tree valid at every intermediate state.
   Future<void> _preserveHouseholdOnParticipantRemoval(
     WidgetRef ref,
     String groupId,
@@ -2739,9 +2506,6 @@ class _PeopleTabState extends ConsumerState<_PeopleTab> {
               .read(participantRepositoryProvider)
               .archive(groupId, participant.id);
           ref.invalidate(participantsByGroupProvider(groupId));
-          if (!ref.read(effectiveLocalOnlyProvider)) {
-            await ref.read(dataSyncServiceProvider.notifier).syncNow();
-          }
           await fireCelebration(
             ref,
             CelebrationKind.personLeft,
@@ -2826,9 +2590,6 @@ class _PeopleTabState extends ConsumerState<_PeopleTab> {
           .mergeParticipantWithMember(groupId, participant.id, chosen.id);
       ref.invalidate(participantsByGroupProvider(groupId));
       ref.invalidate(membersByGroupProvider(groupId));
-      if (!ref.read(effectiveLocalOnlyProvider)) {
-        await ref.read(dataSyncServiceProvider.notifier).syncNow();
-      }
       if (context.mounted) {
         context.showSuccess('merge_with_user_success'.tr());
       }
@@ -2876,9 +2637,6 @@ class _PeopleTabState extends ConsumerState<_PeopleTab> {
         await ref
             .read(groupMemberRepositoryProvider)
             .updateRole(groupId, member.id, role);
-        if (!ref.read(effectiveLocalOnlyProvider)) {
-          await ref.read(dataSyncServiceProvider.notifier).syncNow();
-        }
         ref.invalidate(membersByGroupProvider(groupId));
       } catch (e, st) {
         Log.warning('Change role failed', error: e, stackTrace: st);
@@ -2898,9 +2656,6 @@ class _PeopleTabState extends ConsumerState<_PeopleTab> {
       await ref
           .read(groupMemberRepositoryProvider)
           .transferOwnership(groupId, memberId);
-      if (!ref.read(effectiveLocalOnlyProvider)) {
-        await ref.read(dataSyncServiceProvider.notifier).syncNow();
-      }
       ref.invalidate(futureGroupProvider(groupId));
       ref.invalidate(membersByGroupProvider(groupId));
       ref.invalidate(myRoleInGroupProvider(groupId));
@@ -2949,10 +2704,7 @@ class _PeopleTabState extends ConsumerState<_PeopleTab> {
         await ref
             .read(groupMemberRepositoryProvider)
             .kickMember(groupId, member.id);
-        // Sync so local DB gets updated (RPC only changes server); then invalidate so UI refreshes.
-        if (!ref.read(effectiveLocalOnlyProvider)) {
-          await ref.read(dataSyncServiceProvider.notifier).syncNow();
-        }
+        // Reload the local database after the mutation so the UI refreshes.
         if (!context.mounted) return;
         ref.invalidate(membersByGroupProvider(groupId));
         ref.invalidate(participantsByGroupProvider(groupId));

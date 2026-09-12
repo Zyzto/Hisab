@@ -1,4 +1,4 @@
-/// Ring buffer of recent route locations for error reports (GitHub / share).
+/// Ring buffer of recent route locations for local diagnostic reports.
 /// Paths are route URIs (ASCII); section text for reports is written in English.
 class NavigationTrace {
   NavigationTrace._();

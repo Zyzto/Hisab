@@ -18,7 +18,6 @@ double _railWidthForDialog({
   if (centerInFullViewport) return 0.0;
   final isOutsideShell =
       path.startsWith('/groups') ||
-      path.startsWith('/invite') ||
       path.startsWith('/functions/');
   if (isOutsideShell) return 0.0;
   final isShellRoute =

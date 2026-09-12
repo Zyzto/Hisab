@@ -77,7 +77,6 @@ class BackupService {
     required this.expenseRepo,
     required this.tagRepo,
     this.householdReassignmentRepo,
-    required this.effectiveLocalOnly,
   });
 
   final PowerSyncDatabase db;
@@ -86,49 +85,20 @@ class BackupService {
   final IExpenseRepository expenseRepo;
   final ITagRepository tagRepo;
   final IHouseholdBalanceReassignmentRepository? householdReassignmentRepo;
-  final bool effectiveLocalOnly;
 
-  /// Repos that never hot-loop PostgREST (queue when not local-only).
+  /// Repositories backed directly by the local SQLite database.
   static BackupService forImport({
     required PowerSyncDatabase db,
-    required bool effectiveLocalOnly,
   }) {
-    // Local-only: SQLite only. Online: treat offline so writes enqueue silently.
-    final reposLocalOnly = effectiveLocalOnly;
     return BackupService(
       db: db,
-      groupRepo: PowerSyncGroupRepository(
+      groupRepo: PowerSyncGroupRepository(db),
+      participantRepo: PowerSyncParticipantRepository(db),
+      expenseRepo: PowerSyncExpenseRepository(db),
+      tagRepo: PowerSyncTagRepository(db),
+      householdReassignmentRepo: PowerSyncHouseholdBalanceReassignmentRepository(
         db,
-        cloud: null,
-        isOnline: false,
-        isLocalOnly: reposLocalOnly,
       ),
-      participantRepo: PowerSyncParticipantRepository(
-        db,
-        cloud: null,
-        isOnline: false,
-        isLocalOnly: reposLocalOnly,
-      ),
-      expenseRepo: PowerSyncExpenseRepository(
-        db,
-        cloud: null,
-        isOnline: false,
-        isLocalOnly: reposLocalOnly,
-      ),
-      tagRepo: PowerSyncTagRepository(
-        db,
-        cloud: null,
-        isOnline: false,
-        isLocalOnly: reposLocalOnly,
-      ),
-      householdReassignmentRepo:
-          PowerSyncHouseholdBalanceReassignmentRepository(
-            db,
-            cloud: null,
-            isOnline: false,
-            isLocalOnly: reposLocalOnly,
-          ),
-      effectiveLocalOnly: effectiveLocalOnly,
     );
   }
 
@@ -352,17 +322,9 @@ class BackupService {
     required bool restoreArchivedAt,
   }) async {
     if (mode == BackupImportMode.replaceLocal) {
-      if (!effectiveLocalOnly) {
-        throw StateError('Replace import requires local-only mode');
-      }
       onProgress?.call('import_wipe', 0.05);
       await wipeLocalDataTables(db);
     }
-
-    final pendingBefore = await db.getAll('SELECT id FROM pending_writes');
-    final pendingBeforeIds = pendingBefore
-        .map((r) => r['id'] as String)
-        .toSet();
 
     final failed = <String>[];
     var succeeded = 0;
@@ -397,32 +359,7 @@ class BackupService {
       );
     }
 
-    try {
-      if (effectiveLocalOnly) {
-        return await run();
-      }
-      return await runWithSilentPendingWrites(run);
-    } catch (e) {
-      await _cleanupImportPendingWrites(pendingBeforeIds);
-      rethrow;
-    } finally {
-      if (failed.isNotEmpty || succeeded == 0 && data.groups.isNotEmpty) {
-        // On hard failure mid-way with enqueue, drop new silent rows.
-        if (!effectiveLocalOnly && failed.isNotEmpty) {
-          await _cleanupImportPendingWrites(pendingBeforeIds);
-        }
-      }
-    }
-  }
-
-  Future<void> _cleanupImportPendingWrites(Set<String> keepIds) async {
-    final rows = await db.getAll('SELECT id FROM pending_writes');
-    for (final row in rows) {
-      final id = row['id'] as String;
-      if (!keepIds.contains(id)) {
-        await db.execute('DELETE FROM pending_writes WHERE id = ?', [id]);
-      }
-    }
+    return run();
   }
 
   Future<void> _importOneGroup(

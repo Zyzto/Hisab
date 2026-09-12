@@ -30,12 +30,5 @@ List<RouteBase> getOnboardingRoutes() {
         child: const OnboardingPage(initialPage: 2),
       ),
     ),
-    GoRoute(
-      path: RoutePaths.onboardingConnect,
-      pageBuilder: (context, state) => appNoTransitionPage(
-        key: state.pageKey,
-        child: const OnboardingPage(initialPage: 3),
-      ),
-    ),
   ];
 }

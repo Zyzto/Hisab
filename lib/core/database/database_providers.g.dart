@@ -8,14 +8,14 @@ part of 'database_providers.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// The PowerSync database instance. Always available (local SQLite).
-/// Initialized in main.dart and overridden in ProviderScope.
+/// The local SQLite database. It is initialized in main.dart and overridden
+/// in the root ProviderScope.
 
 @ProviderFor(powerSyncDatabase)
 final powerSyncDatabaseProvider = PowerSyncDatabaseProvider._();
 
-/// The PowerSync database instance. Always available (local SQLite).
-/// Initialized in main.dart and overridden in ProviderScope.
+/// The local SQLite database. It is initialized in main.dart and overridden
+/// in the root ProviderScope.
 
 final class PowerSyncDatabaseProvider
     extends
@@ -25,8 +25,8 @@ final class PowerSyncDatabaseProvider
           PowerSyncDatabase
         >
     with $Provider<PowerSyncDatabase> {
-  /// The PowerSync database instance. Always available (local SQLite).
-  /// Initialized in main.dart and overridden in ProviderScope.
+  /// The local SQLite database. It is initialized in main.dart and overridden
+  /// in the root ProviderScope.
   PowerSyncDatabaseProvider._()
     : super(
         from: null,
@@ -62,55 +62,3 @@ final class PowerSyncDatabaseProvider
 }
 
 String _$powerSyncDatabaseHash() => r'052a1c8d9f8f94272f5b9cb11fa402f2fcca1baa';
-
-@ProviderFor(DataSyncService)
-final dataSyncServiceProvider = DataSyncServiceProvider._();
-
-final class DataSyncServiceProvider
-    extends $NotifierProvider<DataSyncService, void> {
-  DataSyncServiceProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'dataSyncServiceProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$dataSyncServiceHash();
-
-  @$internal
-  @override
-  DataSyncService create() => DataSyncService();
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(void value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<void>(value),
-    );
-  }
-}
-
-String _$dataSyncServiceHash() => r'003fef82d7a145319f010d552110c3ab4f6755fe';
-
-abstract class _$DataSyncService extends $Notifier<void> {
-  void build();
-  @$mustCallSuper
-  @override
-  WhenComplete runBuild() {
-    final ref = this.ref as $Ref<void, void>;
-    final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<void, void>,
-              void,
-              Object?,
-              Object?
-            >;
-    return element.handleCreate(ref, build);
-  }
-}

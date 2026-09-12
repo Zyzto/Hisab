@@ -39,14 +39,14 @@ extension ToastContext on BuildContext {
     );
   }
 
-  /// Shows an error toast with Share and Report issue actions.
-  /// Use when the user should be able to share or report the error.
+  /// Shows an error toast with share and copy-diagnostics actions.
+  /// Use when the user should be able to preserve or share the error locally.
   void showErrorWithActions(
     String message, {
     String? details,
     StackTrace? stackTrace,
 
-    /// Short English line for GitHub / share (e.g. same as [Log.warning] text).
+    /// Short English diagnostic line (e.g. same as [Log.warning] text).
     String? summaryEnglish,
     Duration? duration,
   }) {
@@ -106,7 +106,7 @@ extension ToastContext on BuildContext {
                     onPressed: () async {
                       dismiss();
                       try {
-                        await openErrorReportGitHubIssue(
+                        await copyErrorReportToClipboard(
                           surfaceContext,
                           message: message,
                           details: details,
@@ -204,7 +204,7 @@ extension ToastContext on BuildContext {
     );
   }
 
-  /// Dismisses all visible toasts. Use before showing a replacement (e.g. sync status).
+  /// Dismisses all visible toasts. Use before showing a replacement status.
   void dismissAllToasts() {
     dismissSafaehFeedbacks();
   }

@@ -27,7 +27,7 @@ const _sampleEn =
     'Purchase of 42.50 SAR at Starbucks in Riyadh on 25/08/2026. Card *1234';
 const _sampleAr = 'تم خصم 150.00 ر.س لدى كريم في الرياض';
 
-/// Full setup wizard: privacy → permission → apps → teach → destination → AI.
+/// Full setup wizard: privacy → permission → apps → teach → destination → rules.
 class ScannerSetupPage extends ConsumerStatefulWidget {
   const ScannerSetupPage({super.key});
 
@@ -47,7 +47,6 @@ class _ScannerSetupPageState extends ConsumerState<ScannerSetupPage> {
   List<FieldSpan> _spans = const [];
   String? _groupId;
   bool _categorize = true;
-  String _aiMode = 'off';
 
   static const _stepCount = 7;
 
@@ -64,8 +63,6 @@ class _ScannerSetupPageState extends ConsumerState<ScannerSetupPage> {
     if (settings != null) {
       _categorize =
           settings.controller.get(scannerCategorizeEnabledSettingDef) == true;
-      _aiMode =
-          settings.controller.get(scannerAiModeSettingDef) as String? ?? 'off';
       final gid =
           settings.controller.get(scannerDefaultGroupIdSettingDef) as String?;
       if (gid != null && gid.isNotEmpty) _groupId = gid;
@@ -153,7 +150,6 @@ class _ScannerSetupPageState extends ConsumerState<ScannerSetupPage> {
         scannerCategorizeEnabledSettingDef,
         _categorize,
       );
-      await applySetting(ref, settings, scannerAiModeSettingDef, _aiMode);
       if (_groupId != null) {
         await applySetting(
           ref,
@@ -293,11 +289,9 @@ class _ScannerSetupPageState extends ConsumerState<ScannerSetupPage> {
           onNext: _groupId == null ? null : () => setState(() => _step = 5),
         );
       case 5:
-        return _AiStep(
+        return _CategoriesStep(
           categorize: _categorize,
-          aiMode: _aiMode,
           onCategorize: (v) => setState(() => _categorize = v),
-          onAiMode: (v) => setState(() => _aiMode = v),
           onNext: () => setState(() => _step = 6),
         );
       default:
@@ -785,69 +779,39 @@ class _DestinationStep extends ConsumerWidget {
   }
 }
 
-class _AiStep extends ConsumerWidget {
+class _CategoriesStep extends StatelessWidget {
   final bool categorize;
-  final String aiMode;
   final ValueChanged<bool> onCategorize;
-  final ValueChanged<String> onAiMode;
   final VoidCallback onNext;
 
-  const _AiStep({
+  const _CategoriesStep({
     required this.categorize,
-    required this.aiMode,
     required this.onCategorize,
-    required this.onAiMode,
     required this.onNext,
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final settings = ref.watch(hisabSettingsProvidersProvider);
-    final provider = settings?.controller.get(receiptAiProviderSettingDef);
-    final apiKey = provider == 'openai'
-        ? settings?.controller.get(openaiApiKeySettingDef)
-        : settings?.controller.get(geminiApiKeySettingDef);
-    final hasCloudKey = apiKey is String && apiKey.trim().isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'scanner_setup_ai_title'.tr(),
+          'scanner_setup_categories_title'.tr(),
           style: theme.textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.bold,
           ),
         ),
         const SizedBox(height: 8),
-        Text('scanner_setup_ai_body'.tr(), style: theme.textTheme.bodyMedium),
+        Text(
+          'scanner_setup_categories_body'.tr(),
+          style: theme.textTheme.bodyMedium,
+        ),
         SwitchListTile.adaptive(
           value: categorize,
           onChanged: onCategorize,
           title: Text('scanner_categorize_enabled'.tr()),
           subtitle: Text('scanner_categorize_enabled_subtitle'.tr()),
-        ),
-        RadioListTile<String>(
-          value: 'off',
-          groupValue: aiMode,
-          onChanged: (v) => onAiMode(v ?? 'off'),
-          title: Text('scanner_ai_mode_off'.tr()),
-        ),
-        RadioListTile<String>(
-          value: 'nano',
-          groupValue: aiMode,
-          onChanged: (v) => onAiMode(v ?? 'off'),
-          title: Text('scanner_ai_mode_nano'.tr()),
-        ),
-        RadioListTile<String>(
-          value: 'cloud',
-          groupValue: aiMode,
-          onChanged: (v) => onAiMode(v ?? 'off'),
-          title: Text('scanner_ai_mode_cloud'.tr()),
-          subtitle: Text(
-            hasCloudKey
-                ? 'scanner_ai_cloud_privacy'.tr()
-                : 'scanner_ai_cloud_needs_key'.tr(),
-          ),
         ),
         const Spacer(),
         FilledButton(

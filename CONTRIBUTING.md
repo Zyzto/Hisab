@@ -1,30 +1,21 @@
 # Contributing to Hisab
 
-Thanks for wanting to help. A few things are worth knowing before you start,
-because this project's structure is unusual in one specific way.
+Thanks for wanting to help. The project is a Flutter application with a local
+SQLite/PowerSync data model and platform-specific local integrations.
 
 ## What lives here
 
-This repository is the **client**: the Flutter app, the backend contract in
-`packages/hisab_backend`, and the offline stub in `packages/hisab_cloud`.
-Adaptive chrome lives in the separate [Safaeh](https://github.com/Zyzto/Safaeh)
-package (MPL-2.0). This repo builds a fully functional offline app on its own,
-and that build is what CI verifies on every push.
-
-The hosted backend is a separate, private, proprietary project. Nothing in it
-is here, and pull requests cannot touch it. If you want to run your own
-backend, [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md) is the specification.
+The repository builds a fully functional local app on its own. Adaptive chrome
+lives in the separate [Safaeh](https://github.com/Zyzto/Safaeh) package
+(MPL-2.0), and CI verifies the local build on every push.
 
 ## Contributor Licence Agreement
 
 **Every contribution requires a CLA.** This is not paperwork; it is what keeps
 the project's structure legal.
 
-Hisab is AGPL-3.0. The official app is the same client linked against a
-proprietary backend package, which the AGPL would normally prohibit —
-distributing a combined work means publishing all of its source. That build is
-legal only because a single party holds the copyright to every line of the
-AGPL side and can therefore also license it otherwise.
+Hisab is AGPL-3.0. A single party holds the copyright to the AGPL source and
+can therefore also license it under compatible terms for official releases.
 
 The first contribution merged without a CLA ends that, permanently, for
 everyone.
@@ -62,9 +53,8 @@ flutter test
 bash scripts/run_release_checks.sh
 ```
 
-CI runs all of these plus an offline build guard, which asserts that the tree
-still compiles with no backend attached. If your change needs a backend to
-build, it belongs behind the `CloudBackend` contract rather than in `lib/`.
+CI runs all of these plus a self-contained build guard. Changes should keep
+the application usable without any external service.
 
 ## Secrets
 

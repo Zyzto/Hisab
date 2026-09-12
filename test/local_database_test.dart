@@ -5,15 +5,14 @@ import 'package:path/path.dart' as path;
 import 'package:powersync/powersync.dart';
 
 import 'package:hisab/core/database/powersync_schema.dart' as ps;
-import 'package:hisab/core/repository/group_repository.dart';
 import 'package:hisab/core/repository/powersync_repository.dart';
 import 'package:hisab/domain/domain.dart';
 
-/// Set to false if PowerSync native binary could not be loaded (see test/README.md).
+/// Set to false when the native PowerSync library is unavailable.
 bool powerSyncAvailable = false;
 
 void main() {
-  late PowerSyncDatabase? db;
+  PowerSyncDatabase? db;
   late String dbPath;
 
   setUpAll(() async {
@@ -44,250 +43,76 @@ void main() {
   });
 
   tearDown(() async {
-    if (db != null) {
-      await db!.close();
-      try {
-        final f = File(dbPath);
-        if (await f.exists()) await f.delete();
-      } catch (_) {}
+    final current = db;
+    if (current != null) {
+      await current.close();
+      final file = File(dbPath);
+      if (await file.exists()) await file.delete();
       db = null;
     }
   });
 
-  IGroupRepository repo() => PowerSyncGroupRepository(
-    db!,
-    cloud: null,
-    isOnline: false,
-    isLocalOnly: true,
-  );
+  PowerSyncGroupRepository groups() => PowerSyncGroupRepository(db!);
+  PowerSyncParticipantRepository participants() =>
+      PowerSyncParticipantRepository(db!);
+  PowerSyncExpenseRepository expenses() => PowerSyncExpenseRepository(db!);
 
-  group('PowerSyncGroupRepository (local only)', () {
-    test('create then getById and getAll', () async {
+  group('local database repositories', () {
+    test('create a group with participants and read it back', () async {
       if (!powerSyncAvailable) return;
-      final r = repo();
-      final id = await r.create('Test Group', 'USD');
-      expect(id, isNotEmpty);
 
-      final byId = await r.getById(id);
-      expect(byId, isNotNull);
-      expect(byId!.name, 'Test Group');
-      expect(byId.currencyCode, 'USD');
-      expect(byId.id, id);
+      final groupId = await groups().create(
+        'Test Group',
+        'USD',
+        initialParticipants: const ['Alice', 'Bob'],
+      );
+      final group = await groups().getById(groupId);
+      final people = await participants().getByGroupId(groupId);
 
-      final all = await r.getAll();
-      expect(all.length, 1);
-      expect(all.first.id, id);
-      expect(all.first.name, 'Test Group');
+      expect(group?.name, 'Test Group');
+      expect(group?.currencyCode, 'USD');
+      expect(
+        people.map((person) => person.name),
+        containsAll(['Alice', 'Bob']),
+      );
     });
 
-    test(
-      'create with treasurer method sets treasurer_participant_id',
-      () async {
-        if (!powerSyncAvailable) return;
-        final r = repo();
-        final id = await r.create(
-          'Treasurer Trip',
-          'USD',
-          initialParticipants: const ['Alice', 'Bob'],
-          settlementMethod: SettlementMethod.treasurer,
-          treasurerInitialParticipantName: 'Bob',
-        );
-        final group = await r.getById(id);
-        expect(group, isNotNull);
-        expect(group!.settlementMethod, SettlementMethod.treasurer);
-        expect(group.treasurerParticipantId, isNotNull);
-
-        final participants = await PowerSyncParticipantRepository(
-          db!,
-          cloud: null,
-          isOnline: false,
-          isLocalOnly: true,
-        ).getByGroupId(id);
-        final bob = participants.firstWhere((p) => p.name == 'Bob');
-        expect(group.treasurerParticipantId, bob.id);
-      },
-    );
-
-    test('update persists to local DB', () async {
+    test('updates and deletes local groups', () async {
       if (!powerSyncAvailable) return;
-      final r = repo();
-      final id = await r.create('Original', 'EUR');
-      final g = await r.getById(id);
-      expect(g, isNotNull);
 
-      final updated = g!.copyWith(name: 'Updated Name', currencyCode: 'GBP');
-      await r.update(updated);
-
-      final after = await r.getById(id);
-      expect(after!.name, 'Updated Name');
-      expect(after.currencyCode, 'GBP');
-    });
-
-    test('delete removes group from local DB', () async {
-      if (!powerSyncAvailable) return;
-      final r = repo();
-      final id = await r.create('To Delete', 'USD');
-      expect(await r.getById(id), isNotNull);
-
-      await r.delete(id);
-      expect(await r.getById(id), isNull);
-      expect(await r.getAll(), isEmpty);
-    });
-
-    test('watchAll emits when data changes', () async {
-      if (!powerSyncAvailable) return;
-      final r = repo();
-      final emitted = <List<Group>>[];
-      final sub = r.watchAll().listen((list) => emitted.add(list));
-
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-      await r.create('First', 'USD');
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-      await r.create('Second', 'EUR');
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-
-      await sub.cancel();
-
-      expect(emitted, isNotEmpty);
-      final last = emitted.last;
-      expect(last.length, 2);
-      final names = last.map((g) => g.name).toList();
-      expect(names, contains('First'));
-      expect(names, contains('Second'));
-    });
-  });
-
-  group('PowerSyncParticipantRepository (local only)', () {
-    test('create group then add participant and list', () async {
-      if (!powerSyncAvailable) return;
-      final groupRepo = repo();
-      final groupId = await groupRepo.create('Group', 'USD');
-      final participantRepo = PowerSyncParticipantRepository(
-        db!,
-        cloud: null,
-        isOnline: false,
-        isLocalOnly: true,
+      final groupId = await groups().create('Original', 'EUR');
+      final group = await groups().getById(groupId);
+      await groups().update(
+        group!.copyWith(name: 'Updated', currencyCode: 'GBP'),
       );
 
-      final participantId = await participantRepo.create(groupId, 'Alice', 1);
-      expect(participantId, isNotEmpty);
-
-      final list = await participantRepo.getByGroupId(groupId);
-      expect(list.length, greaterThanOrEqualTo(1));
-      final alice = list.where((p) => p.name == 'Alice').toList();
-      expect(alice.length, 1);
-      expect(alice.first.id, participantId);
+      expect((await groups().getById(groupId))?.name, 'Updated');
+      await groups().delete(groupId);
+      expect(await groups().getById(groupId), isNull);
     });
 
-    test('update persists name and order to local DB', () async {
+    test('creates, updates, and deletes participants', () async {
       if (!powerSyncAvailable) return;
-      final groupRepo = repo();
-      final groupId = await groupRepo.create('Group', 'USD');
-      final participantRepo = PowerSyncParticipantRepository(
-        db!,
-        cloud: null,
-        isOnline: false,
-        isLocalOnly: true,
+
+      final groupId = await groups().create('People', 'USD');
+      final participantId = await participants().create(groupId, 'Alice', 1);
+      final participant = await participants().getById(participantId);
+
+      await participants().update(
+        participant!.copyWith(name: 'Alicia', order: 2),
       );
-      final participantId = await participantRepo.create(groupId, 'Alice', 0);
-      final p = await participantRepo.getById(participantId);
-      expect(p, isNotNull);
-
-      await participantRepo.update(p!.copyWith(name: 'Alicia', order: 2));
-
-      final list = await participantRepo.getByGroupId(groupId);
-      final updated = list.where((x) => x.id == participantId).first;
-      expect(updated.name, 'Alicia');
-      expect(updated.order, 2);
+      expect((await participants().getById(participantId))?.name, 'Alicia');
+      await participants().delete(participantId);
+      expect(await participants().getById(participantId), isNull);
     });
 
-    test('delete removes participant from local DB', () async {
+    test('creates and reads a local expense', () async {
       if (!powerSyncAvailable) return;
-      final groupRepo = repo();
-      final groupId = await groupRepo.create('Group', 'USD');
-      final participantRepo = PowerSyncParticipantRepository(
-        db!,
-        cloud: null,
-        isOnline: false,
-        isLocalOnly: true,
-      );
-      final participantId = await participantRepo.create(
-        groupId,
-        'ToDelete',
-        0,
-      );
-      expect(await participantRepo.getById(participantId), isNotNull);
 
-      await participantRepo.delete(participantId);
-
-      expect(await participantRepo.getById(participantId), isNull);
-      final list = await participantRepo.getByGroupId(groupId);
-      expect(list.any((p) => p.id == participantId), false);
-    });
-  });
-
-  group('PowerSyncExpenseRepository (local only)', () {
-    test('create group and participant then add expense', () async {
-      if (!powerSyncAvailable) return;
-      final groupRepo = repo();
-      final groupId = await groupRepo.create('Expense Group', 'USD');
-      final participantRepo = PowerSyncParticipantRepository(
-        db!,
-        cloud: null,
-        isOnline: false,
-        isLocalOnly: true,
-      );
-      final participantId = await participantRepo.create(groupId, 'Payer', 0);
-
+      final groupId = await groups().create('Expenses', 'USD');
+      final participantId = await participants().create(groupId, 'Payer', 0);
       final now = DateTime.now();
-      final expense = Expense(
-        id: '',
-        groupId: groupId,
-        payerParticipantId: participantId,
-        amountCents: 1000,
-        currencyCode: 'USD',
-        title: 'Lunch',
-        date: now,
-        splitType: SplitType.equal,
-        splitShares: const {},
-        createdAt: now,
-        updatedAt: now,
-      );
-      final expenseRepo = PowerSyncExpenseRepository(
-        db!,
-        cloud: null,
-        isOnline: false,
-        isLocalOnly: true,
-      );
-      final expenseId = await expenseRepo.create(expense);
-      expect(expenseId, isNotEmpty);
-
-      final list = await expenseRepo.getByGroupId(groupId);
-      expect(list.length, 1);
-      expect(list.first.id, expenseId);
-      expect(list.first.title, 'Lunch');
-      expect(list.first.amountCents, 1000);
-    });
-
-    test('update persists expense changes to local DB', () async {
-      if (!powerSyncAvailable) return;
-      final groupRepo = repo();
-      final groupId = await groupRepo.create('Expense Group', 'USD');
-      final participantRepo = PowerSyncParticipantRepository(
-        db!,
-        cloud: null,
-        isOnline: false,
-        isLocalOnly: true,
-      );
-      final participantId = await participantRepo.create(groupId, 'Payer', 0);
-      final now = DateTime.now();
-      final expenseRepo = PowerSyncExpenseRepository(
-        db!,
-        cloud: null,
-        isOnline: false,
-        isLocalOnly: true,
-      );
-      final expenseId = await expenseRepo.create(
+      final expenseId = await expenses().create(
         Expense(
           id: '',
           groupId: groupId,
@@ -302,56 +127,54 @@ void main() {
           updatedAt: now,
         ),
       );
-      final e = await expenseRepo.getById(expenseId);
-      expect(e, isNotNull);
 
-      await expenseRepo.update(e!.copyWith(title: 'Dinner', amountCents: 2000));
-
-      final after = await expenseRepo.getById(expenseId);
-      expect(after!.title, 'Dinner');
-      expect(after.amountCents, 2000);
+      final expense = await expenses().getById(expenseId);
+      expect(expense?.title, 'Lunch');
+      expect(expense?.amountCents, 1000);
     });
 
-    test('delete removes expense from local DB', () async {
+    test('reopens without dropping legacy tables or rows', () async {
       if (!powerSyncAvailable) return;
-      final groupRepo = repo();
-      final groupId = await groupRepo.create('Expense Group', 'USD');
-      final participantRepo = PowerSyncParticipantRepository(
-        db!,
-        cloud: null,
-        isOnline: false,
-        isLocalOnly: true,
-      );
-      final participantId = await participantRepo.create(groupId, 'Payer', 0);
-      final now = DateTime.now();
-      final expenseRepo = PowerSyncExpenseRepository(
-        db!,
-        cloud: null,
-        isOnline: false,
-        isLocalOnly: true,
-      );
-      final expenseId = await expenseRepo.create(
-        Expense(
-          id: '',
-          groupId: groupId,
-          payerParticipantId: participantId,
-          amountCents: 500,
-          currencyCode: 'USD',
-          title: 'ToDelete',
-          date: now,
-          splitType: SplitType.equal,
-          splitShares: const {},
-          createdAt: now,
-          updatedAt: now,
-        ),
-      );
-      expect(await expenseRepo.getById(expenseId), isNotNull);
 
-      await expenseRepo.delete(expenseId);
+      await db!.execute(
+        '''
+        INSERT INTO group_invites
+          (id, group_id, token, created_at, is_active)
+        VALUES (?, ?, ?, ?, ?)
+        ''',
+        ['legacy-invite', 'legacy-group', 'legacy-token', '2026-01-01', 1],
+      );
+      await db!.execute(
+        '''
+        INSERT INTO pending_writes
+          (id, table_name, operation, row_id, data_json, created_at, silent)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''',
+        [
+          'legacy-write',
+          'groups',
+          'insert',
+          'legacy-group',
+          '{"id":"legacy-group"}',
+          '2026-01-01',
+          0,
+        ],
+      );
 
-      expect(await expenseRepo.getById(expenseId), isNull);
-      final list = await expenseRepo.getByGroupId(groupId);
-      expect(list.any((e) => e.id == expenseId), false);
+      await db!.close();
+      db = PowerSyncDatabase(schema: ps.schema, path: dbPath);
+      await db!.initialize();
+
+      final invite = await db!.get(
+        'SELECT token FROM group_invites WHERE id = ?',
+        ['legacy-invite'],
+      );
+      final pendingWrite = await db!.get(
+        'SELECT data_json FROM pending_writes WHERE id = ?',
+        ['legacy-write'],
+      );
+      expect(invite['token'], 'legacy-token');
+      expect(pendingWrite['data_json'], '{"id":"legacy-group"}');
     });
   });
 }

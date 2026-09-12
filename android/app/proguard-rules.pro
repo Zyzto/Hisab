@@ -13,12 +13,6 @@
 -dontwarn com.googlecode.tesseract.android.**
 -dontwarn com.googlecode.leptonica.android.**
 
-# Firebase / Play Services (messaging + related)
--keep class com.google.firebase.** { *; }
--keep class com.google.android.gms.** { *; }
--dontwarn com.google.firebase.**
--dontwarn com.google.android.gms.**
-
 # Keep native methods
 -keepclasseswithmembernames class * {
     native <methods>;

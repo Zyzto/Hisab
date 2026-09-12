@@ -30,17 +30,6 @@ void main() {
     await index.build();
   });
 
-  test('Arabic usage-tracking synonyms find telemetry', () {
-    for (final query in ['تحليلات', 'إحصاءات']) {
-      final results = index.search(query);
-      expect(
-        results.map((r) => r.setting.key),
-        contains('telemetry_enabled'),
-        reason: query,
-      );
-    }
-  });
-
   test('Arabic query finds theme while UI terms are English-indexed too', () {
     final results = index.search('داكن');
     expect(results.map((r) => r.setting.key), contains('theme_mode'));
@@ -67,17 +56,14 @@ void main() {
 
   test('internal settings never appear in results', () {
     // Exact key match is indexed but filtered by visible:false.
-    final byKey = index.search('pending_invite_token');
+    final byKey = index.search('last_route_path');
+    expect(byKey.map((r) => r.setting.key), isNot(contains('last_route_path')));
+    final byPendingImage = index.search('pending_image_pick_mode');
     expect(
-      byKey.map((r) => r.setting.key),
-      isNot(contains('pending_invite_token')),
+      byPendingImage.map((r) => r.setting.key),
+      isNot(contains('pending_image_pick_mode')),
     );
-    final byOnboarding = index.search('onboarding_online_pending');
-    expect(
-      byOnboarding.map((r) => r.setting.key),
-      isNot(contains('onboarding_online_pending')),
-    );
-    expect(index.getTermsForSetting('pending_invite_token'), isNotEmpty);
+    expect(index.getTermsForSetting('last_route_path'), isNotEmpty);
   });
 
   test('home_list display is indexed but settings page filters separately', () {

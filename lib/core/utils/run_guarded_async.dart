@@ -1,17 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart' show WidgetRef;
-
-import 'error_report_helper.dart';
 import '../widgets/toast.dart';
 
 /// Runs [future] and on catch logs [logMessage] with [Log.warning].
 /// Returns the result on success, or `null` on failure.
 /// If [context] and [errorToastMessage] are provided and the context is still
 /// mounted after a catch, shows an error toast with Share/Report actions.
-/// If [ref] is provided, sends anonymized error telemetry when online and telemetry is enabled.
-///
-/// [errorSummaryEnglish] is included in Share / GitHub reports (English). When
+/// [errorSummaryEnglish] is included in copied diagnostic reports (English). When
 /// null, [logMessage] is used for that section.
 Future<T?> runGuardedAsync<T>(
   Future<T> future,
@@ -19,20 +14,12 @@ Future<T?> runGuardedAsync<T>(
   BuildContext? context,
   String? errorToastMessage,
   String? errorSummaryEnglish,
-  WidgetRef? ref,
 }) async {
   try {
     return await future;
   } catch (e, st) {
     Log.warning(logMessage, error: e, stackTrace: st);
     final details = e.toString();
-    if (ref != null) {
-      sendErrorTelemetryIfOnline(
-        ref,
-        message: errorSummaryEnglish ?? logMessage,
-        details: details,
-      );
-    }
     if (context != null && context.mounted && errorToastMessage != null) {
       context.showErrorWithActions(
         errorToastMessage,

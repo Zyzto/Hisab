@@ -1,17 +1,28 @@
 #!/usr/bin/env bash
 # Materialize an Android signing keystore from base64 and point Gradle at it.
 #
-# Reads KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD. With
-# none of them set this exits 0 without writing anything, which is what a
-# contributor building locally wants: android/app/build.gradle.kts falls back
-# to debug signing when android/key.properties is absent.
+# Reads KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD.
+#
+# The optional argument is the build mode. Debug builds may use Android's
+# development key when no signing secret is present; release builds must fail
+# closed rather than silently producing a debug-signed artifact.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
+MODE="${1:-debug}"
+if [[ "$MODE" != release && "$MODE" != debug ]]; then
+  echo "usage: $0 [release|debug]" >&2
+  exit 2
+fi
+
 if [[ -z "${KEYSTORE_BASE64:-}" ]]; then
-  echo "KEYSTORE_BASE64 not set — building with debug signing"
+  if [[ "$MODE" == release ]]; then
+    echo "KEYSTORE_BASE64 is required for a release build" >&2
+    exit 1
+  fi
+  echo "KEYSTORE_BASE64 not set — debug build will use Android's development key"
   exit 0
 fi
 

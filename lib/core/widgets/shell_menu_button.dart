@@ -28,7 +28,7 @@ class ShellMenuButton extends StatelessWidget {
 
 /// Shell leading: menu when temporary drawer mode, otherwise [fallback].
 ///
-/// On phone / pinned desktop returns [fallback] (typically [SyncStatusChip]).
+/// On phone / pinned desktop returns [fallback].
 class ShellAppBarLeading extends StatelessWidget {
   const ShellAppBarLeading({super.key, required this.fallback});
 
@@ -37,7 +37,7 @@ class ShellAppBarLeading extends StatelessWidget {
   /// Width to pass as [ContentAlignedAppBar.leadingWidth].
   static double widthFor(BuildContext context) => kToolbarHeight;
 
-  /// Whether the sync chip should sit in actions (temporary drawer mode).
+  /// Whether the shell menu should sit in actions (temporary drawer mode).
   static bool syncInActions(BuildContext context) {
     final scope = ShellDrawerScope.maybeOf(context);
     return scope != null && scope.showMenuButton;

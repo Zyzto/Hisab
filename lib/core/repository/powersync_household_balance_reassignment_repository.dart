@@ -3,19 +3,11 @@ part of 'powersync_repository.dart';
 class PowerSyncHouseholdBalanceReassignmentRepository
     implements IHouseholdBalanceReassignmentRepository {
   PowerSyncHouseholdBalanceReassignmentRepository(
-    this._db, {
-    CloudBackend? cloud,
-    bool isOnline = false,
-    bool isLocalOnly = true,
-  }) : _cloud = cloud,
-       _isOnline = isOnline,
-       _isLocalOnly = isLocalOnly;
+    this._db,
+  );
 
   static const _uuid = Uuid();
   final PowerSyncDatabase _db;
-  final CloudBackend? _cloud;
-  final bool _isOnline;
-  final bool _isLocalOnly;
 
   HouseholdBalanceReassignment _fromRow(Map<String, dynamic> row) =>
       HouseholdBalanceReassignment(
@@ -80,21 +72,6 @@ class PowerSyncHouseholdBalanceReassignmentRepository
       'amount_cents': amountCents,
       'created_at': now,
     };
-
-    if (!_isLocalOnly && _isOnline && _cloud != null) {
-      await _cloud.sync.upsert('household_balance_reassignments', data);
-    } else if (_shouldQueueOffline(
-      isLocalOnly: _isLocalOnly,
-      isOnline: _isOnline,
-    )) {
-      await _enqueue(
-        _db,
-        tableName: 'household_balance_reassignments',
-        operation: 'insert',
-        rowId: id,
-        data: data,
-      );
-    }
 
     await _db.execute(
       'INSERT INTO household_balance_reassignments (id, group_id, source_participant_id, target_participant_id, amount_cents, created_at) VALUES (?, ?, ?, ?, ?, ?)',

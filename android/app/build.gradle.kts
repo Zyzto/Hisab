@@ -1,6 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
-import java.io.FileInputStream
 
 plugins {
     id("com.android.application")
@@ -9,30 +8,15 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-// Firebase config only ships with the cloud flavor. A clean clone of the public
-// repo has no google-services.json at all, so applying the plugin unconditionally
-// would fail the build for anyone without the cloud credentials.
-val cloudGoogleServices = file("src/cloud/google-services.json")
-if (cloudGoogleServices.exists()) {
-    apply(plugin = "com.google.gms.google-services")
-
-    // The plugin, once applied, wires itself into every variant — including
-    // foss, which has no config and does not want Firebase. Without this the
-    // foss build fails for anyone who also happens to have the cloud
-    // credentials on disk, which is every maintainer.
-    tasks.matching {
-        it.name.startsWith("process") && it.name.endsWith("GoogleServices") &&
-            !it.name.contains("Cloud")
-    }.configureEach {
-        enabled = false
-    }
-}
-
 // Load key.properties if it exists (CI writes it from secrets; local dev may not have it).
 val keyPropertiesFile = rootProject.file("key.properties")
 val keyProperties = Properties()
 if (keyPropertiesFile.exists()) {
-    keyProperties.load(FileInputStream(keyPropertiesFile))
+    keyProperties.load(keyPropertiesFile.inputStream())
+}
+val releaseBuildRequested = gradle.startParameter.taskNames.any { task ->
+    task.contains("release", ignoreCase = true) ||
+        task.equals("build", ignoreCase = true)
 }
 
 android {
@@ -50,8 +34,6 @@ android {
 
     defaultConfig {
         applicationId = "com.shenepoy.hisab"
-        manifestPlaceholders["hisabAuthScheme"] = "com.shenepoy.hisab"
-        // ML Kit GenAI Prompt (Gemini Nano) requires API 26+
         minSdk = maxOf(flutter.minSdkVersion, 26)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -71,28 +53,17 @@ android {
         }
     }
 
-    // cloud: the published app — Firebase, deep links, production signing key.
-    //        Built only from the private repo, which supplies the credentials.
-    // foss:  the offline build from the public repo. Installs side by side with
-    //        cloud and is signed with a separate key held in the public repo.
+    // The public application is the local-only FOSS flavor.
     flavorDimensions += "distribution"
     productFlavors {
-        create("cloud") {
-            dimension = "distribution"
-        }
         create("foss") {
             dimension = "distribution"
-            applicationIdSuffix = ".foss"
         }
     }
 
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
-            manifestPlaceholders["hisabAuthScheme"] = "com.shenepoy.hisab.debug"
-            // Staging remains side-by-side with production while using the
-            // dedicated staging certificate for App Links in CI. Local debug
-            // builds fall back to Android's normal debug key.
             signingConfig = if (keyPropertiesFile.exists()) {
                 signingConfigs.getByName("release")
             } else {
@@ -100,11 +71,11 @@ android {
             }
         }
         release {
-            signingConfig = if (keyPropertiesFile.exists()) {
-                signingConfigs.getByName("release")
-            } else {
-                // Fall back to debug signing for local development.
-                signingConfigs.getByName("debug")
+            if (!keyPropertiesFile.exists() && releaseBuildRequested) {
+                error("Release builds require android/key.properties; refusing debug signing")
+            }
+            if (keyPropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
             }
             isMinifyEnabled = true
             isShrinkResources = true

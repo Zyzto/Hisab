@@ -7,11 +7,8 @@ const _leakedAppPathPrefixes = <String>[
   '/settings',
   '/home',
   '/onboarding',
-  '/invite',
-  '/profile',
   '/privacy-policy',
   '/archived',
-  '/scan-invite',
   '/functions',
 ];
 
@@ -37,8 +34,8 @@ String hashStrategyPathname(String pathname) {
 ///
 /// Flutter web defaults to **hash** URL strategy (`/#/groups/...`), where the
 /// route lives in [Uri.fragment]. Path URL strategy stores it in [Uri.path].
-/// OAuth callback hashes (`#access_token=...`) do not start with `/` and are
-/// ignored so pathname is used instead.
+/// Non-route callback fragments do not start with `/` and are ignored so the
+/// pathname is used instead.
 String appRoutePathFromBrowserUri(Uri uri) {
   final fragment = uri.fragment;
   if (fragment.startsWith('/')) {

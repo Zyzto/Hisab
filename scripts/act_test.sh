@@ -11,7 +11,6 @@
 # Usage:
 #   bash scripts/act_test.sh                  # runs the "test" job (default)
 #   bash scripts/act_test.sh --job test       # explicit job name
-#   bash scripts/act_test.sh --job test-online
 #   bash scripts/act_test.sh --privileged     # pass --privileged to container
 #   bash scripts/act_test.sh -- --verbose     # extra flags forwarded to act
 #

@@ -67,11 +67,6 @@ void main() {
       );
     });
 
-    test('profile expenses under profile', () {
-      expect(isStrictAncestorPath('/profile', '/profile/expenses'), isTrue);
-      expect(isStrictAncestorPath('/profile', '/profile'), isFalse);
-    });
-
     test('home is ancestor of nested routes', () {
       expect(isStrictAncestorPath('/', '/groups/g1/expenses'), isTrue);
       expect(isStrictAncestorPath('/', '/'), isFalse);

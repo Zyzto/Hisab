@@ -2,11 +2,8 @@ import 'dart:typed_data';
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 
 import '../../../core/layout/responsive_sheet.dart';
-import '../../../core/platform/network_image_decode.dart';
-import '../../../core/receipt/receipt_image_cache.dart';
 import '../../../core/receipt/receipt_image_compress.dart';
 
 /// One expense photo: pending bytes and/or stored URL.
@@ -85,21 +82,7 @@ class _ExpensePhotoGalleryDialogState
 
   Future<Uint8List?> _resolveBytes(ExpensePhotoItem item) async {
     if (item.bytes != null && item.bytes!.isNotEmpty) return item.bytes;
-    final url = item.url;
-    if (url == null || url.isEmpty) return null;
-
-    final cached = await loadReceiptImageBytesForUrl(url);
-    if (cached != null && cached.isNotEmpty) return cached;
-
-    try {
-      final uri = Uri.tryParse(url);
-      if (uri == null) return null;
-      final response = await http.get(uri).timeout(const Duration(seconds: 20));
-      if (response.statusCode != 200 || response.bodyBytes.isEmpty) return null;
-      return response.bodyBytes;
-    } catch (_) {
-      return null;
-    }
+    return null;
   }
 
   Future<void> _rotate(int degrees) async {
@@ -399,10 +382,6 @@ class _PhotoPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-    final decode = NetworkImageDecode.cacheSizePreserveAspect(
-      context,
-      logicalMaxEdge: size.longestSide,
-    );
     // Bound to the page so BoxFit.contain applies (unbounded Center lets the
     // image take its intrinsic size and overflow / look wrong).
     if (item.bytes != null && item.bytes!.isNotEmpty) {
@@ -410,24 +389,7 @@ class _PhotoPage extends StatelessWidget {
         child: Image.memory(
           item.bytes!,
           fit: BoxFit.contain,
-          cacheWidth: decode.width,
           gaplessPlayback: true,
-          errorBuilder: (_, _, _) => const _BrokenPhoto(),
-        ),
-      );
-    }
-    final url = item.url;
-    if (url != null && url.isNotEmpty) {
-      return SizedBox.expand(
-        child: Image.network(
-          url,
-          fit: BoxFit.contain,
-          cacheWidth: decode.width,
-          gaplessPlayback: true,
-          loadingBuilder: (_, child, progress) {
-            if (progress == null) return child;
-            return const Center(child: CircularProgressIndicator());
-          },
           errorBuilder: (_, _, _) => const _BrokenPhoto(),
         ),
       );
@@ -443,32 +405,12 @@ class _PhotoThumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final decode = NetworkImageDecode.cacheSizePreserveAspect(
-      context,
-      logicalMaxEdge: 56,
-    );
     if (item.bytes != null && item.bytes!.isNotEmpty) {
       return Image.memory(
         item.bytes!,
         fit: BoxFit.cover,
         width: 56,
         height: 56,
-        cacheWidth: decode.width,
-        gaplessPlayback: true,
-        errorBuilder: (_, _, _) => const ColoredBox(
-          color: Colors.white12,
-          child: Icon(Icons.broken_image_outlined, color: Colors.white54),
-        ),
-      );
-    }
-    final url = item.url;
-    if (url != null && url.isNotEmpty) {
-      return Image.network(
-        url,
-        fit: BoxFit.cover,
-        width: 56,
-        height: 56,
-        cacheWidth: decode.width,
         gaplessPlayback: true,
         errorBuilder: (_, _, _) => const ColoredBox(
           color: Colors.white12,

@@ -74,6 +74,11 @@
   <url>
     <loc>https://hisab.shenepoy.com/delete-account/</loc>
     <changefreq>monthly</changefreq>
-    <priority>0.3</priority>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://hisab.shenepoy.com/ar/delete-account/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
   </url>
 </urlset>

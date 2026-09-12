@@ -31,16 +31,12 @@ class ExpenseDetailShell extends ConsumerStatefulWidget {
   final String groupId;
   final String expenseId;
   final Widget child;
-  final bool readOnlyPreview;
-  final String? previewToken;
 
   const ExpenseDetailShell({
     super.key,
     required this.groupId,
     required this.expenseId,
     required this.child,
-    this.readOnlyPreview = false,
-    this.previewToken,
   });
 
   @override
@@ -68,9 +64,7 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
     _viewingExpenseId = widget.expenseId;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final parent = widget.readOnlyPreview && widget.previewToken != null
-          ? RoutePaths.invitePreviewExpenses(widget.previewToken!)
-          : RoutePaths.groupExpenses(widget.groupId);
+      final parent = RoutePaths.groupExpenses(widget.groupId);
       seedParentHistoryForBrowserBack(
         context: context,
         parentPath: parent,
@@ -89,12 +83,6 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
   String get _activeExpenseId => _viewingExpenseId ?? widget.expenseId;
 
   String _pathForExpense(String expenseId) {
-    if (widget.readOnlyPreview && widget.previewToken != null) {
-      return RoutePaths.invitePreviewExpenseDetail(
-        widget.previewToken!,
-        expenseId,
-      );
-    }
     return RoutePaths.groupExpenseDetail(widget.groupId, expenseId);
   }
 
@@ -278,9 +266,7 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
       _goToAdjacent(next: true, index: index, length: pages.length);
     }
 
-    final parentPath = widget.readOnlyPreview && widget.previewToken != null
-        ? RoutePaths.invitePreviewExpenses(widget.previewToken!)
-        : RoutePaths.groupExpenses(widget.groupId);
+    final parentPath = RoutePaths.groupExpenses(widget.groupId);
     final appBarLeading = IconButton(
       icon: const Icon(Icons.arrow_back),
       onPressed: () => popOrGo(context, parentPath),
@@ -294,8 +280,7 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
         icon: const Icon(Icons.chevron_right),
         onPressed: nextId != null && !_blockInteraction ? goNext : null,
       ),
-      if (!widget.readOnlyPreview)
-        PopupMenuButton<String>(
+      PopupMenuButton<String>(
           useRootNavigator: true,
           icon: const Icon(Icons.more_vert),
           enabled: expense != null,
@@ -442,9 +427,7 @@ class _ExpenseDetailShellState extends ConsumerState<ExpenseDetailShell>
         icon: Icons.delete_outline,
       );
 
-      final parent = widget.readOnlyPreview && widget.previewToken != null
-          ? RoutePaths.invitePreviewExpenses(widget.previewToken!)
-          : RoutePaths.groupExpenses(widget.groupId);
+      final parent = RoutePaths.groupExpenses(widget.groupId);
       popOrGo(context, parent);
     }
   }

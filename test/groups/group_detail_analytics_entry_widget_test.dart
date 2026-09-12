@@ -63,7 +63,6 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          effectiveLocalOnlyProvider.overrideWith((ref) => true),
           futureGroupProvider(
             groupId,
           ).overrideWithValue(AsyncValue.data(group)),
@@ -181,7 +180,6 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          effectiveLocalOnlyProvider.overrideWith((ref) => true),
           futureGroupProvider(
             groupId,
           ).overrideWithValue(AsyncValue.data(group)),
@@ -300,7 +298,6 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          effectiveLocalOnlyProvider.overrideWith((ref) => true),
           futureGroupProvider(
             groupId,
           ).overrideWithValue(AsyncValue.data(group)),
@@ -369,7 +366,6 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            effectiveLocalOnlyProvider.overrideWith((ref) => true),
             futureGroupProvider(
               groupId,
             ).overrideWithValue(AsyncValue.data(group)),

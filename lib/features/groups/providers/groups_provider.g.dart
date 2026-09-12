@@ -720,7 +720,7 @@ final class BalanceParticipantsByGroupProvider
 }
 
 String _$balanceParticipantsByGroupHash() =>
-    r'861a9347b8c64209aa30a52b45a3887df4c96b51';
+    r'c97333d34446b35a08f9196720489f278d796bae';
 
 /// Participants needed to explain historical household balances. Archived
 /// rows with no named children remain visible as historical roots; archived

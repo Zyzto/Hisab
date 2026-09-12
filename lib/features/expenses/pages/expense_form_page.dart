@@ -6,40 +6,31 @@ import 'package:flutter/material.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hisab_backend/hisab_backend.dart';
 import 'package:custom_sliding_segmented_control/custom_sliding_segmented_control.dart';
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../../../core/receipt/receipt_image_compress.dart';
-import '../../../core/receipt/receipt_image_cache.dart';
 import '../../../core/receipt/receipt_ocr.dart';
 import '../../../core/receipt/receipt_scan_capability.dart';
 import '../../../core/receipt/receipt_scan_service.dart';
-import '../../../core/receipt/receipt_storage_upload.dart';
 import '../../../core/platform_utils.dart';
-import '../../../core/services/connectivity_service.dart';
 import '../../../core/services/permission_service.dart';
-import '../../../core/auth/auth_providers.dart';
 import '../../../core/celebration/celebration_controller.dart';
 import '../../../core/celebration/celebration_kind.dart';
 import '../../../core/repository/repository_providers.dart';
-import '../../../core/services/exchange_rate_service.dart';
 import '../../../core/services/household_service.dart';
-import '../../../core/telemetry/telemetry_service.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/layout/responsive_sheet.dart';
-import '../../../core/navigation/last_route_restore.dart';
 import '../../../core/navigation/nav_back.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/navigation/route_transition_ready.dart';
 import '../../../core/widgets/missing_route_page.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/utils/currency_helpers.dart';
-import '../../../core/utils/error_report_helper.dart';
 import '../../../core/utils/form_validators.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/expandable_section.dart';
@@ -48,10 +39,7 @@ import '../../../core/widgets/sheet_helpers.dart';
 import '../../../core/widgets/toast.dart';
 import '../../../core/widgets/user_text.dart';
 import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
-import 'package:hisab/core/settings/settings_definitions.dart';
 import '../../balance/providers/balance_provider.dart';
-import '../../billing/widgets/billing_plus_card.dart';
-import '../../groups/providers/group_member_provider.dart';
 import '../../groups/providers/groups_provider.dart';
 import '../camera/receipt_camera_debug.dart';
 import '../camera/show_receipt_camera.dart';
@@ -394,11 +382,10 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
     _householdMode =
         group.householdCountingEnabled ||
         (_initialExpense != null && hasHouseholdSnapshot);
-    final localOnly = ref.read(effectiveLocalOnlyProvider);
-    final myRole = await ref.read(myRoleInGroupProvider(widget.groupId).future);
     if (!mounted) return;
-    final isOwnerOrAdmin =
-        localOnly || myRole == GroupRole.owner || myRole == GroupRole.admin;
+    // Local groups have no account roles. Every local participant can manage
+    // the records stored on this device.
+    const isOwnerOrAdmin = true;
     final canAddExpense = isOwnerOrAdmin || group.allowMemberAddExpense;
     if (!canAddExpense) {
       context.showToast('add_expense_restricted'.tr());
@@ -408,22 +395,8 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
       context.showToast('add_expense_blocked_archived'.tr());
       return;
     }
-    final restrictPayerToSelf =
-        !group.allowExpenseAsOtherParticipant && !isOwnerOrAdmin;
-    final currentUserId = ref.read(authServiceProvider).currentUser?.id;
-    var myParticipantId = participants
-        .where((p) => p.userId == currentUserId)
-        .firstOrNull
-        ?.id;
-    if (myParticipantId == null) {
-      final myMember = await ref.read(
-        myMemberInGroupProvider(widget.groupId).future,
-      );
-      final pid = myMember?.participantId;
-      if (pid != null && participants.any((p) => p.id == pid)) {
-        myParticipantId = pid;
-      }
-    }
+    const restrictPayerToSelf = false;
+    final myParticipantId = participants.first.id;
     final payerId = restrictPayerToSelf
         ? (myParticipantId ?? participants.first.id)
         : (_payerParticipantId ?? participants.first.id);
@@ -564,37 +537,11 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
       }
 
       final existingExpenseId = _initialExpense?.id ?? '';
-      final localOnly = ref.read(effectiveLocalOnlyProvider);
-      final isOnline = ref.read(connectivityProvider);
-      final shouldUploadPhotos = !localOnly && isOnline;
-
       final List<String> imageUrls = [];
       for (final item in _expenseImages) {
-        // Prefer pending bytes (e.g. after rotate) over a stale stored URL.
-        if (item.bytes != null && shouldUploadPhotos) {
-          final uploadId = existingExpenseId.isNotEmpty
-              ? existingExpenseId
-              : '';
-          if (uploadId.isEmpty) {
-            // New expense: upload after create (below). Keep URL fallback.
-            if (item.url != null && item.url!.isNotEmpty) {
-              imageUrls.add(item.url!);
-            }
-            continue;
-          }
-          final url = await uploadExpenseImageBytesToStorage(
-            item.bytes!,
-            widget.groupId,
-            uploadId,
-            fileExt: 'jpg',
-          );
-          if (url != null) {
-            imageUrls.add(url);
-            await warmReceiptImageCacheForUrl(url, item.bytes!, fileExt: 'jpg');
-          } else if (item.url != null && item.url!.isNotEmpty) {
-            imageUrls.add(item.url!);
-          }
-        } else if (item.url != null && item.url!.isNotEmpty) {
+        // Receipt paths are local app-storage paths. Raw bytes remain in the
+        // form until the local record is saved; no remote upload is attempted.
+        if (item.url != null && item.url!.isNotEmpty) {
           imageUrls.add(item.url!);
         }
       }
@@ -658,53 +605,9 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
           );
         }
         final id = await ref.read(expenseRepositoryProvider).create(expense);
-        final createdUrls = <String>[];
-        for (final item in _expenseImages) {
-          if (item.bytes != null && shouldUploadPhotos) {
-            final url = await uploadExpenseImageBytesToStorage(
-              item.bytes!,
-              widget.groupId,
-              id,
-              fileExt: 'jpg',
-            );
-            if (url != null) {
-              createdUrls.add(url);
-              await warmReceiptImageCacheForUrl(
-                url,
-                item.bytes!,
-                fileExt: 'jpg',
-              );
-            } else if (item.url != null && item.url!.isNotEmpty) {
-              createdUrls.add(item.url!);
-            }
-          } else if (item.url != null && item.url!.isNotEmpty) {
-            createdUrls.add(item.url!);
-          }
-        }
-        if (createdUrls.isNotEmpty) {
-          await ref
-              .read(expenseRepositoryProvider)
-              .update(
-                expense.copyWith(
-                  id: id,
-                  imagePath: createdUrls.first,
-                  imagePaths: createdUrls,
-                ),
-              );
-        }
         Log.info(
           'Expense created: id=$id groupId=${expense.groupId} title="${expense.title}" amountCents=${expense.amountCents} currencyCode=${expense.currencyCode}',
         );
-        try {
-          unawaited(
-            TelemetryService.sendEvent('expense_created', {
-              'groupId': expense.groupId,
-              'amountCents': expense.amountCents,
-            }, enabled: ref.read(telemetryEnabledProvider)),
-          );
-        } catch (e) {
-          Log.debug('Telemetry expense_created failed', error: e);
-        }
         if (!isTransferExpense && isFirstExpense) {
           await fireCelebration(
             ref,
@@ -720,12 +623,6 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
       didPop = true;
     } catch (e, st) {
       Log.warning('Expense save failed', error: e, stackTrace: st);
-      if (mounted &&
-          e is CloudException &&
-          e.kind == CloudErrorKind.quotaExceeded) {
-        context.showError('hisab_plus_limit_reached'.tr());
-        unawaited(showBillingPlusSheet(context, ref));
-      }
     } finally {
       if (!didPop && mounted) setState(() => _saving = false);
     }
@@ -957,31 +854,10 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
               );
             }
             ensureRouteReady(context, onReady: _recoverLostPickerImage);
-            final localOnly = ref.watch(effectiveLocalOnlyProvider);
-            final myRole = ref
-                .watch(myRoleInGroupProvider(widget.groupId))
-                .value;
-            final restrictPayerToSelf =
-                group.isPersonal ||
-                (!group.allowExpenseAsOtherParticipant &&
-                    (localOnly ||
-                        (myRole != GroupRole.owner &&
-                            myRole != GroupRole.admin)));
-            final currentUserId = ref.read(authServiceProvider).currentUser?.id;
-            // Resolve "my" participant: by userId on participant, or by group_members.participant_id (more reliable when joined via invite)
-            var myParticipantId = participants
-                .where((p) => p.userId == currentUserId)
-                .firstOrNull
-                ?.id;
-            final myMemberAsync = ref.watch(
-              myMemberInGroupProvider(widget.groupId),
-            );
-            if (myParticipantId == null) {
-              final pid = myMemberAsync.value?.participantId;
-              if (pid != null && participants.any((p) => p.id == pid)) {
-                myParticipantId = pid;
-              }
-            }
+            const restrictPayerToSelf = false;
+            // Use the first participant as the local default payer. The user
+            // can select another participant in the form.
+            final myParticipantId = participants.first.id;
             // Sync create defaults on first / updated participants (no post-frame setState).
             final currentIds = participants.map((p) => p.id).toSet();
             final newIds = currentIds.difference(_previousParticipantIds);
@@ -996,7 +872,7 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
                 participants.isNotEmpty) {
               if (myParticipantId != null) {
                 _payerParticipantId = myParticipantId;
-              } else if (!myMemberAsync.isLoading) {
+              } else {
                 _payerParticipantId = participants.first.id;
               }
             }
@@ -1686,11 +1562,6 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
           loading: () =>
               const Scaffold(body: Center(child: CircularProgressIndicator())),
           error: (e, st) {
-            sendErrorTelemetryIfOnline(
-              ref,
-              message: e.toString(),
-              details: e.toString(),
-            );
             return Scaffold(
               body: Center(
                 child: ErrorContentWidget(
@@ -1710,11 +1581,6 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, st) {
-        sendErrorTelemetryIfOnline(
-          ref,
-          message: e.toString(),
-          details: e.toString(),
-        );
         return Scaffold(
           body: Center(
             child: ErrorContentWidget(
@@ -1773,23 +1639,15 @@ class _ExpenseFormPageState extends ConsumerState<ExpenseFormPage>
     );
   }
 
-  bool _canCreateTags(Group? group, GroupRole? myRole) {
-    if (group == null) return false;
-    final localOnly = ref.read(effectiveLocalOnlyProvider);
-    final isOwnerOrAdmin =
-        localOnly || myRole == GroupRole.owner || myRole == GroupRole.admin;
-    return isOwnerOrAdmin || group.allowMemberChangeSettings;
+  bool _canCreateTags(Group? group) {
+    return group != null;
   }
 
   void _showTagPicker(List<ExpenseTag> customTags) {
     _defocusFormInputs();
     final theme = Theme.of(context);
     final group = ref.read(futureGroupProvider(widget.groupId)).asData?.value;
-    final myRole = ref
-        .read(myRoleInGroupProvider(widget.groupId))
-        .asData
-        ?.value;
-    final canCreate = _canCreateTags(group, myRole);
+    final canCreate = _canCreateTags(group);
     final expenses =
         ref.read(expensesByGroupProvider(widget.groupId)).asData?.value ??
         const <Expense>[];

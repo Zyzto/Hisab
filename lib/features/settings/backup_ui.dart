@@ -49,7 +49,6 @@ Future<void> runBackupExportFlow(BuildContext context, WidgetRef ref) async {
     householdReassignmentRepo: ref.read(
       householdBalanceReassignmentRepositoryProvider,
     ),
-    effectiveLocalOnly: ref.read(effectiveLocalOnlyProvider),
   );
 
   try {
@@ -101,10 +100,8 @@ Future<void> runBackupImportFlow(BuildContext context, WidgetRef ref) async {
     if (file == null || !context.mounted) return;
     final bytes = await file.readAsBytes();
 
-    final localOnly = ref.read(effectiveLocalOnlyProvider);
     final service = BackupService.forImport(
       db: ref.read(powerSyncDatabaseProvider),
-      effectiveLocalOnly: localOnly,
     );
     final parsed = service.parsePackageBytes(
       Uint8List.fromList(bytes),
@@ -126,10 +123,6 @@ Future<void> runBackupImportFlow(BuildContext context, WidgetRef ref) async {
     if (hasPersonal && importingPersonal) {
       warnings.add('backup_warning_multi_personal');
     }
-    if (!localOnly) {
-      warnings.add('backup_warning_archive_online');
-    }
-
     if (!context.mounted) return;
     final mode = await showOptionPickerSheet<BackupImportMode>(
       context,
@@ -168,10 +161,7 @@ Future<void> runBackupImportFlow(BuildContext context, WidgetRef ref) async {
         SheetPickerOption(
           value: BackupImportMode.replaceLocal,
           label: 'import_mode_replace'.tr(),
-          subtitle: localOnly
-              ? 'import_mode_replace_subtitle'.tr()
-              : 'import_mode_replace_requires_local'.tr(),
-          enabled: localOnly,
+          subtitle: 'import_mode_replace_subtitle'.tr(),
         ),
       ],
     );
@@ -190,62 +180,38 @@ Future<void> runBackupImportFlow(BuildContext context, WidgetRef ref) async {
     );
     if (confirmed != true || !context.mounted) return;
 
-    final sync = ref.read(dataSyncServiceProvider.notifier);
-    sync.pause();
-    try {
-      final result = await service.importBackup(
-        data: preview.data,
-        mode: mode,
-        zipReceipts: preview.zipReceipts,
-        restoreArchivedAt: localOnly,
+    final result = await service.importBackup(
+      data: preview.data,
+      mode: mode,
+      zipReceipts: preview.zipReceipts,
+      restoreArchivedAt: true,
+    );
+    if (mode == BackupImportMode.replaceLocal && context.mounted) {
+      final settings = ref.read(hisabSettingsProvidersProvider);
+      if (settings != null) {
+        await ref
+            .read(settings.provider(homeListCustomOrderSettingDef).notifier)
+            .set('');
+        await ref
+            .read(settings.provider(homeListPinnedIdsSettingDef).notifier)
+            .set('');
+      }
+    }
+    if (!context.mounted) return;
+    if (result.hasFailures) {
+      context.showError(
+        'import_partial_failed'.tr(
+          namedArgs: {
+            'ok': '${result.succeededGroups}',
+            'fail': result.failedGroups.join(', '),
+          },
+        ),
       );
-      if (mode == BackupImportMode.replaceLocal && context.mounted) {
-        final settings = ref.read(hisabSettingsProvidersProvider);
-        if (settings != null) {
-          await ref
-              .read(settings.provider(homeListCustomOrderSettingDef).notifier)
-              .set('');
-          await ref
-              .read(settings.provider(homeListPinnedIdsSettingDef).notifier)
-              .set('');
-        }
-      }
-      if (!context.mounted) return;
-      if (result.hasFailures) {
-        context.showError(
-          'import_partial_failed'.tr(
-            namedArgs: {
-              'ok': '${result.succeededGroups}',
-              'fail': result.failedGroups.join(', '),
-            },
-          ),
-        );
-      } else {
-        context.showSuccess('import_success'.tr());
-      }
-
-      if (!localOnly && result.succeededGroups > 0 && context.mounted) {
-        final syncNow = await showConfirmSheet(
-          context,
-          title: 'import_sync_now_title'.tr(),
-          content: 'import_sync_now_body'.tr(),
-          confirmLabel: 'import_sync_now'.tr(),
-          centerInFullViewport: false,
-        );
-        if (syncNow == true) {
-          await sync.syncNow();
-        }
-      }
-    } finally {
-      sync.resume();
+    } else {
+      context.showSuccess('import_success'.tr());
     }
   } catch (e, st) {
     Log.warning('Backup import failed', error: e, stackTrace: st);
-    try {
-      ref.read(dataSyncServiceProvider.notifier).resume();
-    } catch (e) {
-      Log.debug('Resume sync after import failure failed', error: e);
-    }
     if (context.mounted) context.showError('import_failed'.tr());
   }
 }

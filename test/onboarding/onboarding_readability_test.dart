@@ -67,7 +67,6 @@ void main() {
       'onboarding_welcome',
       'onboarding_preferences',
       'onboarding_permissions_title',
-      'onboarding_connect',
     ];
     for (var page = 0; page < titleKeys.length; page++) {
       await pumpStep(tester, page);

@@ -6,10 +6,9 @@
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "Split trip, household, and group expenses. See who owes whom, settle up, and work offline. Free web app — English and Arabic (حساب).",
+    "description": "Keep group expenses, balances, settlements, and receipts on your device.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
-    "gcm_sender_id": "103953800507",
     "icons": [
         {
             "src": "icons/Icon-192.png",

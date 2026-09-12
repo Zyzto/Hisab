@@ -6,7 +6,6 @@ import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/navigation/nav_back.dart';
 import '../../../core/navigation/route_paths.dart';
-import '../../../core/utils/error_report_helper.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../groups/providers/groups_provider.dart';
 import '../../groups/widgets/group_card.dart';
@@ -145,11 +144,6 @@ class _ArchivedGroupsPageState extends ConsumerState<ArchivedGroupsPage> {
                   loading: () =>
                       const Center(child: CircularProgressIndicator()),
                   error: (e, st) {
-                    sendErrorTelemetryIfOnline(
-                      ref,
-                      message: e.toString(),
-                      details: e.toString(),
-                    );
                     return Center(
                       child: ErrorContentWidget(
                         message: e.toString(),
@@ -165,11 +159,6 @@ class _ArchivedGroupsPageState extends ConsumerState<ArchivedGroupsPage> {
                 ),
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (e, st) {
-                  sendErrorTelemetryIfOnline(
-                    ref,
-                    message: e.toString(),
-                    details: e.toString(),
-                  );
                   return Center(
                     child: ErrorContentWidget(
                       message: e.toString(),

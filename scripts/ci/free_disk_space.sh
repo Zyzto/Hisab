@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
 # Reclaim runner disk before an Android build.
 #
-# A cloud staging build finished with 96 MB free, which is where the Hosting
-# deploy started hanging on `npx`. The toolchains removed here are all shipped
-# in the GitHub runner image for other ecosystems and are never touched by a
-# Flutter build. The Android SDK and NDK are deliberately left alone: plugins
-# with native code need them, and the point is to be safe, not to be thorough.
+# Flutter's Android build needs substantial temporary disk space. The
+# toolchains removed here are shipped in the GitHub runner image for other
+# ecosystems and are not used by this project. The Android SDK and NDK remain.
 set -euo pipefail
 
 before=$(df --output=avail -m / | tail -1)

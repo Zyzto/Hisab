@@ -1,43 +1,70 @@
 #!/usr/bin/env bash
-# Fail if the public tree has grown a dependency on a backend SDK.
-#
-# The open-core split only holds if this repo builds standalone. Cal.com's
-# split failed exactly here: hundreds of imports crossed from the open tree
-# into the licensed one, so the "open source" build no longer stood alone. The
-# imports are cheap to add and invisible until someone tries a clean clone, so
-# they are checked rather than trusted.
+# Guard the public repository against reintroducing hosted-service code.
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT_DIR"
 
-status=0
-
-fail() {
-  echo "❌ $1" >&2
-  status=1
+fail=0
+check_absent() {
+  local pattern="$1"
+  local scope="$2"
+  if rg -n -i --glob '*.dart' --glob '!**/*.g.dart' "$pattern" $scope; then
+    echo "❌ Forbidden public reference: $pattern" >&2
+    fail=1
+  fi
 }
 
-if grep -rn --include='*.dart' -E "^\s*import\s+'package:supabase" lib test packages; then
-  fail "lib/, test/ or packages/ imports a Supabase SDK; the app must go through package:hisab_backend"
+check_absent 'package:(hisab_backend|hisab_cloud|firebase_|supabase|revenuecat|paddle|url_launcher|connectivity_plus|langchain_|upgrader|in_app_update|app_links)' 'lib test integration_test packages'
+check_absent '\b(CloudBackend|CloudBilling|RevenueCat|Paddle|Supabase|Firebase|DataSyncService|SyncEngine|telemetry)\b' 'lib test integration_test packages'
+
+check_platform_absent() {
+  local pattern="$1"
+  local scope=(
+    android/app/build.gradle.kts
+    android/app/src
+    android/settings.gradle.kts
+    ios/Runner
+    ios/Runner.xcodeproj
+    web/index.html
+    web/manifest.json
+    pubspec.yaml
+  )
+  if rg -n -i "$pattern" "${scope[@]}"; then
+    echo "❌ Forbidden public platform/config reference: $pattern" >&2
+    fail=1
+  fi
+}
+
+check_platform_absent 'firebase|supabase|revenuecat|paddle|google-services|google_sign_in|url_launcher|connectivity_plus|langchain_|upgrader|in_app_update|app_links|oauth'
+check_platform_absent "create\\([\"']cloud|src/cloud|flavor[[:space:]]*=[[:space:]]*[\"']cloud"
+
+if rg -n -i --glob 'pubspec*.yaml' 'hisab_backend|hisab_cloud|firebase|supabase|revenuecat|paddle|url_launcher|connectivity|langchain|upgrader|in_app_update|app_links|http:' pubspec.yaml packages; then
+  echo "❌ Hosted-service dependency found in public pubspec files" >&2
+  fail=1
 fi
 
-if grep -nE '^\s*supabase(_flutter)?\s*:' pubspec.yaml; then
-  fail "pubspec.yaml declares a Supabase dependency"
+private_package_present=0
+while IFS= read -r private_file; do
+  if [[ -e "$private_file" ]]; then
+    echo "$private_file"
+    private_package_present=1
+  fi
+done < <(git ls-files -- 'packages/hisab_backend/**' 'packages/hisab_cloud/**')
+if [[ "$private_package_present" -ne 0 ]]; then
+  echo "❌ Private package source remains in the public repository" >&2
+  fail=1
 fi
 
-# The stub is what makes the public build offline. A path pointing outside the
-# repo means someone wired the private package in and it would not resolve for
-# anyone else.
-if ! grep -q 'path: packages/hisab_cloud' pubspec.yaml; then
-  fail "pubspec.yaml no longer resolves hisab_cloud to the in-repo stub"
-fi
+for path in android/app/src/cloud android/app/src/cloudDebug web/firebase-messaging-sw.js \
+  web/redirect.html web/invite-redirect-template.html web/.well-known; do
+  if [[ -e "$path" ]]; then
+    echo "❌ Cloud-only platform asset remains: $path" >&2
+    fail=1
+  fi
+done
 
-if git ls-files --error-unmatch android/app/src/cloud/google-services.json >/dev/null 2>&1; then
-  fail "android/app/src/cloud/google-services.json is tracked; it must stay gitignored"
+if [[ "$fail" -ne 0 ]]; then
+  exit 1
 fi
-
-if [[ $status -eq 0 ]]; then
-  echo "✅ Public tree is standalone"
-fi
-exit $status
+echo "✅ Public tree is local-only"

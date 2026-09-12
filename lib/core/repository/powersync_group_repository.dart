@@ -6,18 +6,8 @@ part of 'powersync_repository.dart';
 
 class PowerSyncGroupRepository implements IGroupRepository {
   final PowerSyncDatabase _db;
-  final CloudBackend? _cloud;
-  final bool _isOnline;
-  final bool _isLocalOnly;
 
-  PowerSyncGroupRepository(
-    this._db, {
-    CloudBackend? cloud,
-    bool isOnline = false,
-    bool isLocalOnly = true,
-  }) : _cloud = cloud,
-       _isOnline = isOnline,
-       _isLocalOnly = isLocalOnly;
+  PowerSyncGroupRepository(this._db);
 
   static const _activeGroupsWhere = "(archived_at IS NULL OR archived_at = '')";
   static const _archivedGroupsWhere =
@@ -110,40 +100,10 @@ class PowerSyncGroupRepository implements IGroupRepository {
     }
     final id = _uuid.v4();
     final now = _nowIso();
-    String? ownerId;
-    String? ownerDisplayName;
-    String? ownerAvatarId;
-    final user = cloudBackend?.auth.currentUser;
-    if (user != null) {
-      ownerId = user.id;
-      ownerDisplayName =
-          user.metadata['display_name'] as String? ??
-          user.fullName ??
-          user.email ??
-          'default_owner_name'.tr();
-      ownerAvatarId = user.avatarId;
-    }
+    const String? ownerId = null;
+    const String? ownerAvatarId = null;
 
-    final groupData = <String, dynamic>{
-      'id': id,
-      'name': trimmedName,
-      'currency_code': currencyCode,
-      'owner_id': ownerId,
-      'settlement_method': settlementMethod.name,
-      'allow_member_add_expense': allowMemberAddExpense,
-      'allow_member_change_settings': allowMemberChangeSettings,
-      'allow_expense_as_other_participant': allowExpenseAsOtherParticipant,
-      'allow_member_settle_for_others': allowMemberSettleForOthers,
-      'household_counting_enabled': householdCountingEnabled,
-      'icon': icon,
-      'color': _colorToSigned(color),
-      'is_personal': isPersonal,
-      'budget_amount_cents': budgetAmountCents,
-      'created_at': now,
-      'updated_at': now,
-    };
-
-    // Pre-generate participant IDs for additional participants so Supabase and local use the same IDs
+    // Pre-generate participant IDs so locally created records remain stable.
     final additionalParticipantIds =
         <({String id, String name, int sortOrder})>[];
     for (int i = 0; i < initialParticipants.length; i++) {
@@ -177,151 +137,15 @@ class PowerSyncGroupRepository implements IGroupRepository {
     } else {
       treasurerParticipantId = null;
     }
-    if (treasurerParticipantId != null) {
-      groupData['treasurer_participant_id'] = treasurerParticipantId;
-    }
-    final ownerMemberId = ownerId != null ? _uuid.v4() : null;
-    // participants.name CHECK is 1–100; clamp auth display names so group
-    // create cannot fail after the groups row is already inserted.
+    // Keep the first participant local; there is no account owner in the FOSS
+    // build. Clamp the fallback so the SQLite CHECK constraint is respected.
     final fallbackOwnerName = 'default_owner_name'.tr();
-    final rawOwnerName = (ownerDisplayName ?? fallbackOwnerName).trim();
+    final rawOwnerName = fallbackOwnerName.trim();
     final participantName = rawOwnerName.isEmpty
         ? fallbackOwnerName
         : clampCodePoints(rawOwnerName, maxCodePoints: 100);
 
-    if (!_isLocalOnly && _isOnline && _cloud != null) {
-      // Online: write to Supabase first
-      // A participant references its group, while the optional treasurer on
-      // the group references that participant. Break the FK cycle by linking
-      // the treasurer only after all initial participants have been inserted.
-      final cloudGroupData = Map<String, dynamic>.from(groupData)
-        ..remove('treasurer_participant_id');
-      await _cloud.sync.upsert('groups', cloudGroupData);
-      // Create owner membership first (without participant_id) so that
-      // get_user_role() returns 'owner' for subsequent RLS checks.
-      if (ownerId != null && ownerMemberId != null) {
-        await _cloud.sync.upsert('group_members', {
-          'id': ownerMemberId,
-          'group_id': id,
-          'user_id': ownerId,
-          'role': 'owner',
-          'joined_at': now,
-        });
-      }
-      // Create participant for owner (RLS now passes via get_user_role)
-      await _cloud.sync.upsert('participants', {
-        'id': participantId,
-        'group_id': id,
-        'name': participantName,
-        'sort_order': 0,
-        'user_id': ownerId,
-        'avatar_id': ownerAvatarId,
-        'parent_participant_id': null,
-        'unnamed_dependent_count': 0,
-        'created_at': now,
-        'updated_at': now,
-      });
-      // Link participant to the membership record
-      if (ownerMemberId != null) {
-        await _cloud.sync.update('group_members', {
-          'participant_id': participantId,
-        }, ownerMemberId);
-      }
-      // Create additional participants from the wizard (use same IDs as local loop below)
-      for (int i = 0; i < additionalParticipantIds.length; i++) {
-        final entry = additionalParticipantIds[i];
-        await _cloud.sync.upsert('participants', {
-          'id': entry.id,
-          'group_id': id,
-          'name': entry.name,
-          'sort_order': entry.sortOrder,
-          'parent_participant_id': null,
-          'unnamed_dependent_count': 0,
-          'created_at': now,
-          'updated_at': now,
-        });
-      }
-      if (treasurerParticipantId != null) {
-        await _cloud.sync.update('groups', {
-          'treasurer_participant_id': treasurerParticipantId,
-        }, id);
-      }
-    } else if (_shouldQueueOffline(
-      isLocalOnly: _isLocalOnly,
-      isOnline: _isOnline,
-    )) {
-      await _enqueue(
-        _db,
-        tableName: 'groups',
-        operation: 'insert',
-        rowId: id,
-        data: Map<String, dynamic>.from(groupData)
-          ..remove('treasurer_participant_id'),
-      );
-      await _enqueue(
-        _db,
-        tableName: 'participants',
-        operation: 'insert',
-        rowId: participantId,
-        data: {
-          'id': participantId,
-          'group_id': id,
-          'name': participantName,
-          'sort_order': 0,
-          'user_id': ownerId,
-          'avatar_id': ownerAvatarId,
-          'parent_participant_id': null,
-          'unnamed_dependent_count': 0,
-          'created_at': now,
-          'updated_at': now,
-        },
-      );
-      if (ownerId != null && ownerMemberId != null) {
-        await _enqueue(
-          _db,
-          tableName: 'group_members',
-          operation: 'insert',
-          rowId: ownerMemberId,
-          data: {
-            'id': ownerMemberId,
-            'group_id': id,
-            'user_id': ownerId,
-            'role': 'owner',
-            'participant_id': participantId,
-            'joined_at': now,
-          },
-        );
-      }
-      for (final entry in additionalParticipantIds) {
-        await _enqueue(
-          _db,
-          tableName: 'participants',
-          operation: 'insert',
-          rowId: entry.id,
-          data: {
-            'id': entry.id,
-            'group_id': id,
-            'name': entry.name,
-            'sort_order': entry.sortOrder,
-            'parent_participant_id': null,
-            'unnamed_dependent_count': 0,
-            'created_at': now,
-            'updated_at': now,
-          },
-        );
-      }
-      if (treasurerParticipantId != null) {
-        await _enqueue(
-          _db,
-          tableName: 'groups',
-          operation: 'update',
-          rowId: id,
-          data: {'treasurer_participant_id': treasurerParticipantId},
-        );
-      }
-    }
-
-    // Always write to local DB (use signed color for consistency with Supabase and reader)
+    // Write directly to the local database.
     final colorStored = _colorToSigned(color);
     await _db.execute(
       '''INSERT INTO groups (
@@ -370,13 +194,7 @@ class PowerSyncGroupRepository implements IGroupRepository {
         now,
       ],
     );
-    if (ownerId != null && ownerMemberId != null) {
-      await _db.execute(
-        'INSERT INTO group_members (id, group_id, user_id, role, participant_id, joined_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [ownerMemberId, id, ownerId, 'owner', participantId, now],
-      );
-    }
-    // Create additional participants from the wizard in local DB (same IDs as Supabase)
+    // Create additional participants from the wizard in local DB.
     for (final entry in additionalParticipantIds) {
       await _db.execute(
         'INSERT INTO participants (id, group_id, name, sort_order, parent_participant_id, unnamed_dependent_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -423,27 +241,6 @@ class PowerSyncGroupRepository implements IGroupRepository {
       'budget_amount_cents': group.budgetAmountCents,
       'updated_at': now,
     };
-
-    if (!_isLocalOnly && _isOnline && _cloud != null) {
-      // Omit id (PK) and archived_at (archive/unarchive use dedicated methods).
-      // Personal/budget/settle/permission columns are part of the groups schema
-      // (migrations 12/16/19/20260728120000) and must sync or local edits revert on fetch.
-      final supabaseData = Map<String, dynamic>.from(data)
-        ..remove('archived_at')
-        ..remove('id');
-      await _cloud.sync.update('groups', supabaseData, group.id);
-    } else if (_shouldQueueOffline(
-      isLocalOnly: _isLocalOnly,
-      isOnline: _isOnline,
-    )) {
-      await _enqueue(
-        _db,
-        tableName: 'groups',
-        operation: 'update',
-        rowId: group.id,
-        data: data,
-      );
-    }
 
     await _db.execute(
       '''UPDATE groups SET
@@ -494,20 +291,6 @@ class PowerSyncGroupRepository implements IGroupRepository {
       updateData['settlement_snapshot_json'] = _archiveAutoFreezeMarker;
     }
 
-    if (!_isLocalOnly && _isOnline && _cloud != null) {
-      await _cloud.sync.update('groups', updateData, groupId);
-    } else if (_shouldQueueOffline(
-      isLocalOnly: _isLocalOnly,
-      isOnline: _isOnline,
-    )) {
-      await _enqueue(
-        _db,
-        tableName: 'groups',
-        operation: 'update',
-        rowId: groupId,
-        data: updateData,
-      );
-    }
     if (shouldAutoFreeze) {
       await _db.execute(
         'UPDATE groups SET archived_at = ?, settlement_freeze_at = ?, settlement_snapshot_json = ?, updated_at = ? WHERE id = ?',
@@ -542,20 +325,6 @@ class PowerSyncGroupRepository implements IGroupRepository {
       updateData['settlement_snapshot_json'] = null;
     }
 
-    if (!_isLocalOnly && _isOnline && _cloud != null) {
-      await _cloud.sync.update('groups', updateData, groupId);
-    } else if (_shouldQueueOffline(
-      isLocalOnly: _isLocalOnly,
-      isOnline: _isOnline,
-    )) {
-      await _enqueue(
-        _db,
-        tableName: 'groups',
-        operation: 'update',
-        rowId: groupId,
-        data: updateData,
-      );
-    }
     if (shouldAutoUnfreeze) {
       await _db.execute(
         'UPDATE groups SET archived_at = NULL, settlement_freeze_at = NULL, settlement_snapshot_json = NULL, updated_at = ? WHERE id = ?',
@@ -569,7 +338,7 @@ class PowerSyncGroupRepository implements IGroupRepository {
     }
   }
 
-  /// Local-only: not written to pending_writes or Supabase. Persists on device only.
+  /// Local-only: persists on the device without entering the legacy queue.
   @override
   Future<void> setLocalArchived(String groupId) async {
     final now = _nowIso();
@@ -642,14 +411,6 @@ class PowerSyncGroupRepository implements IGroupRepository {
 
   @override
   Future<void> delete(String id) async {
-    if (!_isLocalOnly && _isOnline && _cloud != null) {
-      await _cloud.sync.delete('groups', id);
-    } else if (_shouldQueueOffline(
-      isLocalOnly: _isLocalOnly,
-      isOnline: _isOnline,
-    )) {
-      await _enqueue(_db, tableName: 'groups', operation: 'delete', rowId: id);
-    }
     await _db.execute('DELETE FROM groups WHERE id = ?', [id]);
   }
 
@@ -661,29 +422,6 @@ class PowerSyncGroupRepository implements IGroupRepository {
     final now = _nowIso();
     final snapshotJson = snapshot.toJsonString();
 
-    if (!_isLocalOnly && _isOnline && _cloud != null) {
-      await _cloud.sync.update('groups', {
-        'settlement_freeze_at': now,
-        'settlement_snapshot_json': snapshotJson,
-        'updated_at': now,
-      }, groupId);
-    } else if (_shouldQueueOffline(
-      isLocalOnly: _isLocalOnly,
-      isOnline: _isOnline,
-    )) {
-      await _enqueue(
-        _db,
-        tableName: 'groups',
-        operation: 'update',
-        rowId: groupId,
-        data: {
-          'settlement_freeze_at': now,
-          'settlement_snapshot_json': snapshotJson,
-          'updated_at': now,
-        },
-      );
-    }
-
     await _db.execute(
       'UPDATE groups SET settlement_freeze_at = ?, settlement_snapshot_json = ?, updated_at = ? WHERE id = ?',
       [now, snapshotJson, now, groupId],
@@ -693,29 +431,6 @@ class PowerSyncGroupRepository implements IGroupRepository {
   @override
   Future<void> unfreezeSettlement(String groupId) async {
     final now = _nowIso();
-
-    if (!_isLocalOnly && _isOnline && _cloud != null) {
-      await _cloud.sync.update('groups', {
-        'settlement_freeze_at': null,
-        'settlement_snapshot_json': null,
-        'updated_at': now,
-      }, groupId);
-    } else if (_shouldQueueOffline(
-      isLocalOnly: _isLocalOnly,
-      isOnline: _isOnline,
-    )) {
-      await _enqueue(
-        _db,
-        tableName: 'groups',
-        operation: 'update',
-        rowId: groupId,
-        data: {
-          'settlement_freeze_at': null,
-          'settlement_snapshot_json': null,
-          'updated_at': now,
-        },
-      );
-    }
 
     await _db.execute(
       'UPDATE groups SET settlement_freeze_at = NULL, settlement_snapshot_json = NULL, updated_at = ? WHERE id = ?',

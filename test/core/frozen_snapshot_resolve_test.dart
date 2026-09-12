@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hisab/domain/domain.dart';
 
-/// Mirrors balance/profile frozen-snapshot resolution for unit coverage.
+/// Mirrors balance frozen-snapshot resolution for unit coverage.
 ({
   List<ParticipantBalance> balances,
   List<SettlementTransaction> settlements,

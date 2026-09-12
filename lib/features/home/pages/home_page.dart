@@ -5,7 +5,6 @@ import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:safaeh/safaeh.dart';
 import '../../../core/build_env.dart';
-import '../../../core/database/database_providers.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
 import '../../../core/layout/content_aligned_fab_location.dart';
 import '../../../core/layout/constrained_content.dart';
@@ -19,9 +18,7 @@ import '../../../core/widgets/app_fab.dart';
 import '../../../core/widgets/async_value_builder.dart';
 import '../../../core/widgets/sheet_option_tile.dart';
 import '../../../core/widgets/shell_menu_button.dart';
-import '../../../core/widgets/sync_status_icon.dart';
 import '../../../core/widgets/user_text.dart';
-import '../../groups/pages/show_invite_scanner.dart';
 import '../../groups/providers/groups_provider.dart';
 import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 import 'package:hisab/core/settings/settings_definitions.dart';
@@ -48,7 +45,6 @@ class HomePage extends ConsumerWidget {
   }
 
   Future<void> _onRefresh(WidgetRef ref) async {
-    await ref.read(dataSyncServiceProvider.notifier).syncNow();
     ref.invalidate(groupsProvider);
   }
 
@@ -302,7 +298,7 @@ class HomePage extends ConsumerWidget {
     final selectedGroups = ordered != null
         ? ordered.where((g) => selectedIds.contains(g.id)).toList()
         : <Group>[];
-    final localOnly = ref.watch(effectiveLocalOnlyProvider);
+    const localOnly = true;
     final rawDisplay = ref.watch(homeListDisplayProvider);
     const validDisplays = {'list_separate', 'list_combined'};
     // Setting is the UI source of truth so list-option taps apply immediately.
@@ -418,7 +414,7 @@ class HomePage extends ConsumerWidget {
                       onPressed: clearSelection,
                       tooltip: 'cancel'.tr(),
                     )
-                  : const ShellAppBarLeading(fallback: SyncStatusChip()),
+                  : const ShellAppBarLeading(fallback: SizedBox.shrink()),
               title: effectiveSelectionMode
                   ? (selectedGroups.length == 1
                         ? UserText(
@@ -452,8 +448,6 @@ class HomePage extends ConsumerWidget {
                       ),
                     ]
                   : [
-                      if (ShellAppBarLeading.syncInActions(context))
-                        const SyncStatusChip(),
                       Semantics(
                         label: 'home_list_options'.tr(),
                         button: true,
@@ -807,10 +801,6 @@ class HomePage extends ConsumerWidget {
             floatingActionButton: _HomeFabCluster(
               localOnly: localOnly,
               onCreate: () => _showCreateModal(context, ref),
-              onScan: (fabOrigin) {
-                clearSelection();
-                showInviteScanner(context, origin: fabOrigin);
-              },
             ),
           );
         },
@@ -823,24 +813,18 @@ class _HomeFabCluster extends StatefulWidget {
   const _HomeFabCluster({
     required this.localOnly,
     required this.onCreate,
-    required this.onScan,
   });
 
   final bool localOnly;
   final VoidCallback onCreate;
-  final void Function(Rect? fabOrigin) onScan;
 
   @override
   State<_HomeFabCluster> createState() => _HomeFabClusterState();
 }
 
 class _HomeFabClusterState extends State<_HomeFabCluster> {
-  final GlobalKey _scanFabKey = GlobalKey();
-
   @override
   Widget build(BuildContext context) {
-    // With two FABs, only the top scan FAB idles; create keeps press motion.
-    // In local-only mode create is alone, so it keeps idle motion.
     final createFab = AppFab(
       icon: Icons.add,
       heroTag: 'create_group',
@@ -851,49 +835,7 @@ class _HomeFabClusterState extends State<_HomeFabCluster> {
       playIdleMotion: widget.localOnly,
     );
 
-    if (widget.localOnly) return createFab;
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const fabHeight = AppFab.size;
-        const twoFabHeight = fabHeight * 2;
-        final spacing = (constraints.maxHeight >= twoFabHeight + 12)
-            ? 12.0
-            : (constraints.maxHeight - twoFabHeight).clamp(0.0, 12.0);
-        final column = Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            KeyedSubtree(
-              key: _scanFabKey,
-              child: AppFab(
-                icon: Icons.qr_code_scanner,
-                heroTag: 'scan_invite',
-                semanticsLabel: 'scan_invite'.tr(),
-                tooltip: 'scan_invite'.tr(),
-                onPressed: () {
-                  final box =
-                      _scanFabKey.currentContext?.findRenderObject()
-                          as RenderBox?;
-                  final origin = box == null
-                      ? null
-                      : box.localToGlobal(Offset.zero) & box.size;
-                  widget.onScan(origin);
-                },
-              ),
-            ),
-            SizedBox(height: spacing),
-            createFab,
-          ],
-        );
-        if (constraints.maxHeight.isFinite &&
-            constraints.maxHeight < twoFabHeight &&
-            constraints.maxHeight > 0) {
-          return FittedBox(alignment: Alignment.bottomCenter, child: column);
-        }
-        return column;
-      },
-    );
+    return createFab;
   }
 }
 

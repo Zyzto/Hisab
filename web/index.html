@@ -1,91 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
-
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <title>Hisab – Split group expenses and settle up</title>
-  <meta name="description" content="Split trip, household, and group expenses. See who owes whom, settle up, and work offline. Free web app — English and Arabic (حساب).">
-  <link rel="canonical" href="https://hisab.shenepoy.com/">
-  <link rel="alternate" hreflang="en" href="https://hisab.shenepoy.com/">
-  <link rel="alternate" hreflang="ar" href="https://hisab.shenepoy.com/ar/">
-  <link rel="alternate" hreflang="x-default" href="https://hisab.shenepoy.com/">
-  <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Hisab">
-  <meta property="og:url" content="https://hisab.shenepoy.com/">
-  <meta property="og:title" content="Hisab – Split group expenses and settle up">
-  <meta property="og:description" content="Split trip, household, and group expenses. See who owes whom, settle up, and work offline. Free web app — English and Arabic (حساب).">
-  <meta property="og:image" content="https://hisab.shenepoy.com/images/og-en.png">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-  <meta property="og:locale" content="en_US">
-  <meta property="og:locale:alternate" content="ar_SA">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Hisab – Split group expenses and settle up">
-  <meta name="twitter:description" content="Split trip, household, and group expenses. See who owes whom, settle up, and work offline. Free web app — English and Arabic (حساب).">
-  <meta name="twitter:image" content="https://hisab.shenepoy.com/images/og-en.png">
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@graph": [
-      {
-        "@type": "WebSite",
-        "@id": "https://hisab.shenepoy.com/#website",
-        "url": "https://hisab.shenepoy.com/",
-        "name": "Hisab",
-        "alternateName": "حساب",
-        "inLanguage": ["en", "ar"],
-        "description": "Split trip, household, and group expenses. See who owes whom, settle up, and work offline."
-      },
-      {
-        "@type": "SoftwareApplication",
-        "name": "Hisab",
-        "alternateName": "حساب",
-        "url": "https://hisab.shenepoy.com/",
-        "applicationCategory": "FinanceApplication",
-        "operatingSystem": "Android, Web",
-        "inLanguage": ["en", "ar"],
-        "description": "Split trip, household, and group expenses. See who owes whom, settle up, and work offline. Free web app — English and Arabic.",
-        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-        "screenshot": [
-          "https://hisab.shenepoy.com/images/welcome.png",
-          "https://hisab.shenepoy.com/images/groups.png",
-          "https://hisab.shenepoy.com/images/add-expense.png",
-          "https://hisab.shenepoy.com/images/settlement.png"
-        ]
-      }
-    ]
-  }
-  </script>
-
-  <!-- iOS / PWA meta tags & icons -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#0175C2">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="Hisab">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
-
-  <!-- Favicon: 48x48 is Google's SERP minimum -->
-  <link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <meta name="description" content="Hisab keeps group expenses, balances, settlements, and receipts on your device.">
+  <title>Hisab – Local group expenses</title>
   <link rel="icon" type="image/png" href="favicon.png">
-
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
   <link rel="manifest" href="manifest.json">
   <style>
     html, body {
@@ -98,35 +22,20 @@
     #hisab-boot-splash {
       position: fixed;
       inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
+      display: grid;
+      place-content: center;
       gap: 12px;
-      font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+      text-align: center;
+      font-family: system-ui, sans-serif;
       z-index: 9999;
-      pointer-events: none;
     }
     #hisab-boot-splash .title {
       font-size: 28px;
       font-weight: 700;
-      letter-spacing: 0.02em;
     }
     #hisab-boot-splash .subtitle {
       font-size: 14px;
-      opacity: 0.7;
-    }
-    /* Crawler-visible copy; stays in the DOM after Flutter boots (CanvasKit has no indexable text). */
-    #hisab-seo {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      white-space: nowrap;
-      border: 0;
+      opacity: .7;
     }
     @media (prefers-color-scheme: dark) {
       html, body {
@@ -137,223 +46,76 @@
   </style>
 </head>
 <body>
-  <div id="hisab-seo">
-    <h1>Hisab – Split group expenses and settle up</h1>
-    <p>Split trip, household, and group expenses. See who owes whom, settle up, and work offline. Free web app — English and Arabic (حساب).</p>
-    <nav>
-      <a href="/features/">Features</a>
-      <a href="/privacy/">Privacy</a>
-      <a href="/ar/">العربية</a>
-    </nav>
-  </div>
-  <!-- Visible while Flutter boots / OAuth returns — avoids a blank black screen on iOS. -->
   <div id="hisab-boot-splash" aria-live="polite">
     <div class="title">Hisab</div>
-    <div class="subtitle" id="hisab-boot-splash-status">Loading…</div>
+    <div class="subtitle">Local expenses, private by default</div>
   </div>
 
-  <!-- Sync: gate in-app browsers before Firebase / Flutter (fail open if script missing). -->
-  <script src="in_app_browser.js"></script>
-  <script>
-    window.__hisabInAppBlocked = !!(
-      window.HisabInApp &&
-      typeof window.HisabInApp.isInAppBrowser === "function" &&
-      window.HisabInApp.isInAppBrowser()
-    );
-    if (window.__hisabInAppBlocked) {
-      (function () {
-        var splash = document.getElementById("hisab-boot-splash");
-        if (splash && splash.parentNode) splash.parentNode.removeChild(splash);
-        // Preserve full URL (including ?code= / hash) for OAuth returns.
-        window.HisabInApp.mountGate({ targetUrl: window.location.href });
-      })();
-    }
-  </script>
-
   <script>
     (function () {
-      if (window.__hisabInAppBlocked) return;
-      try {
-        var params = new URLSearchParams(window.location.search);
-        var hash = window.location.hash || "";
-        if (params.has("code") || hash.indexOf("access_token") !== -1) {
-          var el = document.getElementById("hisab-boot-splash-status");
-          if (el) el.textContent = "Signing you in…";
-        } else if (params.has("error") || hash.indexOf("error") !== -1) {
-          var errEl = document.getElementById("hisab-boot-splash-status");
-          if (errEl) errEl.textContent = "Sign-in issue — finishing…";
-        }
-      } catch (_) {}
-      function removeBootSplash() {
-        var splash = document.getElementById("hisab-boot-splash");
-        if (splash && splash.parentNode) splash.parentNode.removeChild(splash);
-      }
-      // Flutter dispatches this after the first frame; also time out so a stuck
-      // boot cannot leave the splash covering the page forever.
-      window.addEventListener("flutter-first-frame", removeBootSplash);
-      setTimeout(removeBootSplash, 15000);
-    })();
-  </script>
-
-  <!-- Firebase SDK: load async so the boot splash paints before gstatic download. -->
-  <script>
-    if (!window.__hisabInAppBlocked) {
-    // Firebase config — placeholders replaced at build time (CI) or from dart_defines_online.json (debug).
-    // Do not commit real values. See CONFIGURATION.md and dart_defines_online.example.json.
-    const firebaseConfig = {
-      apiKey: "__FIREBASE_API_KEY__",
-      authDomain: "__FIREBASE_AUTH_DOMAIN__",
-      projectId: "__FIREBASE_PROJECT_ID__",
-      storageBucket: "__FIREBASE_STORAGE_BUCKET__",
-      messagingSenderId: "__FIREBASE_MESSAGING_SENDER_ID__",
-      appId: "__FIREBASE_APP_ID__",
-    };
-
-    function hasPlaceholderFirebaseConfig(config) {
-      const values = Object.values(config);
-      return values.some((v) => typeof v === "string" && (v.includes("YOUR_") || v.includes("__FIREBASE_")));
-    }
-
-    function loadScript(src) {
-      return new Promise(function (resolve, reject) {
-        var s = document.createElement("script");
-        s.src = src;
-        s.async = true;
-        s.onload = function () { resolve(); };
-        s.onerror = function () { reject(new Error("Failed to load " + src)); };
-        document.head.appendChild(s);
-      });
-    }
-
-    // Resolved before Flutter bootstrap so firebase_messaging sees an initialized app.
-    window.__hisabFirebaseReady = (function () {
-      if (hasPlaceholderFirebaseConfig(firebaseConfig)) {
-        console.warn(
-          "[hisab] Firebase web config uses placeholders; web push notifications are disabled until real values are set."
-        );
-        return Promise.resolve();
-      }
-      return loadScript("https://www.gstatic.com/firebasejs/11.4.0/firebase-app-compat.js")
-        .then(function () {
-          return loadScript("https://www.gstatic.com/firebasejs/11.4.0/firebase-messaging-compat.js");
-        })
-        .then(function () {
-          firebase.initializeApp(firebaseConfig);
-        })
-        .catch(function (err) {
-          console.warn("[hisab] Firebase web SDK failed to load; push disabled.", err);
-        });
-    })();
-    } else {
-      window.__hisabFirebaseReady = Promise.resolve();
-    }
-  </script>
-
-  <!-- PWA capability bridge (used by lib/core/pwa) + notification click routing -->
-  <script>
-    if (!window.__hisabInAppBlocked) {
-    function handleNotificationClickUrl(targetUrl) {
-      if (typeof targetUrl !== "string" || targetUrl.length === 0) return;
-
-      // Same-origin route navigation for Flutter web app.
-      if (window.location.pathname !== targetUrl) {
-        window.location.assign(targetUrl);
-      } else {
-        // Already on target path; emit popstate for routers listening to history.
-        window.dispatchEvent(new PopStateEvent("popstate"));
-      }
-    }
-
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.addEventListener("message", (event) => {
-        const data = event.data || {};
-        if (data.type === "NOTIFICATION_CLICK" && typeof data.url === "string") {
-          handleNotificationClickUrl(data.url);
-        }
-      });
-    }
-
-    (function () {
-      let deferredPrompt = null;
-
-      function isStandaloneDisplay() {
+      var deferredPrompt = null;
+      var listeners = [];
+      function standalone() {
         try {
-          if (window.matchMedia("(display-mode: standalone)").matches) return true;
-          if (window.matchMedia("(display-mode: fullscreen)").matches) return true;
-          if (window.matchMedia("(display-mode: minimal-ui)").matches) return true;
-        } catch (_) {}
-        return !!(navigator.standalone) ||
-          (typeof document.referrer === "string" &&
-            document.referrer.indexOf("android-app://") === 0);
-      }
-
-      function notifyChanged() {
-        if (typeof window.hisabPwa.onChanged === "function") {
-          try {
-            window.hisabPwa.onChanged();
-          } catch (_) {}
+          return window.matchMedia('(display-mode: standalone)').matches ||
+            window.matchMedia('(display-mode: fullscreen)').matches ||
+            window.matchMedia('(display-mode: minimal-ui)').matches;
+        } catch (_) {
+          return false;
         }
       }
-
+      function changed() {
+        if (typeof window.hisabPwa !== 'undefined' &&
+            typeof window.hisabPwa.onChanged === 'function') {
+          try { window.hisabPwa.onChanged(); } catch (_) {}
+        }
+        listeners.slice().forEach(function (listener) {
+          try { listener(); } catch (_) {}
+        });
+      }
       window.hisabPwa = {
         canPrompt: false,
-        isStandalone: isStandaloneDisplay(),
+        isStandalone: standalone(),
         onChanged: null,
         promptInstall: function () {
           if (!deferredPrompt) return Promise.resolve(false);
-          var promptEvent = deferredPrompt;
+          var event = deferredPrompt;
           deferredPrompt = null;
-          window.hisabPwa.canPrompt = false;
-          notifyChanged();
-          return promptEvent.prompt().then(function () {
-            return promptEvent.userChoice;
+          this.canPrompt = false;
+          changed();
+          return event.prompt().then(function () {
+            return event.userChoice;
           }).then(function (choice) {
-            return !!(choice && choice.outcome === "accepted");
-          }).catch(function () {
-            return false;
-          });
-        },
+            return !!choice && choice.outcome === 'accepted';
+          }).catch(function () { return false; });
+        }
       };
-
-      window.addEventListener("beforeinstallprompt", function (e) {
-        e.preventDefault();
-        deferredPrompt = e;
+      window.hisabPwa.onChanged = function () { changed(); };
+      window.hisabPwa.addListener = function (listener) {
+        listeners.push(listener);
+      };
+      window.addEventListener('beforeinstallprompt', function (event) {
+        event.preventDefault();
+        deferredPrompt = event;
         window.hisabPwa.canPrompt = true;
-        window.hisabPwa.isStandalone = isStandaloneDisplay();
-        notifyChanged();
+        changed();
       });
-
-      window.addEventListener("appinstalled", function () {
+      window.addEventListener('appinstalled', function () {
         deferredPrompt = null;
         window.hisabPwa.canPrompt = false;
         window.hisabPwa.isStandalone = true;
-        notifyChanged();
+        changed();
       });
-
-      try {
-        var standaloneMq = window.matchMedia("(display-mode: standalone)");
-        var onDisplayMode = function () {
-          window.hisabPwa.isStandalone = isStandaloneDisplay();
-          notifyChanged();
-        };
-        if (typeof standaloneMq.addEventListener === "function") {
-          standaloneMq.addEventListener("change", onDisplayMode);
-        } else if (typeof standaloneMq.addListener === "function") {
-          standaloneMq.addListener(onDisplayMode);
-        }
-      } catch (_) {}
-    })();
-    }
-  </script>
-
-  <script>
-    (function () {
-      if (window.__hisabInAppBlocked) return;
-      var s = document.createElement("script");
-      s.src = "flutter_bootstrap.js";
-      s.async = true;
-      document.body.appendChild(s);
+      window.addEventListener('flutter-first-frame', function () {
+        var splash = document.getElementById('hisab-boot-splash');
+        if (splash) splash.remove();
+      });
+      window.setTimeout(function () {
+        var splash = document.getElementById('hisab-boot-splash');
+        if (splash) splash.remove();
+      }, 15000);
     })();
   </script>
+  <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

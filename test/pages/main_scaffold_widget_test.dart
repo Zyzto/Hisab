@@ -100,7 +100,7 @@ void main() {
     final router = _buildRouter(RoutePaths.home);
     await pumpRouterApp(tester, router: router);
     expect(find.byType(MainScaffold), findsOneWidget);
-    // Advance time so any timers (e.g. SyncStatusChip collapse) can complete before teardown
+    // Advance time so any shell timers can complete before teardown.
     await tester.pump(const Duration(seconds: 3));
   });
 
@@ -152,7 +152,8 @@ void main() {
     expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
     expect(find.byKey(const ValueKey('shell_nav_groups')), findsOneWidget);
     expect(find.byKey(const ValueKey('shell_nav_settings')), findsOneWidget);
-    expect(find.byKey(const ValueKey('shell_nav_profile')), findsOneWidget);
+    // The public FOSS build has no account navigation.
+    expect(find.byKey(const ValueKey('shell_nav_profile')), findsNothing);
     await tester.pump(const Duration(seconds: 2));
   });
 

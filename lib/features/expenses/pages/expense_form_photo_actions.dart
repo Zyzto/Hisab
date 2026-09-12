@@ -14,9 +14,6 @@ mixin _ExpenseFormPhotoActionsMixin on ConsumerState<ExpenseFormPage> {
   /// Cooperative cancel for the in-flight receipt scan.
   ReceiptScanCancelToken? _scanCancel;
 
-  /// One Nano-unavailable toast per form session.
-  bool _nanoFallbackToastShown = false;
-
   /// Android may kill the activity under the camera; recover once via retrieveLostData.
   bool _lostPickerDataChecked = false;
 
@@ -39,13 +36,11 @@ mixin _ExpenseFormPhotoActionsMixin on ConsumerState<ExpenseFormPage> {
     _lostPickerDataChecked = true;
     if (kIsWeb || !isAndroid) return;
     if (_expenseImages.length >= kMaxExpenseImages) {
-      clearPendingImagePick(ref);
       return;
     }
     try {
       final response = await ImagePicker().retrieveLostData();
       if (!mounted || response.isEmpty) {
-        clearPendingImagePick(ref);
         return;
       }
       final exception = response.exception;
@@ -53,7 +48,6 @@ mixin _ExpenseFormPhotoActionsMixin on ConsumerState<ExpenseFormPage> {
         Log.warning(
           'Lost camera/gallery data: ${exception.code} ${exception.message}',
         );
-        clearPendingImagePick(ref);
         return;
       }
       final files = <XFile>[
@@ -63,11 +57,9 @@ mixin _ExpenseFormPhotoActionsMixin on ConsumerState<ExpenseFormPage> {
           response.file!,
       ];
       if (files.isEmpty) {
-        clearPendingImagePick(ref);
         return;
       }
-      final scanAfter =
-          readPendingImagePickMode(ref) == PendingImagePickMode.scan;
+      const scanAfter = false;
       Log.info(
         'Recovered ${files.length} photo(s) after picker activity kill '
         '(scanAfter=$scanAfter)',
@@ -75,7 +67,6 @@ mixin _ExpenseFormPhotoActionsMixin on ConsumerState<ExpenseFormPage> {
       await _ingestPickedPhotos(files, scanAfter: scanAfter);
     } catch (e, stack) {
       Log.warning('retrieveLostData failed', error: e, stackTrace: stack);
-      clearPendingImagePick(ref);
     }
   }
 
@@ -85,7 +76,6 @@ mixin _ExpenseFormPhotoActionsMixin on ConsumerState<ExpenseFormPage> {
     required bool scanAfter,
   }) async {
     if (files.isEmpty) {
-      clearPendingImagePick(ref);
       return;
     }
     Uint8List? lastOcrBytes;
@@ -111,7 +101,6 @@ mixin _ExpenseFormPhotoActionsMixin on ConsumerState<ExpenseFormPage> {
         context.showError('receipt_scan_error'.tr(args: [e.toString()]));
       }
     } finally {
-      clearPendingImagePick(ref);
     }
     if (scanAfter && lastOcrBytes != null && mounted) {
       final scanIndex = _expenseImages.length - 1;
@@ -215,12 +204,6 @@ mixin _ExpenseFormPhotoActionsMixin on ConsumerState<ExpenseFormPage> {
     }
     if (!hasPermission || !mounted) return;
 
-    persistLastRoutePath(ref, _photoForm._formRoutePath);
-    setPendingImagePickMode(
-      ref,
-      scanAfter ? PendingImagePickMode.scan : PendingImagePickMode.attach,
-    );
-
     final picker = ImagePicker();
     final List<XFile> files;
     if (source == ImageSource.gallery) {
@@ -245,7 +228,6 @@ mixin _ExpenseFormPhotoActionsMixin on ConsumerState<ExpenseFormPage> {
         _lostPickerDataChecked = false;
         await _recoverLostPickerImage();
       } else {
-        clearPendingImagePick(ref);
       }
       return;
     }
@@ -316,15 +298,6 @@ mixin _ExpenseFormPhotoActionsMixin on ConsumerState<ExpenseFormPage> {
     // -1 keeps the section header busy without marking every thumbnail.
     setState(() => _scanningImageIndex = imageIndex ?? -1);
     try {
-      if (!_nanoFallbackToastShown &&
-          !cancel.isCancelled &&
-          await nanoNeedsUserAttention(ref)) {
-        cancel.throwIfCancelled();
-        _nanoFallbackToastShown = true;
-        if (mounted) {
-          context.showToast('receipt_nano_unavailable_toast'.tr());
-        }
-      }
       cancel.throwIfCancelled();
       final result = await processReceiptBytes(
         bytes,

@@ -1,11 +1,7 @@
-name: Release (offline build)
+name: Release (local-only build)
 
-# Ships the FOSS variant: no backend, no Firebase, its own signing key and its
-# own application id (com.shenepoy.hisab.foss), so it installs alongside the
-# cloud build rather than replacing it.
-#
-# The cloud build is produced by the private repo and uploaded to the same
-# GitHub Release. Nothing here has access to production credentials.
+# Ships the public local-only Android application. The workflow has no service
+# credentials and produces only the FOSS flavor.
 
 on:
   push:
@@ -47,7 +43,7 @@ jobs:
       - name: Static release checks
         run: bash ./scripts/run_release_checks.sh
 
-      - name: Assert the tree carries no backend dependency
+      - name: Assert the tree is local-only
         run: bash ./scripts/ci/assert_offline_only.sh
 
       - name: Flutter pub get
@@ -58,10 +54,6 @@ jobs:
 
   build-foss:
     name: Build FOSS APKs
-    # Test tags are completed by the private staging workflow, which adds the
-    # cloud APK connected to test.hisab.shenepoy.com. Do not publish an
-    # unrelated offline APK set into that test release.
-    if: ${{ !contains(github.ref_name, '-test.') }}
     needs: checks
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -105,7 +97,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.FOSS_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.FOSS_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.FOSS_KEY_PASSWORD }}
-        run: bash ./scripts/ci/build_android.sh foss
+        run: bash ./scripts/ci/build_android.sh release
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v7
@@ -138,8 +130,6 @@ jobs:
         with:
           name: foss-apk
 
-      # Created as a draft so the private pipeline can attach the cloud build
-      # before anyone sees a release that offers only one of the two.
       - name: Create draft release
         uses: softprops/action-gh-release@v2
         with:
@@ -150,22 +140,3 @@ jobs:
             app-armeabi-v7a-foss-release.apk
             app-arm64-v8a-foss-release.apk
             app-x86_64-foss-release.apk
-
-  github-test-release:
-    name: GitHub Test Release
-    needs: checks
-    if: ${{ startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-test.') }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: write
-    steps:
-      # The private staging workflow attaches the cloud test APKs after this
-      # draft exists. Keeping the release empty here prevents offline FOSS
-      # artifacts from being mistaken for a connected staging build.
-      - name: Create draft prerelease
-        uses: softprops/action-gh-release@v2
-        with:
-          draft: true
-          prerelease: true
-          generate_release_notes: true

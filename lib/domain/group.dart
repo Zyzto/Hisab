@@ -4,7 +4,7 @@ import 'settlement_method.dart';
 /// [id] is a UUID string.
 ///
 /// When [isPersonal] is true, the group is "my expenses only": single participant,
-/// minimized UI (no People/Balance tabs, no split in expense form, no invites).
+/// minimized UI (no People/Balance tabs and no split in expense form).
 /// [budgetAmountCents] is optional and used for personal "My budget" display.
 class Group {
   final String id;
@@ -29,7 +29,7 @@ class Group {
   final int? color;
   final DateTime? archivedAt;
 
-  /// True for personal (my-expenses-only) groups; minimal UI, no invites.
+  /// True for personal (my-expenses-only) groups with a minimal UI.
   final bool isPersonal;
 
   /// Optional budget in group currency (cents); used when [isPersonal].

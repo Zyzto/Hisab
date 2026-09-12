@@ -45,29 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-			<key>CFBundleURLName</key>
-			<string>invite</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>com.shenepoy.hisab</string>
-				<string>io.supabase.hisab</string>
-			</array>
-		</dict>
-	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Hisab needs camera access to scan receipts</string>
-	<key>NSUserNotificationsUsageDescription</key>
-	<string>Hisab uses notifications to alert you about group activity</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Hisab needs photo library access to pick expense images</string>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>remote-notification</string>
-	</array>
 </dict>
 </plist>

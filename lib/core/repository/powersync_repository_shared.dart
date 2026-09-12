@@ -76,18 +76,10 @@ Object? _expenseFp(Expense? e) {
   );
 }
 
-Object? _memberFp(GroupMember? m) {
-  if (m == null) return null;
-  return Object.hash(m.id, m.groupId, m.userId, m.role, m.participantId);
-}
-
 Object _groupsListFp(List<Group> list) => Object.hashAll(list.map(_groupFp));
 
 Object _expensesListFp(List<Expense> list) =>
     Object.hashAll(list.map(_expenseFp));
-
-Object _membersListFp(List<GroupMember> list) =>
-    Object.hashAll(list.map(_memberFp));
 
 Object? _participantFp(Participant p) => Object.hash(
   p.id,
@@ -361,38 +353,6 @@ ExpenseTag _tagFromRow(Map<String, dynamic> row) => ExpenseTag(
   updatedAt: _parseDateTime(row['updated_at']),
 );
 
-GroupMember _memberFromRow(Map<String, dynamic> row) => GroupMember(
-  id: row['id'] as String,
-  groupId: row['group_id'] as String,
-  userId: row['user_id'] as String,
-  role: row['role'] as String? ?? 'member',
-  participantId: row['participant_id'] as String?,
-  joinedAt: _parseDateTime(row['joined_at']),
-);
-
-GroupInvite _inviteFromRow(Map<String, dynamic> row) => GroupInvite(
-  id: row['id'] as String,
-  groupId: row['group_id'] as String,
-  token: row['token'] as String,
-  inviteeEmail: row['invitee_email'] as String?,
-  role: row['role'] as String? ?? 'member',
-  createdAt: _parseDateTime(row['created_at']),
-  expiresAt: _parseDateTimeNullable(row['expires_at']),
-  createdBy: row['created_by'] as String?,
-  label: row['label'] as String?,
-  maxUses: (row['max_uses'] as num?)?.toInt(),
-  useCount: (row['use_count'] as num?)?.toInt() ?? 0,
-  isActive: _parseBool(row['is_active']),
-  accessMode: InviteAccessMode.fromValue(row['access_mode'] as String?),
-);
-
-InviteUsage _inviteUsageFromRow(Map<String, dynamic> row) => InviteUsage(
-  id: row['id'] as String,
-  inviteId: row['invite_id'] as String,
-  userId: row['user_id'] as String,
-  acceptedAt: _parseDateTime(row['accepted_at']),
-);
-
 String _nowIso() => DateTime.now().toUtc().toIso8601String();
 
 /// Returns normalized `#RRGGBB` or null when missing/invalid.
@@ -405,51 +365,3 @@ String? _normalizeTagColorHex(String? colorHex) {
   if (int.tryParse(s, radix: 16) == null) return null;
   return '#${s.toUpperCase()}';
 }
-
-/// When true, new [pending_writes] rows are marked silent (import/restore).
-bool _enqueueSilentDefault = false;
-
-/// Runs [fn] so any queued writes are marked `silent=1` for notify-suppress push.
-Future<T> runWithSilentPendingWrites<T>(Future<T> Function() fn) async {
-  final prev = _enqueueSilentDefault;
-  _enqueueSilentDefault = true;
-  try {
-    return await fn();
-  } finally {
-    _enqueueSilentDefault = prev;
-  }
-}
-
-/// Enqueue an offline write for later push.
-///
-/// When [silent] is true (or [runWithSilentPendingWrites] is active), SyncEngine
-/// pushes under notify-suppress.
-Future<void> _enqueue(
-  PowerSyncDatabase db, {
-  required String tableName,
-  required String operation,
-  required String rowId,
-  Map<String, dynamic>? data,
-  bool? silent,
-}) async {
-  final isSilent = silent ?? _enqueueSilentDefault;
-  final id = _uuid.v4();
-  await db.execute(
-    'INSERT INTO pending_writes (id, table_name, operation, row_id, data_json, created_at, silent) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [
-      id,
-      tableName,
-      operation,
-      rowId,
-      data != null ? jsonEncode(data) : null,
-      _nowIso(),
-      isSilent ? 1 : 0,
-    ],
-  );
-  Log.debug(
-    'Queued pending write: $operation on $tableName/$rowId silent=$isSilent',
-  );
-}
-
-bool _shouldQueueOffline({required bool isLocalOnly, required bool isOnline}) =>
-    !isLocalOnly && !isOnline;

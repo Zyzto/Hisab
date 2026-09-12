@@ -5,7 +5,6 @@ import 'package:easy_localization/easy_localization.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/platform/ui_perf.dart';
 import '../../../core/theme/accent_style.dart';
-import '../../../core/utils/error_report_helper.dart';
 import '../../../core/widgets/amount_with_secondary_display.dart';
 import '../../../core/widgets/error_content.dart';
 import '../../../core/widgets/participant_avatar.dart';
@@ -50,7 +49,6 @@ class BalanceList extends ConsumerWidget {
     final balanceAsync = ref.watch(groupBalanceProvider(groupId));
     final myMemberAsync = ref.watch(myMemberInGroupProvider(groupId));
     final myRoleAsync = ref.watch(myRoleInGroupProvider(groupId));
-
     return balanceAsync.when(
       data: (result) {
         if (result == null) {
@@ -62,8 +60,11 @@ class BalanceList extends ConsumerWidget {
         final individualBalances = result.individualBalances;
         final settlements = result.settlements;
 
-        final myMember = myMemberAsync.hasValue ? myMemberAsync.value : null;
-        final myRole = myRoleAsync.hasValue ? myRoleAsync.value : null;
+        // Local-only groups have no authenticated account identity. Legacy
+        // membership rows are still read when opening an existing database so
+        // older snapshots and compatibility tests can keep their self view.
+        final myMember = myMemberAsync.asData?.value;
+        final myRole = myRoleAsync.asData?.value;
         final myParticipantId = myMember?.participantId;
         final showHero = myParticipantId != null && myParticipantId.isNotEmpty;
 
@@ -119,6 +120,9 @@ class BalanceList extends ConsumerWidget {
           if (group.isArchived) return false;
           if (group.isSettlementFrozen) return false;
           if (group.allowMemberSettleForOthers) return true;
+          // Without a membership row this is a local group, so there is no
+          // server-side role restriction to apply.
+          if (myRole == null) return true;
           if (myRole == GroupRole.owner) return true;
           if (settlementParticipantId == s.fromParticipantId) return true;
           return false;
@@ -160,11 +164,6 @@ class BalanceList extends ConsumerWidget {
       },
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, st) {
-        sendErrorTelemetryIfOnline(
-          ref,
-          message: e.toString(),
-          details: e.toString(),
-        );
         return Center(
           child: ErrorContentWidget(
             message: e.toString(),

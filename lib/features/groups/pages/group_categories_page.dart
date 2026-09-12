@@ -17,8 +17,6 @@ import '../../../core/widgets/user_text.dart';
 import '../../../domain/domain.dart';
 import '../../expenses/category_icons.dart';
 import '../../expenses/widgets/tag_style_fields.dart';
-import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
-import '../providers/group_member_provider.dart';
 import '../providers/groups_provider.dart';
 
 /// Manage custom expense categories for a group (rename / re-icon / delete).
@@ -46,12 +44,8 @@ class _GroupCategoriesPageState extends ConsumerState<GroupCategoriesPage> {
     });
   }
 
-  bool _canEdit(Group? group, GroupRole? myRole) {
-    if (group == null) return false;
-    final localOnly = ref.read(effectiveLocalOnlyProvider);
-    final isOwnerOrAdmin =
-        localOnly || myRole == GroupRole.owner || myRole == GroupRole.admin;
-    return isOwnerOrAdmin || group.allowMemberChangeSettings;
+  bool _canEdit(Group? group) {
+    return group != null;
   }
 
   Future<void> _editTag(ExpenseTag tag) async {
@@ -170,10 +164,6 @@ class _GroupCategoriesPageState extends ConsumerState<GroupCategoriesPage> {
     final groupAsync = ref.watch(futureGroupProvider(widget.groupId));
     final tagsAsync = ref.watch(tagsByGroupProvider(widget.groupId));
     final expensesAsync = ref.watch(expensesByGroupProvider(widget.groupId));
-    final localOnly = ref.watch(effectiveLocalOnlyProvider);
-    final myRoleAsync = localOnly
-        ? const AsyncValue<GroupRole?>.data(null)
-        : ref.watch(myRoleInGroupProvider(widget.groupId));
     final settingsPath = RoutePaths.groupSettings(widget.groupId);
     final canPop = routerCanPop(context);
 
@@ -195,8 +185,7 @@ class _GroupCategoriesPageState extends ConsumerState<GroupCategoriesPage> {
             ),
             floatingActionButton: groupAsync.maybeWhen(
               data: (group) {
-                final myRole = myRoleAsync.asData?.value;
-                if (!_canEdit(group, myRole)) return null;
+                if (!_canEdit(group)) return null;
                 return FloatingActionButton.extended(
                   onPressed: _createTag,
                   icon: const Icon(Icons.add),
@@ -215,8 +204,7 @@ class _GroupCategoriesPageState extends ConsumerState<GroupCategoriesPage> {
                 ),
               ),
               data: (group) {
-                final myRole = myRoleAsync.asData?.value;
-                final canEdit = _canEdit(group, myRole);
+                final canEdit = _canEdit(group);
                 if (!canEdit) {
                   return Center(
                     child: ErrorContentWidget(

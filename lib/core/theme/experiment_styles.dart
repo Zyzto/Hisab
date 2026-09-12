@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'app_theme.dart';
 import 'theme_config.dart';
 
@@ -145,20 +144,9 @@ class ExperimentStyles {
     final base = brightness == Brightness.light
         ? ThemeData.light().textTheme
         : ThemeData.dark().textTheme;
-    switch (styleIndex) {
-      case 1:
-        return GoogleFonts.tajawalTextTheme(base);
-      case 2:
-        return GoogleFonts.almaraiTextTheme(base);
-      case 3:
-        return GoogleFonts.cairoTextTheme(base);
-      case 4:
-        return GoogleFonts.changaTextTheme(base);
-      case 5:
-        return GoogleFonts.amiriTextTheme(base);
-      default:
-        return GoogleFonts.cairoTextTheme(base);
-    }
+    // Fonts are intentionally resolved from the platform/theme. The public
+    // build never fetches font files at runtime.
+    return base;
   }
 
   static TextTheme _scaleTextTheme(TextTheme base, double scale) {

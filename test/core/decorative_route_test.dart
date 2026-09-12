@@ -60,18 +60,16 @@ void main() {
       expect(appRoutePathFromBrowserUri(Uri.parse('https://hisab.app/')), '/');
     });
 
-    test('ignores OAuth-style fragment without leading slash', () {
+    test('ignores non-route fragment without leading slash', () {
       expect(
         appRoutePathFromBrowserUri(
-          Uri.parse(
-            'https://hisab.app/?code=abc#access_token=tok&expires_in=3600',
-          ),
+          Uri.parse('https://hisab.app/?code=abc#callback=ignored'),
         ),
         '/',
       );
       expect(
         appRoutePathFromBrowserUri(
-          Uri.parse('https://hisab.app/home/combined#access_token=tok'),
+          Uri.parse('https://hisab.app/home/combined#callback=ignored'),
         ),
         '/home/combined',
       );
@@ -90,12 +88,6 @@ void main() {
         ),
         '/groups/g1/balance',
       );
-      expect(
-        appRoutePathFromBrowserUri(
-          Uri.parse('https://hisab.app/profile#/settings'),
-        ),
-        '/settings',
-      );
     });
   });
 
@@ -104,7 +96,6 @@ void main() {
       expect(isLeakedAppPathname('/settings'), isTrue);
       expect(isLeakedAppPathname('/groups/g1/expenses'), isTrue);
       expect(isLeakedAppPathname('/home/combined'), isTrue);
-      expect(isLeakedAppPathname('/profile'), isTrue);
       expect(isLeakedAppPathname('/onboarding/welcome'), isTrue);
       expect(isLeakedAppPathname('/'), isFalse);
       expect(isLeakedAppPathname('/index.html'), isFalse);

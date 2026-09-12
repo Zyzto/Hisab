@@ -196,7 +196,7 @@ void main() {
                 child: Scaffold(
                   appBar: ContentAlignedAppBar(
                     contentAreaWidth: contentAreaWidth,
-                    leading: Icon(Icons.cloud),
+                    leading: Icon(Icons.storage),
                     title: Text('حساب', key: titleKey),
                     actions: [
                       Icon(Icons.view_list),

@@ -18,8 +18,8 @@ enum InlineBannerTone {
 
 /// Inline message block used inside sheets, above or below a form.
 ///
-/// Replaces the hand-rolled `Container` + `Row` callouts that were copied
-/// between the auth sheets, so tone and spacing stay consistent.
+/// Replaces hand-rolled `Container` + `Row` callouts copied between form
+/// sheets, so tone and spacing stay consistent.
 class InlineBanner extends StatelessWidget {
   const InlineBanner({
     super.key,

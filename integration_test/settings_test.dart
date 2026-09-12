@@ -6,7 +6,7 @@ import 'helpers/test_helpers.dart';
 void main() {
   group('Settings lifecycle', () {
     testWidgets(
-      'theme → language → font size → export → import → telemetry → about → persist',
+      'theme → language → font size → export → import → about → persist',
       (tester) async {
         await ensureIntegrationTestReady(tester);
         await waitForAnyText(
@@ -138,52 +138,6 @@ void main() {
           await waitForAnyText(tester, ['Settings', 'الإعدادات']);
         });
 
-        // ── Stage: toggle telemetry ──
-        await stage('toggle telemetry', () async {
-          // Sections start expanded; only tap the header if the tile is hidden.
-          await scrollUntilVisible(
-            tester,
-            textAnyOf(tester, ['Privacy', 'الخصوصية']),
-          );
-          final telemetryLabel = textAnyOf(tester, [
-            'Send anonymous usage data',
-            'إرسال بيانات استخدام مجهولة',
-          ]);
-          if (telemetryLabel.evaluate().isEmpty) {
-            await tapAndSettle(
-              tester,
-              textAnyOf(tester, ['Privacy', 'الخصوصية']),
-            );
-            await tester.pumpAndSettle();
-          }
-
-          await scrollUntilVisible(tester, telemetryLabel);
-
-          final telemetryTile = find.ancestor(
-            of: textAnyOf(
-              tester,
-              ['Send anonymous usage data', 'إرسال بيانات استخدام مجهولة'],
-            ),
-            matching: find.byType(ListTile),
-          );
-          final switchWidget = find.descendant(
-            of: telemetryTile,
-            matching: find.byType(Switch),
-          );
-
-          if (switchWidget.evaluate().isNotEmpty) {
-            final initialSwitch = tester.widget<Switch>(switchWidget);
-            final wasOn = initialSwitch.value;
-
-            await tapAndSettle(tester, switchWidget);
-
-            final updatedSwitch = tester.widget<Switch>(switchWidget);
-            expect(updatedSwitch.value, equals(!wasOn));
-
-            await tapAndSettle(tester, switchWidget);
-          }
-        });
-
         // ── Stage: verify About section ──
         await stage('verify about section', () async {
           await scrollUntilVisible(tester, textAnyOf(tester, ['About', 'حول']));
@@ -211,7 +165,7 @@ void main() {
 
         // ── Stage: settings persist ──
         await stage('settings persist', () async {
-          // After about/telemetry the browse list is scrolled down and Theme is
+          // After the About section the browse list is scrolled down and Theme is
           // lazily disposed. Scroll the settings ListView specifically — the
           // page-section index also owns a Scrollable that must not be dragged.
           final settingsScrollable = find.descendant(

@@ -74,7 +74,6 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            effectiveLocalOnlyProvider.overrideWith((ref) => false),
             groupRepositoryProvider.overrideWithValue(fakeGroupRepo),
             participantRepositoryProvider.overrideWithValue(
               fakeParticipantRepo,
@@ -158,7 +157,6 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          effectiveLocalOnlyProvider.overrideWith((ref) => false),
           groupRepositoryProvider.overrideWithValue(fakeGroupRepo),
           participantRepositoryProvider.overrideWithValue(fakeParticipantRepo),
           expenseRepositoryProvider.overrideWithValue(fakeExpenseRepo),

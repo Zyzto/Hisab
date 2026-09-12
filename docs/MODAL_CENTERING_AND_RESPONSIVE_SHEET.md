@@ -6,7 +6,7 @@ This document describes modal/dialog centering on web (tablet and desktop), **cl
 
 ## Problems addressed
 
-1. **Centering** – On web tablet/desktop, modals opened from **group**, **invite**, **expense**, or **balance** routes were not centered: they appeared shifted (e.g. to the right with empty space on the left), as if rail padding was being applied when no sidebar was visible. Cause: path/rail logic was sometimes evaluated in the overlay context and reported the wrong route.
+1. **Centering** – On web tablet/desktop, modals opened from **group**, **expense**, or **balance** routes were not centered: they appeared shifted (e.g. to the right with empty space on the left), as if rail padding was being applied when no sidebar was visible. Cause: path/rail logic was sometimes evaluated in the overlay context and reported the wrong route.
 2. **Click outside to close** – On desktop web, tapping/clicking outside the modal (on the dimmed barrier) did not close it, because the overlay content is full-size and was absorbing all hit tests; the route’s barrier never received taps.
 
 ## Solution overview
@@ -59,8 +59,8 @@ Shared APIs: [Safaeh](https://github.com/Zyzto/Safaeh) (`showSafaeh`), `lib/core
 Opened from **home**, **settings** (incl. nested settings routes), **archived**, debug menu, or services status chip so the dialog sits in the content area next to the permanent desktop sidenav (240px; mid-band temporary drawer reserves 0):
 
 - `home_page.dart` — create chooser, list options
-- `settings_page.dart` — language/theme/scheme/color/font pickers, currency/favorites, confirms, delete local/cloud, migration, API key, logs, about, import
-- `edit_profile_sheet.dart`, `change_password_sheet.dart`
+- `settings_page.dart` — language/theme/scheme/color/font pickers, currency/favorites, confirmations, logs, about, and import
+- local settings and backup sheets
 - `services_status_sheet.dart`
 - `debug_menu.dart`
 - Transaction scanner confirms/sheets (opened from settings hub)
@@ -68,7 +68,7 @@ Opened from **home**, **settings** (incl. nested settings routes), **archived**,
 
 ### Non-shell routes → default `true`
 
-Group, invite, expense, balance, onboarding, auth, permission sheets keep full-viewport centering unless a nested sheet explicitly opts out.
+Group, expense, balance, onboarding, and permission sheets keep full-viewport centering unless a nested sheet explicitly opts out.
 
 ## API
 
@@ -88,6 +88,10 @@ Group, invite, expense, balance, onboarding, auth, permission sheets keep full-v
 
 - **Drag handle** – Provided by `showResponsiveSheet` on narrow screens (and web bottom sheet). **Sheet content must not draw its own drag handle**; otherwise two handles appear. On tablet+ the dialog uses a title bar instead of a handle.
 - **Keyboard (IME)** – The adaptive host pads by `MediaQuery.viewInsets.bottom` (not via `AnimatedContainer` height) so sheets lift with the keyboard without replaying the modal open morph. Phone bottom `SafeArea` is off while the IME is up so the home-indicator inset does not leave a gap above the keyboard. Sheet bodies should not re-apply bottom safe/viewPadding (host owns it).
+- **Phone drag-to-dismiss** – When a primary scrollable reaches its start edge,
+  dragging down pulls the sheet itself. Pulls shorter than the shared
+  `SheetHandleDrag.dismissDistance` settle back; a deliberate pull dismisses
+  when the barrier is dismissible.
 - **Custom tag editor** – Create/edit category sheets use `TagEditorSheetShell` (`tag_style_fields.dart`): scrollable name + style pickers, sticky one-row footer (dynamic-width preview chip + trailing Cancel/Done, RTL-aware).
 - **Services status** – Nests a `DraggableScrollableSheet` inside the responsive sheet; chrome changes must preserve height/drag sizing.
 - **Scanner** – Destructive/confirm flows use `showConfirmSheet` / `showResponsiveSheet` (not raw `AlertDialog`).
@@ -95,7 +99,7 @@ Group, invite, expense, balance, onboarding, auth, permission sheets keep full-v
 ## Adding new modals
 
 - If the modal is only ever opened from **home** or **settings** (shell routes), pass **`centerInFullViewport: false`** so it is centered in the content area next to the rail.
-- If the modal can be opened from **group**, **invite**, **expense**, **balance**, **onboarding**, or any other non–shell route, you can rely on the default (`centerInFullViewport` is `true`).
+- If the modal can be opened from **group**, **expense**, **balance**, **onboarding**, or any other non–shell route, you can rely on the default (`centerInFullViewport` is `true`).
 - Prefer `showConfirmSheet` / `showTextInputSheet` / `showOptionPickerSheet` over ad-hoc `AlertDialog` or dense `ListTile` stacks.
 - All modals close when the user taps/clicks outside (barrier) by default; pass `barrierDismissible: false` only when the modal must not be dismissible (e.g. critical progress).
 - Do not add a drag handle inside the sheet content; the responsive sheet provides it on narrow screens.

@@ -32,7 +32,7 @@ class GroupCard extends ConsumerWidget {
   final int badgeCount;
 
   /// When set by a parent that already watches experiment style, avoids N card
-  /// subscriptions during home/profile list scroll.
+  /// rebuilds during home-list scrolling.
   final int? experimentStyleIndex;
 
   const GroupCard({

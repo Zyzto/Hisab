@@ -19,18 +19,6 @@ const _arabicDialectMarkers = [
   'إشعارات الدفع',
 ];
 
-/// Push copy duplicated in hisab-cloud `send-notification` NOTIFICATION_STRINGS.
-/// Changing these app values means the Edge Function strings need the same change.
-const _pushCopyMustMatchServer = {
-  'notification_group_activity': ('Group activity', 'نشاط المجموعة'),
-  'notification_member_joined': (
-    'A new member joined the group.',
-    'انضم عضو جديد إلى المجموعة.',
-  ),
-  'notification_expense_updated': ('Edit', 'تعديل'),
-  'notification_expense_deleted': ('Deleted', 'تم الحذف'),
-};
-
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -172,17 +160,9 @@ void main() {
       expect(ar['balance'], 'الحسابات');
       expect(ar['your_balance'], contains('رصيد'));
       expect(ar['analytics'], 'الإحصاءات');
-      expect(ar['notifications_enabled'], 'إشعارات فورية');
       expect(ar['receipt'], contains('إيصال'));
       expect(ar['scan_receipt'], contains('إيصال'));
       expect(ar['paid_by'], contains('دفعها'));
-    });
-
-    test('push prefixes stay in sync with documented server copy', () {
-      for (final entry in _pushCopyMustMatchServer.entries) {
-        expect(en[entry.key], entry.value.$1, reason: entry.key);
-        expect(ar[entry.key], entry.value.$2, reason: entry.key);
-      }
     });
   });
 }
@@ -209,16 +189,10 @@ final _optionLabelsBlock = RegExp(r'optionLabels:\s*\{(.*?)\},', dotAll: true);
 final _optionLabelValue = RegExp(
   r"""['"][^'"]+['"]\s*:\s*['"]([a-z][a-z0-9_]{2,})['"]""",
 );
-final _authErrorConst = RegExp(
-  r"""static const String \w+ = '([a-z][a-z0-9_]+)';""",
-);
 final _labelKeysMap = RegExp(r'LabelKeys\s*=\s*\{(.*?)\};', dotAll: true);
 final _quotedKey = RegExp(r"""['"]([a-z][a-z0-9_]{2,})['"]""");
 final _expiryOption = RegExp(r"""_ExpiryOption\(\s*'([a-z][a-z0-9_]+)'""");
 final _experimentStyleKey = RegExp(r"""'(theme_style_[a-z_]+)'""");
-final _oauthCallbackKey = RegExp(
-  r"""pendingWebOAuthCallbackError\s*=\s*'([a-z][a-z0-9_]+)'""",
-);
 
 Set<String> _collectReferencedKeys(Directory libDir) {
   final keys = <String>{};
@@ -247,11 +221,6 @@ Set<String> _collectReferencedKeys(Directory libDir) {
         keys.add(value.group(1)!);
       }
     }
-    if (source.contains('abstract final class AuthErrorKeys')) {
-      for (final match in _authErrorConst.allMatches(source)) {
-        keys.add(match.group(1)!);
-      }
-    }
     for (final block in _labelKeysMap.allMatches(source)) {
       for (final value in _quotedKey.allMatches(block.group(1)!)) {
         final key = value.group(1)!;
@@ -262,9 +231,6 @@ Set<String> _collectReferencedKeys(Directory libDir) {
       keys.add(match.group(1)!);
     }
     for (final match in _experimentStyleKey.allMatches(source)) {
-      keys.add(match.group(1)!);
-    }
-    for (final match in _oauthCallbackKey.allMatches(source)) {
       keys.add(match.group(1)!);
     }
   }

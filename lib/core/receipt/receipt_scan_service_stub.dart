@@ -24,6 +24,3 @@ Future<ReceiptScanResult?> processReceiptBytes(
   DateTime fallbackDate, {
   ReceiptScanCancelToken? cancel,
 }) async => null;
-
-/// Web: Nano never needs attention (scan UI hidden).
-Future<bool> nanoNeedsUserAttention(WidgetRef ref) async => false;

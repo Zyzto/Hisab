@@ -1,45 +1,24 @@
-import 'dart:ui' as ui;
 import 'dart:async';
-import 'package:feedback/feedback.dart';
-import 'package:flutter/foundation.dart';
+import 'dart:ui' as ui;
+
+import 'package:back_button_interceptor/back_button_interceptor.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:easy_localization/easy_localization.dart';
-import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
-import 'package:upgrader/upgrader.dart';
-import 'package:version/version.dart';
-import 'package:hisab_backend/hisab_backend.dart';
 import 'package:safaeh/safaeh.dart';
-import 'core/auth/auth_pending_finalize.dart';
-import 'core/auth/auth_providers.dart';
-import 'core/auth/oauth_callback_state.dart';
-import 'features/settings/widgets/change_password_sheet.dart';
-import 'core/database/database_providers.dart';
-import 'core/services/notification_service.dart';
+
+import 'core/build_env.dart';
+import 'core/celebration/celebration_host.dart';
 import 'core/debug/debug_menu.dart';
 import 'core/debug/integration_test_mode.dart';
-import 'core/update/app_update_helper.dart';
-import 'core/update/hisab_upgrader.dart';
-import 'core/update/update_check_providers.dart';
-import 'core/update/upgrader_messages.dart';
-import 'core/settings/providers/settings_framework_providers.dart';
-import 'core/theme/app_scroll_behavior.dart';
-import 'core/theme/theme_providers.dart';
 import 'core/layout/layout_breakpoints.dart';
 import 'core/motion/app_motion.dart';
 import 'core/navigation/app_router.dart';
-import 'core/navigation/invite_link_handler.dart';
-import 'core/navigation/last_route_restore.dart';
-import 'core/navigation/shell_nav_layout.dart';
-import 'core/services/connectivity_service.dart';
-import 'core/celebration/celebration_host.dart';
-import 'core/services/screenshot_report_prompt_host.dart';
-import 'core/build_env.dart';
+import 'core/theme/app_scroll_behavior.dart';
+import 'core/theme/theme_providers.dart';
 import 'core/widgets/back_button_keyboard_dismiss.dart';
-import 'features/transaction_scanner/providers/scanner_providers.dart';
-import 'core/widgets/toast.dart';
 
 class App extends ConsumerStatefulWidget {
   const App({super.key});
@@ -49,514 +28,202 @@ class App extends ConsumerStatefulWidget {
 }
 
 class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
-  late final HisabUpgrader _upgrader;
-
-  /// In release, defer UpgradeAlert until after first frame to avoid any
-  /// upgrader work blocking the first paint (splash can disappear).
-  bool _showUpgradeAlert = kDebugMode;
-
-  /// Hide debug FAB while the debug menu sheet is open so it doesn't obstruct it.
   bool _debugFabVisible = true;
-  bool _updateTriggerRegistered = false;
-  bool _manualUpdateCheckInFlight = false;
-  ProviderSubscription<bool>? _authSubscription;
-  StreamSubscription<CloudAuthState>? _authEventSubscription;
-  bool _passwordRecoverySheetOpen = false;
-  void Function(BuildContext context)? _updateCheckCallback;
-  VoidCallback? _clearOwnedUpdateCheckTrigger;
+  bool _debugMenuOpen = false;
+  GlobalKey<NavigatorState>? _debugMenuNavigatorKey;
+  Offset? _debugFabPosition;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _scheduleStartupKeyboardDismiss();
-    _upgrader = HisabUpgrader(
-      durationUntilAlertAgain: const Duration(days: 3),
-      debugLogging:
-          false, // use app-level aggregated log instead of package prints
-      messages: HisabUpgraderMessages(context: context),
-      willDisplayUpgrade:
-          ({
-            required bool display,
-            String? installedVersion,
-            UpgraderVersionInfo? versionInfo,
-          }) {
-            Log.debug(
-              'Upgrader (auto): store=${versionInfo?.appStoreVersion}, installed=$installedVersion, showDialog=$display',
-            );
-          },
+    BackButtonInterceptor.add(
+      _handleDebugMenuBack,
+      zIndex: 100,
+      name: 'hisab_debug_menu',
     );
-    _registerAuthListener();
-    _registerPasswordRecoveryListener();
-    // Keep long-lived services alive without rebuilding the whole App tree.
-    ref.listenManual(dataSyncServiceProvider, (_, _) {});
-    if (scannerAvailable) {
-      ref.listenManual(scannerControllerProvider, (_, _) {});
-    }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showPendingWebOAuthErrorIfAny();
-    });
-    if (!kDebugMode) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _showUpgradeAlert = true);
-      });
-    }
+    _scheduleStartupKeyboardDismiss();
   }
 
-  void _showPendingWebOAuthErrorIfAny([int attempt = 0]) {
-    final key = pendingWebOAuthCallbackError;
-    if (key == null || !mounted) return;
-    // App's own context sits above SafaehFeedbackHost; use the navigator.
-    final navContext = ref
-        .read(routerProvider)
-        .routerDelegate
-        .navigatorKey
-        .currentContext;
-    if (navContext == null || !navContext.mounted) {
-      if (attempt < 10) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _showPendingWebOAuthErrorIfAny(attempt + 1);
-        });
-      }
-      return;
-    }
-    pendingWebOAuthCallbackError = null;
-    navContext.showToast(key.tr());
+  @override
+  void dispose() {
+    BackButtonInterceptor.remove(_handleDebugMenuBack);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  bool _handleDebugMenuBack(bool stopDefaultButtonEvent, RouteInfo info) {
+    if (!_debugMenuOpen) return false;
+    final navigator = _debugMenuNavigatorKey?.currentState;
+    if (navigator == null) return true;
+    navigator.pop();
+    return true;
+  }
+
+  void _openDebugMenu(GlobalKey<NavigatorState> navigatorKey) {
+    if (!mounted) return;
+    setState(() {
+      _debugFabVisible = false;
+      _debugMenuOpen = true;
+      _debugMenuNavigatorKey = navigatorKey;
+    });
+  }
+
+  void _closeDebugMenu() {
+    if (!mounted) return;
+    setState(() {
+      _debugFabVisible = true;
+      _debugMenuOpen = false;
+      _debugMenuNavigatorKey = null;
+    });
+  }
+
+  void _moveDebugFab(Offset delta, Size viewport, bool isRtl) {
+    const fabExtent = 40.0;
+    const edgeMargin = 8.0;
+    final defaultPosition = Offset(
+      isRtl ? viewport.width - edgeMargin - fabExtent : edgeMargin,
+      viewport.height - 96 - fabExtent,
+    );
+    final current = _debugFabPosition ?? defaultPosition;
+    final maxLeft = (viewport.width - fabExtent - edgeMargin).clamp(
+      edgeMargin,
+      double.infinity,
+    );
+    final maxTop = (viewport.height - fabExtent - edgeMargin).clamp(
+      edgeMargin,
+      double.infinity,
+    );
+    final next = Offset(
+      (current.dx + delta.dx).clamp(edgeMargin, maxLeft).toDouble(),
+      (current.dy + delta.dy).clamp(edgeMargin, maxTop).toDouble(),
+    );
+    if (next != current) setState(() => _debugFabPosition = next);
   }
 
   void _scheduleStartupKeyboardDismiss() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _dismissKeyboardIfVisible();
-      // Some emulators/dev builds can restore IME visibility shortly after
-      // first frame (especially after restart). Retry once after a short delay.
+      _dismissKeyboard();
       Future<void>.delayed(const Duration(milliseconds: 250), () {
-        if (!mounted) return;
-        _dismissKeyboardIfVisible();
+        if (mounted) _dismissKeyboard();
       });
     });
   }
 
-  @override
-  void dispose() {
-    _clearOwnedUpdateCheckTrigger?.call();
-    _clearOwnedUpdateCheckTrigger = null;
-    _authSubscription?.close();
-    unawaited(_authEventSubscription?.cancel());
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.paused ||
-        state == AppLifecycleState.hidden ||
-        state == AppLifecycleState.detached ||
-        state == AppLifecycleState.resumed) {
-      _dismissKeyboardIfVisible();
-    }
-    // Also pin on inactive: Android often kills the process under the system
-    // camera before paused/detached is delivered.
-    if (state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.paused ||
-        state == AppLifecycleState.detached) {
-      _saveCurrentRoute();
-    } else if (state == AppLifecycleState.resumed) {
-      // Skip while camera/gallery pick is in flight (inactive→resumed flicker).
-      if (!hasPendingImagePick(ref)) {
-        _clearSavedRoute();
-      }
-    }
+  void _dismissKeyboard() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    unawaited(SystemChannels.textInput.invokeMethod<void>('TextInput.hide'));
   }
 
   @override
   void reassemble() {
     super.reassemble();
-    _dismissKeyboardIfVisible();
-  }
-
-  void _dismissKeyboardIfVisible() {
-    final focus = FocusManager.instance.primaryFocus;
-    final hadFocus = focus != null && focus.hasFocus;
-    if (focus != null && focus.hasFocus) {
-      focus.unfocus();
-    }
-    if (!hadFocus && !_hasVisibleImeInsets()) return;
-    // Hot reload keeps state by design; explicitly ask the platform to hide
-    // the IME so keyboards do not remain visible after reload/lifecycle hops.
-    unawaited(SystemChannels.textInput.invokeMethod<void>('TextInput.hide'));
-  }
-
-  bool _hasVisibleImeInsets() {
-    final views = WidgetsBinding.instance.platformDispatcher.views;
-    for (final view in views) {
-      if (view.viewInsets.bottom > 0) return true;
-    }
-    return false;
-  }
-
-  void _saveCurrentRoute() {
-    if (!mounted) return;
-    final path = ref
-        .read(routerProvider)
-        .routerDelegate
-        .currentConfiguration
-        .uri
-        .path;
-    persistLastRoutePath(ref, path);
-  }
-
-  void _clearSavedRoute() {
-    if (!mounted) return;
-    clearLastRoutePath(ref);
-  }
-
-  void _registerAuthListener() {
-    _authSubscription?.close();
-    _authSubscription = ref.listenManual<bool>(isAuthenticatedProvider, (
-      prev,
-      isAuth,
-    ) {
-      if (!mounted) return;
-      if (isAuth && prev != true) {
-        // Native warm resume after magic link / OAuth — main() does not re-run.
-        final settings = ref.read(hisabSettingsProvidersProvider);
-        if (settings != null) {
-          finalizePendingOnlineAuth(
-            controller: settings.controller,
-            hasSession: true,
-          );
-        }
-        if (ref.read(notificationsEnabledProvider)) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted) return;
-            unawaited(
-              ref
-                  .read(notificationServiceProvider.notifier)
-                  .initialize(context),
-            );
-          });
-        }
-      } else if (!isAuth && prev == true) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          unawaited(
-            ref.read(notificationServiceProvider.notifier).unregisterToken(),
-          );
-        });
-      }
-    }, fireImmediately: true);
-  }
-
-  /// Opens the set-a-new-password sheet when the user arrives from a recovery
-  /// link.
-  ///
-  /// Subscribing here rather than in `main()` is safe even on web, where the
-  /// event fires during startup before this widget exists: the backend's auth
-  /// stream replays past events to new listeners, so the recovery that happened
-  /// during the page load still reaches us.
-  void _registerPasswordRecoveryListener() {
-    if (!cloudAvailable) return;
-    _authEventSubscription = ref
-        .read(authServiceProvider)
-        .onAuthStateChange
-        .listen((state) {
-          if (state.event != CloudAuthEvent.passwordRecovery) return;
-          Log.info('Password recovery link opened');
-          _openPasswordRecoverySheet();
-        });
-  }
-
-  void _openPasswordRecoverySheet([int attempt = 0]) {
-    if (_passwordRecoverySheetOpen || !mounted) return;
-    // App's own context sits above the router; use the navigator's.
-    final navContext = ref
-        .read(routerProvider)
-        .routerDelegate
-        .navigatorKey
-        .currentContext;
-    if (navContext == null || !navContext.mounted) {
-      // On a cold start from the link there is no navigator yet.
-      if (attempt < 10) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _openPasswordRecoverySheet(attempt + 1);
-        });
-      }
-      return;
-    }
-    _passwordRecoverySheetOpen = true;
-    unawaited(
-      showChangePasswordSheet(
-        navContext,
-        ref,
-        mode: ChangePasswordMode.recovery,
-      ).whenComplete(() => _passwordRecoverySheetOpen = false),
-    );
-  }
-
-  void _registerUpdateCheckTrigger() {
-    if (_updateTriggerRegistered) return;
-    _updateTriggerRegistered = true;
-    _updateCheckCallback = (BuildContext context) {
-      if (_manualUpdateCheckInFlight) return;
-      _manualUpdateCheckInFlight = true;
-      Future<void>(() async {
-        try {
-          await _upgrader.updateVersionInfo();
-          if (!mounted) return;
-          final vi = _upgrader.versionInfo;
-          final pkg = _upgrader.state.packageInfo;
-          // When HisabUpgrader cleared versionInfo (store ≤ installed), show toast.
-          if (vi == null && _upgrader.lastCheckStoreNotNewer) {
-            if (context.mounted) context.showToast('no_update_available'.tr());
-            return;
-          }
-          // Don't show update dialog when store version is same or older (e.g. Play
-          // Store internal/closed/open testing returning same version).
-          if (vi != null &&
-              vi.appStoreVersion != null &&
-              pkg != null &&
-              pkg.version.isNotEmpty) {
-            try {
-              final installed = Version.parse(pkg.version);
-              if (vi.appStoreVersion! <= installed) {
-                if (context.mounted) {
-                  context.showToast('no_update_available'.tr());
-                }
-                return;
-              }
-            } catch (e) {
-              Log.debug('Version parse failed during update check', error: e);
-            }
-          }
-          _upgrader.updateState(
-            _upgrader.state.copyWith(debugDisplayAlways: true),
-          );
-          await Future.delayed(const Duration(milliseconds: 400));
-          if (!mounted) return;
-          final shouldShow = _upgrader.shouldDisplayUpgrade();
-          Log.debug(
-            'Upgrader (manual): store=${vi?.appStoreVersion}, installed=${vi?.installedVersion}, showDialog=$shouldShow',
-          );
-          if (!shouldShow && context.mounted) {
-            final msg = _upgrader.versionInfo == null
-                ? 'could_not_check_for_updates'.tr()
-                : 'no_update_available'.tr();
-            context.showToast(msg);
-          }
-        } catch (e, st) {
-          Log.warning(
-            'Upgrader (manual): failed to check for updates',
-            error: e,
-            stackTrace: st,
-          );
-          if (context.mounted) {
-            context.showToast('could_not_check_for_updates'.tr());
-          }
-        } finally {
-          _manualUpdateCheckInFlight = false;
-        }
-      });
-    };
-    final dynamic triggerHolder = ref.read(updateCheckTriggerProvider);
-    triggerHolder.callback = _updateCheckCallback;
-    _clearOwnedUpdateCheckTrigger = () {
-      if (identical(triggerHolder.callback, _updateCheckCallback)) {
-        triggerHolder.callback = null;
-      }
-    };
+    _dismissKeyboard();
   }
 
   Widget _buildDebugFab({
-    required bool isDebug,
-    required bool isRtl,
     required BuildContext context,
     required GoRouter router,
+    required bool isDebug,
+    required bool isRtl,
   }) {
     if (!isDebug || isIntegrationTestMode || !_debugFabVisible) {
       return const SizedBox.shrink();
     }
+    const fabExtent = 40.0;
+    const edgeMargin = 8.0;
+    final viewport = MediaQuery.sizeOf(context);
+    final maxLeft = (viewport.width - fabExtent - edgeMargin)
+        .clamp(edgeMargin, double.infinity)
+        .toDouble();
+    final maxTop = (viewport.height - fabExtent - edgeMargin)
+        .clamp(edgeMargin, double.infinity)
+        .toDouble();
+    final defaultPosition = Offset(
+      isRtl ? viewport.width - edgeMargin - fabExtent : edgeMargin,
+      viewport.height - 96 - fabExtent,
+    );
+    final position = _debugFabPosition ?? defaultPosition;
     return Positioned(
-      bottom: 96,
-      left: isRtl ? null : 8,
-      right: isRtl ? 8 : null,
+      left: position.dx.clamp(edgeMargin, maxLeft).toDouble(),
+      top: position.dy.clamp(edgeMargin, maxTop).toDouble(),
       child: DebugMenuFab(
-        upgrader: _upgrader,
         navigatorKey: router.routerDelegate.navigatorKey,
         localeContext: context,
-        onBeforeOpen: () => setState(() => _debugFabVisible = false),
-        whenSheetClosed: () => setState(() => _debugFabVisible = true),
+        onBeforeOpen: () => _openDebugMenu(router.routerDelegate.navigatorKey),
+        whenSheetClosed: _closeDebugMenu,
+        onDragDelta: (delta) => _moveDebugFab(delta, viewport, isRtl),
       ),
     );
   }
 
-  Widget _buildRootContent({
-    required BuildContext context,
-    required Widget contentWithSyncIndicator,
-    required bool isDebug,
-    required bool isRtl,
-    required GoRouter router,
-  }) {
-    final debugFab = _buildDebugFab(
-      isDebug: isDebug,
-      isRtl: isRtl,
-      context: context,
-      router: router,
-    );
-    final rootChild = _showUpgradeAlert
-        ? UpgradeAlert(
-            navigatorKey: router.routerDelegate.navigatorKey,
-            upgrader: _upgrader,
-            onUpdate: () {
-              if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-                handleAndroidUpdateThenStore(_upgrader);
-                return false;
-              }
-              return true;
-            },
-            child: contentWithSyncIndicator,
-          )
-        : contentWithSyncIndicator;
-    return Stack(children: [rootChild, debugFab]);
-  }
-
   @override
   Widget build(BuildContext context) {
-    _registerUpdateCheckTrigger();
     final router = ref.watch(routerProvider);
     final themes = ref.watch(appThemesProvider);
     final themeMode = ref.watch(appThemeModeProvider);
     final suppressThemeLerp = ref.watch(suppressThemeLerpProvider);
 
-    // Locale is read exclusively from EasyLocalization (context.locale) so that
-    // locale: and localizationsDelegates always come from the same frame.
-    // _LocaleSync (in main.dart) bridges languageProvider → context.setLocale.
-    final feedbackTheme = FeedbackThemeData(
-      background: themes.light.colorScheme.surfaceContainerHighest,
-      feedbackSheetColor: themes.light.colorScheme.surface,
-      drawColors: [
-        themes.light.colorScheme.primary,
-        themes.light.colorScheme.secondary,
-        themes.light.colorScheme.tertiary,
-      ],
-    );
-    return BetterFeedback(
-      theme: feedbackTheme,
-      localizationsDelegates: [
-        ...context.localizationDelegates,
-        GlobalFeedbackLocalizationsDelegate(),
-      ],
-      localeOverride: context.locale,
-      child: InviteLinkHandler(
-        ref: ref,
-        child: ScreenshotReportPromptHost(
-          child: CelebrationHost(
-            child: SafaehFeedbackHost(
-              itemWidthBuilder: (context) =>
-                  LayoutBreakpoints.isTabletOrWider(context)
-                  ? LayoutBreakpoints.sheetDialogMaxWidth
-                  : (MediaQuery.sizeOf(context).width - 32).clamp(
-                      0.0,
-                      LayoutBreakpoints.sheetDialogMaxWidth,
-                    ),
-              bottomInsetBuilder: ShellNavLayout.feedbackBottomInset,
-              child: SafaehTheme(
-                data: const SafaehThemeData(
-                  tabletBreakpoint: LayoutBreakpoints.breakpointTablet,
-                  dialogMaxWidth: LayoutBreakpoints.sheetDialogMaxWidth,
-                  motion: AppMotion.modal,
-                  enterCurve: AppMotion.enterCurve,
-                  compactNavWidth: LayoutBreakpoints.shellNavWidthCompact,
-                  expandedNavWidth: LayoutBreakpoints.shellNavWidth,
-                  navMotion: AppMotion.shellNav,
-                  sheetRoll: AppMotion.sheetRoll,
-                  sheetRollEnter: AppMotion.sheetRollEnter,
-                  exitCurve: AppMotion.exitCurve,
-                  contentMaxWidth: LayoutBreakpoints.contentMaxWidthTablet,
-                  floatingAppearance: SafaehFloatingAppearance(
-                    style: SafaehFloatingSurfaceStyle.glass,
-                  ),
-                ),
-                child: MaterialApp.router(
-                  title: appNameTranslationKey.tr(),
-                  debugShowCheckedModeBanner: false,
-                  scrollBehavior: AppScrollBehavior(),
-                  localizationsDelegates: context.localizationDelegates,
-                  supportedLocales: context.supportedLocales,
-                  locale: context.locale,
-                  builder: (context, child) {
-                    final isRtl = context.locale.languageCode == 'ar';
-                    final isDebug = ref.watch(showDebugMenuProvider);
-                    final innerContent = BackButtonKeyboardDismiss(
-                      child: GestureDetector(
-                        onTap: () =>
-                            FocusManager.instance.primaryFocus?.unfocus(),
-                        behavior: HitTestBehavior.deferToChild,
-                        child: Directionality(
-                          textDirection: isRtl
-                              ? ui.TextDirection.rtl
-                              : ui.TextDirection.ltr,
-                          child: child ?? const SizedBox.shrink(),
-                        ),
-                      ),
-                    );
-                    final contentWithSyncIndicator = Stack(
-                      children: [
-                        Positioned.fill(child: innerContent),
-                        const Positioned(
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          child: _SyncProgressLine(),
-                        ),
-                      ],
-                    );
-                    // In release, first frame paints without UpgradeAlert to avoid
-                    // any upgrader init blocking splash removal.
-                    return _buildRootContent(
-                      context: context,
-                      contentWithSyncIndicator: contentWithSyncIndicator,
-                      isDebug: isDebug,
-                      isRtl: isRtl,
-                      router: router,
-                    );
-                  },
-                  theme: themes.light,
-                  darkTheme: themes.dark,
-                  themeMode: themeMode,
-                  themeAnimationDuration: suppressThemeLerp
-                      ? Duration.zero
-                      : kThemeAnimationDuration,
-                  routerConfig: router,
-                ),
-              ),
-            ),
-          ),
+    return SafaehTheme(
+      data: const SafaehThemeData(
+        tabletBreakpoint: LayoutBreakpoints.breakpointTablet,
+        dialogMaxWidth: LayoutBreakpoints.sheetDialogMaxWidth,
+        motion: AppMotion.modal,
+        enterCurve: AppMotion.enterCurve,
+        compactNavWidth: LayoutBreakpoints.shellNavWidthCompact,
+        expandedNavWidth: LayoutBreakpoints.shellNavWidth,
+        navMotion: AppMotion.shellNav,
+        sheetRoll: AppMotion.sheetRoll,
+        sheetRollEnter: AppMotion.sheetRollEnter,
+        exitCurve: AppMotion.exitCurve,
+        contentMaxWidth: LayoutBreakpoints.contentMaxWidthTablet,
+        floatingAppearance: SafaehFloatingAppearance(
+          style: SafaehFloatingSurfaceStyle.glass,
         ),
       ),
-    );
-  }
-}
-
-/// Sync progress line that watches [syncStatusForDisplayProvider] so only this
-/// widget rebuilds when sync status changes, not the rest of the app (avoids
-/// overlay/dialog rebuild and focus loss when sync completes).
-class _SyncProgressLine extends ConsumerWidget {
-  const _SyncProgressLine();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final syncStatus = ref.watch(syncStatusForDisplayProvider);
-    if (syncStatus != SyncStatus.syncing) return const SizedBox.shrink();
-    return SafeArea(
-      bottom: false,
-      child: SizedBox(
-        height: 3,
-        child: LinearProgressIndicator(
-          backgroundColor: Theme.of(
-            context,
-          ).colorScheme.surfaceContainerHighest,
+      child: CelebrationHost(
+        child: MaterialApp.router(
+          title: appNameTranslationKey.tr(),
+          debugShowCheckedModeBanner: false,
+          scrollBehavior: AppScrollBehavior(),
+          localizationsDelegates: context.localizationDelegates,
+          supportedLocales: context.supportedLocales,
+          locale: context.locale,
+          builder: (context, child) {
+            final isRtl = context.locale.languageCode == 'ar';
+            final isDebug = ref.watch(showDebugMenuProvider);
+            final content = BackButtonKeyboardDismiss(
+              child: GestureDetector(
+                onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+                behavior: HitTestBehavior.deferToChild,
+                child: Directionality(
+                  textDirection: isRtl
+                      ? ui.TextDirection.rtl
+                      : ui.TextDirection.ltr,
+                  child: child ?? const SizedBox.shrink(),
+                ),
+              ),
+            );
+            return Stack(
+              children: [
+                Positioned.fill(child: content),
+                _buildDebugFab(
+                  context: context,
+                  router: router,
+                  isDebug: isDebug,
+                  isRtl: isRtl,
+                ),
+              ],
+            );
+          },
+          theme: themes.light,
+          darkTheme: themes.dark,
+          themeMode: themeMode,
+          themeAnimationDuration: suppressThemeLerp
+              ? Duration.zero
+              : kThemeAnimationDuration,
+          routerConfig: router,
         ),
       ),
     );

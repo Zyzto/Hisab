@@ -2,7 +2,7 @@ import 'pwa_capability_logic.dart';
 
 export 'pwa_capability_logic.dart';
 
-/// Non-web defaults: no install banner, notifications handled by the OS.
+/// Non-web defaults: no install banner is needed.
 bool get isPwaStandalone => true;
 
 bool get isPwaIos => false;
@@ -20,13 +20,6 @@ PwaInstallMode get pwaInstallMode => resolvePwaInstallMode(
   isIos: isPwaIos,
   isAndroid: isPwaAndroid,
 );
-
-PwaNotificationSupport get pwaNotificationSupport =>
-    resolvePwaNotificationSupport(
-      notificationApiAvailable: true,
-      isIos: isPwaIos,
-      isStandalone: isPwaStandalone,
-    );
 
 /// No-op outside web.
 Future<bool> promptPwaInstall() async => false;

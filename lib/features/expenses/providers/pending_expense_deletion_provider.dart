@@ -67,7 +67,7 @@ class PendingExpenseDeletionController extends Notifier<Set<String>> {
 
     try {
       // Read the current repository at commit time. If the user changed
-      // account mode or connectivity during the Undo window, the mutation
+      // local storage state during the Undo window, the mutation
       // follows the mode that is active when it becomes irreversible.
       await ref.read(expenseRepositoryProvider).delete(operation.expenseId);
       if (!identical(_pending[operation.expenseId], operation)) return;

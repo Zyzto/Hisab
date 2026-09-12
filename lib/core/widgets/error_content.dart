@@ -12,8 +12,6 @@ const LoadingContent = Center(child: CircularProgressIndicator());
 /// Shared error content for async/error states. Shows icon, optional title,
 /// message, optional retry button, and Share/Report issue actions.
 /// Use with [AsyncValue.when] error builder or anywhere a consistent error UI is needed.
-/// Parents that build this with [message]/[details] should call [sendErrorTelemetryIfOnline]
-/// once when showing the error if telemetry when online is desired.
 class ErrorContentWidget extends StatelessWidget {
   const ErrorContentWidget({
     super.key,
@@ -41,10 +39,10 @@ class ErrorContentWidget extends StatelessWidget {
   /// Optional raw details for Share/Report payload (e.g. full error.toString()).
   final String? details;
 
-  /// Optional stack trace for Report issue body.
+  /// Optional stack trace for the diagnostic body.
   final StackTrace? stackTrace;
 
-  /// Optional English line for Share / GitHub (e.g. provider or API context).
+  /// Optional English line for the diagnostic body.
   final String? summaryEnglish;
 
   @override
@@ -105,7 +103,7 @@ class ErrorContentWidget extends StatelessWidget {
                 label: Text('share'.tr()),
               ),
               FilledButton.tonalIcon(
-                onPressed: () => openErrorReportGitHubIssue(
+                onPressed: () => copyErrorReportToClipboard(
                   context,
                   message: displayMessage,
                   details: details,

@@ -2,7 +2,6 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/motion/app_motion.dart';
-import '../../../core/platform/network_image_decode.dart';
 import '../constants/expense_form_constants.dart';
 import 'expense_photo_gallery.dart';
 
@@ -210,46 +209,19 @@ class _PhotoThumbnail extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     Widget image;
-    final thumbDecode = NetworkImageDecode.cacheSizePreserveAspect(
-      context,
-      logicalMaxEdge: 80,
-    );
     if (item.bytes != null) {
       image = Image.memory(
         item.bytes!,
         fit: BoxFit.cover,
         width: 80,
         height: 80,
-        cacheWidth: thumbDecode.width,
         gaplessPlayback: true,
       );
     } else if (item.url != null && item.url!.isNotEmpty) {
-      image = Image.network(
-        item.url!,
-        fit: BoxFit.cover,
-        width: 80,
-        height: 80,
-        cacheWidth: thumbDecode.width,
-        gaplessPlayback: true,
-        loadingBuilder: (_, child, progress) {
-          if (progress == null) return child;
-          return const SizedBox(
-            width: 80,
-            height: 80,
-            child: Center(
-              child: SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
-          );
-        },
-        errorBuilder: (_, Object o, StackTrace? s) => const SizedBox(
+      image = const SizedBox(
           width: 80,
           height: 80,
           child: Icon(Icons.broken_image_outlined),
-        ),
       );
     } else {
       image = const SizedBox(width: 80, height: 80);

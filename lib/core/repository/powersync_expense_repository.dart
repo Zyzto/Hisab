@@ -6,18 +6,8 @@ part of 'powersync_repository.dart';
 
 class PowerSyncExpenseRepository implements IExpenseRepository {
   final PowerSyncDatabase _db;
-  final CloudBackend? _cloud;
-  final bool _isOnline;
-  final bool _isLocalOnly;
 
-  PowerSyncExpenseRepository(
-    this._db, {
-    CloudBackend? cloud,
-    bool isOnline = false,
-    bool isLocalOnly = true,
-  }) : _cloud = cloud,
-       _isOnline = isOnline,
-       _isLocalOnly = isLocalOnly;
+  PowerSyncExpenseRepository(this._db);
 
   @override
   Future<List<Expense>> getAll() async {
@@ -130,21 +120,6 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
       'updated_at': now,
     };
 
-    if (!_isLocalOnly && _isOnline && _cloud != null) {
-      // Online: write to Supabase first
-      await _cloud.sync.upsert('expenses', data);
-    } else if (!_isLocalOnly && !_isOnline) {
-      // Online mode but temporarily offline: queue for later push
-      await _enqueue(
-        _db,
-        tableName: 'expenses',
-        operation: 'insert',
-        rowId: id,
-        data: data,
-      );
-    }
-
-    // Always write to local DB
     await _db.execute(
       '''INSERT INTO expenses (id, group_id, payer_participant_id, amount_cents,
         currency_code, exchange_rate, base_amount_cents,
@@ -208,59 +183,6 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
     final imagePathsJson = imagePaths != null ? jsonEncode(imagePaths) : null;
     final currencyCode = expense.currencyCode.trim().toUpperCase();
 
-    if (!_isLocalOnly && _isOnline && _cloud != null) {
-      await _cloud.sync.update('expenses', {
-        'title': title,
-        'amount_cents': expense.amountCents,
-        'currency_code': currencyCode,
-        'exchange_rate': expense.exchangeRate,
-        'base_amount_cents': expense.baseAmountCents,
-        'payer_participant_id': expense.payerParticipantId,
-        'description': expense.description,
-        'date': expense.date.toUtc().toIso8601String(),
-        'split_type': expense.splitType.name,
-        'split_shares_json': splitSharesJson,
-        'household_split_snapshot_json': householdSplitSnapshotJson,
-        'type': expense.transactionType.name,
-        'to_participant_id': expense.toParticipantId,
-        'tag': expense.tag,
-        'line_items_json': lineItemsJson,
-        'image_path': imagePath,
-        'image_paths': imagePathsJson,
-        'updated_at': now,
-      }, expense.id);
-    } else if (_shouldQueueOffline(
-      isLocalOnly: _isLocalOnly,
-      isOnline: _isOnline,
-    )) {
-      await _enqueue(
-        _db,
-        tableName: 'expenses',
-        operation: 'update',
-        rowId: expense.id,
-        data: {
-          'title': title,
-          'amount_cents': expense.amountCents,
-          'currency_code': currencyCode,
-          'exchange_rate': expense.exchangeRate,
-          'base_amount_cents': expense.baseAmountCents,
-          'payer_participant_id': expense.payerParticipantId,
-          'description': expense.description,
-          'date': expense.date.toUtc().toIso8601String(),
-          'split_type': expense.splitType.name,
-          'split_shares_json': splitSharesJson,
-          'household_split_snapshot_json': householdSplitSnapshotJson,
-          'type': expense.transactionType.name,
-          'to_participant_id': expense.toParticipantId,
-          'tag': expense.tag,
-          'line_items_json': lineItemsJson,
-          'image_path': imagePath,
-          'image_paths': imagePathsJson,
-          'updated_at': now,
-        },
-      );
-    }
-
     await _db.execute(
       '''UPDATE expenses SET
         title = ?, amount_cents = ?, currency_code = ?,
@@ -296,19 +218,6 @@ class PowerSyncExpenseRepository implements IExpenseRepository {
 
   @override
   Future<void> delete(String id) async {
-    if (!_isLocalOnly && _isOnline && _cloud != null) {
-      await _cloud.sync.delete('expenses', id);
-    } else if (_shouldQueueOffline(
-      isLocalOnly: _isLocalOnly,
-      isOnline: _isOnline,
-    )) {
-      await _enqueue(
-        _db,
-        tableName: 'expenses',
-        operation: 'delete',
-        rowId: id,
-      );
-    }
     await _db.execute('DELETE FROM expenses WHERE id = ?', [id]);
   }
 }

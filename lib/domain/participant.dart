@@ -1,7 +1,7 @@
 /// Domain entity: a participant in a group.
 ///
 /// A participant can be:
-/// - Linked to an auth user ([userId] != null) — auto-created when a member joins.
+/// - Linked to a local participant identity ([userId] != null) when available.
 /// - Standalone (no [userId]) — a non-person entity like "Cash" or "Hotel",
 ///   or a friend who doesn't have the app.
 class Participant {
@@ -10,7 +10,7 @@ class Participant {
   final String name;
   final int order;
 
-  /// Auth user id this participant belongs to. Null for standalone participants.
+  /// Legacy account identifier, when present. Null for standalone participants.
   final String? userId;
 
   /// Avatar identifier (matches a key in [predefinedAvatars]).

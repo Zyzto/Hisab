@@ -1,62 +1,34 @@
-import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:hisab_backend/hisab_backend.dart';
 
 import '../database/database_providers.dart';
-import '../services/connectivity_service.dart';
-import '../settings/providers/settings_framework_providers.dart';
 import 'group_repository.dart';
-import 'group_member_repository.dart';
-import 'group_invite_repository.dart';
 import 'participant_repository.dart';
 import 'expense_repository.dart';
+import 'group_member_repository.dart';
 import 'tag_repository.dart';
 import 'powersync_repository.dart';
 import 'household_balance_reassignment_repository.dart';
 
 part 'repository_providers.g.dart';
 
-/// The backend when this build has one and the user has not opted into
-/// local-only mode. Null makes every repository take its offline path.
-CloudBackend? _backendIfOnline(bool localOnly) =>
-    localOnly ? null : cloudBackend;
-
 @riverpod
 IGroupRepository groupRepository(Ref ref) {
-  final localOnly = ref.watch(effectiveLocalOnlyProvider);
-  final isOnline = ref.watch(connectivityProvider);
-  Log.debug(
-    'Providing group repository (localOnly=$localOnly, online=$isOnline)',
-  );
   return PowerSyncGroupRepository(
     ref.watch(powerSyncDatabaseProvider),
-    cloud: _backendIfOnline(localOnly),
-    isOnline: isOnline,
-    isLocalOnly: localOnly,
   );
 }
 
 @riverpod
 IParticipantRepository participantRepository(Ref ref) {
-  final localOnly = ref.watch(effectiveLocalOnlyProvider);
-  final isOnline = ref.watch(connectivityProvider);
   return PowerSyncParticipantRepository(
     ref.watch(powerSyncDatabaseProvider),
-    cloud: _backendIfOnline(localOnly),
-    isOnline: isOnline,
-    isLocalOnly: localOnly,
   );
 }
 
 @riverpod
 IExpenseRepository expenseRepository(Ref ref) {
-  final localOnly = ref.watch(effectiveLocalOnlyProvider);
-  final isOnline = ref.watch(connectivityProvider);
   return PowerSyncExpenseRepository(
     ref.watch(powerSyncDatabaseProvider),
-    cloud: _backendIfOnline(localOnly),
-    isOnline: isOnline,
-    isLocalOnly: localOnly,
   );
 }
 
@@ -64,44 +36,19 @@ IExpenseRepository expenseRepository(Ref ref) {
 IHouseholdBalanceReassignmentRepository householdBalanceReassignmentRepository(
   Ref ref,
 ) {
-  final localOnly = ref.watch(effectiveLocalOnlyProvider);
-  final isOnline = ref.watch(connectivityProvider);
   return PowerSyncHouseholdBalanceReassignmentRepository(
     ref.watch(powerSyncDatabaseProvider),
-    cloud: _backendIfOnline(localOnly),
-    isOnline: isOnline,
-    isLocalOnly: localOnly,
   );
 }
 
 @riverpod
 ITagRepository tagRepository(Ref ref) {
-  final localOnly = ref.watch(effectiveLocalOnlyProvider);
-  final isOnline = ref.watch(connectivityProvider);
   return PowerSyncTagRepository(
     ref.watch(powerSyncDatabaseProvider),
-    cloud: _backendIfOnline(localOnly),
-    isOnline: isOnline,
-    isLocalOnly: localOnly,
   );
 }
 
 @riverpod
 IGroupMemberRepository groupMemberRepository(Ref ref) {
-  final localOnly = ref.watch(effectiveLocalOnlyProvider);
-  return PowerSyncGroupMemberRepository(
-    ref.watch(powerSyncDatabaseProvider),
-    isLocalOnly: localOnly,
-  );
-}
-
-@riverpod
-IGroupInviteRepository groupInviteRepository(Ref ref) {
-  return PowerSyncGroupInviteRepository(
-    ref.watch(powerSyncDatabaseProvider),
-    // Invite token lookup is needed to route readonly invite previews even
-    // when account mode is currently local-only. Mutating invite actions still
-    // enforce authentication/online at repository method level.
-    cloud: cloudBackend,
-  );
+  return PowerSyncGroupMemberRepository(ref.watch(powerSyncDatabaseProvider));
 }

@@ -90,23 +90,6 @@ PwaInstallMode get pwaInstallMode => resolvePwaInstallMode(
   isAndroid: isPwaAndroid,
 );
 
-PwaNotificationSupport get pwaNotificationSupport {
-  var notificationApiAvailable = false;
-  try {
-    // Throws if Notification is unavailable in this browser.
-    final _ = web.Notification.permission;
-    notificationApiAvailable = true;
-  } catch (_) {
-    notificationApiAvailable = false;
-  }
-
-  return resolvePwaNotificationSupport(
-    notificationApiAvailable: notificationApiAvailable,
-    isIos: isPwaIos,
-    isStandalone: isPwaStandalone,
-  );
-}
-
 Future<bool> promptPwaInstall() async {
   _ensureJsBridge();
   final api = _hisabPwa;

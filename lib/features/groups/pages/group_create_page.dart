@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
-import '../../../core/auth/auth_providers.dart';
 import '../../../core/celebration/celebration_controller.dart';
 import '../../../core/celebration/celebration_kind.dart';
 import '../../../core/layout/content_aligned_app_bar.dart';
@@ -18,7 +17,6 @@ import '../../../core/navigation/nav_back.dart';
 import '../../../core/navigation/route_paths.dart';
 import '../../../core/navigation/route_transition_ready.dart';
 import '../../../core/platform/ui_perf.dart';
-import '../../../core/telemetry/telemetry_service.dart';
 import '../../../core/theme/theme_config.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/currency_helpers.dart';
@@ -564,7 +562,6 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
         'Group create failed',
         context: context,
         errorToastMessage: 'create_group_failed'.tr(),
-        ref: ref,
       );
       if (id == null) return;
       // Keep the directory tree even when household counting is switched off
@@ -615,16 +612,6 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
       Log.info(
         'Group created via wizard: id=$id name="$name" currency=$currencyCode participants=${orderedDraftPeople.length + 1}',
       );
-      try {
-        await TelemetryService.sendEvent('group_created', {
-          'groupId': id,
-          'currencyCode': currencyCode,
-          'participantCount': orderedDraftPeople.length + 1,
-          'hasIcon': _selectedIcon != null,
-        }, enabled: ref.read(telemetryEnabledProvider));
-      } catch (e) {
-        Log.debug('Telemetry group_created failed', error: e);
-      }
       await fireCelebration(
         ref,
         widget.isPersonal
@@ -1119,11 +1106,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
   Widget _buildDirectoryEditor(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final profile = ref.watch(authUserProfileProvider).value;
-    final profileName = profile?.name?.trim();
-    final ownerName = (profileName != null && profileName.isNotEmpty)
-        ? profileName
-        : 'wizard_you'.tr();
+    final ownerName = 'wizard_you'.tr();
     final owner = _DraftPerson(
       id: _draftOwnerId,
       name: ownerName,
@@ -1187,7 +1170,7 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
             context,
             owner,
             depth: 0,
-            avatarId: profile?.avatarId,
+            avatarId: null,
             isOwner: true,
           ),
           for (final person in _draftPeople.where(
@@ -1687,25 +1670,29 @@ class _GroupCreatePageState extends ConsumerState<GroupCreatePage>
     required bool dense,
     required ValueChanged<bool> onChanged,
   }) {
-    return SwitchListTile(
-      contentPadding: EdgeInsets.zero,
-      dense: dense,
-      visualDensity: dense ? VisualDensity.compact : VisualDensity.standard,
-      title: Text(titleKey.tr(), maxLines: 3, overflow: TextOverflow.ellipsis),
-      value: value,
-      onChanged: onChanged,
+    // ListTile paints its tile color and ink on the nearest Material. The
+    // permissions panel itself is a decorated surface, so give each row its
+    // own transparent Material layer to keep ripples visible without
+    // changing the panel background.
+    return Material(
+      color: Colors.transparent,
+      child: SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        dense: dense,
+        visualDensity: dense ? VisualDensity.compact : VisualDensity.standard,
+        title: Text(
+          titleKey.tr(),
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+        ),
+        value: value,
+        onChanged: onChanged,
+      ),
     );
   }
 
   /// Owner display name for the treasurer picker (create-time, before save).
   String _ownerTreasurerLabel() {
-    final user = ref.read(authServiceProvider).currentUser;
-    final raw =
-        user?.metadata['display_name'] as String? ??
-        user?.fullName ??
-        user?.email;
-    final trimmed = raw?.trim();
-    if (trimmed != null && trimmed.isNotEmpty) return trimmed;
     return 'default_owner_name'.tr();
   }
 

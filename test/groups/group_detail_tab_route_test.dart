@@ -37,39 +37,14 @@ void main() {
         ),
         isNull,
       );
-      expect(
-        groupDetailTabIndexFromPath(
-          path: '/invite/tok/preview/balance',
-          groupId: 'g1',
-          readOnlyPreview: true,
-          previewToken: 'tok',
-        ),
-        1,
-      );
     });
   });
 
   group('RoutePaths URL sync helpers', () {
-    test('builds invite preview tab paths', () {
-      expect(
-        RoutePaths.invitePreviewExpenses('tok'),
-        '/invite/tok/preview/expenses',
-      );
-      expect(
-        RoutePaths.invitePreviewBalance('tok'),
-        '/invite/tok/preview/balance',
-      );
-      expect(
-        RoutePaths.invitePreviewPeople('tok'),
-        '/invite/tok/preview/people',
-      );
-    });
-
     test('builds onboarding step paths', () {
       expect(RoutePaths.onboardingWelcome, '/onboarding/welcome');
       expect(RoutePaths.onboardingPreferences, '/onboarding/preferences');
       expect(RoutePaths.onboardingPermissions, '/onboarding/permissions');
-      expect(RoutePaths.onboardingConnect, '/onboarding/connect');
     });
 
     test('builds group-create step paths', () {
@@ -113,7 +88,6 @@ void main() {
       expect(onboardingStepFromPath('/onboarding/welcome'), 0);
       expect(onboardingStepFromPath('/onboarding/preferences'), 1);
       expect(onboardingStepFromPath('/onboarding/permissions'), 2);
-      expect(onboardingStepFromPath('/onboarding/connect'), 3);
       expect(onboardingStepFromPath('/home'), isNull);
     });
 

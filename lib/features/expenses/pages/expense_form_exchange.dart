@@ -39,21 +39,10 @@ mixin _ExpenseFormExchangeMixin on ConsumerState<ExpenseFormPage> {
   Future<void> _fetchLiveRate() async {
     setState(() => _fetchingRate = true);
     try {
-      final service = ExchangeRateService();
-      final rate = await service.getRate(
-        _exchangeForm._currencyCode,
-        _exchangeForm._groupCurrencyCode,
-      );
-      if (!mounted) return;
-      if (rate != null && rate > 0) {
-        setState(() {
-          _exchangeRate = rate;
-          _exchangeRateController.text = rate.toStringAsFixed(4);
-          _recalcBaseAmount();
-        });
-      }
-    } catch (e) {
-      Log.debug('Exchange rate fetch failed: $e');
+      // The public build is offline-only. Keep the manual rate and do not
+      // pretend that an automatic quote is available.
+      await Future<void>.delayed(Duration.zero);
+      if (mounted) _recalcBaseAmount();
     } finally {
       if (mounted) setState(() => _fetchingRate = false);
     }

@@ -40,7 +40,7 @@ class FilteredExpenseRow {
   final bool showManageMenu;
 
   /// When true (sheet/dialog), dismiss the overlay before pushing a route.
-  /// Must stay false for in-page lists (e.g. profile) or back would pop the page.
+  /// Must stay false for in-page lists or back would pop the page.
   final bool popOverlayBeforeNavigate;
 }
 
@@ -89,7 +89,7 @@ Future<void> showFilteredExpensesSheet({
   );
 }
 
-/// Scrollable expense list matching profile / group expense tile styling.
+/// Scrollable expense list matching group expense tile styling.
 class FilteredExpensesList extends StatelessWidget {
   const FilteredExpensesList({
     super.key,

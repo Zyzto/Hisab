@@ -1,214 +1,76 @@
-# Release setup (FOSS build)
+# Release setup
 
-<!-- markdownlint-disable MD031 MD040 MD060 -->
+This repository releases the public local-only application for Android, iOS,
+and web. It has no runtime service credentials.
 
-This is the manual setup behind `.github/workflows/release.yml`, the pipeline
-that ships the **FOSS** variant of Hisab from this repository. It does exactly
-two things: build signed per-ABI APKs from a tree with no backend, and attach
-them to a draft GitHub Release.
+The public release uses the `foss` flavor.
 
-It has no Play Store upload, no Firebase deploy, and no production credentials.
-The cloud build is produced by a separate private pipeline that attaches its
-artifacts to the same release; nothing here can reach it.
+## Prerequisites
 
-If you forked Hisab and run your own backend, this is also the pipeline to copy
-— you would add your own defines and signing to it.
+- Flutter version from .flutter-version;
+- JDK and Android SDK for Android builds;
+- an Apple signing environment for iOS;
+- a signing keystore for distributable Android builds.
 
----
+## Android signing
 
-## 1. Prerequisites
+Generate a keystore once and keep it outside the repository:
 
-- A fork or clone of this repository on GitHub.
-- `keytool` (ships with the JDK).
+    keytool -genkeypair -keystore foss-keystore.jks -alias hisab-foss -keyalg RSA -keysize 2048
 
-That is all. There is no account to create, because there is no service to
-deploy to.
+Create a gitignored android/key.properties for local signing. CI accepts
+FOSS_KEYSTORE_BASE64, FOSS_KEYSTORE_PASSWORD, FOSS_KEY_ALIAS, and
+FOSS_KEY_PASSWORD. Never commit any of these values.
 
----
+Build the only public Android flavor:
 
-## 2. Generate an Android release keystore
+    bash scripts/ci/build_android.sh release
 
-Run once, locally. **Keep the `.jks` safe** — Android identifies an app by its
-signature, so losing it means users cannot upgrade in place and must uninstall
-first.
+## Web
 
-```bash
-keytool -genkeypair \
-  -v \
-  -keystore foss-keystore.jks \
-  -keyalg RSA \
-  -keysize 2048 \
-  -validity 10000 \
-  -alias hisab-foss \
-  -storepass YOUR_STORE_PASSWORD \
-  -keypass YOUR_KEY_PASSWORD
-```
+    bash scripts/ci/build_web.sh
 
-Fill in the name and organisation prompts; they end up in the certificate but
-are not shown to users.
+The script prepares local database assets, builds Flutter web, and stages the
+privacy, data-deletion, feature, image, and PWA files.
 
-| Value | What to remember |
-|-------|-----------------|
-| File  | `foss-keystore.jks` |
-| Alias | `hisab-foss` |
-| Store password | The `-storepass` value |
-| Key password   | The `-keypass` value |
+## Store listing legal links
 
-> Never commit the keystore or its passwords. `android/.gitignore` already
-> excludes `*.jks` and `key.properties`, and `scripts/verify_security.sh`
-> fails the build if one is tracked.
+Use these public URLs in the Google Play and Apple App Store listings:
 
----
+- Privacy policy: `https://hisab.shenepoy.com/privacy/`
+- Data deletion: `https://hisab.shenepoy.com/delete-account/`
 
-## 3. Base64-encode the keystore
+The deletion page explains that this local-only app creates no account and
+gives the exact steps for removing local records, backups, and app storage.
 
-GitHub secrets hold text only.
+## iOS
 
-```bash
-base64 -w 0 foss-keystore.jks     # Linux
-base64 -i foss-keystore.jks | tr -d '\n'   # macOS
-```
+Validate the unsigned local build on macOS with Xcode installed:
 
-The output is the value for `FOSS_KEYSTORE_BASE64`. In CI,
-`scripts/ci/decode_keystore.sh` turns it back into a keystore and writes
-`android/key.properties`.
+    bash scripts/ci/build_ios.sh
 
----
+The CI guard performs this build without signing credentials. App Store
+signing and upload remain release-operator steps in Xcode or App Store
+Connect.
 
-## 4. Add the secrets
+## Pre-release checks
 
-**Settings → Secrets and variables → Actions → New repository secret.**
+    bash scripts/run_release_checks.sh
+    flutter test
 
-| Secret name | Value |
-|-------------|-------|
-| `FOSS_KEYSTORE_BASE64` | Output from step 3 |
-| `FOSS_KEYSTORE_PASSWORD` | Store password from step 2 |
-| `FOSS_KEY_ALIAS` | Key alias, e.g. `hisab-foss` |
-| `FOSS_KEY_PASSWORD` | Key password from step 2 |
+The release workflow builds the FOSS APKs and creates a draft release. Publish
+only after checking the generated artifacts and localized static pages.
 
-Four secrets, all signing material, none of which grants access to anything but
-the ability to sign an APK with this identity. If the workflow runs without
-them, the build falls back to debug signing and produces an APK that is fine
-for testing and unsuitable for distribution.
+Before publishing, confirm that the artifact set contains only the local
+application and that `bash scripts/ci/assert_offline_only.sh` passes.
 
----
+## Versioning
 
-## 5. Cut a release
+Update pubspec.yaml with an increasing marketing.build version such as
+1.0.0+1, then tag the release according to the repository policy.
 
-1. Bump the version in `pubspec.yaml`:
+## Data safety
 
-```yaml
-version: 1.0.0+1
-```
-
-The format is `MARKETING_VERSION+BUILD_NUMBER`. Increment the build number on
-every release; Android refuses to install a build whose version code did not
-increase.
-
-2. Commit, tag, push:
-
-```bash
-git add pubspec.yaml
-git commit -m "Bump version to 1.0.0+1"
-git push
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-3. Watch the **Actions** tab.
-
-### What the workflow does
-
-| Job | What it gates |
-|-----|----------------|
-| `checks` | `scripts/run_release_checks.sh` (secret scan, infra checks), `scripts/ci/assert_offline_only.sh` (no backend dependency crept in), then `flutter test` |
-| `build-foss` | `scripts/ci/build_android.sh foss` — per-ABI release APKs, obfuscated, with symbols uploaded as an artifact |
-| `github-release` | On stable/RC `v*` tags: creates a **draft** release with the three APKs attached |
-| `github-test-release` | On `vX.Y.Z-test.N`: creates an empty **draft prerelease** for the private staging APKs |
-
-The release is a draft on purpose. The private cloud pipeline attaches its own
-artifacts to the same release afterwards, and publishing early would show users
-a release offering only one of the two builds.
-
-### Local preflight
-
-```bash
-bash ./scripts/run_release_checks.sh
-bash ./scripts/ci/assert_offline_only.sh
-flutter test
-```
-
-Install the push-time secret scan once per clone:
-
-```bash
-bash ./scripts/install_git_hooks.sh
-```
-
-The full agent-driven gate is in
-[`.cursor/skills/hisab-release-checks/SKILL.md`](../.cursor/skills/hisab-release-checks/SKILL.md).
-
----
-
-## 6. Building locally
-
-```bash
-flutter build apk --release --flavor foss --split-per-abi \
-  --obfuscate \
-  --split-debug-info=build/app/outputs/symbols \
-  --tree-shake-icons
-```
-
-Or just `bash scripts/ci/build_android.sh foss`, which is the same command CI
-runs, so a local failure is a real failure rather than an environment
-difference.
-
-To sign locally, create `android/key.properties` (gitignored):
-
-```properties
-storeFile=/absolute/path/to/foss-keystore.jks
-storePassword=YOUR_STORE_PASSWORD
-keyAlias=hisab-foss
-keyPassword=YOUR_KEY_PASSWORD
-```
-
-Without it, release builds fall back to debug signing.
-
-### Flutter version
-
-`.flutter-version` is the single source of truth. Every workflow reads it, so
-upgrading Flutter is a one-line change rather than a hunt through YAML.
-
-### `pubspec_overrides.yaml`
-
-Used to swap in a backend implementation locally; see
-[SELF_HOSTING.md](SELF_HOSTING.md). `dart pub` ignores it in git, so it never
-affects a release build made from a clean checkout.
-
----
-
-## 7. App size and update load
-
-Release Android builds use R8 minify plus resource shrinking, `resConfigs`
-limited to `en`/`ar`, Dart `--obfuscate` with `--split-debug-info`, and
-`--tree-shake-icons`. GitHub Release APKs are `--split-per-abi` rather than one
-fat APK. Symbol maps are uploaded as the `foss-symbols` artifact — keep them,
-because without them a crash stack from a release build is unreadable.
-
-**Biggest asset win:** the onboarding parallax under `assets/images/parallax/`
-is hybrid WebP (lossy q85 for opaque `bg*`, lossless for alpha layers), about
-**18.4 MB → ~8.2 MB** in the package. Tessdata stays bundled for offline OCR
-(~5.5 MB raw ≈ **~2.7 MB** packaged), which is the price of the scanner working
-with no network.
-
-Measure a change for real:
-
-```bash
-flutter build appbundle --analyze-size --flavor foss \
-  --obfuscate \
-  --split-debug-info=build/app/outputs/symbols \
-  --tree-shake-icons
-```
-
-Open the generated `*-code-size-analysis_*.json` in DevTools → App size. Smoke
-test after any size-focused change: onboarding meadow plus one local receipt
-OCR scan.
+Test database upgrades, backup restore, receipt attachment, local OCR, and
+scanner drafts before publishing. Do not add a migration that drops legacy
+tables or columns without an explicit user-data export path.

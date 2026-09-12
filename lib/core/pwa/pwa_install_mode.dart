@@ -15,15 +15,3 @@ enum PwaInstallMode {
   /// Desktop / unsupported — do not show install UI.
   unsupported,
 }
-
-/// Whether web push / Notification permission can work in this context.
-enum PwaNotificationSupport {
-  /// Permission + push can be requested now.
-  supported,
-
-  /// iOS WebKit requires Home Screen install before web push works.
-  needsInstall,
-
-  /// Notification / Push API unavailable.
-  unsupported,
-}

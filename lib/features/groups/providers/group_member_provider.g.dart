@@ -138,7 +138,7 @@ final class MyRoleInGroupProvider
   }
 }
 
-String _$myRoleInGroupHash() => r'9abfa4e248389ced029bb623a87ef63eb5532e17';
+String _$myRoleInGroupHash() => r'66fec1c9cd36a2871f8436bdb2a5e95306d1a5d8';
 
 final class MyRoleInGroupFamily extends $Family
     with $FunctionalFamilyOverride<Stream<GroupRole?>, String> {

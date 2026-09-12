@@ -92,10 +92,8 @@ jobs:
       - name: Run security check
         run: bash ./scripts/run_release_checks.sh
 
-  # The check Cal.com's open-core split lacked: prove the public tree still
-  # builds on its own. No google-services.json, no dart-defines, only the
-  # offline stub — the state a fresh clone is in. Without this the repo can
-  # rot into something that only compiles inside the private overlay.
+  # Prove a fresh public checkout builds on its own, without credentials or
+  # generated configuration.
   #
   # Android and web are separate jobs because the APK takes several times as
   # long, and a web regression should not wait behind it to be reported.
@@ -135,7 +133,7 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
-      - name: Assert the tree carries no backend dependency
+      - name: Assert the tree is local-only
         run: bash ./scripts/ci/assert_offline_only.sh
 
       - name: Build foss APK
@@ -163,10 +161,38 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
-      - name: Assert the tree carries no backend dependency
+      - name: Assert the tree is local-only
         run: bash ./scripts/ci/assert_offline_only.sh
 
       # --no-wasm-dry-run: the dry run only reports incompatibilities in
       # packages we do not control, and is not free.
       - name: Build web
         run: flutter build web --no-wasm-dry-run
+
+  offline-build-ios:
+    name: Offline Build Guard (iOS)
+    runs-on: macos-14
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Read Flutter version
+        id: flutter
+        run: echo "version=$(cat .flutter-version)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ steps.flutter.outputs.version }}
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Assert the tree is local-only
+        run: bash ./scripts/ci/assert_offline_only.sh
+
+      - name: Build unsigned iOS app
+        run: bash ./scripts/ci/build_ios.sh

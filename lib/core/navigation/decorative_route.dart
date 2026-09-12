@@ -40,7 +40,7 @@ String? _lastSyncedRouterPath;
 ///
 /// [GoRouterDelegate.currentConfiguration.uri] stays on the declarative base
 /// when [GoRouter.optionURLReflectsImperativeAPIs] is false; drill into
-/// [ImperativeRouteMatch] so browser sync still sees group/expense pushes.
+/// [ImperativeRouteMatch] so browser navigation still sees group/expense pushes.
 String goRouterVisiblePath(GoRouter router) {
   final configuration = router.routerDelegate.currentConfiguration;
   if (configuration.isEmpty) return '';

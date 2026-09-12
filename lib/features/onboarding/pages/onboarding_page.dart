@@ -8,12 +8,7 @@ import 'package:flutter_settings_framework/flutter_settings_framework.dart';
 import 'package:flutter_logging_service/flutter_logging_service.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/auth/auth_providers.dart';
-import '../../../core/auth/sign_in_sheet.dart';
-import '../../../core/database/database_providers.dart';
 import '../../../core/debug/integration_test_mode.dart';
-import '../../../core/widgets/toast.dart';
-import 'package:hisab_backend/hisab_backend.dart';
 import '../../../core/layout/constrained_content.dart';
 import '../../../core/layout/layout_breakpoints.dart';
 import '../../../core/motion/app_motion.dart';
@@ -27,7 +22,6 @@ import '../../../core/theme/theme_providers.dart';
 import '../../../core/widgets/sheet_helpers.dart';
 import 'package:hisab/core/settings/providers/settings_framework_providers.dart';
 import 'package:hisab/core/settings/settings_definitions.dart';
-import '../widgets/onboarding_connect_page.dart';
 import '../widgets/onboarding_permissions_page.dart';
 import '../widgets/onboarding_preferences_page.dart';
 import '../widgets/onboarding_shared.dart';
@@ -41,7 +35,6 @@ int? onboardingStepFromPath(String path) {
   if (path == RoutePaths.onboardingWelcome) return 0;
   if (path == RoutePaths.onboardingPreferences) return 1;
   if (path == RoutePaths.onboardingPermissions) return 2;
-  if (path == RoutePaths.onboardingConnect) return 3;
   return null;
 }
 
@@ -77,8 +70,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
   ];
 
   bool? _cameraGranted;
-  bool? _notificationGranted;
-  Future<({bool camera, bool notification})>? _permissionStatusFuture;
+  Future<bool>? _permissionStatusFuture;
 
   int _hintLocaleIndex = 0;
   int _themeDemoIndex = 0;
@@ -97,7 +89,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
   Timer? _themeDemoTimer;
   Timer? _languagePulseStopTimer;
 
-  static const int _lastPageIndex = 3;
+  static const int _lastPageIndex = 2;
   int _currentPage = 0;
   bool _isCompleting = false;
 
@@ -107,8 +99,6 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
         return RoutePaths.onboardingPreferences;
       case 2:
         return RoutePaths.onboardingPermissions;
-      case 3:
-        return RoutePaths.onboardingConnect;
       case 0:
       default:
         return RoutePaths.onboardingWelcome;
@@ -297,12 +287,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
     super.dispose();
   }
 
-  Future<({bool camera, bool notification})> _loadPermissionStatus() async {
-    final camera = await PermissionService.isCameraPermissionGranted();
-    final notification =
-        await PermissionService.isNotificationPermissionGranted();
-    return (camera: camera, notification: notification);
-  }
+  Future<bool> _loadPermissionStatus() =>
+      PermissionService.isCameraPermissionGranted();
 
   static String _localeDisplayName(Locale locale) {
     switch (locale.languageCode) {
@@ -403,8 +389,6 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(hisabSettingsProvidersProvider);
-    final onlineAvailable = cloudAvailable;
-
     if (settings == null) {
       return Scaffold(body: Center(child: Text('settings_unavailable'.tr())));
     }
@@ -444,7 +428,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                               child: ConstrainedContent(
                                 child: PageView.builder(
                                   controller: _pageController,
-                                  itemCount: 4,
+                                  itemCount: 3,
                                   physics: _isCompleting
                                       ? const NeverScrollableScrollPhysics()
                                       : null,
@@ -463,11 +447,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                                           1 =>
                                             const OnboardingPreferencesPage(),
                                           2 => OnboardingPermissionsPage(
-                                            settings: settings,
-                                            onlineAvailable: onlineAvailable,
                                             cameraGranted: _cameraGranted,
-                                            notificationGranted:
-                                                _notificationGranted,
                                             permissionStatusFuture:
                                                 _permissionStatusFuture,
                                             onRequestCamera: () async {
@@ -481,23 +461,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                                                 );
                                               }
                                             },
-                                            onRequestNotification: () async {
-                                              final result =
-                                                  await PermissionService.requestNotificationPermission(
-                                                    context,
-                                                  );
-                                              if (mounted) {
-                                                setState(
-                                                  () => _notificationGranted =
-                                                      result,
-                                                );
-                                              }
-                                            },
                                           ),
-                                          _ => OnboardingConnectPage(
-                                            settings: settings,
-                                            onlineAvailable: onlineAvailable,
-                                          ),
+                                          _ => const SizedBox.shrink(),
                                         },
                                       ),
                                     );
@@ -556,7 +521,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
                         ),
                         const SizedBox(width: ThemeConfig.spacingM),
                         Text(
-                          'services_status_loading'.tr(),
+                          'loading'.tr(),
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                       ],
@@ -650,7 +615,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
       padding: const EdgeInsets.symmetric(vertical: ThemeConfig.spacingS),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: List.generate(4, (index) {
+        children: List.generate(3, (index) {
           final isActive = index == _currentPage;
           return AnimatedContainer(
             duration: UiPerf.preferInstantShellTabs
@@ -974,72 +939,13 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
     _stopChromeDemos();
     setState(() => _isCompleting = true);
 
-    final onlineAvailable = cloudAvailable;
-    var isLocalOnly = ref.read(settings.provider(localOnlySettingDef));
-    // Online unavailable: never leave the user in a "online" local_only=false state.
-    if (!onlineAvailable && !isLocalOnly) {
-      ref.read(settings.provider(localOnlySettingDef).notifier).set(true);
-      isLocalOnly = true;
-      Log.info('Setting changed: ${localOnlySettingDef.key}=true');
-    }
-
     try {
-      if (!isLocalOnly && onlineAvailable) {
-        final authService = ref.read(authServiceProvider);
-        if (!authService.isAuthenticated) {
-          if (!mounted) return;
-          // Web OAuth unloads the page before showSignInSheet returns, so this
-          // must be flushed before the provider redirect starts.
-          await settings.controller.set(
-            onboardingOnlinePendingSettingDef,
-            true,
-          );
-          Log.info(
-            'Setting changed: ${onboardingOnlinePendingSettingDef.key}=true '
-            '(before sign-in)',
-          );
-          if (!mounted) return;
-          final result = await showSignInSheet(context, ref);
-          switch (result) {
-            case SignInResult.success:
-              await ref.read(dataSyncServiceProvider.notifier).syncNow();
-              break;
-            case SignInResult.pendingRedirect:
-            case SignInResult.pendingEmailLink:
-              return;
-            case SignInResult.cancelled:
-              await settings.controller.set(
-                onboardingOnlinePendingSettingDef,
-                false,
-              );
-              if (mounted) {
-                context.showToast('onboarding_online_requires_sign_in'.tr());
-              }
-              return;
-          }
-        }
-      }
-
       ref
           .read(settings.provider(onboardingCompletedSettingDef).notifier)
           .set(true);
       Log.info('Setting changed: ${onboardingCompletedSettingDef.key}=true');
       if (!mounted) return;
-      final pendingToken = ref.read(
-        settings.provider(pendingInviteTokenSettingDef),
-      );
-      if (pendingToken.isNotEmpty) {
-        ref
-            .read(settings.provider(pendingInviteTokenSettingDef).notifier)
-            .set('');
-        // Keep pending_invite_auto_join so InviteAcceptPage joins then opens group.
-        Log.info(
-          'Setting changed: ${pendingInviteTokenSettingDef.key}=(cleared)',
-        );
-        context.go(RoutePaths.inviteAccept(pendingToken));
-      } else {
-        context.go(RoutePaths.home);
-      }
+      context.go(RoutePaths.home);
     } finally {
       if (mounted) {
         setState(() => _isCompleting = false);

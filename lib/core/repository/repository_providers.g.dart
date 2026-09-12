@@ -53,7 +53,7 @@ final class GroupRepositoryProvider
   }
 }
 
-String _$groupRepositoryHash() => r'3a89fa4eb862de5bfed98285e0e73c6384e75006';
+String _$groupRepositoryHash() => r'670c6004b1c4d9c183e4ca7d9bcfb5b2ef22171d';
 
 @ProviderFor(participantRepository)
 final participantRepositoryProvider = ParticipantRepositoryProvider._();
@@ -101,7 +101,7 @@ final class ParticipantRepositoryProvider
 }
 
 String _$participantRepositoryHash() =>
-    r'609091fa7a99bb69c269f483f32fa94f7f7bec40';
+    r'd47454f3d9dda2806ea30afa42166c4f8d0f02dd';
 
 @ProviderFor(expenseRepository)
 final expenseRepositoryProvider = ExpenseRepositoryProvider._();
@@ -148,7 +148,7 @@ final class ExpenseRepositoryProvider
   }
 }
 
-String _$expenseRepositoryHash() => r'9232e188e3a8a2aaa79d8e36b37ee5b5298f5a73';
+String _$expenseRepositoryHash() => r'9d052440579807e46645bf3a7064f250e6e267c6';
 
 @ProviderFor(householdBalanceReassignmentRepository)
 final householdBalanceReassignmentRepositoryProvider =
@@ -199,7 +199,7 @@ final class HouseholdBalanceReassignmentRepositoryProvider
 }
 
 String _$householdBalanceReassignmentRepositoryHash() =>
-    r'f39f74f5834ebee5f3ea44af1534ba32a9c14f89';
+    r'4e25f4aaa7b02371f1744270777e3c2663b9452c';
 
 @ProviderFor(tagRepository)
 final tagRepositoryProvider = TagRepositoryProvider._();
@@ -240,7 +240,7 @@ final class TagRepositoryProvider
   }
 }
 
-String _$tagRepositoryHash() => r'8ac8818534b9eb060aec7d81ed1aad99ecd7ce89';
+String _$tagRepositoryHash() => r'7d5fdea11a11a29426590de5a8245f77e1b135b8';
 
 @ProviderFor(groupMemberRepository)
 final groupMemberRepositoryProvider = GroupMemberRepositoryProvider._();
@@ -288,52 +288,4 @@ final class GroupMemberRepositoryProvider
 }
 
 String _$groupMemberRepositoryHash() =>
-    r'9087c5d7cb49bd87ed249198c8a33243f6937777';
-
-@ProviderFor(groupInviteRepository)
-final groupInviteRepositoryProvider = GroupInviteRepositoryProvider._();
-
-final class GroupInviteRepositoryProvider
-    extends
-        $FunctionalProvider<
-          IGroupInviteRepository,
-          IGroupInviteRepository,
-          IGroupInviteRepository
-        >
-    with $Provider<IGroupInviteRepository> {
-  GroupInviteRepositoryProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'groupInviteRepositoryProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$groupInviteRepositoryHash();
-
-  @$internal
-  @override
-  $ProviderElement<IGroupInviteRepository> $createElement(
-    $ProviderPointer pointer,
-  ) => $ProviderElement(pointer);
-
-  @override
-  IGroupInviteRepository create(Ref ref) {
-    return groupInviteRepository(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(IGroupInviteRepository value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<IGroupInviteRepository>(value),
-    );
-  }
-}
-
-String _$groupInviteRepositoryHash() =>
-    r'e928d2c6d857a09193c7a18e8fd9a457e5748e7a';
+    r'18ac35a3eb5d160f186506ce10d19738502133bb';

@@ -12,7 +12,7 @@ String _defaultTranslate(String key, {Map<String, String>? namedArgs}) =>
 ///
 /// Transfers rebuild from payer/payee names so the UI follows the current
 /// locale instead of the language used when the row was saved. The stored
-/// [Expense.title] remains a human string for push/activity feeds.
+/// [Expense.title] remains a human string for local activity views.
 String expenseDisplayTitle(
   Expense expense, {
   String? fromName,

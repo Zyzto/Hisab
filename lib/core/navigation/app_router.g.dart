@@ -8,14 +8,9 @@ part of 'app_router.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Notifier that triggers GoRouter refresh when locale changes.
-/// Ensures navigation labels and all visible content update in realtime.
 
 @ProviderFor(localeRefreshNotifier)
 final localeRefreshProvider = LocaleRefreshNotifierProvider._();
-
-/// Notifier that triggers GoRouter refresh when locale changes.
-/// Ensures navigation labels and all visible content update in realtime.
 
 final class LocaleRefreshNotifierProvider
     extends
@@ -25,8 +20,6 @@ final class LocaleRefreshNotifierProvider
           ValueNotifier<String>
         >
     with $Provider<ValueNotifier<String>> {
-  /// Notifier that triggers GoRouter refresh when locale changes.
-  /// Ensures navigation labels and all visible content update in realtime.
   LocaleRefreshNotifierProvider._()
     : super(
         from: null,
@@ -62,7 +55,7 @@ final class LocaleRefreshNotifierProvider
 }
 
 String _$localeRefreshNotifierHash() =>
-    r'424857f00b7cebc42d68a206a95113dfedc0d5ca';
+    r'1394cb04923e8ef85c77c3df974c71b72874877c';
 
 @ProviderFor(router)
 final routerProvider = RouterProvider._();
@@ -103,4 +96,4 @@ final class RouterProvider
   }
 }
 
-String _$routerHash() => r'edeec50a5045bb599ab16105ff4de6fdaf75ac05';
+String _$routerHash() => r'26c768eae388f02d6d320e7bd0986232aee441fc';

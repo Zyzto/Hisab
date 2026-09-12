@@ -5,7 +5,6 @@ import 'package:easy_localization/easy_localization.dart';
 
 import '../../../core/build_env.dart';
 import '../../../core/motion/app_motion.dart';
-import '../../../core/platform/network_image_decode.dart';
 import '../../../core/platform/ui_perf.dart';
 import '../../../core/theme/accent_style.dart';
 import '../../../core/theme/theme_config.dart';
@@ -138,11 +137,6 @@ class _OnboardingWelcomePageState extends State<OnboardingWelcomePage>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final subtle = context.subtleAccents;
-    final decode = NetworkImageDecode.cacheSize(
-      context,
-      logicalWidth: heroLogoSize,
-      logicalHeight: heroLogoSize,
-    );
     const logoRadius = 20.0;
     return Padding(
       padding: const EdgeInsets.only(bottom: ThemeConfig.spacingS),
@@ -178,8 +172,6 @@ class _OnboardingWelcomePageState extends State<OnboardingWelcomePage>
                         width: heroLogoSize,
                         height: heroLogoSize,
                         fit: BoxFit.cover,
-                        cacheWidth: decode.width,
-                        cacheHeight: decode.height,
                         errorBuilder: (_, error, stackTrace) => Container(
                           width: heroLogoSize,
                           height: heroLogoSize,

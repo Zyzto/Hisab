@@ -11,13 +11,10 @@ class RoutePaths {
     path: settings,
     queryParameters: {settingsFocusParam: settingKey},
   ).toString();
-  static const String profile = '/profile';
-  static const String profileExpenses = '/profile/expenses';
   static const String onboarding = '/onboarding';
   static const String onboardingWelcome = '/onboarding/welcome';
   static const String onboardingPreferences = '/onboarding/preferences';
   static const String onboardingPermissions = '/onboarding/permissions';
-  static const String onboardingConnect = '/onboarding/connect';
   static const String privacyPolicy = '/privacy-policy';
 
   /// Canonical group entry URL (expenses tab). Prefer this over bare `/groups/:id`
@@ -51,21 +48,8 @@ class RoutePaths {
   static const String archivedGroups = '/archived';
   static String groupEdit(String groupId) => '/groups/$groupId/edit';
   static String groupSettings(String groupId) => '/groups/$groupId/settings';
-  static String groupInvites(String groupId) => '/groups/$groupId/invites';
   static String groupCategories(String groupId) =>
       '/groups/$groupId/categories';
-
-  static String inviteAccept(String token) => '/invite/$token';
-  static String invitePreview(String token) => '/invite/$token/preview';
-  static String invitePreviewExpenses(String token) =>
-      '/invite/$token/preview/expenses';
-  static String invitePreviewBalance(String token) =>
-      '/invite/$token/preview/balance';
-  static String invitePreviewPeople(String token) =>
-      '/invite/$token/preview/people';
-  static String invitePreviewExpenseDetail(String token, String expenseId) =>
-      '/invite/$token/preview/expenses/$expenseId';
-  static const String scanInvite = '/scan-invite';
 
   static String homeMode(String mode) => '$homeModeBase/$mode';
 }

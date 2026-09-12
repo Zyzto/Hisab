@@ -55,7 +55,7 @@ bool _hasStrongDirectional(String text) {
 
 /// Grapheme-safe hard elide (emoji / ZWJ / flags stay intact). Prefer layout
 /// [TextOverflow.ellipsis] when width-based clipping is enough; use this when
-/// a character budget is required (toasts, push bodies, app-bar soft caps).
+/// a character budget is required (toasts and app-bar soft caps).
 String elideGraphemes(
   String text, {
   required int maxGraphemes,

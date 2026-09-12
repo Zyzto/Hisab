@@ -28,7 +28,7 @@ class BreakdownPieSlice {
   final bool canOpen;
 }
 
-/// Shared donut chart used by profile + group analytics.
+/// Shared donut chart used by group analytics.
 ///
 /// Interaction:
 /// - 1st tap on a slice → select (center shows amount)
