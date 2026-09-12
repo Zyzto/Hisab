@@ -61,7 +61,7 @@ jobs:
     # Test tags are completed by the private staging workflow, which adds the
     # cloud APK connected to test.hisab.shenepoy.com. Do not publish an
     # unrelated offline APK set into that test release.
-    if: ${{ !contains(github.ref_name, '-test.') }}
+    if: ${{ !contains(github.ref_name, '-test') }}
     needs: checks
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -126,7 +126,7 @@ jobs:
 
   github-release:
     name: GitHub Release
-    if: ${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-test.') }}
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-test') }}
     needs: build-foss
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -154,7 +154,7 @@ jobs:
   github-test-release:
     name: GitHub Test Release
     needs: checks
-    if: ${{ startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-test.') }}
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-test') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
